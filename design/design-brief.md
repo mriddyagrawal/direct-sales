@@ -35,7 +35,7 @@ You are designing **Phase 1 of a B2B field-sales order app** for Ganpati Enterpr
 1. **Login** (email/password, remember-me; error states).
 2. **Home / My Orders** — "New Order" primary; order cards with ref, retailer, total, status chip, countdown; Today vs earlier; empty state.
 3. **Retailer picker** — instant search, recents first, quick-add form (name/area/phone), "continue draft?" resume prompt.
-4. **Quick Order list — the hero screen.** Category-grouped dense list, sticky instant search, rows = name + price + stepper (tap qty → numeric keypad), qty>0 rows visibly "in cart", sticky cart bar (`3 items · ₹2,584 — Review ▸`). Design searching / filtered / empty-results states.
+4. **Quick Order list — the hero screen.** Category-grouped dense list, sticky instant search, rows = name + price + stepper (tap qty → numeric keypad), qty>0 rows visibly "in cart", sticky cart bar (`3 items · ₹4,478 — Review ▸`). Design searching / filtered / empty-results states.
 5. **Review** — editable lines, notes field, retailer header, total, Submit.
 6. **Confirmation** — big order ref, "editable until HH:MM", back to Home.
 7. **Order detail** — snapshot lines, humanized event timeline, countdown; Edit/Cancel while editable; locked read-only state ("call the accountant…").

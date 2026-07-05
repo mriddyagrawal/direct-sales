@@ -31,7 +31,7 @@ Email + password, "remember me" default on (long-lived session). No signup, no s
 - **Dense list grouped by category** (Adaptors, Adaptors with Cable, Charging Cables, Earphones, Power Banks, Speakers), category headers sticky-ish, CSV order preserved within groups.
 - **Row = product name (up to 2 lines) + price + stepper** `[−] qty [+]`. Tapping the qty number opens a numeric keypad for direct entry (typing 24 beats tapping + 24 times). Rows with qty > 0 are visually distinct.
 - **Sticky search bar** (top): instant, client-side, case/space-insensitive substring match over name + sku ("astra" → ASTRA 40). Clearing restores the grouped list. No network round-trip.
-- **Sticky cart bar** (bottom): `3 items · ₹2,584 — Review ▸`. Always visible once qty > 0. Item count = distinct lines.
+- **Sticky cart bar** (bottom): `3 items · ₹4,478 — Review ▸` (10× MU240 + 5× MA104B + 2× ASTRA 40 BLACK — a real, checkable basket). Always visible once qty > 0. Item count = distinct lines.
 - Catalog = `active AND priced` products only (RLS guarantees it; ~34 rows at launch, no pagination needed). **No product images exist** — this is a text-first design, by constraint and by speed.
 - Prices displayed ₹ en-IN, GST-inclusive as-is (D5) — what you see is what the shop pays.
 

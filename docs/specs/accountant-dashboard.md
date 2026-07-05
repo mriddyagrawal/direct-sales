@@ -33,7 +33,7 @@ Salesman: Raju
   ───   ─────────────────────────────────────────────
    10   Micro Usb Cable MU240 - ZB CABLE (White)
     5   ADAPTOR (MA104B WHITE) ZEB
-    2   SPK-PSPK 44 PORTABLE BTH SPEAKER (ASTRA 40)
+    2   SPK-PSPK 44 PORTABLE BTH SPEAKER (ASTRA 40 BLACK)
 
 Notes: deliver Tuesday morning
 
