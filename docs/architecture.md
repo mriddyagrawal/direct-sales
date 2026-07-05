@@ -66,7 +66,7 @@ Shops have dead zones; the app must never lose an order, but full offline sync i
 
 ## 6. Environments, deploy, and cost reality
 
-- **Two Supabase projects**: `dev` and `prod`. Migrations applied to dev first; prod promoted after the TESTER's review passes.
+- **Two Supabase projects**: `dev` and `prod`. Migrations applied to dev first; prod promoted after the REVIEWER's review passes.
 - **Vercel**: preview deploys per branch; production on `main`.
 - **Cost gotchas (known, accepted, revisit at go-live):**
   - Supabase Free **pauses projects after ~1 week of inactivity** — fatal for a business tool. Before the pilot ends, upgrade prod to **Pro (~$25/mo)**, which also brings daily backups.
