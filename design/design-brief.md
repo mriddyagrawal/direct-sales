@@ -59,6 +59,6 @@ Marketing pages, onboarding tours, retailer-facing UI, catalog-admin screens (Su
 1. Yours (the DESIGNER session): `Prompts/phase1-design-prompt.md` — the complete, self-contained design markdown.
 2. Claude design's (your markdown must demand these): designs for the 11 screens including the listed states; component tokens (type scale, spacing, status chips, steppers, table/list rows, buttons, form fields — enough for a builder to implement without guessing); and the pick-slip print stylesheet spec.
 
-## Open design questions (flag your recommendation)
+## Design decisions to resolve (state your recommendation as the decision)
 
-Accent color · countdown presentation · A4 vs thermal slip layout · add-to-home-screen icon.
+Accent color · countdown presentation · A4 vs thermal slip layout · add-to-home-screen icon. Decide all four in your markdown — Claude design must receive zero open questions; the owner can override later.
