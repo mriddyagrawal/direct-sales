@@ -30,7 +30,7 @@ locked_for_salesman(order) :=
 
 | Transition | Actor | Guards | Side effects |
 |---|---|---|---|
-| *(client draft)* → `submitted` via `submit_order` | owning salesman | ≥1 line; every product active + priced; qty > 0; retailer exists | Assign `order_no` (sequence) + `order_ref`; `submitted_at = now()`; `editable_until = now() + EDIT_WINDOW`; snapshot lines from catalog; event `submitted`. Idempotent on client-generated `id`: a retry with an existing `id` returns that order untouched even if the retried payload differs (safe double-tap / retry-after-timeout). |
+| *(client draft)* → `submitted` via `submit_order` | owning salesman | ≥1 line; every product active + priced; qty 1–9999; retailer exists | Assign `order_no` (sequence) + `order_ref`; `submitted_at = now()`; `editable_until = now() + EDIT_WINDOW`; snapshot lines from catalog; event `submitted`. Idempotent on client-generated `id`: a retry with an existing `id` returns that order untouched even if the retried payload differs (safe double-tap / retry-after-timeout). |
 | `submitted` → `processed` via `process_order` | accountant / admin | — (any time after submit; does **not** wait for the window) | `processed_at/by`; event `processed`. Salesman is locked out immediately — processing beats the timer. |
 | `submitted` → `cancelled` via `cancel_order` | owning salesman **while editable**; accountant/admin any time | accountant must supply a reason | `cancelled_at`; event `cancelled` (+reason). |
 | `processed` → `cancelled` via `cancel_order` | accountant / admin only | reason required | Event logged. Any corresponding Tally reversal is the accountant's manual job — out of app scope. |

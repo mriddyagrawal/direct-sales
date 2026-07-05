@@ -141,7 +141,7 @@ Salesmen and accountants have **no direct INSERT/UPDATE grants on `orders`/`orde
 
 | RPC | Caller | Does |
 |---|---|---|
-| `submit_order(id, retailer_id, notes, items[])` | salesman | Validates items (priced, active, qty > 0), snapshots names/prices from catalog, assigns `order_no`/`order_ref`, sets `submitted_at`/`editable_until`, writes `submitted` event. Idempotent on `id`: a retry carrying an existing `id` returns that order untouched — a differing payload is ignored, never merged. |
+| `submit_order(id, retailer_id, notes, items[])` | salesman | Validates items (priced, active, qty 1–9999), snapshots names/prices from catalog, assigns `order_no`/`order_ref`, sets `submitted_at`/`editable_until`, writes `submitted` event. Idempotent on `id`: a retry carrying an existing `id` returns that order untouched — a differing payload is ignored, never merged. |
 | `update_order_items(order_id, notes, items[])` | salesman (own, within window) or accountant | Replaces lines; existing lines keep their original snapshot price, newly added products snapshot at edit time; recomputes totals; writes event. |
 | `cancel_order(order_id, reason)` | salesman (own, within window) or accountant | Sets status/`cancelled_at`; writes event with reason. |
 | `process_order(order_id)` | accountant/admin | `submitted → processed`; sets `processed_at/by`; writes event. |
