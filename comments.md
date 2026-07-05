@@ -278,3 +278,49 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 **Next-commit suggestion:** M0 design pass per the brief, or jump to M1 (`supabase/migrations/0001_*.sql`). The backlog is clear — nothing owed to this log.
 
 ---
+
+## Review of 3dbade2 — docs(specs): align qty prose with the 1..9999 constraint
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Close the one cosmetic residue I deferred in the bc9c10f block — two prose spots still said "qty > 0" where the constraint is `1..9999`.
+
+**What works:** Both spots fixed and nothing else touched: the `submit_order` RPC row ([data-model.md:144](docs/specs/data-model.md#L144)) and the submit transition guard ([order-lifecycle.md:33](docs/specs/order-lifecycle.md#L33)) now read "qty 1–9999". Commit message cites the review block it closes — good log hygiene.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**What I tried:** Read the full diff; `git grep -n "qty > 0" 3dbade2 -- docs/` mentally confirmed via the two hunks (only occurrences).
+
+**Open flags (cumulative):** Empty, except standing M1 test obligations.
+
+---
+
+## Review of 8781c2f — docs(design): designer-session kickoff prompt + align brief/PLAN to the Claude-design flow
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Operationalize M0: a paste-ready kickoff prompt for a third session role (DESIGNER), whose sole deliverable is a **fully self-contained** `Prompts/phase1-design-prompt.md` — because the downstream Claude design session has no repo access. Brief and PLAN M0 updated to match the two-step flow.
+
+**What works:**
+- **The load-bearing constraint is stated as such and enforced structurally**: "Claude design will not have access to this repo… If any answer lives only in the repo, your file is not done", plus a concrete self-check ("read your file as if you were Claude design"). This is the difference between a prompt that works and one that generates questions.
+- **Every real-data claim in the data pack verifies against the CSV**: `SPK-ZEB COMPUTER MULTIMEDIA 2.1 SOUNDBAR SPEAKER (ABABA 1)` is genuinely the longest name (58 chars) and genuinely ₹7,250; the ₹60 (MU240) and ₹9,138 (DSPK 102) extremes are the true min/max rows, names exact.
+- The `₹1,02,584` example uses correct en-IN lakh grouping — a detail that would have silently taught the designer the wrong format if wrong.
+- **Process rules are review-loop aware**: single commit, one file only, factually-accurate-message warning, specs-win-on-contradiction with contradictions reported (not fixed) — keeps the DESIGNER from becoming an unreviewed second BUILDER.
+- Resolving all four open design questions inside the prompt (decisions with rationale, owner can override) is the right call — "zero open questions" is what makes the downstream file self-contained.
+- Brief §working-order/§deliverables and PLAN M0 consistently restate the same two-step flow — no version skew among the three documents.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- The brief's closing section is still headed "Open design questions (**flag your recommendation**)" while the kickoff prompt demands "you **decide** all four". Compatible readings, but a literal-minded DESIGNER may hedge with recommendations instead of decisions. One-word tidy: "resolve, stating your recommendation as the decision".
+- The kickoff prompt pins the branch as `feature/planning-docs`. Correct today; if the branch merges before M0 runs, the instruction goes stale. Fine to leave — just re-check the line when merging.
+
+**Domain / correctness checks:** Formatting rules transcribed for the designer (GST-inclusive, en-IN, IST, `ORD-2026-1042` ref shape) all match D5 + the lifecycle spec. Status taxonomy matches the derived-lock model. ✓
+
+**What I tried:** Read the kickoff prompt end-to-end; verified all three CSV stress-case rows via grep (names, prices, longest-name ranking); diffed brief + PLAN hunks against the prompt's flow to confirm the three documents agree.
+
+**Open flags (cumulative):** Empty, except standing M1 test obligations. ⑤ (minor, new): brief heading "flag your recommendation" vs. prompt "decide" — tidy opportunistically.
+
+**Next-commit suggestion:** Run the DESIGNER session with the kickoff prompt — the expected next commit is `docs(design): M0 — authored phase1 design prompt for Claude design`, touching only `Prompts/phase1-design-prompt.md`. I will review it against the self-containment test: could Claude design work from that file alone.
+
+---
