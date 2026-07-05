@@ -228,3 +228,53 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 **Next-commit suggestion:** M0 — run the design session per the brief. On the build side, the highest-value next commit is `supabase/migrations/0001_*.sql` implementing data-model.md exactly; I'll run the full 6-step RLS protocol plus my own invariant checks (data-model §invariants) against a real dev project when it lands.
 
 ---
+
+## Review of bc9c10f — docs: address review followups from 8bdd373 (flags 1-7, naming, design gaps)
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Close the entire non-blocking backlog from my five-block review batch — pin the seven 99d60ab implementation flags into the specs, sweep TESTER→REVIEWER, and fix both design-brief gaps.
+
+**What works — every claimed fix verified in the diff:**
+- **Flag 1 ✓** [order-lifecycle.md:48](docs/specs/order-lifecycle.md#L48): the delete-and-reinsert trap is now an explicit "Implementation pin" with the exact required test (submit → change catalog price → edit qty → original price survives).
+- **Flag 2 ✓** data-model.md triggers table: `guard_order_transition` must pass `recompute_order_total`'s internal `total_paise` write while rejecting out-of-RPC status changes.
+- **Flag 3 ✓** pinned in **both** specs, with the right semantics (retry with existing `id` returns the order untouched; differing payload ignored, never merged).
+- **Flag 4 ✓** `qty check (between 1 and 9999)`; `line_total_paise` and `orders.total_paise` widened to bigint, with the overflow arithmetic documented inline. `unit_price_paise` correctly stays int4 (₹2.1 crore per-unit ceiling is ample).
+- **Flag 5 ✓** `retailers.verified default false` — fail-closed, comment updated.
+- **Flag 6 ✓** seed-data.md now lists BOM + CRLF + no-trailing-newline under source facts, and the script contract requires stripping them.
+- **Flag 7 ✓** event-payload note: RPCs join `products` for `sku` at write time; "do not simplify to bare product_ids".
+- **Design gaps ✓** Retailer verification queue is explicit screen 11 (with concrete contents, not just a pointer); screen count updated in brief + PLAN M0; M0 exit criterion now requires recording who approved and when; salesman-app.md touch targets now ≥48px matching the brief.
+- **Rename ~✓** README, decisions.md, PLAN.md, and all four touched specs — verified line by line. One straggler survived (architecture.md:69), fixed one commit later; see b66fc78.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- Cosmetic residue: the `submit_order` RPC row and the lifecycle transition guard column still say "qty > 0" while the check constraint is now `1..9999`. The DB constraint is authoritative so this can't cause a bug; align the prose whenever those files are next touched.
+
+**Domain / correctness checks:** The bigint widening is the only schema-semantics change and it is strictly safer; no new mechanisms introduced.
+
+**What I tried:** Read the full diff hunk by hunk against my flag list; `grep -n "px" docs/specs/salesman-app.md` → 48px; `git grep TESTER` at the commit (see lesson below).
+
+**Open flags (cumulative):** ① BOM/CRLF — ✅ CLOSED (spec'd). ② Rename — closed at b66fc78. ③ 99d60ab flags 1–5, 7 — ✅ CLOSED as spec items; they convert into **M1 test obligations** I will verify against real SQL. ④ Design-brief gaps — ✅ CLOSED.
+
+**Next-commit suggestion:** Unchanged — M0 design pass, or M1 migrations.
+
+---
+
+## Review of b66fc78 — docs: rename straggler — architecture.md had one TESTER the flag-2 sweep missed
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** One-line fix: the last TESTER reference (architecture.md:69), missed by bc9c10f's sweep and honestly labeled as such.
+
+**What works:** `git grep -n "TESTER" b66fc78 -- '*.md' ':!archive' ':!comments.md'` → **zero matches**. The rename is complete on the committed tree. (archive/ and my own historical review blocks keep the old word by design — history is immutable.)
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Lesson for my own review discipline (logged so it sticks):** at bc9c10f I grepped the **working tree** and got "none" for TESTER — but the committed tree at bc9c10f still had architecture.md:69. The BUILDER shares this checkout and had already fixed the straggler uncommitted, masking it from my check. **Verification must run against the commit (`git grep <sha>` / `git show <sha>:file`), never the shared working directory.** Applied in this very review.
+
+**Open flags (cumulative):** ② Rename — ✅ CLOSED. All flags from the planning batch are now closed; the open list is empty except the standing M1 test obligations (snapshot-preserving edit test, trigger-interaction test, idempotent-retry test, qty-bound test, RLS 6-step protocol, post-seed queries).
+
+**Next-commit suggestion:** M0 design pass per the brief, or jump to M1 (`supabase/migrations/0001_*.sql`). The backlog is clear — nothing owed to this log.
+
+---
