@@ -342,3 +342,58 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 **Next-commit suggestion:** Unchanged — the DESIGNER session's `Prompts/phase1-design-prompt.md`.
 
 ---
+
+## Review of 6a1573c — docs(design): M0 — authored phase1 design prompt for Claude design
+
+**Verdict:** ✅ accept — with two commit-message accuracy flags (content itself is excellent)
+
+**Phase / commit goal (as I understood it):** The DESIGNER session's single deliverable: a fully self-contained `Prompts/phase1-design-prompt.md` from which Claude design (no repo access) can produce all Phase 1 designs, with the four open design decisions resolved.
+
+**What works:**
+- **The data pack is flawless — verified mechanically, not by eye.** I regenerated the expected catalog from the CSV by implementing seed-data.md's exact rules in a script (BOM/CRLF strip, trim + collapse whitespace runs, position-within-category SKU codes, TBD → hidden): **all 34 rows match exactly on SKU + name + price**, including the subtle part — gap numbering (`ZEB-EAR-07`, `ZEB-PWR-03/04`, `ZEB-SPK-11` where unpriced SKUs hold 05/06, 02/05, and 10/12/13/14). The prompt even warns the designer never to renumber. This is the hardest 30% of the file and it is perfect.
+- **Self-containment holds.** I read it simulating a designer with no repo: context capsule, personas/viewports, nine principles, status taxonomy with the derived-lock nuance intact, per-screen contents + states for all 11 screens, global state patterns, en-IN/IST/GST-inclusive formatting, print spec with both variants, and consistent sample data (one worked order — ORD-2026-1042, ₹4,478, editable until 13:42 = 11:42 + 2h ✓ — reused across S3/S4/S9/S10). I could not construct a question that requires the repo.
+- **All four design decisions are decided, not hedged** (deep-blue accent with WCAG note; minutes-only text-in-chip countdown, amber <10m, never red/rings/seconds; A4; GE monogram with 192/512/maskable sizes) — each with one-line rationale and "do not reopen". Exactly what the kickoff demanded.
+- **Process rules obeyed**: one file, one commit, correct subject line, spec contradictions reported in the message body instead of edited — the DESIGNER did not become a second BUILDER.
+- Smart additions beyond the brief: near-identical-pair stress case (TT27 vs TT65 — straight from the problem statement's dispute scenario), "no Draft chip" clarification, Zebronics-red avoidance note on principle 9.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions — commit-message accuracy (the log must stay trustworthy):**
+1. **"'3 items · ₹2,584' is not derivable from the priced catalog" is factually false.** I brute-forced it: **488** three-distinct-line combinations reach ₹2,584 (e.g. 1×₹60 + 7×₹72 + 20×₹101). The true statement: the spec's example named no basket and was presumably invented. The substitution with a named, checkable basket is still an improvement — but the claim as written overreaches.
+2. **Misattribution:** the message says designer-session-prompt.md "quotes the same abbreviated form" — it contains no ASTRA mention at all (`grep -i` clean). The second abbreviated occurrence is [salesman-app.md:33](docs/specs/salesman-app.md#L33) ("astra" → ASTRA 40).
+3. The first contradiction claim **is** verified: [accountant-dashboard.md:36](docs/specs/accountant-dashboard.md#L36) did say "(ASTRA 40)" where the CSV verbatim name is "(ASTRA 40 BLACK)". Correctly caught, correctly left to the BUILDER.
+
+**Domain / correctness checks:** Money display (whole rupees, en-IN incl. `₹1,02,584` lakh grouping, no tax math — D5 ✓); status taxonomy matches the derived-lock lifecycle ✓; gaps-are-normal note on order refs matches D1 ✓; "no TBD UI state" matches D2 ✓; no-images constraint matches reality ✓.
+
+**What I tried:** Scripted CSV→expected-table regeneration + diff (34/34 exact); subset-sum brute force over the 34 priced values for the ₹2,584 claim; `grep -in astra` across the three claimed files; arithmetic check of the worked order; end-to-end read simulating a repo-less designer.
+
+**Open flags (cumulative):** ⑥ (minor): the two message inaccuracies above — for the record, not for action; the underlying doc fixes landed as 6b0aa56 (next block).
+
+**Next-commit suggestion:** BUILDER fixes the two flagged example-data contradictions (landed as 6b0aa56 before I finished this block). Then: owner hands the prompt to Claude design; the M0-completing commit must record who approved and when.
+
+---
+
+## Review of 6b0aa56 — docs: fix the two example-data contradictions the DESIGNER flagged in 6a1573c
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Close the DESIGNER's two verified contradiction reports: the abbreviated ASTRA name in the dashboard pick-slip mock, and the fabricated ₹2,584 cart-bar example in salesman-app.md + design-brief.md.
+
+**What works — every message claim verified:**
+- [accountant-dashboard.md:36](docs/specs/accountant-dashboard.md#L36) now reads `(ASTRA 40 BLACK)` — the CSV-verbatim name ✓.
+- Cart-bar examples in [salesman-app.md:34](docs/specs/salesman-app.md#L34) and [design-brief.md:38](design/design-brief.md#L38) now read `₹4,478`, with the basket spelled out and labeled "a real, checkable basket" ✓ (10×60 + 5×364 + 2×1,029 = 600 + 1,820 + 2,058 = 4,478 — re-verified).
+- **All example baskets across the repo now agree**: spec pick-slip mock = designer prompt's worked order = cart-bar example. One canonical basket everywhere.
+- The message's third paragraph independently reaches the same conclusion my 6a1573c review did — designer-session-prompt.md has no abbreviated ASTRA (the BUILDER grepped; so did I; same result) — and correctly declines to change it. Honest verification, honestly reported.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- [salesman-app.md:33](docs/specs/salesman-app.md#L33) still says `("astra" → ASTRA 40)` — acceptable as a search-query→result illustration rather than a name assertion, but if anyone ever "fixes" it, the right form is `→ the ASTRA 40 BLACK row` (as the designer prompt phrases it).
+
+**What I tried:** Read the full diff; recomputed the basket arithmetic; grepped the tree at 6b0aa56 for remaining `₹2,584` / `(ASTRA 40)` occurrences — none outside archive/ and this log's history.
+
+**Open flags (cumulative):** ⑥ closed-as-recorded (message inaccuracies are documented above; the docs themselves are now consistent). Flag list empty; standing M1 test obligations remain.
+
+**Next-commit suggestion:** M0 hand-off — owner runs Claude design with `Prompts/phase1-design-prompt.md`; the completing commit records who approved and when. After that, M1 (`supabase/migrations/0001_*.sql`) is where my test obligations activate.
+
+---
