@@ -8,7 +8,7 @@ Decisions confirmed with the owner on **2026-07-06**. Each entry: context → de
 
 **Decision.** App order numbers are **internal references** (`ORD-2026-1042`) from a plain Postgres sequence, assigned at **submit** (drafts are unnumbered, which also minimizes gaps). **Tally remains the statutory system of record** and assigns real invoice numbers when the accountant books the order.
 
-**Consequences.** No counter-table locking; simpler submit path. A gap in refs is not a defect — the TESTER checklist item "gapless sequence" in `comments.md` predates this decision and is superseded.
+**Consequences.** No counter-table locking; simpler submit path. A gap in refs is not a defect — the REVIEWER's original checklist item "gapless sequence" in `comments.md` predates this decision (the REVIEWER has since amended it).
 
 ## D2 — Unpriced ("TBD") products are hidden until priced
 

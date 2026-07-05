@@ -27,7 +27,7 @@ Today a salesman writes orders in a notebook, the accountant deciphers and re-ty
 | [design/design-brief.md](design/design-brief.md) | Input for the design phase (Claude design reads the repo, then this) |
 | [Prompts/](Prompts/) | Destination for designer-authored prompts |
 | [data/ZebronicsPriceList.csv](data/ZebronicsPriceList.csv) | Source price list (42 SKUs; 8 unpriced "TBD") — never hand-edited |
-| [comments.md](comments.md) | TESTER's commit-review log (see workflow below) |
+| [comments.md](comments.md) | REVIEWER's commit-review log (see workflow below) |
 | [archive/](archive/) | Original AI-drafted planning docs + conversation export, kept for history |
 
 ## Key decisions (TL;DR — full context in [docs/decisions.md](docs/decisions.md))
@@ -44,10 +44,10 @@ Today a salesman writes orders in a notebook, the accountant deciphers and re-ty
 
 - **Engineers / builder session**: problem-statement → architecture → decisions → all of `docs/specs/` → PLAN.md.
 - **Designer session**: README → problem-statement → salesman-app + accountant-dashboard specs → **design/design-brief.md** (your instructions live there).
-- **Reviewer / TESTER session**: everything above, plus note that the specs **supersede** the standing checklist in `comments.md` where they diverge — specifically: gaps in order numbers are by design (D1, not a defect), and "LOCKED" is a *derived condition*, not a stored status (see [order-lifecycle.md](docs/specs/order-lifecycle.md)).
+- **REVIEWER session**: everything above. The specs supersede the original standing checklist in `comments.md` where they diverge — gaps in order numbers are by design (D1) and "LOCKED" is a *derived condition*, not a stored status (see [order-lifecycle.md](docs/specs/order-lifecycle.md)); the REVIEWER has amended the checklist accordingly (review of 3e5bf1f).
 
 ## Working agreement
 
 - **Spec-first**: `docs/specs/` is authoritative. If implementation must deviate, update the spec in the same commit and say why.
-- **Builder/tester split**: the BUILDER commits code; a separate TESTER session reviews every commit in [comments.md](comments.md) by actually running things. Blocking findings are fixed in the very next commit.
+- **Builder/reviewer split**: the BUILDER commits code; a separate REVIEWER session reviews every commit in [comments.md](comments.md) by actually running things. Blocking findings are fixed in the very next commit.
 - **Stack**: Next.js (App Router) on Vercel + Supabase (Postgres, Auth, RLS, Realtime). Money is always integer **paise**. Details in [docs/architecture.md](docs/architecture.md).

@@ -65,7 +65,7 @@ create table public.retailers (
   name              text not null,
   area              text,            -- locality / route hint, e.g. 'Sadar Bazaar'
   phone             text,
-  verified          boolean not null default true,  -- salesman quick-adds start false
+  verified          boolean not null default false, -- fail-closed: seed + accountant set true explicitly
   active            boolean not null default true,
   tally_ledger_name text,            -- exact Tally party-ledger name; Phase 2
   created_by        uuid references public.profiles (id),
@@ -89,7 +89,7 @@ create table public.orders (
   status         text not null
                  check (status in ('submitted', 'processed', 'cancelled')),
   notes          text not null default '',
-  total_paise    integer not null,          -- cache; recomputed by trigger from items
+  total_paise    bigint not null,           -- cache; recomputed by trigger from items (bigint, like line totals)
   submitted_at   timestamptz not null,
   editable_until timestamptz not null,      -- submitted_at + edit window (default 2h)
   processed_at   timestamptz,
@@ -110,8 +110,9 @@ create table public.order_items (
   product_id       uuid not null references public.products (id),
   product_name     text not null,     -- SNAPSHOT: copied from products at line write
   unit_price_paise integer not null,  -- SNAPSHOT: copied from products at line write
-  qty              integer not null check (qty > 0),
-  line_total_paise integer not null,  -- unit_price_paise * qty, computed server-side
+  qty              integer not null check (qty between 1 and 9999),  -- upper bound = fat-finger guard
+  line_total_paise bigint  not null,  -- unit_price_paise * qty, computed server-side in bigint
+                                      -- (9999 × ₹9,138 = 9.14e9 paise overflows int4)
   position         integer not null default 0,
   unique (order_id, product_id)
 );
@@ -140,7 +141,7 @@ Salesmen and accountants have **no direct INSERT/UPDATE grants on `orders`/`orde
 
 | RPC | Caller | Does |
 |---|---|---|
-| `submit_order(id, retailer_id, notes, items[])` | salesman | Validates items (priced, active, qty > 0), snapshots names/prices from catalog, assigns `order_no`/`order_ref`, sets `submitted_at`/`editable_until`, writes `submitted` event. Idempotent on `id`. |
+| `submit_order(id, retailer_id, notes, items[])` | salesman | Validates items (priced, active, qty > 0), snapshots names/prices from catalog, assigns `order_no`/`order_ref`, sets `submitted_at`/`editable_until`, writes `submitted` event. Idempotent on `id`: a retry carrying an existing `id` returns that order untouched — a differing payload is ignored, never merged. |
 | `update_order_items(order_id, notes, items[])` | salesman (own, within window) or accountant | Replaces lines; existing lines keep their original snapshot price, newly added products snapshot at edit time; recomputes totals; writes event. |
 | `cancel_order(order_id, reason)` | salesman (own, within window) or accountant | Sets status/`cancelled_at`; writes event with reason. |
 | `process_order(order_id)` | accountant/admin | `submitted → processed`; sets `processed_at/by`; writes event. |
@@ -150,7 +151,7 @@ Salesmen and accountants have **no direct INSERT/UPDATE grants on `orders`/`orde
 | Trigger | Table | Purpose |
 |---|---|---|
 | `touch_updated_at` | `products`, `orders` | Keep `updated_at` fresh (pattern from `quoteit`). |
-| `guard_order_transition` (BEFORE UPDATE) | `orders` | Reject illegal status transitions even from privileged code paths — defense in depth behind the RPCs. |
+| `guard_order_transition` (BEFORE UPDATE) | `orders` | Reject illegal status transitions even from privileged code paths — defense in depth behind the RPCs. Note the trigger interaction: it must allow the internal `total_paise` write coming from `recompute_order_total` while still rejecting out-of-RPC status changes. |
 | `recompute_order_total` (AFTER INSERT/UPDATE/DELETE) | `order_items` | `orders.total_paise = sum(line_total_paise)`; client totals are display-only. |
 | `create_profile_for_new_user` | `auth.users` | Auto-insert `profiles` row, role `salesman`. |
 
@@ -164,7 +165,7 @@ create index order_events_order_idx        on public.order_events (order_id, cre
 create index products_brand_category_idx   on public.products (brand_id, category, active);
 ```
 
-## Invariants (the TESTER's checklist hooks here)
+## Invariants (the REVIEWER's checklist hooks here)
 
 1. Every order row has `order_no`, `order_ref`, `submitted_at`, `editable_until` — no partial/draft rows exist, ever.
 2. `orders.total_paise` always equals the sum of its items' `line_total_paise` (trigger-enforced).

@@ -29,7 +29,7 @@ You are designing **Phase 1 of a B2B field-sales order app** for Ganpati Enterpr
 8. **Light theme first** (sunlight readability, high contrast). Dark optional.
 9. **Brand-neutral palette + one confident accent**: the app must not look Zebronics-branded — more brands arrive in Phase 3.
 
-## Screens (10)
+## Screens (11)
 
 **Salesman — mobile, 360×800 baseline:**
 1. **Login** (email/password, remember-me; error states).
@@ -41,9 +41,10 @@ You are designing **Phase 1 of a B2B field-sales order app** for Ganpati Enterpr
 7. **Order detail** — snapshot lines, humanized event timeline, countdown; Edit/Cancel while editable; locked read-only state ("call the accountant…").
 
 **Accountant — desktop, 1280+:**
-8. **Orders list** — live table (new rows highlight in), filters (status/salesman/date), search, NEW-retailer badge; the retailer verification queue can share this pattern language.
+8. **Orders list** — live table (new rows highlight in), filters (status/salesman/date), search, NEW-retailer badge.
 9. **Order detail** — lines, notes, event timeline, actions: Mark processed (the lock), Edit (reason modal after lock), Cancel (reason), Print.
 10. **Pick slip (print)** — A4 print CSS: qty column first and huge, item names, notes, signature lines; prices off by default (toggle for a priced order copy). Must be legible at arm's length in a godown.
+11. **Retailer verification queue** (`/dashboard/retailers`) — design as a variant of the orders-table pattern: list with verified/unverified filter, NEW badges, inline edit of name/area/phone (canonical spellings feed the Phase 2 Tally mapping), mark-verified action.
 
 ## States to design deliberately
 
@@ -56,7 +57,7 @@ Marketing pages, onboarding tours, retailer-facing UI, catalog-admin screens (Su
 ## Deliverables
 
 1. `Prompts/phase1-design-prompt.md` — your distilled, definitive design prompt.
-2. Designs for the 10 screens, including the listed states.
+2. Designs for the 11 screens, including the listed states.
 3. Component tokens: type scale, spacing, status chips, steppers, table/list rows, buttons, form fields — enough for a builder to implement without guessing.
 4. The pick-slip print stylesheet spec.
 

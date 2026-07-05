@@ -30,7 +30,7 @@ locked_for_salesman(order) :=
 
 | Transition | Actor | Guards | Side effects |
 |---|---|---|---|
-| *(client draft)* → `submitted` via `submit_order` | owning salesman | ≥1 line; every product active + priced; qty > 0; retailer exists | Assign `order_no` (sequence) + `order_ref`; `submitted_at = now()`; `editable_until = now() + EDIT_WINDOW`; snapshot lines from catalog; event `submitted`. Idempotent on client-generated `id` (safe double-tap / retry). |
+| *(client draft)* → `submitted` via `submit_order` | owning salesman | ≥1 line; every product active + priced; qty > 0; retailer exists | Assign `order_no` (sequence) + `order_ref`; `submitted_at = now()`; `editable_until = now() + EDIT_WINDOW`; snapshot lines from catalog; event `submitted`. Idempotent on client-generated `id`: a retry with an existing `id` returns that order untouched even if the retried payload differs (safe double-tap / retry-after-timeout). |
 | `submitted` → `processed` via `process_order` | accountant / admin | — (any time after submit; does **not** wait for the window) | `processed_at/by`; event `processed`. Salesman is locked out immediately — processing beats the timer. |
 | `submitted` → `cancelled` via `cancel_order` | owning salesman **while editable**; accountant/admin any time | accountant must supply a reason | `cancelled_at`; event `cancelled` (+reason). |
 | `processed` → `cancelled` via `cancel_order` | accountant / admin only | reason required | Event logged. Any corresponding Tally reversal is the accountant's manual job — out of app scope. |
@@ -45,7 +45,7 @@ Everything else is illegal and rejected by the `guard_order_transition` trigger 
 | `submitted`, past window | Read-only. | May edit (event `edited_after_lock`, with before/after in `details`), process, cancel. |
 | `processed` / `cancelled` | Read-only. | `processed`: may still edit with `edited_after_lock` event (e.g. retailer phoned a correction that's already in Tally — the trail is what matters); may cancel with reason. |
 
-- **Snapshot semantics on edit:** lines that survive an edit keep their **original** snapshot price (the price at order time is the deal); newly added lines snapshot the catalog price at edit time. Totals recomputed server-side.
+- **Snapshot semantics on edit:** lines that survive an edit keep their **original** snapshot price (the price at order time is the deal); newly added lines snapshot the catalog price at edit time. Totals recomputed server-side. **Implementation pin (review flag):** the naive delete-all-and-reinsert re-snapshots survivors at *current* catalog prices, silently violating this rule — `update_order_items` must diff by `product_id`, updating qty on survivors (snapshot columns untouched) and inserting only genuinely new lines. Dedicated test required: submit → change the catalog price → edit qty → the line still shows the original price.
 - **Concurrency:** at this scale (D6) last-write-wins within the window is acceptable; every write lands in `order_events`, so nothing is ever silently lost. `process_order` during an in-flight salesman edit wins — the salesman's next write is rejected by the guards.
 
 ## The edit window
@@ -74,7 +74,7 @@ Everything else is illegal and rejected by the `guard_order_transition` trigger 
 | `cancelled` | either | `{ reason? }` (required from accountant) |
 | `retailer_quick_added` | salesman | `{ retailer_id, name }` — logged on the first order for an unverified retailer |
 
-`before`/`after` arrays hold `{ sku, qty, unit_price_paise }` — enough to reconstruct any dispute without archaeology.
+`before`/`after` arrays hold `{ sku, qty, unit_price_paise }` — enough to reconstruct any dispute without archaeology. (`order_items` doesn't store `sku`, so the RPCs join `products` at event-write time — do not "simplify" payloads to bare `product_id`s; the trail must stay human-readable.)
 
 ## Edge cases
 

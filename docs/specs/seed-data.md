@@ -5,6 +5,7 @@ How [data/ZebronicsPriceList.csv](../../data/ZebronicsPriceList.csv) becomes row
 ## Source file facts (verify before seeding)
 
 - 43 lines: 1 header (`Brand,Type,Product,Price`) + **42 products**, all `Zebronics`.
+- **Encoding hazards (REVIEWER-verified):** UTF-8 BOM (`EF BB BF`) at byte 0, CRLF line endings, no trailing newline. The parser must strip the BOM and `\r` before any field handling — otherwise the first header column reads as `﻿Brand` and `TBD\r ≠ TBD`.
 - Categories ("Type") and counts: ADAPTOR (4), Adaptor with Cable (6), Charging Cable (6), Eare Phones (7), Power Bank (5), SPEAKER (14).
 - **8 rows have `Price = TBD`** (2 earphones, 2 power banks, 4 speakers). Priced range: ₹60–₹9,138, whole rupees.
 - Known data quirks, preserved deliberately (see name policy): "Eare Phones", "Balck", "Bannk", "Lighting", doubled/stray spaces.
@@ -22,8 +23,8 @@ How [data/ZebronicsPriceList.csv](../../data/ZebronicsPriceList.csv) becomes row
 
 ## Script contract (`scripts/seed.ts`)
 
-- Runs with `SUPABASE_SERVICE_ROLE_KEY` from env (never committed); parses `data/ZebronicsPriceList.csv`.
-- **Idempotent, upsert by `sku`**, with one hard rule: **a re-run never silently overwrites a non-NULL `price_paise` in the DB with a different CSV value** — it prints a drift warning and skips (`--force-prices` to override). The DB is the working truth after go-live; drift is flagged, not clobbered (this is also the TESTER's "catalog integrity" check).
+- Runs with `SUPABASE_SERVICE_ROLE_KEY` from env (never committed); parses `data/ZebronicsPriceList.csv`, stripping the UTF-8 BOM and CRLF endings first (see encoding hazards above).
+- **Idempotent, upsert by `sku`**, with one hard rule: **a re-run never silently overwrites a non-NULL `price_paise` in the DB with a different CSV value** — it prints a drift warning and skips (`--force-prices` to override). The DB is the working truth after go-live; drift is flagged, not clobbered (this is also the REVIEWER's "catalog integrity" check).
 - Never deletes: SKUs missing from a future CSV are reported (candidates for `active = false`), not removed.
 - Prints a summary: inserted / updated / price-drift / unpriced counts.
 - Multi-brand ready (Phase 3): same pipeline, new CSV in `data/`, brand-specific SKU prefix.

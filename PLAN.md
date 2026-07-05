@@ -1,6 +1,6 @@
 # PLAN — Phased Roadmap
 
-**Now:** planning complete → **design phase (Phase 1 · M0)** → build. Decisions live in [docs/decisions.md](docs/decisions.md); specs in [docs/specs/](docs/specs/) are the source of truth. Work happens on **feature branches with granular commits**; every commit is reviewed by the TESTER in [comments.md](comments.md), and blocking findings are fixed in the very next commit.
+**Now:** planning complete → **design phase (Phase 1 · M0)** → build. Decisions live in [docs/decisions.md](docs/decisions.md); specs in [docs/specs/](docs/specs/) are the source of truth. Work happens on **feature branches with granular commits**; every commit is reviewed by the REVIEWER in [comments.md](comments.md), and blocking findings are fixed in the very next commit.
 
 ---
 
@@ -12,8 +12,8 @@
 
 | # | Milestone | Exit criteria |
 |---|---|---|
-| **M0** | **Design pass** — a Claude design session reads this repo, writes the distilled design prompt into `Prompts/`, and produces Phase 1 screen designs per [design/design-brief.md](design/design-brief.md) | Designs for the 10 screens approved by the owner |
-| **M1** | **Scaffold + schema** — Next.js app; Supabase dev project; migrations implementing [data-model](docs/specs/data-model.md), [lifecycle](docs/specs/order-lifecycle.md) RPCs/triggers, and the full [RLS matrix](docs/specs/roles-and-permissions.md) | TESTER passes all 6 items of the RLS verification protocol |
+| **M0** | **Design pass** — a Claude design session reads this repo, writes the distilled design prompt into `Prompts/`, and produces Phase 1 screen designs per [design/design-brief.md](design/design-brief.md) | Designs for the 11 screens approved by the owner; the completing commit records who approved and when |
+| **M1** | **Scaffold + schema** — Next.js app; Supabase dev project; migrations implementing [data-model](docs/specs/data-model.md), [lifecycle](docs/specs/order-lifecycle.md) RPCs/triggers, and the full [RLS matrix](docs/specs/roles-and-permissions.md) | REVIEWER passes all 6 items of the RLS verification protocol |
 | **M2** | **Seed** — `scripts/seed.ts` per [seed-data.md](docs/specs/seed-data.md) | All post-seed verification queries pass; salesman client sees exactly 34 products |
 | **M3** | **Auth + roles** — login flow, provisioning runbook executed for the real team | Each role logs in and sees only what the matrix allows |
 | **M4** | **Salesman app** per [salesman-app.md](docs/specs/salesman-app.md) | All 6 acceptance criteria, incl. the 90-second stopwatch test and airplane-mode drills |
@@ -89,4 +89,4 @@ Realtime vs 30s polling for the dashboard · Tailwind vs vanilla CSS · PWA mani
 
 ## Changelog discipline
 
-Decision changes hit [docs/decisions.md](docs/decisions.md) first; affected specs update in the same commit; milestone completion is claimed in the commit message and verified by the TESTER before it counts.
+Decision changes hit [docs/decisions.md](docs/decisions.md) first; affected specs update in the same commit; milestone completion is claimed in the commit message and verified by the REVIEWER before it counts.

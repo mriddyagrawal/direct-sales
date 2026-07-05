@@ -53,7 +53,7 @@ Email + password, "remember me" default on (long-lived session). No signup, no s
 ## Non-functional
 
 - Interactive in < 2s on a mid-range Android over 4G; search filters in < 50ms (in-memory over ≤100 rows).
-- Touch targets ≥ 44px; stepper `+` is the most-tapped control in the app — size it accordingly.
+- Touch targets ≥ 48px; stepper `+` is the most-tapped control in the app — size it accordingly.
 - Works in Chrome Android + Safari iOS. English UI; product names verbatim from the catalog.
 - Session persists ~30 days (Supabase default refresh) — a field salesman must ~never see the login screen.
 

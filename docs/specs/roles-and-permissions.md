@@ -49,7 +49,7 @@ The `guard_order_transition` trigger backstops the RPCs, so even a future privil
 - Role lookup inside policies uses a `security definer` helper (`current_role()` reading `profiles`) to avoid RLS recursion — standard Supabase pattern.
 - Realtime subscriptions respect RLS (dashboard subscribes to `orders`; salesmen receive only their own rows if they subscribe at all).
 
-## Verification protocol (for the TESTER)
+## Verification protocol (for the REVIEWER)
 
 Reading policy SQL is not verification. With three real authenticated clients (one per role):
 
