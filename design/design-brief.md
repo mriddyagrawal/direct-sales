@@ -4,8 +4,8 @@ You are designing **Phase 1 of a B2B field-sales order app** for Ganpati Enterpr
 
 **Your working order:**
 1. Read [README.md](../README.md) → [docs/problem-statement.md](../docs/problem-statement.md) → [docs/specs/salesman-app.md](../docs/specs/salesman-app.md) → [docs/specs/accountant-dashboard.md](../docs/specs/accountant-dashboard.md) → this brief. The specs define *what exists on each screen*; this brief defines *how it should feel*.
-2. Write the distilled design prompt to **`Prompts/phase1-design-prompt.md`** (the owner's workflow: you author the definitive prompt after reading the repo).
-3. Produce the designs.
+2. Write the complete design markdown to **`Prompts/phase1-design-prompt.md`** (the owner's workflow: you author the definitive prompt after reading the repo; kickoff instructions live in `Prompts/designer-session-prompt.md`).
+3. The designs themselves are produced by **Claude design** from that file — and Claude design has **no repo access**, so your markdown must be fully self-contained (all constraints, screens, and real data embedded).
 
 ## The one-line brief
 
@@ -56,10 +56,8 @@ Marketing pages, onboarding tours, retailer-facing UI, catalog-admin screens (Su
 
 ## Deliverables
 
-1. `Prompts/phase1-design-prompt.md` — your distilled, definitive design prompt.
-2. Designs for the 11 screens, including the listed states.
-3. Component tokens: type scale, spacing, status chips, steppers, table/list rows, buttons, form fields — enough for a builder to implement without guessing.
-4. The pick-slip print stylesheet spec.
+1. Yours (the DESIGNER session): `Prompts/phase1-design-prompt.md` — the complete, self-contained design markdown.
+2. Claude design's (your markdown must demand these): designs for the 11 screens including the listed states; component tokens (type scale, spacing, status chips, steppers, table/list rows, buttons, form fields — enough for a builder to implement without guessing); and the pick-slip print stylesheet spec.
 
 ## Open design questions (flag your recommendation)
 

@@ -12,7 +12,7 @@
 
 | # | Milestone | Exit criteria |
 |---|---|---|
-| **M0** | **Design pass** — a Claude design session reads this repo, writes the distilled design prompt into `Prompts/`, and produces Phase 1 screen designs per [design/design-brief.md](design/design-brief.md) | Designs for the 11 screens approved by the owner; the completing commit records who approved and when |
+| **M0** | **Design pass** — a DESIGNER session reads this repo and authors `Prompts/phase1-design-prompt.md` per [design/design-brief.md](design/design-brief.md) (kickoff: `Prompts/designer-session-prompt.md`); **Claude design** then produces the Phase 1 screen designs from that self-contained file | Designs for the 11 screens approved by the owner; the completing commit records who approved and when |
 | **M1** | **Scaffold + schema** — Next.js app; Supabase dev project; migrations implementing [data-model](docs/specs/data-model.md), [lifecycle](docs/specs/order-lifecycle.md) RPCs/triggers, and the full [RLS matrix](docs/specs/roles-and-permissions.md) | REVIEWER passes all 6 items of the RLS verification protocol |
 | **M2** | **Seed** — `scripts/seed.ts` per [seed-data.md](docs/specs/seed-data.md) | All post-seed verification queries pass; salesman client sees exactly 34 products |
 | **M3** | **Auth + roles** — login flow, provisioning runbook executed for the real team | Each role logs in and sees only what the matrix allows |
