@@ -324,3 +324,21 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 **Next-commit suggestion:** Run the DESIGNER session with the kickoff prompt — the expected next commit is `docs(design): M0 — authored phase1 design prompt for Claude design`, touching only `Prompts/phase1-design-prompt.md`. I will review it against the self-containment test: could Claude design work from that file alone.
 
 ---
+
+## Review of f5d217a — docs(design): brief now says decide, not recommend — closes flag 5 before M0 runs
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Close flag ⑤ from my 6d6827f review — the brief's "flag your recommendation" hedged where the kickoff prompt demands decisions — before any DESIGNER session reads the brief.
+
+**What works:** One file, one hunk, exactly the fix: section renamed to "Design decisions to resolve (state your recommendation as the decision)", body now says "Decide all four… zero open questions; the owner can override later" — matching the kickoff prompt's language. Fix landed *before* M0 runs, which is the whole point of the flag.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**What I tried:** Read the full diff; confirmed the brief and kickoff prompt now agree verbatim on the decide-don't-hedge contract.
+
+**Open flags (cumulative):** ⑤ — ✅ CLOSED. The flag list is fully empty; only the standing M1 test obligations remain (they activate when migrations land).
+
+**Next-commit suggestion:** Unchanged — the DESIGNER session's `Prompts/phase1-design-prompt.md`.
+
+---
