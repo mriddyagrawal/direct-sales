@@ -1,0 +1,20 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 31, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--color-white);
+  border-top: 2px solid var(--color-ink);
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
