@@ -1330,3 +1330,32 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** M4 — the salesman order flow (S3→S7 + the write RPCs through the app), where I'll exercise `submit_order`/`update_order_items` end-to-end via the UI and re-verify snapshot/idempotency through the real client.
 
 ---
+
+## Review of bd32706 — docs: builder prompt for M4 — salesman order flow (S3-S7 + write RPCs)
+
+**Verdict:** ✅ accept — an accurate, comprehensive, invariant-faithful M4 kickoff. Docs-only (a new `Prompts/` file).
+
+**Phase / commit goal (as I understood it):** The BUILDER prompt for the salesman order flow (S3→S7 + write-RPC wiring), scoping M5 out.
+
+**What works — cross-checked against the built state, the specs, and my prior verifications:**
+- **Every hard invariant is stated correctly** and matches what I verified: client never sends prices (server snapshots), client-UUID idempotency (don't regenerate on retry), localStorage-only drafts (no DB draft rows), "locked" derived + enforced by the RPC guards with buttons **removed not disabled** at expiry, salesmen see **active AND priced only** (~34, RLS), ≥48px hit areas, qty cap 999 (stricter than the DB `1..9999`). All consistent with the RPCs/RLS/lifecycle I proved at M1. ✓
+- **References are accurate:** the routes (`/login`, `/`, `/dashboard`, `/new-order` placeholder), the reusable primitives + `format.ts`/`order-status.ts`, the four Supabase clients, and "read `20260706T150400_rpcs.sql` for the exact `p_items` shape — don't guess." ✓
+- **RPC wiring (§4) is faithful:** `submit_order` (product_id+qty only, idempotent on p_id), `update_order_items` (server diffs by product_id, survivors keep snapshot), `cancel_order` (salesman passes no reason) — exactly the behaviour I verified. ✓
+- **Acceptance criteria (§5) are falsifiable and match my obligations:** <90s stopwatch; airplane-mode draft + offline submit → **exactly one** row; double-tap → one row; **countdown→0 flips UI read-only AND a forged `update_order_items` is rejected *server-side* (verify the RPC, not just the UI)**; never renders unpriced/inactive; order detail reconstructs edits from `order_events`. These are precisely the tests I'll run. ✓
+- **M5 correctly scoped out** (§6): `process_order`, the S9 workbench, S10 pick slip, S11 verification queue, dashboard realtime/filters — explicitly deferred; "don't extend the S8 shell into the workbench." Prevents scope creep. ✓
+- **§7 Do-NOTs** reinforce the invariants (no client prices, no UUID regen, no draft DB rows, no disabled-vs-removed buttons, `getUser()` not `getSession()`, no design-system fork/shadows). ✓
+- **Anticipates my test path:** §5 tells the BUILDER to hand the REVIEWER the 3 accounts (passwords from Mridul) and names the salesman account for driving the flow — aligns with my open offer to drive login end-to-end once a credential exists. ✓
+
+**Blocking issues:** None. **Non-blocking suggestions:**
+- The prompt says the foundation is "reviewer-verified" — true, with the one caveat from my ba387fa block (an actual password sign-in hasn't been driven; RLS matrix + lookup path *are* live-verified). Immaterial to the M4 work.
+- Process note: M4 moves to branch `feature/salesman-app`; my HEAD watcher follows the shared checkout, so I'll keep seeing commits.
+
+**Domain / correctness checks:** No code/behavior change — a kickoff prompt. Its encoded invariants match the money/snapshot/idempotency/state-machine/RLS rules I've verified; nothing in it would steer the BUILDER into violating a spec.
+
+**What I tried:** read the prompt end-to-end against salesman-app.md / the design spec / order-lifecycle.md / the RPC migration and my prior review blocks; checked each named file/route/RPC exists as described.
+
+**Open flags (cumulative):** No blocking items. ⑯ (leaked-password), ⑬ (seed loader), ⑭ (perf pass), ⑦⑧⑨ (M0 doc) remain; ㉒ resolved. My M4 test obligations now activate: the airplane-mode/idempotency/post-expiry-guard/`order_events` acceptance criteria, driven through the app.
+
+**Next-commit suggestion:** deliverable #1 — the cart store + localStorage draft + submit-queue infrastructure — then S3.
+
+---
