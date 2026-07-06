@@ -18,3 +18,16 @@ Ideas the owner has approved in principle but deliberately **not** scheduled int
 **Idempotency interaction (pinned per the 6d81e88 review):** `submit_order` retries with an existing `id` return the order untouched — so **the geotag rides the first successful submit only; retries never update it**. If the first attempt lands without a fix and a retry arrives with one, the fix is discarded. That is acceptable (the tag is a soft signal); do not weaken the idempotency rule to merge coordinates.
 
 **Revisit when:** the Phase 1 pilot has proven adoption (post-M6), or the first "was he really at the shop?" dispute makes the data worth having.
+
+## RLS/index performance pass (flagged 2026-07-07, M1)
+
+**What:** four `get_advisors(performance)` findings from the M1 Supabase build, left unfixed on purpose — all confirmed harmless at current scale, not silently missed (see the M1.6/M1.6b review blocks in [comments.md](../comments.md)):
+
+1. **Multiple permissive RLS policies per table/action** — e.g. `products_select_salesman` + `products_select_staff` are two separate `SELECT` policies Postgres ORs together, instead of one combined `using (... or ...)` clause. Kept split for matrix-auditability (each policy documents one role's rule).
+2. **`auth_profile_role()` / `auth.uid()` called unwrapped inside RLS policies** instead of `(select auth_profile_role())` — the wrapped form lets the planner evaluate it once per query instead of once per row scanned.
+3. **Five foreign keys without a covering index:** `order_events.actor_id`, `order_items.product_id`, `orders.processed_by`, `orders.retailer_id`, `retailers.created_by`.
+4. (informational only, not a fix candidate) unused-index noise on a near-empty table — resolves itself once real order volume exists.
+
+**Decision context:** none of this matters at D6 scale (1–2 salesmen, <20 orders/day, the whole `products` table is 42 rows) — fixing it now would be optimizing a query that touches a few dozen rows. It becomes worth doing if either (a) real order/retailer volume grows meaningfully past the Phase 1 pilot, or (b) the app stays on Supabase's **Free tier** (smaller shared compute than Pro) for an extended period — free tier doesn't cause these, but it shrinks the headroom before any of them would show up as observable latency. All four are mechanical, low-risk fixes with zero schema/behavior change (rewrite ~10 `CREATE POLICY` statements to combine clauses and wrap auth calls, add 5 indexes).
+
+**Revisit when:** alongside the Supabase Pro upgrade decision (PLAN.md open question #5), or if `get_advisors(performance)` warnings start correlating with actually-observed slowness.
