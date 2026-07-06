@@ -76,6 +76,10 @@ Realtime vs 30s polling for the dashboard · Tailwind vs vanilla CSS · PWA mani
 
 ---
 
+## Unscheduled — [docs/future-plans.md](docs/future-plans.md)
+
+Owner-approved ideas parked outside the committed phases (currently: **order-punch geotagging** — fail-open GPS fix at submit, order tags only, quiet presentation).
+
 ## Open questions
 
 | # | Question | Owner |

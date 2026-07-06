@@ -17,6 +17,7 @@ Today a salesman writes orders in a notebook, the accountant deciphers and re-ty
 | [docs/problem-statement.md](docs/problem-statement.md) | The business, the current workflow, the pain, success criteria |
 | [docs/architecture.md](docs/architecture.md) | Stack, system design, principles, ops/cost reality |
 | [docs/decisions.md](docs/decisions.md) | Decision log (D1–D7) + graveyard of rejected ideas |
+| [docs/future-plans.md](docs/future-plans.md) | Parking lot for owner-approved but unscheduled ideas (order-punch geotagging) |
 | [docs/specs/](docs/specs/) | Engineering specs — the source of truth for implementation |
 | [docs/specs/data-model.md](docs/specs/data-model.md) | Tables, fields, constraints, sequence, triggers |
 | [docs/specs/order-lifecycle.md](docs/specs/order-lifecycle.md) | Order state machine, edit window, numbering, audit events |
