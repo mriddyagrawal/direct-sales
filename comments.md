@@ -77,7 +77,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — enable before pilot |
-| ⑲ | Self-referential `--font-structure`/`--font-figures` in globals.css (same name next/font assigns) → equal-specificity cycle; Space Grotesk may silently drop depending on CSS load order. Use distinct names or drop the redeclaration. | 🟡 minor / css | design system (7f65371) | 🟡 open — fix + verify on a text-heavy screen |
+| ⑲ | Self-referential `--font-structure`/`--font-figures` in globals.css (same name next/font assigns) → equal-specificity cycle; Space Grotesk may silently drop depending on CSS load order. Use distinct names or drop the redeclaration. | 🟡 was css | design system (7f65371) | ✅ **CLOSED** at 345dce2 — distinct names (`--font-space-grotesk`/`--font-jetbrains-mono`); no cycle, confirmed in served CSS |
 | ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | ✅ **CLOSED** at dcb3904 — `design/**`+`archive/**` ignored; `npm run lint` exit 0 |
 | ⑮ | D8 filter must scope to **self**-cancels only (`cancelled_by = salesman_id`), else an accountant-cancelled order silently vanishes from the salesman's list. | 🔵 was design gap | M1 (3496c17) | ✅ **CLOSED** at M1.9 (a6ec10a) — `cancelled_by` added; self/office distinction verified live |
 | ⑪ | Rename `current_role()` → `auth_profile_role()` (reserved-keyword footgun). | 🔴 was blocking — owner directive | M1.5/M1.6 | ✅ **CLOSED** at M1.8 — rename complete; RLS (OID-bound) + RPCs re-verified live |
@@ -1096,5 +1096,34 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** **⑱ — ✅ CLOSED.** No blocking items. ⑲ (font var), ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) — all non-blocking.
 
 **Next-commit suggestion:** the S1 login screen + sign-in Server Action — the first end-to-end exercise of the auth flow (getUser gating, the redirect cookies, role routing) and the primitives; I'll drive it with the 3 real test accounts and settle ⑲ with a rendered-font check.
+
+---
+
+## Review of 345dce2 — feat(app): S1 Login screen (full) + fix self-referential font var (flag 19)
+
+**Verdict:** ✅ accept — S1 is spec-faithful and renders; ⑲ is fixed and verified in the served output. Two minor non-blocking notes.
+
+**Phase / commit goal (as I understood it):** Build the S1 login screen (mark, form, remember-me, footer, deactivated strip) wired to `signInWithPassword` + proxy role-routing, and fix the ⑲ font cycle.
+
+**What works — verified by execution (prerendered HTML + served CSS, not just reading):**
+- **⑲ CLOSED, confirmed in output:** `next/font` now uses distinct names (`--font-space-grotesk` / `--font-jetbrains-mono`); globals' semantic tokens reference *those* (`--font-structure: var(--font-space-grotesk), …`). The served CSS reads `font-structure:var(--font-space-grotesk)` (no self-reference) and `<html>` carries both `…_variable` classes — so Space Grotesk actually applies. The canonical create-next-app pattern; cycle gone. ✓
+- **S1 renders** (`/login` prerenders ○ static): the prerendered HTML contains "Ganpati Enterprises", "ORDER CAPTURE", "FIELD SALES", the footer "Call the office to reset it.", and the **receipt-glyph mark** (`/icon.png`) — i.e. the code correctly follows **deviation #6** (receipt glyph in the S1 block), not the stale "GE monogram" body text. That resolves the *code* half of ⑨ (the spec-doc text is still unreconciled — ⑨ stays open for the doc). ✓
+- **Form is spec-faithful** ([LoginForm.tsx](src/app/login/LoginForm.tsx)): `Field` primitives (email/password with autoComplete + the mono SHOW toggle), remember-me **checked by default**, `Button` with `loading`, the `?reason=deactivated` strip ("This account has been deactivated. Call the office."), a **generic** "Wrong email or password." (no user-enumeration leak), then `signInWithPassword` → `router.push("/")` + `refresh()` letting the ⑱-fixed proxy role-route. Client-side sign-in (a valid alternative to a Server Action; the browser client persists the session cookies the middleware reads). ✓
+- **`<Suspense>` around `LoginForm`** is required (it calls `useSearchParams`) and correctly present — avoids the build-time bailout error. ✓
+- build + lint exit 0. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **Blank-form flash on slow 4G.** Because `LoginForm` reads `useSearchParams` under `<Suspense fallback={null}>`, the entire form is **client-rendered** — the SSR HTML has the mark/tagline/footer but **no form fields** until the JS bundle hydrates. On the field-salesman's slow connection that's a visible formless beat. Since `useSearchParams` is only used to read `?reason=deactivated`, prefer reading it **server-side** in [page.tsx](src/app/login/page.tsx) (page components receive a `searchParams` prop) and passing `deactivated` as a prop — then `LoginForm` can SSR and the form paints immediately. Login is rare (S1 notes ~monthly), so minor, but it nicks the <2s-on-4G budget the design spec prioritizes.
+- **Remember-me is still cosmetic** (carry-forward from 0dc60a3): the checkbox toggles state nobody reads — the 30-day cookie is always applied, so unchecking does nothing. Wire it (session-vs-persistent) when that toggle is implemented, or the UI overpromises.
+
+**Domain / correctness checks:** Design fidelity — mark/tagline/footer/fields per S1, receipt glyph per deviation #6 ✓. Auth flow — client sign-in → cookies → proxy role-route, deactivated wired to the (⑱-fixed) middleware ✓. Could not drive a *real* login end-to-end: the 3 test accounts' passwords aren't committed (correctly), so a live sign-in awaits credentials — the DB/RLS side is already proven (M1), and the client wiring is standard @supabase/ssr.
+
+**What I tried:** read page.tsx / LoginForm.tsx / login.module.css and the font-var diff; `npm run build` (exit 0, `/login` ○ static) + `npm run lint` (exit 0); grepped the **prerendered** `.next/server/app/login.html` for S1 content (present) and the form fields (absent → client-rendered, as analysed); confirmed the served CSS has no font cycle and `<html>` carries the distinct font-variable classes.
+
+**Open flags (cumulative):** **⑲ — ✅ CLOSED (verified in output).** No blocking items. ⑨ (M0 doc — S1 mark code now correct, spec text still says "GE monogram"), ⑦⑧ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain — all non-blocking.
+
+**Next-commit suggestion:** continue the salesman flow (S2 Home / My Orders, or S3 retailer picker), or a real end-to-end login drive once test credentials are available. When a data-reading screen lands I'll re-exercise RLS through the real client.
 
 ---
