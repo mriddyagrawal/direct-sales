@@ -71,6 +71,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
+| ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, 5 unindexed FKs, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
@@ -830,5 +831,34 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** none new. ⑦⑧⑨ (minor M0 doc), ⑬ (deferred) remain; no blocking items.
 
 **Next-commit suggestion:** M2 app scaffolding. My M1 verification is complete — the schema, triggers, RPCs, RLS, seed, and provisioning are all verified against the live project.
+
+---
+
+## Review of 7cc9e4c — docs: park the M1 performance-advisor findings in future-plans.md
+
+**Verdict:** ✅ accept — the parked list is accurate to the live advisor, and deferring these (rather than fixing now) is the correct engineering call. Docs-only.
+
+**Phase / commit goal (as I understood it):** Give the "left alone on purpose" decision for the M1 `get_advisors(performance)` findings a durable home in future-plans.md, with a revisit trigger tied to the Supabase Pro billing decision (PLAN.md open question #5).
+
+**What works — cross-checked against `get_advisors(performance)` I ran myself:**
+- **The four categories are all real and correctly described.** (1) `multiple_permissive_policies` — the two split SELECT policies per table (+ profiles UPDATE, retailers INSERT); the doc's example `products_select_salesman` + `products_select_staff` is right. (2) `auth_rls_initplan` — exactly 5 policies re-evaluate `auth.uid()` per row: `profiles_update_self`, `retailers_insert_salesman`, `orders_select_own`, `order_items_select_own`, `order_events_select_own`. (3) `unindexed_foreign_keys` — **exactly the 5 listed**: `order_events.actor_id`, `order_items.product_id`, `orders.processed_by`, `orders.retailer_id`, `retailers.created_by` (the other FKs — orders.salesman_id, order_*.order_id, products.brand_id — *are* covered, so the list is precise, not hand-wavy). (4) `unused_index` — 1 (`orders_status_submitted_idx`), correctly flagged informational/self-resolving.
+- **All four are PERFORMANCE-class, none security/correctness/money/state-machine** → none are blocking by my checklist. Parking is entirely appropriate.
+- **The defer decision is sound, not lazy.** At D6 scale (1–2 salesmen, <20 orders/day, 42-row `products`) these touch a few dozen rows; and — a point the doc gets right — adding the 5 FK indexes *now* would immediately generate 5 new `unused_index` findings (write overhead for zero read benefit until volume exists). The revisit trigger (Pro upgrade / observed slowness) is the right gate.
+- PLAN.md "Unscheduled" pointer updated to list both parked items; the geotag entry above it is untouched. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **Minor cross-reference overreach:** the entry says these were "confirmed harmless … (see the M1.6/M1.6b review blocks in comments.md)." My M1.6/M1.6b blocks covered the **security** advisor (the 5 accepted `authenticated`-executable WARNs) — they did **not** discuss these *performance* findings. This parking doc (reviewed here) is actually their first REVIEWER treatment; I've now confirmed them harmless in *this* block. Tighten the reference to avoid implying a review that didn't mention them.
+- "4 findings" is really **4 categories / dozens of individual lint rows** (multiple_permissive_policies alone spans ~7 tables × several roles). Fine as a summary; noting for precision.
+- The `auth_rls_initplan` fix (wrap `auth.uid()` as `(select auth.uid())`) is genuinely trivial and best-practice — reasonable to fold into the RLS policies whenever they're next touched, rather than a dedicated pass.
+
+**Domain / correctness checks:** No schema/behavior change (docs only). Security posture unchanged (these are perf, not security). RLS correctness unaffected — the split policies and unwrapped auth calls change *speed*, not *who-sees-what* (already verified at M1.6/M1.8).
+
+**What I tried:** `git show` the diff; `get_advisors(performance)` on the live project and matched every parked item to the actual lint rows (FK list exact; auth_rls_initplan = 5 policies; unused_index = orders_status_submitted_idx).
+
+**Open flags (cumulative):** No blocking items. ⑦⑧⑨ (minor M0 doc) open; ⑬ (deferred seed loader); **⑭ (new) RLS/index performance pass — parked in future-plans.md, deferred by design** (tracked, not owed). Note ⑧ still open — this commit adds a *performance* entry to future-plans.md, not the Payments-tab entry the design spec references.
+
+**Next-commit suggestion:** M2 app scaffolding.
 
 ---
