@@ -1,0 +1,40 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chrome {
+  height: 49px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-white);
+}
+
+.content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  height: 40px;
+  border-radius: var(--radius);
+  background: linear-gradient(
+    90deg,
+    var(--color-hairline) 25%,
+    var(--color-paper) 37%,
+    var(--color-hairline) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
