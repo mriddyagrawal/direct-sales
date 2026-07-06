@@ -1,6 +1,6 @@
 # PLAN — Phased Roadmap
 
-**Now:** M0 (design) and the **M1 backend** — schema · RPCs · triggers · RLS · seed · provisioning — are ✅ complete and reviewer-verified against the live Supabase project (Mumbai); see the Open Items Ledger in [comments.md](comments.md). **Next: scaffold the Next.js app** on top of the finished backend, then wire auth (M3). Decisions live in [docs/decisions.md](docs/decisions.md); specs in [docs/specs/](docs/specs/) are the source of truth. Work happens on **feature branches with granular commits**; every commit is reviewed by the REVIEWER in [comments.md](comments.md), and blocking findings are fixed in the very next commit.
+**Now:** M0 (design), the **M1 backend** (schema · RPCs · triggers · RLS · seed · provisioning — 11 migrations), and the **M1 app + M3 auth** (Next.js app, `@supabase/ssr` auth, design system, S1 login + role-gated S2/S8 shells, production build green) are ✅ complete and reviewer-verified against the live Supabase project (Mumbai); see the Open Items Ledger in [comments.md](comments.md). **Next: M4 — the salesman order flow** (S3 → S7 + the write RPCs). Decisions live in [docs/decisions.md](docs/decisions.md); specs in [docs/specs/](docs/specs/) are the source of truth. Work happens on **feature branches with granular commits**; every commit is reviewed by the REVIEWER in [comments.md](comments.md), and blocking findings are fixed in the very next commit.
 
 ---
 
@@ -13,14 +13,30 @@
 | # | Milestone | Exit criteria | Status · 2026-07-07 |
 |---|---|---|---|
 | ~~**M0**~~ | ~~**Design pass**~~ — a DESIGNER session reads this repo and authors `Prompts/phase1-design-prompt.md` per [design/design-brief.md](design/design-brief.md) (kickoff: `Prompts/designer-session-prompt.md`); **Claude design** then produces the Phase 1 screen designs from that self-contained file | Designs for the 11 screens approved by the owner; the completing commit records who approved and when | ✅ **Done** — approved by Mridul 2026-07-06 (`c82607e`) |
-| **M1** | **Scaffold + schema** — Next.js app; Supabase dev project; migrations implementing [data-model](docs/specs/data-model.md), [lifecycle](docs/specs/order-lifecycle.md) RPCs/triggers, and the full [RLS matrix](docs/specs/roles-and-permissions.md) | REVIEWER passes all 6 items of the RLS verification protocol | ◑ **Backend ✅ · app ⬜** — 11 migrations live & reviewer-verified (M1.1–M1.9); **RLS 6-step ✅**, RPC suite ✅, provisioning ✅. Next.js app scaffold not started |
+| ~~**M1**~~ | **Scaffold + schema** — Next.js app; Supabase dev project; migrations implementing [data-model](docs/specs/data-model.md), [lifecycle](docs/specs/order-lifecycle.md) RPCs/triggers, and the full [RLS matrix](docs/specs/roles-and-permissions.md) | REVIEWER passes all 6 items of the RLS verification protocol | ✅ **Done** — 11 migrations live & reviewer-verified (M1.1–M1.9); **RLS 6-step ✅**, RPC suite ✅, provisioning ✅. Next.js app scaffolded (App Router/TS, `@supabase/ssr`), production build green |
 | **M2** | **Seed** — `scripts/seed.ts` per [seed-data.md](docs/specs/seed-data.md) | All post-seed verification queries pass; salesman client sees exactly 34 products | ✅ **Data done** — 42 products seeded, salesman sees 34, checks pass (M1.7). Drift-protected `scripts/seed.ts` loader deferred to app scaffold (ledger ⑬) |
-| **M3** | **Auth + roles** — login flow, provisioning runbook executed for the real team | Each role logs in and sees only what the matrix allows | ◑ **DB-side ✅ · login UI ⬜** — provisioning trigger + RLS-per-role verified live; 3 test accounts exist. Login flow + real-team provisioning pending (needs the app) |
+| ~~**M3**~~ | **Auth + roles** — login flow, provisioning runbook executed for the real team | Each role logs in and sees only what the matrix allows | ✅ **Done** — S1 login (username→email via secret-key lookup, D9), middleware route-protection + role routing, deactivated-user lockout — all reviewer-verified live. Real-team account creation = a Dashboard runbook step at go-live |
 | **M4** | **Salesman app** per [salesman-app.md](docs/specs/salesman-app.md) | All 6 acceptance criteria, incl. the 90-second stopwatch test and airplane-mode drills | ⬜ Not started |
 | **M5** | **Accountant dashboard** per [accountant-dashboard.md](docs/specs/accountant-dashboard.md) | All 6 acceptance criteria, incl. live-appearance ≤5s and A4 pick-slip print | ⬜ Not started |
 | **M6** | **Deploy + pilot** — Vercel prod, Supabase prod, real accounts, onboard 1 salesman + accountant | Rollout gate below | ⬜ Not started |
 
 > **Verified-complete detail** lives in the Open Items Ledger atop [comments.md](comments.md). No 🔴 blocking items open — see the ledger for the full non-blocking/deferred list.
+
+### Open items — full mirror of the review ledger
+
+No 🔴 blocking items. Everything below is non-blocking / deferred / owner-config. The REVIEWER's ledger atop [comments.md](comments.md) is the live source; mirrored here in full per owner request (2026-07-07).
+
+| Flag | Item | Type | Home / next step |
+|---|---|---|---|
+| ㉒ | `SUPABASE_SECRET_KEY` set in `.env.local` + Vercel env (D9 username→email lookup needs it, or login fails) | config / owner | ✅ **Resolved 2026-07-07** — owner set it |
+| ⑯ | Enable Supabase Auth leaked-password protection (HaveIBeenPwned check) | config / owner | Owner — **Pro-plan only**; enable at go-live (ties to Q#5/Q#7) |
+| ⑬ | Drift-protected `scripts/seed.ts` loader (warn/skip on price-drift re-run, `--force-prices` override) | minor / deferred | Buildable now (Node exists); do in M4 or when a re-seed is first needed |
+| ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (6 unindexed FKs incl. `orders.cancelled_by`, unwrapped `auth.uid()` in policies, multiple permissive policies, 1 unused index). Verified accurate + harmless at current scale | minor / deferred | Parked in [docs/future-plans.md](docs/future-plans.md); revisit with the Pro-billing decision |
+| ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec | minor / doc | Reconcile in a design-spec doc pass |
+| ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet | minor / doc | Add the parking-lot entry or soften the reference |
+| ⑨ | S1 body/renders still show the GE monogram that deviation #6 overrides with the receipt glyph (login **code** is correct; spec **text** unreconciled) | minor / doc | Reconcile spec text |
+
+Closed flags (audit trail retained in [comments.md](comments.md)): ⑩ RLS fail-open · ⑪ `current_role` rename · ⑫ trigger `search_path` · ⑮ D8 self-cancel scope · ⑰ lint gate · ⑱ middleware cookie-drop · ⑲ font-var cycle · ⑳ S2 D8 filter · ㉑ username email-harvest.
 
 ### Rollout gate (adoption is the metric)
 
