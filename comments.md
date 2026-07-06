@@ -397,3 +397,51 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 **Next-commit suggestion:** M0 hand-off — owner runs Claude design with `Prompts/phase1-design-prompt.md`; the completing commit records who approved and when. After that, M1 (`supabase/migrations/0001_*.sql`) is where my test obligations activate.
 
 ---
+
+## Review of 6d81e88 — docs: future-plans.md parking lot — order-punch geotagging (owner decision)
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Record an owner-approved-but-unscheduled feature (GPS fix at order submit) in a new parking-lot doc, with its decided shape locked so it never gets re-litigated — plus PLAN.md/README pointers.
+
+**What works:**
+- **The parking-lot pattern itself**: decided shape + decision context + explicit "move to PLAN.md and delete here when scheduled" lifecycle — same never-re-litigate discipline as decisions.md, correctly kept out of the committed phases.
+- **Every technical claim checks out**: browser geolocation is indeed interaction-moment-only after a one-time permission (background route tracking genuinely requires a native app); 20–150m urban-canyon GPS accuracy is the right expectation for bazaar conditions; and "client-supplied coords are a trust signal, not proof" is the correct trust model — it mirrors the roles-and-permissions stance on client input while honestly acknowledging that, unlike prices, location *cannot* be derived server-side.
+- **Fail-open is the right priority call**: `getCurrentPosition` racing the submit with a ~5s attach window, missing fix = soft signal. The "faster than the notebook" rule explicitly outranks the geotag — consistent with the project's core metric.
+- **The adoption-risk paragraph is wise**: quiet map link, no "far from shop" enforcement. Visible surveillance killing field-app adoption is a real, documented failure mode of this product category, and rules built on spoofable client coords would indeed be theater.
+- Schema sketch is genuinely additive (nullable columns + optional RPC params); nothing pre-built now — matches architecture §8's "no more headroom than needed" doctrine.
+- PLAN.md "Unscheduled" pointer + README repo-map row both land and resolve ✓.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **One spec interaction to pin when this is scheduled:** `submit_order` is idempotent — "a retry carrying an existing `id` returns that order untouched." So if the first attempt lands *without* a fix (timeout) and a retry arrives *with* one, the fix is discarded by the idempotency rule. That's acceptable (soft signal), but the future entry should say so explicitly so nobody "fixes" idempotency to merge coords. Suggested line: *the geotag rides the first successful submit only; retries never update it.*
+- Owner approval is cited with a date but (per the M0 exit-criterion convention adopted in bc9c10f) future owner-decision commits could name the decision venue/thread. Minor consistency point, not a defect.
+
+**Domain / correctness checks:** No schema/behavior changes now — nothing to execute. Range validation (lat ∈ [-90,90], lng ∈ [-180,180], accuracy > 0) is already specified for the future RPC ✓.
+
+**What I tried:** Read the full diff and new doc; confirmed the README/PLAN links resolve; cross-checked the fail-open flow against the salesman-app resilience spec (no conflict — submit path unchanged) and the idempotency rule (interaction noted above).
+
+**Open flags (cumulative):** Empty; standing M1 test obligations remain. The idempotency×geotag note lives in this block for whenever the feature is scheduled.
+
+**Next-commit suggestion:** Unchanged — M0 design hand-off, then M1 migrations.
+
+---
+
+## Review of 37ce452 — docs: pin the geotag × idempotency interaction in future-plans.md
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Pin the non-blocking note from my 6d81e88 review — geotag rides the first successful submit only; retries never update it — so the idempotency rule can't be weakened to merge coordinates when the feature is eventually scheduled.
+
+**What works:** The pinned paragraph states the rule, the edge case (first attempt lands without a fix, retry arrives with one → fix discarded), why that's acceptable (soft signal), and the explicit prohibition ("do not weaken the idempotency rule to merge coordinates"). Placed in the future-plans entry itself, where the future implementer will actually read it. Semantics match my note exactly.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**What I tried:** Read the diff; cross-checked the wording against the `submit_order` idempotency contract in data-model.md and order-lifecycle.md — consistent with both.
+
+**Open flags (cumulative):** Empty; standing M1 test obligations remain.
+
+**Next-commit suggestion:** Unchanged — M0 design hand-off (noting an untracked `favicon.png` has appeared in the working tree, presumably the GE monogram; I'll review it when it's committed), then M1 migrations.
+
+---
