@@ -445,3 +445,83 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 **Next-commit suggestion:** Unchanged — M0 design hand-off (noting an untracked `favicon.png` has appeared in the working tree, presumably the GE monogram; I'll review it when it's committed), then M1 migrations.
 
 ---
+
+## Review of c82607e — design(m0): import Claude Design deliverable + extracted spec — approved by Mridul, 2026-07-06
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** The M0 milestone deliverable — import the approved Claude Design output (the `Ganpati Phase 1.dc.html` canvas, its 13 static renders, and the `support.js` runtime) and distill it into an implementation-facing `design/phase1-design-spec.md`. The commit message records owner approval ("approved by Mridul, 2026-07-06"), satisfying the M0 exit criterion (who + when) adopted at bc9c10f.
+
+**What works — extraction verified against the source, not by eye:**
+- **The tokens are transcribed from the deliverable, not invented.** The three load-bearing colors appear verbatim in the dc.html at the exact hex the spec's token table lists: `#14181F` (ink) ×148, `#1D4ED8` (accent) ×140, `#B45309` (amber) ×18. The canonical worked order `₹4,478` appears 18× and `ORD-2026-1042` 12×; `ASTRA 40 BLACK` 10×.
+- **Worked-order arithmetic re-derived from the CSV source of truth:** MU240 = ₹60 ([ZebronicsPriceList.csv:13](data/ZebronicsPriceList.csv#L13)), MA104B = ₹364 ([:4](data/ZebronicsPriceList.csv#L4)), ASTRA 40 BLACK = ₹1029 ([:33](data/ZebronicsPriceList.csv#L33)); 10×60 + 5×364 + 2×1029 = 600 + 1820 + 2058 = **₹4,478**, 3 distinct lines — the same basket used at S3 resume-draft, S4 cart bar, S5, S7, S9, S10. Confirmed visually in render `t4_00.png`.
+- **Every referenced asset resolves at the commit:** the source-of-truth link `phase1/Ganpati%20Phase%201.dc.html` (URL-encoded space — correct), `phase1/renders/`, and all 13 render PNGs.
+- **Domain invariants survive the extraction intact:** snapshot-at-submit ("catalog price changes never rewrite history", S7), derived lock, ref gaps by design (S8: "…1044 → …1046 are real"), GST-inclusive no-tax figures, IST times, verbatim typo'd names — all consistent with D1/D5 and the lifecycle spec.
+- **`support.js` carries an honest provenance header** ("GENERATED from dc-runtime/src/*.ts — do not edit") — imported as a frozen design artifact, not app code.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions (all resolved/refined by 5d8e58c, reviewed next):**
+- The extraction **faithfully carries the deliverable's own open contradictions** — correct for an extraction, but it means the spec-at-c82607e is not yet internally consistent: (a) the status line read "Derived (window expiry **or** processed) — same chip either way", which contradicts S7/S8 showing a distinct green `Processed` chip; (b) the bottom tab bar listed Home/New Order/**Sync/Profile** with Sync/Profile explicitly undesigned. Both are owner/builder-resolved in 5d8e58c — logging here so the record shows they were caught at import, not missed.
+- **Render gap:** deviation #5 cites "sec-s1…s8 renders" but there is no `sec-s6_00.png` (present: s1,2,3,4,5,7,8). The "…" range overstates the set by one. Cosmetic — the v1 sec-renders are state checklists only (instrument grammar wins), so no screen is actually undesigned.
+
+**Domain / correctness checks:** Money display, status taxonomy, numbering, snapshot immutability — all spec-level correct and consistent with the frozen specs. No executable surface yet; SQL-level verification stays deferred to M1.
+
+**What I tried:** `grep -c` token/sample-data counts in the dc.html; CSV price lookup + arithmetic for the worked order; `git ls-files` render inventory + a `sec-s{1..8}` presence loop; read renders `t4_00.png` (S5/S6/S7/S10) and `sec-s1_00.png` (login states); read the full spec end-to-end.
+
+**Open flags (cumulative):** ⑦ (new, minor): sec-s6 render absent vs the "sec-s1…s8" label. Standing M1 test obligations remain.
+
+**Next-commit suggestion:** Reviewed as landed — 5d8e58c resolves the extraction's open items.
+
+---
+
+## Review of 5d8e58c — design(m0): builder resolutions + owner decisions on the phase1 design spec
+
+**Verdict:** ✅ accept — with two non-blocking documentation flags
+
+**Phase / commit goal (as I understood it):** Resolve the ambiguities the Claude-design extraction left open and record the owner's 2026-07-06 decisions — six edits to the spec plus the receipt-glyph asset.
+
+**What works — each of the six resolutions verified against the diff, the CSV, and the renders:**
+1. **Touch targets** ([spec:45](design/phase1-design-spec.md#L45)): now separates the ≥48px hit-area floor from the smaller visual cells (44×50 / 40×42) via invisible padding — "spec floor wins on hit area, design visuals win on pixels." Matches the ≥48px constant and the `sec-s1` render annotation ("48px+ fields and button"). Sound.
+2. **Qty cap:** UI keypad cap 999, deliberately stricter than the DB `1..9999` bound verified at bc9c10f. Structurally enforced by "keypad max 3 digits" → ≤999; the two bounds don't need reconciling. Correct fail-safe.
+3. **Chip = status** ([spec:56](design/phase1-design-spec.md#L56)): drops the extraction's "same chip either way." Verified well-founded against render `t4_00` S7-states — the design's *visual* already shows three distinct chips (grey `locked`, green `Processed`, red `Cancelled`); only the annotation prose was loose. The edit aligns the spec with the design's own visuals and with the derived-lock model (lock governs edit *permission*, not chip display). Correct.
+4. **Bottom tab bar → Home + New Order only** (owner): Sync/Profile tabs cut; the amber unsent square moves to the Home tab, Home's pinned "Saved on phone" strip carries sync truth (verified present in the S2/Home render), sign-out at the bottom of Home. Coherent — no orphaned sync surface. (Introduces flag (a).)
+5. **Font-loading mandate:** subset + `font-display: swap` + system fallback stacks (`system-ui` structure; `ui-monospace, Menlo, Consolas, monospace` figures). Right call — the <2s-on-4G persona budget outranks webfont fidelity.
+6. **Product mark = receipt glyph** (owner), overriding the designer's GE monogram; adds `design/phase1/favicon.png`. Byte-verified (sha `39d6ec0…`) and read: a zigzag-edged bill with two ink lines in ink `#14181F`, exactly as deviation #6 describes. **This closes the 37ce452 note** where I flagged an untracked `favicon.png` as "presumably the GE monogram" — it is in fact the receipt glyph, and it *supersedes* the monogram.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **(a) Broken forward reference.** Lines [47](design/phase1-design-spec.md#L47) and [96](design/phase1-design-spec.md#L96) both cite "the future Payments tab — see docs/future-plans.md", but `docs/future-plans.md` has **no Payments entry** (`git grep -i payment` at HEAD → nothing; the file holds only the geotag parking-lot). Same class as the README forward-reference flag from 3e5bf1f. Fix cheaply: add a one-line "Payments (Phase N)" stub to the parking lot, or drop the pointer until it exists. → flag ⑧.
+- **(b) S1 mark contradiction left half-resolved.** Deviation #6 makes the receipt glyph the icon "everywhere … the S1 login block," overriding the GE monogram — but the S1 screen text ([spec:68](design/phase1-design-spec.md#L68)) still reads "GE monogram block (accent)," and the S1 renders (`sec-s1_00`, `t4_00`) still draw the "GE" monogram (expected — they predate the override). Also unaddressed: the desktop **S8** top-chrome "GE block" ([spec:82](design/phase1-design-spec.md#L82)) — does "everywhere" convert desktop chrome too, or does the monogram survive there? Reconcile line 68 (and clarify S8) with deviation #6 so the builder doesn't copy the monogram straight from the renders. → flag ⑨.
+
+**Domain / correctness checks:** No schema/behavior surface — six doc/spec edits + one static asset. The qty-cap and chip=status edits are consistent with the DB constraints and lifecycle already reviewed.
+
+**What I tried:** read the full diff hunk-by-hunk against the six message claims; `git grep -i payment docs/future-plans.md` (empty); byte-compared the favicon across paths (`git cat-file … | shasum`, identical); read `assets/favicon.png` (receipt glyph) and the S7-states render (chip=status corroboration); confirmed the S2/Home sync-strip and S3 resume-draft ₹4,478 basket in `t4_00`.
+
+**Open flags (cumulative):** ⑦ sec-s6 render gap. ⑧ Payments forward reference (docs/future-plans.md). ⑨ S1/S8 mark vs receipt-glyph override. Standing M1 obligations remain.
+
+**Next-commit suggestion:** a two-line doc fix closing ⑧ (Payments stub) and ⑨ (line 68 → receipt glyph). Then M0 is fully consistent and M1 (`supabase/migrations/0001_*.sql`) is the next build step, where my RLS / snapshot / trigger / qty / retry test obligations activate.
+
+---
+
+## Review of bb1dfd3 — chore: relocate favicon to assets/ as the official app logo/favicon
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Promote the receipt glyph to the repo's canonical logo/favicon by moving it `design/phase1/favicon.png → assets/favicon.png` and repointing the spec link.
+
+**What works:**
+- **Pure rename, content untouched:** git reports `similarity index 100% / rename`, and I confirmed byte-identity independently — sha `39d6ec0d…` at both `5d8e58c:design/phase1/favicon.png` and `HEAD:assets/favicon.png`. No re-encode, no size delta.
+- **Link repointed and resolves:** [spec:101](design/phase1-design-spec.md#L101) now `[favicon.png](../assets/favicon.png)`; from `design/phase1-design-spec.md` (in `design/`), `../assets/favicon.png` → repo-root `assets/favicon.png` ✓.
+- **No dangling references:** `git grep "phase1/favicon.png" HEAD` → none; the only favicon reference repo-wide is the now-correct spec line. The frozen `dc.html` never referenced the favicon (owner-added asset, not part of the design export), so nothing to fix there.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** N/A — file move + one link.
+
+**What I tried:** `git show --find-renames bb1dfd3` (100% rename), `git cat-file -p … | shasum` on both blobs (identical), `git grep` for the old path and for favicon repo-wide, `grep favicon` in the dc.html (none).
+
+**Open flags (cumulative):** ⑦ sec-s6 gap, ⑧ Payments forward reference, ⑨ S1/S8 mark override — all carried, all doc-only, none blocking. Standing M1 test obligations remain. **M0 is complete** (owner-approved deliverable imported, spec extracted, decisions recorded); the highest-value next commit is M1 migrations, where my execution-based verification finally activates.
+
+---
