@@ -66,11 +66,12 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 **BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
 
-**No 🔴 blocking items open.** One security followup (㉑ — low practical risk, but fix before pilot) plus minor/deferred items. M1 backend + M2 seed verified complete against the live project; the app build-out (M1 app · M3 auth) is underway.
+**No 🔴 blocking items open.** All items are minor / deferred / owner-config. M1 backend + M2 seed verified complete against the live project; the app build-out (M1 app · M3 auth) is underway.
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
-| ㉑ | `email_for_username()` (username-login lookup) is `anon`-executable → a guessed username returns that account's email (**proven live**). D9's "server action closes the harvest risk" is inaccurate. Use a **service-role** lookup + `revoke … from anon, authenticated`. | 🟡 security (low practical risk) | app D9 (39cf779) | 🟡 open — fix before pilot |
+| ㉒ | `SUPABASE_SERVICE_ROLE_KEY` must be set in `.env.local` (local) + Vercel env (deploy) or **username login fails** — the service-role lookup can't run without it. Owner action (Project Settings → API); no MCP tool exposes it. | 🟡 config / owner | app ㉑-fix (0db66fd) | 🟡 open — set before any login works |
+| ㉑ | `email_for_username()` (username-login lookup) was `anon`-executable → a guessed username returned that account's email (**proven live**). | 🟡 was security | app D9 (39cf779) | ✅ **CLOSED** at 0db66fd — revoked anon/auth, service-role-only; harvest now denied (verified), advisor clear |
 | ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 was correctness-blocking | app auth (dcb3904) | ✅ **CLOSED** at 0dc60a3 — `redirectWithCookies` copies cookies onto all 4 redirects; build+lint clean |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
 | ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, **6** unindexed FKs incl. `orders.cancelled_by`, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
@@ -1232,5 +1233,32 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No blocking items. **㉑ (new, security) `email_for_username` anon-harvestable — use a service-role lookup + revoke anon; correct D9's "closed" claim.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password, PLAN Q#7) remain.
 
 **Next-commit suggestion:** the ㉑ service-role fix (small), then S3/S4 (where `submit_order` gets exercised through the app). A live login drive is now possible with the backfilled usernames if a test password is shared.
+
+---
+
+## Review of 0db66fd — fix(security): ㉑ — email_for_username was anon-harvestable, close it
+
+**Verdict:** ✅ accept — ㉑ closed and **verified by execution**; the harvest I proved is now denied. Clean fix, honest in-place doc correction.
+
+**Phase / commit goal (as I understood it):** Revoke the anon/authenticated grant on `email_for_username` and move the username→email lookup to a server-only service-role client, so the mapping is no longer reachable with the public anon key.
+
+**What works — verified live:**
+- **The harvest is closed.** `has_function_privilege`: `anon=false, authenticated=false, service_role=true`. Re-running my exact attack — `set role anon; select email_for_username('mridul')` — now raises **`permission denied for function email_for_username`** (was returning the real gmail before). ✓✓
+- **`get_advisors(security)` no longer lists `email_for_username`** at all (a service_role-only function isn't externally callable) — the `anon_security_definer_function_executable` finding is gone; only the 5 accepted authenticated RPCs + `auth_leaked_password` (⑯) remain. ✓
+- **`service.ts` is properly guarded:** `import "server-only"` makes an accidental Client-Component import a **build-time** error (not a runtime leak); the client uses `SUPABASE_SERVICE_ROLE_KEY` with `autoRefreshToken/persistSession: false`; the comment explicitly scopes it to *only* this lookup ("don't reach for this client for anything else"). `actions.ts` uses it for the lookup, the regular RLS-scoped client for the sign-in. Good separation + minimal blast radius. ✓
+- **Docs corrected in place, not silently rewritten:** D9 and roles-and-permissions.md now record that the anon grant + the "server action closes the risk"/"anon-callable unavoidable" claims were **wrong**, cite my live proof, and explain why the *grant* is what controls access — matching how the D8 correction was handled. Honest log hygiene. ✓ `.env.example` documents `SUPABASE_SERVICE_ROLE_KEY` (server-only, never `NEXT_PUBLIC_`). `server-only` added to deps. build + lint exit 0. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions / dependency:**
+- **㉒ (config, owner action): username login is now non-functional until `SUPABASE_SERVICE_ROLE_KEY` is set** in `.env.local` (local) and Vercel env (deploy) — the service client can't call the lookup without it, so *every* sign-in fails until then. The BUILDER flagged this honestly ("NEEDS MRIDUL") and no MCP tool exposes the key (Project Settings → API). Same owner-action class as ⑯. Not a defect — a required setup step — but tracked so login isn't mistaken for broken.
+
+**Domain / correctness checks:** Security — the deliberate anon exception is removed; anon is back to zero access; the lookup runs under `service_role` strictly server-side ✓ (verified). No RLS-policy change. No money/state surface.
+
+**What I tried:** read the migration / service.ts / actions.ts / D9 + spec corrections; live `has_function_privilege` (anon/auth/service_role) + a `set role anon` call to `email_for_username` (now **denied**); `get_advisors(security)` (finding gone); `npm run build`/`lint` (exit 0).
+
+**Open flags (cumulative):** **㉑ — ✅ CLOSED (verified).** No blocking items. **㉒ (new, config) set `SUPABASE_SERVICE_ROLE_KEY` before login works.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
+
+**Next-commit suggestion:** S3/S4 (retailer picker + quick order → `submit_order` through the app). Once the service-role key is set, a live end-to-end login + role-routing drive becomes possible with the backfilled usernames (needs a test password).
 
 ---
