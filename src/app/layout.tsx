@@ -7,7 +7,7 @@ import "./globals.css";
 // webfont — the <2s-on-4G budget outranks typography (design spec
 // deviation #2). System fallback stack covers the gap until it loads.
 const spaceGrotesk = Space_Grotesk({
-  variable: "--font-structure",
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
   fallback: ["system-ui", "sans-serif"],
 });
@@ -15,7 +15,7 @@ const spaceGrotesk = Space_Grotesk({
 // Every figure — refs, SKUs, prices, quantities, times, countdowns —
 // renders in this so numbers are tabular and column-aligned by construction.
 const jetBrainsMono = JetBrains_Mono({
-  variable: "--font-figures",
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   fallback: ["ui-monospace", "Menlo", "Consolas", "monospace"],
 });

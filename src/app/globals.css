@@ -16,9 +16,12 @@
   --color-inactive: #8a94a0; /* inactive tab icons/labels */
   --color-hairline: #d8dbdf; /* hairline rules replace shadowed cards */
 
-  /* Type (spec §2 "Type scale") */
-  --font-structure: var(--font-structure), system-ui, sans-serif;
-  --font-figures: var(--font-figures), ui-monospace, Menlo, Consolas, monospace;
+  /* Type (spec §2 "Type scale"). next/font assigns --font-space-grotesk /
+     --font-jetbrains-mono (see layout.tsx); these semantic tokens build on
+     top of those distinct names — same name here would be a self-reference
+     cycle (guaranteed-invalid), silently dropping the webfont. */
+  --font-structure: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-figures: var(--font-jetbrains-mono), ui-monospace, Menlo, Consolas, monospace;
 
   --text-name-size: 21px;
   --text-name-weight: 700;
