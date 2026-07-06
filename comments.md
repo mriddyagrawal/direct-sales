@@ -70,7 +70,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
-| ㉒ | `SUPABASE_SERVICE_ROLE_KEY` must be set in `.env.local` (local) + Vercel env (deploy) or **username login fails** — the service-role lookup can't run without it. Owner action (Project Settings → API); no MCP tool exposes it. | 🟡 config / owner | app ㉑-fix (0db66fd) | 🟡 open — set before any login works |
+| ㉒ | `SUPABASE_SECRET_KEY` (new-style `sb_secret_…`) must be set in `.env.local` (local) + Vercel env (deploy) or **username login fails** — the secret-key lookup can't run without it. Owner action (Dashboard → Settings → API Keys → Secret keys); no MCP tool exposes it. | 🟡 config / owner | app ㉑-fix (0db66fd) | 🟡 open — set before any login works |
 | ㉑ | `email_for_username()` (username-login lookup) was `anon`-executable → a guessed username returned that account's email (**proven live**). | 🟡 was security | app D9 (39cf779) | ✅ **CLOSED** at 0db66fd — revoked anon/auth, service-role-only; harvest now denied (verified), advisor clear |
 | ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 was correctness-blocking | app auth (dcb3904) | ✅ **CLOSED** at 0dc60a3 — `redirectWithCookies` copies cookies onto all 4 redirects; build+lint clean |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
@@ -1260,5 +1260,26 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** **㉑ — ✅ CLOSED (verified).** No blocking items. **㉒ (new, config) set `SUPABASE_SERVICE_ROLE_KEY` before login works.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
 
 **Next-commit suggestion:** S3/S4 (retailer picker + quick order → `submit_order` through the app). Once the service-role key is set, a live end-to-end login + role-routing drive becomes possible with the backfilled usernames (needs a test password).
+
+---
+
+## Review of 58d2158 — chore(security): rename SUPABASE_SERVICE_ROLE_KEY -> SUPABASE_SECRET_KEY
+
+**Verdict:** ✅ accept — complete, accurate rename aligning with Supabase's new key naming. No behavior change.
+
+**What works:**
+- Renamed consistently across the live surfaces: `service.ts` (the `process.env` reader + comment), `.env.example` (with the Dashboard → Settings → API Keys → Secret keys pointer), and the D9 / roles-and-permissions / seed-data docs. `git grep SUPABASE_SERVICE_ROLE_KEY` at HEAD → the **only** remaining hit is `Prompts/supabase-setup-builder-prompt.md` (the frozen M1 builder prompt), correctly left as a historical artifact, as the commit states. ✓
+- **Rationale is sound and the "no behavior change" claim is correct:** an `sb_secret_…` key still authenticates against Postgres as the `service_role` role, so the `grant execute … to service_role` from the ㉑ fix is unaffected — the env var is just renamed to match what it now holds (the client was already on `PUBLISHABLE_KEY`). ✓
+- build + lint exit 0. ✓
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** No security/behavior change — the secret key still maps to `service_role`; the harvest fix (㉑) stands. Purely an env-var rename + doc alignment.
+
+**What I tried:** read the diff; `git grep SUPABASE_SERVICE_ROLE_KEY HEAD` (only the frozen prompt remains); `npm run build`/`lint` (exit 0).
+
+**Open flags (cumulative):** No blocking items. ㉒ now reads **`SUPABASE_SECRET_KEY`** (owner sets it before login works). ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
+
+**Next-commit suggestion:** S3/S4 — `submit_order` through the app.
 
 ---
