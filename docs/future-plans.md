@@ -15,4 +15,6 @@ Ideas the owner has approved in principle but deliberately **not** scheduled int
 
 **Schema when scheduled** (additive, cheap — nothing pre-built now): nullable `orders.submit_lat`, `orders.submit_lng`, `orders.submit_accuracy_m`; the `submit_order` RPC accepts them as optional client-supplied fields (unlike prices, only the client can know them; validate ranges, store as-is).
 
+**Idempotency interaction (pinned per the 6d81e88 review):** `submit_order` retries with an existing `id` return the order untouched — so **the geotag rides the first successful submit only; retries never update it**. If the first attempt lands without a fix and a retry arrives with one, the fix is discarded. That is acceptable (the tag is a soft signal); do not weaken the idempotency rule to merge coordinates.
+
 **Revisit when:** the Phase 1 pilot has proven adoption (post-M6), or the first "was he really at the shop?" dispute makes the data worth having.
