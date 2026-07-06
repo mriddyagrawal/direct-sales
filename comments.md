@@ -76,6 +76,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — enable before pilot |
+| ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | 🟡 open — fix before a CI/Vercel lint gate |
 | ⑮ | D8 filter must scope to **self**-cancels only (`cancelled_by = salesman_id`), else an accountant-cancelled order silently vanishes from the salesman's list. | 🔵 was design gap | M1 (3496c17) | ✅ **CLOSED** at M1.9 (a6ec10a) — `cancelled_by` added; self/office distinction verified live |
 | ⑪ | Rename `current_role()` → `auth_profile_role()` (reserved-keyword footgun). | 🔴 was blocking — owner directive | M1.5/M1.6 | ✅ **CLOSED** at M1.8 — rename complete; RLS (OID-bound) + RPCs re-verified live |
 | ⑩ | RLS fail-open on all 7 tables (anon-readable staff PII; authenticated self-promotion; direct writes bypassing RPCs). | 🔴 was blocking | M1.1–1.3 | ✅ **CLOSED** at M1.6/M1.6b — verified by the 6-step RLS protocol |
@@ -971,5 +972,35 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No blocking items. ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password toggle) — all non-blocking.
 
 **Next-commit suggestion:** the Next.js app scaffold (finishing M1).
+
+---
+
+## Review of 54a3171 — feat(app): scaffold Next.js (App Router, TypeScript, ESLint)
+
+**Verdict:** ✅ accept — clean, standard scaffold; `next build` + TypeScript verified green by execution, app code is lint-clean. One non-blocking finding: `npm run lint` currently **fails**, but entirely on the frozen design artifact, not app code.
+
+**Phase / commit goal (as I understood it):** Stand up the bare Next.js app (App Router, `src/app`, TypeScript, ESLint, no Tailwind) on top of the finished backend — the pending half of M1.
+
+**What works — verified by execution, not by reading:**
+- **`npm run build` is clean** (I ran it): Next 16.2.10 / Turbopack, `✓ Compiled successfully`, TypeScript passed, 3/3 static pages, routes `/` + `/_not-found`. The commit's "build verified clean" is literally true. ✓
+- **App code is lint-clean:** every ESLint issue is in `design/phase1/support.js`; **zero** in `src/`. ✓
+- **Sane, current setup:** Next 16.2.10 + React 19.2.4, App Router under `src/app`, `tsconfig` `strict` + `@/* → ./src/*`, ESLint 9 flat config (`core-web-vitals` + `typescript`). ✓
+- **Right dependency choice for what's coming:** `@supabase/ssr` + `@supabase/supabase-js` — the correct cookie-session pair for App-Router auth (staged, not yet wired). ✓
+- **Secret hygiene is correct:** `.gitignore` already covered `.env`/`.env.*` (with `!.env.example`), `node_modules`, `.next`, `.vercel`; the commit adds only `next-env.d.ts` (Next regenerates it). The untracked `.env.example` holds **empty placeholders** (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) — no secrets; the build reads `.env.local` (gitignored, uncommitted) for the real keys. Both are `NEXT_PUBLIC_` (the publishable/anon key is client-safe — protected by the RLS I verified); no `service_role` in the example. ✓
+- **Honest commit message:** documents the create-next-app-into-temp-then-merge approach, what was/wasn't copied, and that the existing `.gitignore`/README were kept. No overclaim (it says *build* clean, not *lint* clean). ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **⑰ `npm run lint` fails (exit 1: 2 errors, 8 warnings) — all in `design/phase1/support.js`, the frozen generated Claude Design runtime ("GENERATED … do not edit"), not app source.** `src/` is clean. This will red-light any CI/Vercel lint gate the moment one's wired, and misleads a fresh dev running `npm run lint`. One-line fix: add `design/**` (or at least `design/phase1/support.js`) to `globalIgnores` in `eslint.config.mjs` — the design deliverable isn't app code and shouldn't be linted.
+- **Scaffold placeholders to replace next (BUILDER already flagged this):** `layout.tsx` uses Geist/Geist_Mono and `globals.css` uses the default `--background/--foreground` tokens — but the design spec mandates **Space Grotesk + JetBrains Mono** and the instrument tokens (`#1D4ED8`, `#B45309`, `#14181F`, …) with the font-loading mandate (subset + `font-display: swap` + system fallback stacks — deviation #2). Expected in the next commit; I'll verify the tokens/fonts land per spec then.
+
+**Domain / correctness checks:** N/A (scaffold — no data/logic yet). Build/type/lint exercised directly.
+
+**What I tried:** read `package.json` / `tsconfig` / `next.config` / `eslint.config` / `layout.tsx` / `page.tsx` / `globals.css`; `npm install` (up to date); `npm run build` (clean, verified); `npm run lint` (exit 1 — all 10 problems in `design/phase1/support.js`, `src/` clean); inspected `.env.example` (empty placeholders, no secrets).
+
+**Open flags (cumulative):** No blocking items. **⑰ (new) `npm run lint` fails on the frozen design artifact — ignore `design/`.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
+
+**Next-commit suggestion:** the instrument design tokens + fonts (replacing the Geist/default scaffold), and the ⑰ lint-ignore; then the Supabase browser/server clients + login (M3).
 
 ---
