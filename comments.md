@@ -66,17 +66,19 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 **BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
 
+**No 🔴 blocking items currently open.** M1 (schema · triggers · RPCs · RLS · seed · provisioning) is verified complete against the live project. Remaining items are minor/deferred.
+
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
-| ⑪ | **Rename `public.current_role()` → `public.auth_profile_role()`** — reserved-keyword footgun. Repoint all call sites (the 4 RPCs + every M1.6 RLS policy) and the spec prose (roles-and-permissions.md:49). Do it as one atomic drop/recreate-policies+function migration. Nothing is broken today (all sites are qualified), but it's an **owner directive**. | 🔴 **BLOCKING — owner directive** | M1.5 / M1.6 | 🔴 **OPEN — required next commit** |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
+| ⑪ | Rename `current_role()` → `auth_profile_role()` (reserved-keyword footgun). | 🔴 was blocking — owner directive | M1.5/M1.6 | ✅ **CLOSED** at M1.8 — rename complete; RLS (OID-bound) + RPCs re-verified live |
 | ⑩ | RLS fail-open on all 7 tables (anon-readable staff PII; authenticated self-promotion; direct writes bypassing RPCs). | 🔴 was blocking | M1.1–1.3 | ✅ **CLOSED** at M1.6/M1.6b — verified by the 6-step RLS protocol |
 | ⑫ | `search_path` unpinned on the three trigger functions. | 🟡 minor | M1.4 | ✅ CLOSED at M1.6b |
 
-**Standing test obligations (REVIEWER):** RLS 6-step protocol ✅ (M1.6; re-run owed after ⑪) · snapshot/idempotency/qty/guard RPC suite ✅ (M1.5; re-run through RLS after ⑪) · M2 post-seed catalog check ✅ (M1.7, 42 products vs CSV) · Tally-export idempotency — not yet (Phase 2).
+**Standing test obligations (REVIEWER):** RLS 6-step protocol ✅ (M1.6, re-verified post-rename at M1.8) · snapshot/idempotency/qty/guard RPC suite ✅ (M1.5, re-verified through RLS + rename) · M2 post-seed catalog check ✅ (M1.7, 42 products vs CSV) · Tally-export idempotency — not yet (Phase 2).
 
 ---
 
@@ -773,5 +775,60 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** ⑪ `current_role` → `auth_profile_role` rename (OWNER DIRECTIVE, OPEN — the one thing owed before this milestone is clean). ⑬ (new, minor) drift-protected seed loader deferred to app-scaffold. ⑩/⑫ closed.
 
 **Next-commit suggestion:** the ⑪ rename migration (owner-directed), then app scaffolding. On the next order-bearing work I'll re-run the snapshot/idempotency/guard suite *through* the RLS wall with the renamed helper.
+
+---
+
+## Review of 6923b61 — fix(supabase): M1.8 — rename current_role() -> auth_profile_role() (owner directive)
+
+**Verdict:** ✅ accept — closes flag ⑪ (owner directive). Rename is complete and the RLS wall + RPCs still enforce, verified live.
+
+**Phase / commit goal (as I understood it):** Execute the owner-directed rename of the reserved-keyword-shadowing helper `current_role()` → `auth_profile_role()`, repointing every call site.
+
+**What works — verified by execution against the live project:**
+- **The clever part is correct and proven.** The migration uses `alter function public.current_role() rename to auth_profile_role` and does *not* recreate the M1.6 policies — because a policy's `USING`/`WITH CHECK` expression binds to the function's **OID**, not its name, so the 21 policies keep working under the new name untouched. I proved this empirically: as salesman s1, `select count(*) from orders` returned **1** (own order only) — the OID-bound `orders_select_own` policy still filters correctly through the renamed helper. ✓✓
+- **Old name fully gone, new name present:** `pg_proc` shows 0 `public.current_role`, 1 `public.auth_profile_role` (`prosecdef=true`, `search_path=public, pg_temp` preserved). ✓
+- **All 4 RPC bodies repointed:** `prosrc like '%auth_profile_role()%'` = 4, `like '%public.current_role()%'` = 0. The RPCs were recreated with `CREATE OR REPLACE` (same signatures → OID + `authenticated` EXECUTE grant preserved, no re-GRANT needed). ✓
+- **RPC works post-rename:** `submit_order` as s1 returned `total=20000, ref=ORD-2026-1001` — the recreated body resolves `auth_profile_role()` correctly (a broken helper would have raised "not an active profile"). ✓
+- **Full RLS re-check still green:** self-promotion blocked (role stayed `salesman`), s2 sees 0 of s1's orders, anon denied. ✓
+- **Spec updated:** roles-and-permissions.md:49 now names `auth_profile_role()` with the reserved-keyword rationale inline so it can't be reintroduced. ✓
+- The historical migration files (150000/150400/150500/150600) still contain the old name — **correctly left as-is**: they already ran, and 150800 transforms the end state forward (a fresh re-apply still converges, since the rename lands last and policies follow the OID). No history rewrite. ✓
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** RLS matrix — re-verified intact post-rename ✓. RPC role gating / snapshots — helper resolves correctly inside all four ✓. Footgun — eliminated (the reserved-keyword name is gone from every live object).
+
+**What I tried:** `git show` + `git grep current_role` (only historical files + the intended spec line); a live `DO` block asserting function presence/props, RPC-body call sites (`prosrc`), a real `submit_order`, OID-bound policy enforcement (ownership isolation), self-promotion block, and anon denial — rolled back via RAISE, sequence restored.
+
+**Open flags (cumulative):** **⑪ — ✅ CLOSED (verified).** No blocking items remain. Open: ⑦⑧⑨ (minor M0 doc), ⑬ (deferred seed loader).
+
+**Next-commit suggestion:** app scaffolding (M2+), or close the minor M0 doc flags opportunistically.
+
+---
+
+## Review of 5a869d4 — docs: M1 test accounts — record the 3 real test users + role assignment
+
+**Verdict:** ✅ accept — doc is accurate to the live DB; no secrets committed.
+
+**Phase / commit goal (as I understood it):** Record the three real Supabase Auth accounts Mridul created (admin/accountant/salesman) for end-to-end/manual testing, with their role assignments.
+
+**What works — verified live:**
+- `public.profiles` holds exactly the three documented rows: **Vikram = admin, Mriddy = accountant, Mridul = salesman, all `active = true`** — matches the doc's table exactly. ✓
+- `auth.users` count = `profiles` count = 3, i.e. **the M1.1 `create_profile_for_new_user` trigger auto-provisioned a profile for each real Dashboard-created user** — the provisioning path now confirmed with real accounts, not just my synthetic test rows. ✓
+- **No passwords anywhere** in the diff or repo (the commit message claims it; I read the full diff to confirm). The doc points readers to Mridul for credentials. ✓
+- The doc correctly characterizes my automated verification: the `set local role authenticated` + simulated `request.jwt.claim.sub` technique already proved the RLS/RPC behavior without real logins; these accounts are for future manual/app-level testing. Accurate. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **Admin bootstrap clarity:** the doc says roles were promoted "via a plain `update public.profiles set role = ...`". That only works from an **elevated context** (Supabase Studio / `service_role`), which bypasses RLS — an *authenticated* user cannot do it, because the M1.6 policies block self-promotion (I verified). Worth a half-sentence so nobody thinks a signed-in user can self-assign a role. (The runbook context implies Studio, so it's a clarity nit, not an error.)
+- **Real personal emails are now in a committed file** (mild PII). Fine for a private repo and it's the owner's own call/accounts — just flag if this repo is ever made public. → noting, not a flag.
+
+**Domain / correctness checks:** RLS/auth — the three roles are exactly the matrix's three; bootstrap done via elevated access (correct). No schema/behavior change.
+
+**What I tried:** read the full diff (no credentials present); live query of `profiles` (names/roles/active) and `auth.users`/`profiles` counts vs the doc.
+
+**Open flags (cumulative):** none new. ⑦⑧⑨ (minor M0 doc), ⑬ (deferred) remain; no blocking items.
+
+**Next-commit suggestion:** M2 app scaffolding. My M1 verification is complete — the schema, triggers, RPCs, RLS, seed, and provisioning are all verified against the live project.
 
 ---
