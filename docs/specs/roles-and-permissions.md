@@ -56,7 +56,7 @@ Registration is still email+password (D3) — but staff **log in** with a separa
 
 ## Session/config notes
 
-- Anon key ships in the client (safe: RLS is the wall). `service_role` key exists only in server-side env (`SUPABASE_SERVICE_ROLE_KEY`) for the seed script; never in client bundles, never in the repo.
+- The publishable key (new-style `sb_publishable_...`, replacing the legacy `anon` JWT) ships in the client (safe: RLS is the wall). The secret key (`sb_secret_...`, replacing the legacy `service_role` JWT) exists only in server-side env (`SUPABASE_SECRET_KEY`) — used by the username-login lookup (D9) and the future seed script; never in client bundles, never in the repo.
 - Role lookup inside policies uses a `security definer` helper (`auth_profile_role()` reading `profiles`) to avoid RLS recursion — standard Supabase pattern. (Named `auth_profile_role`, not `current_role`, because `current_role` collides with a PostgreSQL reserved/SQL-standard keyword: unqualified `current_role()` is a syntax error, and the bare identifier silently resolves to the Postgres session role instead of our helper.)
 - Realtime subscriptions respect RLS (dashboard subscribes to `orders`; salesmen receive only their own rows if they subscribe at all).
 

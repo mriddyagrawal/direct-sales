@@ -23,7 +23,7 @@ How [data/ZebronicsPriceList.csv](../../data/ZebronicsPriceList.csv) becomes row
 
 ## Script contract (`scripts/seed.ts`)
 
-- Runs with `SUPABASE_SERVICE_ROLE_KEY` from env (never committed); parses `data/ZebronicsPriceList.csv`, stripping the UTF-8 BOM and CRLF endings first (see encoding hazards above).
+- Runs with `SUPABASE_SECRET_KEY` from env (the `sb_secret_...` key, replacing the legacy `service_role` JWT; never committed); parses `data/ZebronicsPriceList.csv`, stripping the UTF-8 BOM and CRLF endings first (see encoding hazards above).
 - **Idempotent, upsert by `sku`**, with one hard rule: **a re-run never silently overwrites a non-NULL `price_paise` in the DB with a different CSV value** — it prints a drift warning and skips (`--force-prices` to override). The DB is the working truth after go-live; drift is flagged, not clobbered (this is also the REVIEWER's "catalog integrity" check).
 - Never deletes: SKUs missing from a future CSV are reported (candidates for `active = false`), not removed.
 - Prints a summary: inserted / updated / price-drift / unpriced counts.
