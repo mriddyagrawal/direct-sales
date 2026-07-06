@@ -23,13 +23,28 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user!.id)
+    .maybeSingle();
+
   // No .eq('salesman_id', ...) here on purpose — the orders_select_own RLS
   // policy already scopes this to the caller's own rows. Same query shape
   // as the accountant/admin dashboard; RLS is what makes the two return
   // different rows, not client-side filtering.
+  //
+  // D8 (decisions.md): a *self*-cancelled order is hidden from this list —
+  // it almost always corrects a mistake and should read as "never
+  // happened." An office-cancelled order (cancelled_by is the accountant/
+  // admin, not this salesman) stays visible — that's real news, not noise.
+  // `status.neq.cancelled` alone already covers every non-cancelled order
+  // regardless of cancelled_by; the second clause only decides which
+  // *cancelled* orders survive.
   const { data } = await supabase
     .from("orders")
     .select("id, order_ref, submitted_at, total_paise, status, editable_until, retailers(name), order_items(count)")
+    .or(`status.neq.cancelled,cancelled_by.neq.${user!.id}`)
     .order("submitted_at", { ascending: false });
 
   const orders = (data ?? []) as unknown as OrderRow[];
@@ -70,7 +85,7 @@ export default async function Home() {
       )}
 
       <div className={styles.account}>
-        Signed in as {user?.email} · <SignOutButton />
+        Signed in as {profile?.full_name ?? user?.email} · <SignOutButton />
       </div>
 
       <BottomTabBar />
