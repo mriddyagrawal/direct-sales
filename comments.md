@@ -62,6 +62,24 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 ---
 
+## 📋 Open Items Ledger — live, updated every review cycle
+
+**BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
+
+| Flag | Item | Severity | Origin | Status |
+|---|---|---|---|---|
+| ⑪ | **Rename `public.current_role()` → `public.auth_profile_role()`** — reserved-keyword footgun. Repoint all call sites (the 4 RPCs + every M1.6 RLS policy) and the spec prose (roles-and-permissions.md:49). Do it as one atomic drop/recreate-policies+function migration. Nothing is broken today (all sites are qualified), but it's an **owner directive**. | 🔴 **BLOCKING — owner directive** | M1.5 / M1.6 | 🔴 **OPEN — required next commit** |
+| ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
+| ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
+| ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
+| ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
+| ⑩ | RLS fail-open on all 7 tables (anon-readable staff PII; authenticated self-promotion; direct writes bypassing RPCs). | 🔴 was blocking | M1.1–1.3 | ✅ **CLOSED** at M1.6/M1.6b — verified by the 6-step RLS protocol |
+| ⑫ | `search_path` unpinned on the three trigger functions. | 🟡 minor | M1.4 | ✅ CLOSED at M1.6b |
+
+**Standing test obligations (REVIEWER):** RLS 6-step protocol ✅ (M1.6; re-run owed after ⑪) · snapshot/idempotency/qty/guard RPC suite ✅ (M1.5; re-run through RLS after ⑪) · M2 post-seed catalog check ✅ (M1.7, 42 products vs CSV) · Tally-export idempotency — not yet (Phase 2).
+
+---
+
 ## Review of edd8b65 — chore: scaffold repo layout — CSV to data/, original AI drafts to archive/
 
 **Verdict:** ✅ accept
