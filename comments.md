@@ -66,17 +66,18 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 **BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
 
-**No 🔴 blocking items currently open.** M1 (schema · triggers · RPCs · RLS · seed · provisioning) is verified complete against the live project. Remaining items are minor/deferred.
+**1 🔴 blocking item open (⑱ — middleware redirect cookie-drop; fix next commit).** The M1 backend + M2 seed are verified complete against the live project; the app build-out (M1 app · M3 auth) is underway.
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
+| ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 correctness | app auth (dcb3904) | 🔴 **open — fix in the next commit, before the login flow** |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
 | ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, **6** unindexed FKs incl. `orders.cancelled_by`, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — enable before pilot |
-| ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | 🟡 open — fix before a CI/Vercel lint gate |
+| ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | ✅ **CLOSED** at dcb3904 — `design/**`+`archive/**` ignored; `npm run lint` exit 0 |
 | ⑮ | D8 filter must scope to **self**-cancels only (`cancelled_by = salesman_id`), else an accountant-cancelled order silently vanishes from the salesman's list. | 🔵 was design gap | M1 (3496c17) | ✅ **CLOSED** at M1.9 (a6ec10a) — `cancelled_by` added; self/office distinction verified live |
 | ⑪ | Rename `current_role()` → `auth_profile_role()` (reserved-keyword footgun). | 🔴 was blocking — owner directive | M1.5/M1.6 | ✅ **CLOSED** at M1.8 — rename complete; RLS (OID-bound) + RPCs re-verified live |
 | ⑩ | RLS fail-open on all 7 tables (anon-readable staff PII; authenticated self-promotion; direct writes bypassing RPCs). | 🔴 was blocking | M1.1–1.3 | ✅ **CLOSED** at M1.6/M1.6b — verified by the 6-step RLS protocol |
@@ -1002,5 +1003,40 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No blocking items. **⑰ (new) `npm run lint` fails on the frozen design artifact — ignore `design/`.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
 
 **Next-commit suggestion:** the instrument design tokens + fonts (replacing the Geist/default scaffold), and the ⑰ lint-ignore; then the Supabase browser/server clients + login (M3).
+
+---
+
+## Review of dcb3904 — feat(app): Supabase SSR integration + route protection/role routing
+
+**Verdict:** ⚠️ accept-with-followups — the auth **architecture is correct and secure**, but the middleware's redirect branches drop the session cookies, which **breaks the deactivated-user path (infinite redirect loop) and causes intermittent logouts**. That fix is **blocking for the next commit** (before the login flow is exercised). ⑰ is closed.
+
+**Phase / commit goal (as I understood it):** Wire Supabase SSR — browser/server clients, generated DB types, and middleware (`proxy.ts`) that gates auth, fails closed on inactive/missing profiles, and routes by role.
+
+**What works — and much of this is genuinely well done:**
+- **`getUser()`, not `getSession()`, is the only server-side gate** ([middleware.ts:38](src/lib/supabase/middleware.ts#L38)) — with a comment explaining it revalidates against the Auth server. This is *the* correct SSR practice and avoids the #1 spoofable-cookie pitfall. ✓✓
+- **Fail-closed on inactive/missing profile:** `role = profile?.active ? profile.role : null`; if null → `signOut()` + `/login?reason=deactivated`, never renders a shell. I traced the RLS interaction: an inactive user's `profiles` SELECT returns 0 rows (the `auth_profile_role() is not null` policy denies them), so `maybeSingle()` → null → fail closed. Double-guarded. ✓
+- **Next.js 16 `proxy.ts` / `export function proxy` convention** — correctly identified (the scaffold warned middleware.ts is deprecated) and verified against Vercel docs rather than guessed. ✓
+- **Precise territory checks** — `pathname === "/dashboard" || startsWith("/dashboard/")` vs `pathname === "/"`, explicitly avoiding a `startsWith("/")` that would catch everything. ✓
+- **Types generated from the live project** ([database.types.ts](src/lib/types/database.types.ts)) — includes `cancelled_by` (post-M1.9), the 4 RPCs, and `auth_profile_role`; both clients are `Database`-typed. ✓
+- **⑰ CLOSED:** `design/**` + `archive/**` added to eslint `globalIgnores`; I verified `npm run lint` now exits **0**. ✓
+- Build verified clean; `.env.example` committed (empty placeholders); commit message honestly notes "auth_profile_role() is UI convenience only — RLS remains the wall." ✓
+
+**Blocking issue — must fix in the next commit (before login is wired):**
+- **The middleware's redirect responses don't carry `supabaseResponse`'s cookies.** Every authenticated redirect branch returns a *fresh* `NextResponse.redirect(url)` ([:59, :75, :80 in middleware.ts](src/lib/supabase/middleware.ts)) that never copies the cookies the `setAll` adapter accumulated on `supabaseResponse`. The @supabase/ssr contract is explicit: when you return a new response, you **must** copy those cookies, or the session terminates prematurely. Two concrete failures:
+  1. **Deactivated / no-profile user → infinite redirect loop.** The `!role` branch calls `signOut()` (which writes cookie-*clears* onto `supabaseResponse`) then returns a redirect that **drops those clears** → the browser keeps its auth cookies → on the redirected `/login` request, `getUser()` still returns the user, the `!role` check fires *again* (it runs before the `isLoginRoute` guard), signs out, redirects to `/login` again → `ERR_TOO_MANY_REDIRECTS`. A deactivated salesman gets a browser redirect-loop error instead of the intended "account deactivated" login screen. (Not a security hole — they're still denied — but the deactivate path is broken.)
+  2. **Intermittent logouts for everyone.** When `getUser()` refreshes a near-expiry token, the new cookies land on `supabaseResponse`; the `isLoginRoute` bounce and `wrongTerritory` bounce drop them → the browser keeps stale tokens → premature logout. This directly undermines the app's "remember me ~30 days, don't make the field salesman re-login" goal.
+  - **Fix:** for each redirect in an authenticated branch, copy the cookies, e.g. `const res = NextResponse.redirect(url); supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c)); return res;`. (The `!user` branch is fine — no session to preserve, matching Supabase's own example.) This is a code-contract finding (verified against the documented @supabase/ssr requirement + Next response semantics), not a runtime repro — reproducing needs a token-refresh-coincident redirect / a live deactivated session.
+
+**Non-blocking suggestions:**
+- **Two network round-trips per navigation** — `getUser()` (Auth server) + a `profiles` query (DB) on every matched request. Correct for security, but on the spotty-connectivity persona it adds latency to each navigation; consider caching the role (JWT `app_metadata` claim, or a short-lived signed cookie) later. Ties into the ⑭ perf theme.
+- **Territory gating is coarse** — only `/` vs `/dashboard*` are role-guarded; other future routes fall through (authenticated+active only). Fine given RLS is the data wall, but worth remembering when finer per-route roles appear.
+
+**Domain / correctness checks:** Auth/RLS — gating is correct and fail-closed (getUser + active check) ✓; the actual data wall is still RLS (verified in M1) ✓. Session persistence — **defective** (the cookie-copy bug above). No money/state-machine surface here.
+
+**What I tried:** read all six files; `npm run build` (clean, Proxy registered) and `npm run lint` (exit 0 — ⑰ closed); traced the RLS interaction of the middleware `profiles` query (fail-closed confirmed); analysed the redirect/cookie flow against the @supabase/ssr contract (the blocking finding). Reviewed against the *committed* tree (the working dir has uncommitted next-commit WIP: globals.css/layout.tsx edits, icon/manifest/components — not part of this commit).
+
+**Open flags (cumulative):** **⑰ — ✅ CLOSED (lint exit 0).** **⑱ (new, BLOCKING-next) middleware redirect cookie-drop** — deactivated loop + intermittent logouts; fix before the login flow. ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain — non-blocking.
+
+**Next-commit suggestion:** fix ⑱ (copy cookies onto the authenticated redirects) as part of, or before, the login page + sign-in action — otherwise the first real deactivated login and any refresh-time bounce will misbehave.
 
 ---
