@@ -75,7 +75,8 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, **6** unindexed FKs incl. `orders.cancelled_by`, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
-| ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
+| ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open (S1 mark code now correct; spec text unreconciled) |
+| ⑳ | S2 salesman Home doesn't apply the D8 self-cancel filter — a self-cancelled order would still show in the list. Add `.or('status.neq.cancelled,cancelled_by.neq.<uid>')`. | 🟡 functional gap | app S2 (32c1c96) | 🟡 open — wire before S2 is done |
 | ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — enable before pilot |
 | ⑲ | Self-referential `--font-structure`/`--font-figures` in globals.css (same name next/font assigns) → equal-specificity cycle; Space Grotesk may silently drop depending on CSS load order. Use distinct names or drop the redeclaration. | 🟡 was css | design system (7f65371) | ✅ **CLOSED** at 345dce2 — distinct names (`--font-space-grotesk`/`--font-jetbrains-mono`); no cycle, confirmed in served CSS |
 | ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | ✅ **CLOSED** at dcb3904 — `design/**`+`archive/**` ignored; `npm run lint` exit 0 |
@@ -1125,5 +1126,37 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** **⑲ — ✅ CLOSED (verified in output).** No blocking items. ⑨ (M0 doc — S1 mark code now correct, spec text still says "GE monogram"), ⑦⑧ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain — all non-blocking.
 
 **Next-commit suggestion:** continue the salesman flow (S2 Home / My Orders, or S3 retailer picker), or a real end-to-end login drive once test credentials are available. When a data-reading screen lands I'll re-exercise RLS through the real client.
+
+---
+
+## Review of 32c1c96 — feat(app): S2 salesman Home + S8 accountant/admin Orders shells
+
+**Verdict:** ✅ accept — the first data screens are well-built and the RLS-as-the-wall architecture is correct; `format.ts`/`order-status.ts` verified by execution. One functional gap: S2 doesn't yet apply the D8 self-cancel filter (⑳, non-blocking).
+
+**Phase / commit goal (as I understood it):** S2 (salesman Home/My Orders) + S8 (accountant/admin Orders table), with shared `format.ts` (money/date/countdown), `order-status.ts` (chip derivation), and the OrderCard / BottomTabBar / SignOutButton primitives.
+
+**What works — money/date logic unit-tested by execution:**
+- **`formatRupees` is correct incl. en-IN lakh grouping:** 447800→`₹4,478`, 6000→`₹60`, 913800→`₹9,138`, **10258400→`₹1,02,584`**, 0→`₹0`. Whole-rupees (`Math.round(paise/100)`), no paise fractions (D5). ✓
+- **`formatCountdown`** minutes-only: +72m→`editable 1h 12m` (not urgent), +8m→`editable 8m` (**urgent**, `<10m`), passed→`null`. Matches spec §2. ✓
+- **`formatOrderTimestamp`** IST-correct: today→`11:42`, yesterday→`Yesterday 16:03`, older→`01 Jul 2026, 11:42`, and it **buckets across the IST/UTC boundary correctly** (a `19:00Z` order lands on the next IST day, not "yesterday"). ✓ (15/16 assertions passed; the one miss was *my* test feeding a future-dated order — the code's full-date output was right.)
+- **`order-status.ts`** implements the derived-lock model faithfully: cancelled→`Cancelled`/error, processed→`Processed`/processed, submitted→countdown chip (amber if `<10m`, else accent) or `Submitted · locked` once the window passes. "Chip = status," processed/cancelled always show their own chip. Matches the corrected spec. ✓
+- **RLS is the wall, not client filtering — both pages get this right.** S2 queries `orders` with **no `.eq('salesman_id')`** and S8 with **no role filter**; each relies on `orders_select_own` vs `orders_select_staff` (which I proved at M1) to return different rows from the *same query shape*. Both have comments stating this explicitly. This is the correct, non-duplicative design. ✓
+- **S8 disambiguates the FK correctly:** `profiles!orders_salesman_id_fkey(full_name)` — `orders` has three FKs to `profiles` (salesman/processed_by/cancelled_by), so the explicit hint is required; it's the right one. Ledger columns (REF/SUBMITTED/SALESMAN/RETAILER+NEW/LINES/TOTAL/STATUS), the `NEW` badge on unverified retailers, and mono figures all match S8. ✓
+- S2 empty state ("No orders yet — take your first order — tap New Order below"), TODAY/EARLIER IST sections, sign-out, and BottomTabBar per spec. Data pages correctly render **dynamic (ƒ)**. build + lint exit 0. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **⑳ S2 doesn't apply the D8 self-cancel filter.** The query fetches *all* the salesman's own orders (incl. `cancelled`) and renders them — so a **self-cancelled** order would appear in Home, contradicting D8 (for which `orders.cancelled_by` was added specifically). Confirmed: no `cancelled_by`/status filter in the query. Fix: exclude self-cancels, e.g. `.or('status.neq.cancelled,cancelled_by.neq.<user.id>')` — keeps non-cancelled + office-cancels (per the corrected D8), hides self-cancels. S8 correctly has *no* such filter (accountant sees all). Non-blocking (nothing breaks; the DB supports it), but it's a decided behaviour not yet wired.
+- **Account line shows the email, not the name.** S2 spec says "Signed in as **Raju** · Sign out"; the code shows `user?.email`. Prefer the profile's `full_name` (a small extra select, or read it in the layout). Cosmetic.
+- Couldn't drive the pages with a *real* logged-in session (test-account passwords aren't committed) — the RLS scoping they depend on is already proven at M1, and the PostgREST query shapes (nested `retailers`/`order_items(count)`, the FK hint) are valid.
+
+**Domain / correctness checks:** Money — integer paise → whole-rupee en-IN, no tax math (D5) ✓, verified. State machine / derived lock — chip derivation matches the lifecycle ✓. RLS — pages rely on it correctly (proven at M1); no client-side ownership filter to drift ✓. D8 — **not yet applied on S2** (⑳). IST — correct across the tz boundary ✓.
+
+**What I tried:** read format.ts / order-status.ts / page.tsx (S2) / dashboard/page.tsx (S8) / OrderCard / BottomTabBar; a `node` TS unit test of `format.ts` (15/16, the miss was a bad expectation); `npm run build` (exit 0; `/` and `/dashboard` are ƒ dynamic) + `npm run lint` (exit 0); grep-confirmed S2 has no D8 filter.
+
+**Open flags (cumulative):** No blocking items. **⑳ (new) S2 missing the D8 self-cancel filter.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain — all non-blocking.
+
+**Next-commit suggestion:** wire the D8 filter on S2 (⑳); continue the flow (S3 retailer picker / S4 quick order). A live login drive (with a test credential) would let me confirm role-routing + RLS end-to-end through the browser.
 
 ---
