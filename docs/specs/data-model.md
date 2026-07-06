@@ -95,6 +95,8 @@ create table public.orders (
   processed_at   timestamptz,
   processed_by   uuid references public.profiles (id),
   cancelled_at   timestamptz,
+  cancelled_by   uuid references public.profiles (id),  -- distinguishes a self-cancel from
+                                                          -- an office-cancel (D8) — added M1.9
   updated_at     timestamptz not null default now()
 );
 ```
@@ -143,7 +145,7 @@ Salesmen and accountants have **no direct INSERT/UPDATE grants on `orders`/`orde
 |---|---|---|
 | `submit_order(id, retailer_id, notes, items[])` | salesman | Validates items (priced, active, qty 1–9999), snapshots names/prices from catalog, assigns `order_no`/`order_ref`, sets `submitted_at`/`editable_until`, writes `submitted` event. Idempotent on `id`: a retry carrying an existing `id` returns that order untouched — a differing payload is ignored, never merged. |
 | `update_order_items(order_id, notes, items[])` | salesman (own, within window) or accountant | Replaces lines; existing lines keep their original snapshot price, newly added products snapshot at edit time; recomputes totals; writes event. |
-| `cancel_order(order_id, reason)` | salesman (own, within window) or accountant | Sets status/`cancelled_at`; writes event with reason. |
+| `cancel_order(order_id, reason)` | salesman (own, within window) or accountant | Sets status/`cancelled_at`/`cancelled_by`; writes event with reason. |
 | `process_order(order_id)` | accountant/admin | `submitted → processed`; sets `processed_at/by`; writes event. |
 
 ## Triggers

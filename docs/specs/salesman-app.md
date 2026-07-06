@@ -19,8 +19,8 @@ Email + password, "remember me" default on (long-lived session). No signup, no s
 ### 2. Home — My Orders (`/`)
 - Primary action: **"New Order"** — big, thumb-reachable.
 - List of the salesman's orders, newest first: `order_ref`, retailer name, line count, `total`, status chip, and — while editable — a **live countdown** ("editable 1h 12m").
-- Status chips: `Submitted` (editable) / `Submitted · locked` (derived, past window) / `Processed` / `Cancelled`.
-- **Cancelled orders are hidden from this list by default (D8)** — a self-cancel is almost always correcting a mistake, and it should read as "never happened" from the salesman's own point of view. The row, its audit trail, and the accountant's visibility are all unaffected — this is a client-query filter (`status != 'cancelled'`), not an RLS change. A dedicated "Cancelled orders" view is parked, not committed (see [future-plans.md](../future-plans.md)).
+- Status chips: `Submitted` (editable) / `Submitted · locked` (derived, past window) / `Processed` / `Cancelled` — the `Cancelled` chip only ever appears here for an **office-cancelled** order (see below); a self-cancelled order doesn't get a chip in this list because it isn't in this list.
+- **Self-cancelled orders are hidden from this list by default (D8, corrected)** — only orders where `cancelled_by = salesman_id` (the salesman cancelled their own order) are hidden; that's almost always correcting a mistake, and should read as "never happened" from their own point of view. An **office-cancelled** order (`cancelled_by` is the accountant/admin) stays visible with the `Cancelled` chip — the retailer backing out is real news the salesman needs, not noise to bury. The row, its audit trail, and the accountant's visibility are unaffected either way — this is a client-query filter (`status = 'cancelled' and cancelled_by = salesman_id`), not an RLS change. A dedicated "Cancelled orders" view (to un-hide self-cancels) is parked, not committed (see [future-plans.md](../future-plans.md)).
 - Tap → Order detail. Empty state for a fresh account. "Today" section separated from older orders (IST days).
 
 ### 3. Pick Retailer
