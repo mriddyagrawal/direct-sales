@@ -46,7 +46,7 @@ The `guard_order_transition` trigger backstops the RPCs, so even a future privil
 ## Session/config notes
 
 - Anon key ships in the client (safe: RLS is the wall). `service_role` key exists only in server-side env (`SUPABASE_SERVICE_ROLE_KEY`) for the seed script; never in client bundles, never in the repo.
-- Role lookup inside policies uses a `security definer` helper (`current_role()` reading `profiles`) to avoid RLS recursion — standard Supabase pattern.
+- Role lookup inside policies uses a `security definer` helper (`auth_profile_role()` reading `profiles`) to avoid RLS recursion — standard Supabase pattern. (Named `auth_profile_role`, not `current_role`, because `current_role` collides with a PostgreSQL reserved/SQL-standard keyword: unqualified `current_role()` is a syntax error, and the bare identifier silently resolves to the Postgres session role instead of our helper.)
 - Realtime subscriptions respect RLS (dashboard subscribes to `orders`; salesmen receive only their own rows if they subscribe at all).
 
 ## Verification protocol (for the REVIEWER)
