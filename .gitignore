@@ -8,3 +8,4 @@ node_modules/
 .vercel/
 coverage/
 supabase/.temp/
+next-env.d.ts
