@@ -48,11 +48,11 @@ The `guard_order_transition` trigger backstops the RPCs, so even a future privil
 Registration is still email+password (D3) — but staff **log in** with a separately-chosen `profiles.username` (D9), not their email. Supabase Auth has no native "sign in by arbitrary field," so:
 
 1. Client submits `{ username, password }` to a Next.js **Server Action** (never the browser's Supabase client directly).
-2. The action calls `public.email_for_username(username)` — `security definer`, granted to `anon` (unavoidable: this runs pre-authentication) **and** `authenticated`. It returns the email only for an **active** profile; NULL for a nonexistent *or* deactivated username — the two look identical from the outside.
-3. The action calls `signInWithPassword({ email, password })` with the looked-up email, using the same server-side Supabase client — so the email is used internally and **never reaches the browser**, closing the "harvest emails by scripting a username-lookup endpoint" risk that calling this RPC from client-side JS would carry.
+2. The action calls `public.email_for_username(username)` using a **service-role client** (`src/lib/supabase/service.ts`, server-only). It returns the email only for an **active** profile; NULL for a nonexistent *or* deactivated username — the two look identical from the outside.
+3. The action calls `signInWithPassword({ email, password })` with the looked-up email, using the regular server-side (RLS-scoped) Supabase client.
 4. Same generic "Wrong username or password" message regardless of which of the three ways it failed (bad username, deactivated, bad password).
 
-`email_for_username` is the one deliberate exception to "anon gets zero access" in the RLS matrix below — scoped as narrowly as possible (returns only an email string, active profiles only).
+**`email_for_username` has NO grant to `anon` or `authenticated`** — only `service_role` can call it. An earlier pass granted it to `anon` on the theory that calling it from a Server Action rather than client-side JS would prevent harvesting; that was wrong and the REVIEWER proved it live (calling the function directly as `anon` returned a real email, completely bypassing the app). The public anon/publishable key ships in the client bundle by design, so *any* anon-grantable endpoint is reachable directly against the REST API regardless of what the app's own code does — the fix has to be the grant itself, not which code path calls it. This is the only RPC in the project that needs `service_role`; see D9's correction for the full account.
 
 ## Session/config notes
 

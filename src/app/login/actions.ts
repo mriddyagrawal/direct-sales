@@ -2,19 +2,23 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export interface LoginState {
   error: string | null;
 }
 
-// Username -> email resolution happens entirely here, server-side.
-// Supabase Auth only authenticates by email/phone (no native username
-// login), so a public.email_for_username() RPC (security definer, callable
-// by anon — see decisions.md D9) is unavoidable. Calling it from a Server
-// Action rather than the browser's Supabase client means the looked-up
-// email is used internally and never serialized back to client-visible
-// network traffic — closing the "script requests to harvest emails via a
-// username-lookup endpoint" risk a client-side call would carry.
+// Username -> email resolution happens entirely server-side via a
+// service-role client (src/lib/supabase/service.ts). Supabase Auth only
+// authenticates by email/phone (no native username login), so a
+// public.email_for_username() RPC is unavoidable — but it has NO anon/
+// authenticated grant (flag 21: an anon-callable version let anyone with
+// the public anon key harvest emails by guessing usernames directly
+// against the REST API, completely bypassing this Server Action — calling
+// it from server-side code doesn't matter if the endpoint itself is
+// anon-callable; the function's grant is what actually controls access).
+// Only the service-role client — server-only, never in the browser — can
+// call it now.
 export async function signInWithUsername(
   _prevState: LoginState,
   formData: FormData,
@@ -26,9 +30,8 @@ export async function signInWithUsername(
     return { error: "Enter a username and password." };
   }
 
-  const supabase = await createClient();
-
-  const { data: email, error: lookupError } = await supabase.rpc("email_for_username", {
+  const serviceClient = createServiceClient();
+  const { data: email, error: lookupError } = await serviceClient.rpc("email_for_username", {
     p_username: username,
   });
 
@@ -38,6 +41,7 @@ export async function signInWithUsername(
     return { error: "Wrong username or password." };
   }
 
+  const supabase = await createClient();
   const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
 
   if (signInError) {
