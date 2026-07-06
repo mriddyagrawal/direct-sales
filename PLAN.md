@@ -1,6 +1,6 @@
 # PLAN — Phased Roadmap
 
-**Now:** planning complete → **design phase (Phase 1 · M0)** → build. Decisions live in [docs/decisions.md](docs/decisions.md); specs in [docs/specs/](docs/specs/) are the source of truth. Work happens on **feature branches with granular commits**; every commit is reviewed by the REVIEWER in [comments.md](comments.md), and blocking findings are fixed in the very next commit.
+**Now:** M0 (design) and the **M1 backend** — schema · RPCs · triggers · RLS · seed · provisioning — are ✅ complete and reviewer-verified against the live Supabase project (Mumbai); see the Open Items Ledger in [comments.md](comments.md). **Next: scaffold the Next.js app** on top of the finished backend, then wire auth (M3). Decisions live in [docs/decisions.md](docs/decisions.md); specs in [docs/specs/](docs/specs/) are the source of truth. Work happens on **feature branches with granular commits**; every commit is reviewed by the REVIEWER in [comments.md](comments.md), and blocking findings are fixed in the very next commit.
 
 ---
 
@@ -10,15 +10,17 @@
 
 ### Milestones
 
-| # | Milestone | Exit criteria |
-|---|---|---|
-| **M0** | **Design pass** — a DESIGNER session reads this repo and authors `Prompts/phase1-design-prompt.md` per [design/design-brief.md](design/design-brief.md) (kickoff: `Prompts/designer-session-prompt.md`); **Claude design** then produces the Phase 1 screen designs from that self-contained file | Designs for the 11 screens approved by the owner; the completing commit records who approved and when |
-| **M1** | **Scaffold + schema** — Next.js app; Supabase dev project; migrations implementing [data-model](docs/specs/data-model.md), [lifecycle](docs/specs/order-lifecycle.md) RPCs/triggers, and the full [RLS matrix](docs/specs/roles-and-permissions.md) | REVIEWER passes all 6 items of the RLS verification protocol |
-| **M2** | **Seed** — `scripts/seed.ts` per [seed-data.md](docs/specs/seed-data.md) | All post-seed verification queries pass; salesman client sees exactly 34 products |
-| **M3** | **Auth + roles** — login flow, provisioning runbook executed for the real team | Each role logs in and sees only what the matrix allows |
-| **M4** | **Salesman app** per [salesman-app.md](docs/specs/salesman-app.md) | All 6 acceptance criteria, incl. the 90-second stopwatch test and airplane-mode drills |
-| **M5** | **Accountant dashboard** per [accountant-dashboard.md](docs/specs/accountant-dashboard.md) | All 6 acceptance criteria, incl. live-appearance ≤5s and A4 pick-slip print |
-| **M6** | **Deploy + pilot** — Vercel prod, Supabase prod, real accounts, onboard 1 salesman + accountant | Rollout gate below |
+| # | Milestone | Exit criteria | Status · 2026-07-07 |
+|---|---|---|---|
+| ~~**M0**~~ | ~~**Design pass**~~ — a DESIGNER session reads this repo and authors `Prompts/phase1-design-prompt.md` per [design/design-brief.md](design/design-brief.md) (kickoff: `Prompts/designer-session-prompt.md`); **Claude design** then produces the Phase 1 screen designs from that self-contained file | Designs for the 11 screens approved by the owner; the completing commit records who approved and when | ✅ **Done** — approved by Mridul 2026-07-06 (`c82607e`) |
+| **M1** | **Scaffold + schema** — Next.js app; Supabase dev project; migrations implementing [data-model](docs/specs/data-model.md), [lifecycle](docs/specs/order-lifecycle.md) RPCs/triggers, and the full [RLS matrix](docs/specs/roles-and-permissions.md) | REVIEWER passes all 6 items of the RLS verification protocol | ◑ **Backend ✅ · app ⬜** — 10 migrations live & reviewer-verified (M1.1–M1.8); **RLS 6-step ✅**, RPC suite ✅, provisioning ✅. Next.js app scaffold not started |
+| **M2** | **Seed** — `scripts/seed.ts` per [seed-data.md](docs/specs/seed-data.md) | All post-seed verification queries pass; salesman client sees exactly 34 products | ✅ **Data done** — 42 products seeded, salesman sees 34, checks pass (M1.7). Drift-protected `scripts/seed.ts` loader deferred to app scaffold (ledger ⑬) |
+| **M3** | **Auth + roles** — login flow, provisioning runbook executed for the real team | Each role logs in and sees only what the matrix allows | ◑ **DB-side ✅ · login UI ⬜** — provisioning trigger + RLS-per-role verified live; 3 test accounts exist. Login flow + real-team provisioning pending (needs the app) |
+| **M4** | **Salesman app** per [salesman-app.md](docs/specs/salesman-app.md) | All 6 acceptance criteria, incl. the 90-second stopwatch test and airplane-mode drills | ⬜ Not started |
+| **M5** | **Accountant dashboard** per [accountant-dashboard.md](docs/specs/accountant-dashboard.md) | All 6 acceptance criteria, incl. live-appearance ≤5s and A4 pick-slip print | ⬜ Not started |
+| **M6** | **Deploy + pilot** — Vercel prod, Supabase prod, real accounts, onboard 1 salesman + accountant | Rollout gate below | ⬜ Not started |
+
+> **Verified-complete detail** lives in the Open Items Ledger atop [comments.md](comments.md). No 🔴 blocking items open; remaining flags are non-blocking/deferred (⑬ `scripts/seed.ts` loader, ⑭ performance pass).
 
 ### Rollout gate (adoption is the metric)
 
