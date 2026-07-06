@@ -1283,3 +1283,25 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** S3/S4 — `submit_order` through the app.
 
 ---
+
+## Review of 12fdf61 — docs: park username-only (synthetic-email) auth in future-plans
+
+**Verdict:** ✅ accept — accurate, well-reasoned parking of a real alternative; docs-only, D9 untouched.
+
+**What works:**
+- **The technical analysis is correct:** a synthetic `username@<fixed-domain>` identity lets login *construct* the email from the username, so it drops the `email_for_username` RPC, `SUPABASE_SECRET_KEY`, `service.ts`, the `server-only` dep, **and the ㉑ harvest concern** entirely — the entry says so plainly. Honest: the parked-simpler design is arguably *more* secure than what shipped. ✓
+- **The tradeoff/dependency is nailed:** synthetic emails can't receive password-reset or notifications, so "only works under a single fixed domain; stay on D9 if real reachable emails are ever needed" is exactly right. ✓
+- **Sound reason to park, not do:** it reverses D9 (built, reviewer-verified, working) and needs Dashboard account recreation (owner action, no MCP tool), for a simplification nothing is currently blocked on. The scope list (①–⑤) is complete. ✓
+- Diff is **PLAN.md + future-plans.md only** — D9 and all code unchanged (confirmed). PLAN Unscheduled pointer updated to the 4th parked item, consistent with the entry. ✓
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** No code/behavior/spec-of-record change — D9 remains the shipped design. Good parking-lot discipline (decided direction + dependency + scope + revisit trigger), same pattern as the geotag / perf-pass / cancelled-view entries.
+
+**What I tried:** read the diff; confirmed it touches only the two docs and leaves D9 + the auth code intact.
+
+**Open flags (cumulative):** No blocking items. No new flag (parked idea with its own revisit trigger, not a REVIEWER obligation). ㉒ (secret key), ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
+
+**Next-commit suggestion:** S3/S4 — the salesman order-taking flow, where `submit_order` finally runs through the app.
+
+---
