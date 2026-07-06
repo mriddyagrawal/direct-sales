@@ -954,3 +954,22 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** the Next.js app scaffold — the pending half of M1 — then M3 login wiring. When the app lands, my deferred obligations activate: the `scripts/seed.ts` drift-guard (⑬) and end-to-end auth/RLS through the real client with the 3 test accounts.
 
 ---
+
+## Review of 77b5a32 — docs: fix migration count in PLAN.md status (11, not 10)
+
+**Verdict:** ✅ accept — closes both non-blocking notes from my 1062a79 review. Trivial doc fix, verified.
+
+**What works:**
+- "10 migrations (M1.1–M1.8)" → "**11 migrations (M1.1–M1.9)**" — matches `git ls-files supabase/migrations/` (= 11) exactly. ✓
+- The ledger callout loosened from naming only ⑬/⑭ to "**see the ledger for the full non-blocking/deferred list**" — my second note, and it pre-empts the same staleness recurring as new flags open. Good call. ✓
+- One file, two hunks, nothing else touched.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**What I tried:** read the diff; re-counted `git ls-files supabase/migrations/` = 11 against the new text.
+
+**Open flags (cumulative):** No blocking items. ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password toggle) — all non-blocking.
+
+**Next-commit suggestion:** the Next.js app scaffold (finishing M1).
+
+---
