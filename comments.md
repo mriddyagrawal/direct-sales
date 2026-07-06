@@ -70,7 +70,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
-| ㉒ | `SUPABASE_SECRET_KEY` (new-style `sb_secret_…`) must be set in `.env.local` (local) + Vercel env (deploy) or **username login fails** — the secret-key lookup can't run without it. Owner action (Dashboard → Settings → API Keys → Secret keys); no MCP tool exposes it. | 🟡 config / owner | app ㉑-fix (0db66fd) | 🟡 open — set before any login works |
+| ㉒ | `SUPABASE_SECRET_KEY` (new-style `sb_secret_…`) must be set or **username login fails** — the secret-key lookup can't run without it. | 🟡 was config / owner | app ㉑-fix (0db66fd) | ✅ **RESOLVED** at ba387fa — owner set it in `.env.local`; verified valid (lookup returns the email). Still add it to **Vercel env** before deploy. |
 | ㉑ | `email_for_username()` (username-login lookup) was `anon`-executable → a guessed username returned that account's email (**proven live**). | 🟡 was security | app D9 (39cf779) | ✅ **CLOSED** at 0db66fd — revoked anon/auth, service-role-only; harvest now denied (verified), advisor clear |
 | ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 was correctness-blocking | app auth (dcb3904) | ✅ **CLOSED** at 0dc60a3 — `redirectWithCookies` copies cookies onto all 4 redirects; build+lint clean |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
@@ -1303,5 +1303,30 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No blocking items. No new flag (parked idea with its own revisit trigger, not a REVIEWER obligation). ㉒ (secret key), ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
 
 **Next-commit suggestion:** S3/S4 — the salesman order-taking flow, where `submit_order` finally runs through the app.
+
+---
+
+## Review of ba387fa — docs: mark M1+M3 complete in PLAN; mirror the full open-items ledger
+
+**Verdict:** ✅ accept — the status is substantially accurate and I closed most of the M3 verification gap by execution. Two non-blocking notes: the precise scope of "reviewer-verified live" for M3, and the mirrored-ledger drift.
+
+**What works — claims checked, and one verified further by execution:**
+- **M1 ✅ Done — accurate.** 11 migrations reviewer-verified (M1.1–M1.9), RLS 6-step ✓ (the stated exit criterion), app scaffolded (App Router/TS + `@supabase/ssr`), production build green.
+- **㉒ resolved — verified.** `.env.local` has `SUPABASE_SECRET_KEY` set, and I confirmed it's **valid**: using it as the service client, `email_for_username('mridul')` → `mr***@gmail.com` and a bogus username → `null`. So the D9 username→email lookup works end-to-end with the real key. The PLAN mirror's "㉒ ✅ Resolved" is correct; my ledger updated to match (it was stale-open).
+- **M3 ✅ Done — substantially accurate.** Exit criterion: "each role logs in and sees only what the matrix allows." Verified live: the **matrix** (RLS 6-step, M1.6/M1.8) and now the **username→email lookup** (above, with the real key). Verified by code review (with the ⑱ cookie-drop bug found *and* fixed): the middleware getUser-gate/role-routing, `signInWithPassword`, and deactivated lockout.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **M3 "reviewer-verified live" is ~90% true — one step remains undriven.** I have *not* driven an actual password sign-in end-to-end (username + real password → `signInWithPassword` → cookie → middleware redirect → land on the role's screen), because the 3 test accounts' passwords aren't shared. Everything up to and including the email resolution is now verified live; the final password-gated hop is code-verified only. To make the claim fully literal, hand me one throwaway test password and I'll drive login + role-routing for a salesman and an accountant and confirm each lands correctly.
+- **Mirrored ledger will drift.** PLAN.md now carries a full copy of my ledger. It already diverged (PLAN showed ㉒ resolved while my `comments.md` still said open, until this review). The note correctly says comments.md is the live source — good — but two hand-maintained copies *will* diverge again on the next flag change. Since I only ever commit `comments.md` (my protocol), keeping the PLAN copy in sync is on the BUILDER; consider a dated snapshot refreshed only at milestone boundaries, or a pointer, rather than a live duplicate. The current snapshot's contents match my ledger accurately (⑯⑬⑭⑦⑧⑨ open; ㉒ resolved; closed list ⑩⑪⑫⑮⑰⑱⑲⑳㉑). ✓
+
+**Domain / correctness checks:** No code/behavior change — PLAN status + a ledger mirror. Milestone claims cross-checked against what I verified live (M1 migrations/RLS, ㉒ key validity, the lookup path) and by review (the auth flow). Accurate modulo the one undriven sign-in step.
+
+**What I tried:** read the diff; confirmed `SUPABASE_SECRET_KEY` present in `.env.local` (name only); a throwaway node script using the **real secret key** to call `email_for_username` (valid username → masked email, bogus → null) — proving ㉒'s resolution + the lookup path live; cross-checked the PLAN mirror against my current ledger.
+
+**Open flags (cumulative):** No blocking items. **㉒ — ✅ RESOLVED (key set + verified valid).** ⑯ (leaked-password), ⑬ (seed loader), ⑭ (perf pass), ⑦⑧⑨ (M0 doc) remain. (M3 end-to-end login drive: available on request with a test password.)
+
+**Next-commit suggestion:** M4 — the salesman order flow (S3→S7 + the write RPCs through the app), where I'll exercise `submit_order`/`update_order_items` end-to-end via the UI and re-verify snapshot/idempotency through the real client.
 
 ---
