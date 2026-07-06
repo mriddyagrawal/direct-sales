@@ -92,6 +92,7 @@ Owner-approved ideas parked outside the committed phases (currently: **order-pun
 | 4 | Pick slip: A4 laser or thermal printer? | Owner |
 | 5 | Go-live billing: approve Supabase Pro ($25/mo) + Vercel Pro ($20/mo) | Owner |
 | 6 | Godown phone view (read-only pick list) as Phase 1.5 if printing annoys | Later |
+| 7 | Enable Supabase Auth's leaked-password protection (HaveIBeenPwned check) — Dashboard-only setting (Authentication → Providers → Email), no MCP tool exposes it; same class of limitation as creating auth users (ledger flag ⑯) | Owner |
 
 ## Changelog discipline
 
