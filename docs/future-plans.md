@@ -31,3 +31,11 @@ Ideas the owner has approved in principle but deliberately **not** scheduled int
 **Decision context:** none of this matters at D6 scale (1–2 salesmen, <20 orders/day, the whole `products` table is 42 rows) — fixing it now would be optimizing a query that touches a few dozen rows. It becomes worth doing if either (a) real order/retailer volume grows meaningfully past the Phase 1 pilot, or (b) the app stays on Supabase's **Free tier** (smaller shared compute than Pro) for an extended period — free tier doesn't cause these, but it shrinks the headroom before any of them would show up as observable latency. All four are mechanical, low-risk fixes with zero schema/behavior change (rewrite ~10 `CREATE POLICY` statements to combine clauses and wrap auth calls, add 5 indexes).
 
 **Revisit when:** alongside the Supabase Pro upgrade decision (PLAN.md open question #5), or if `get_advisors(performance)` warnings start correlating with actually-observed slowness.
+
+## "Cancelled orders" view for the salesman (flagged 2026-07-07)
+
+**What:** D8 (decisions.md) hides a salesman's self-cancelled orders from their default order list. This entry is the *un-hide* — a dedicated screen/filter toggle so a salesman can go look at their own cancelled orders if they ever want to (e.g. "did I actually cancel that Sharma Electronics order, or did it go through?").
+
+**Decision context:** not approved or rejected — genuinely unknown whether salesmen will ever ask for this. The data supports it with zero backend work (the row, event trail, and RLS `SELECT own` policy already exist and already include cancelled orders — D8 is purely a client-side query filter, so removing the filter for this one screen is the entire implementation). Parked rather than speced because building a screen nobody asks for is wasted design/eng time the notebook-beating metric doesn't need.
+
+**Revisit when:** a salesman (or the owner, watching usage) actually asks "where did my cancelled order go?" — a real signal beats guessing.

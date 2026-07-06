@@ -20,6 +20,7 @@ Email + password, "remember me" default on (long-lived session). No signup, no s
 - Primary action: **"New Order"** — big, thumb-reachable.
 - List of the salesman's orders, newest first: `order_ref`, retailer name, line count, `total`, status chip, and — while editable — a **live countdown** ("editable 1h 12m").
 - Status chips: `Submitted` (editable) / `Submitted · locked` (derived, past window) / `Processed` / `Cancelled`.
+- **Cancelled orders are hidden from this list by default (D8)** — a self-cancel is almost always correcting a mistake, and it should read as "never happened" from the salesman's own point of view. The row, its audit trail, and the accountant's visibility are all unaffected — this is a client-query filter (`status != 'cancelled'`), not an RLS change. A dedicated "Cancelled orders" view is parked, not committed (see [future-plans.md](../future-plans.md)).
 - Tap → Order detail. Empty state for a fresh account. "Today" section separated from older orders (IST days).
 
 ### 3. Pick Retailer

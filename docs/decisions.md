@@ -58,6 +58,14 @@ Decisions confirmed with the owner on **2026-07-06**. Each entry: context → de
 
 **Consequences.** We accept building/maintaining auth, catalog, and dashboards ourselves; the honest alternative is recorded here so it never has to be re-litigated.
 
+## D8 — A salesman's own order list hides self-cancelled orders by default
+
+**Context.** `cancel_order` is soft by design (data-model.md) — the row and its audit trail always survive, and the accountant/admin dashboard always sees everything (SELECT all, per the RLS matrix). But when the *owning salesman* cancels within the edit window, it's almost always a fat-fingered mistake ("wrong shop", "hit submit too early"), not a business event they need to keep seeing in their own history.
+
+**Decision.** The salesman's own order list ([salesman-app.md](specs/salesman-app.md)) excludes `status = 'cancelled'` orders by default — a self-cancel reads as "never happened" from the salesman's point of view. This is a client-query filter, not an RLS or schema change: the underlying row, event trail, and the accountant's full visibility are untouched. Whether a dedicated "Cancelled orders" view ever exposes these rows back to the salesman is unscheduled (see [future-plans.md](future-plans.md)).
+
+**Consequences.** No migration needed — `orders.status`, `cancel_order`, and the salesman-own `SELECT` policy built in M1 already support this exactly as-is. Purely a query-shape decision for the (not-yet-scaffolded) order-list screen.
+
 ---
 
 # Graveyard — rejected ideas (do not re-litigate)
