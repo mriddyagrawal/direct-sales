@@ -611,3 +611,149 @@ Every 99d60ab / bc9c10f implementation flag (qty bound, bigint totals, client-UU
 **Next-commit suggestion:** the RLS migration (enable all 7 + rename + policy matrix + write RPCs). Then I run the 6-step RLS protocol and the snapshot/trigger/retry tests against real authenticated clients.
 
 ---
+
+## Review of 8163ac7 — feat(supabase): M1.4 — triggers (touch_updated_at, recompute_order_total, guard_order_transition)
+
+**Verdict:** ✅ accept — all three triggers verified live by driving real orders through them.
+
+**Phase / commit goal (as I understood it):** Attach `touch_updated_at` to products/orders; add `recompute_order_total` (AFTER I/U/D on order_items → sync `orders.total_paise`) and `guard_order_transition` (BEFORE UPDATE on orders → reject illegal status edges).
+
+**What works — verified by execution (harness in the M1.5 block):**
+- Installed exactly as specced: `recompute_order_total` AFTER INSERT/UPDATE/DELETE on `order_items`; `guard_order_transition` + `touch_updated_at` BEFORE UPDATE on `orders`; `touch_updated_at` BEFORE UPDATE on `products` (pg_trigger tgtype 29/19 confirm the timings).
+- **The flag-2 trigger interaction is proven, not asserted.** `submit_order` inserts items → `recompute_order_total` updates `orders.total_paise` → that write fires `guard_order_transition` (BEFORE UPDATE orders) → the guard sees `new.status = old.status` and passes it through. My submit returned `total_paise=50000` with no error; had the guard blocked the internal total write, submit would have raised. It didn't. ✓
+- **guard rejects illegal edges:** a direct `update orders set status='submitted'` on a processed order raised *"illegal order status transition"* ✓; legal edges passed ✓.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- `recompute_order_total` and `guard_order_transition` don't pin `search_path` (advisor `function_search_path_mutable`; same gap as `touch_updated_at`). Not `security definer` so risk is low, but pin for consistency. → flag ⑫. *(Fixed one commit later in M1.6b — see below.)*
+
+**Domain / correctness checks:** State machine — guard enforces submitted→processed/cancelled + processed→cancelled, rejects the rest ✓. Trigger interaction (flag-2) ✓. Money recompute ✓.
+
+**What I tried:** `pg_trigger` timings, then the full lifecycle harness in the M1.5 block.
+
+**Open flags (cumulative):** ⑩ RLS (BLOCKING at this point), ⑪ `current_role` rename, ⑫ (new, minor) search_path on the two new trigger fns.
+
+**Next-commit suggestion:** the RLS migration (full checklist in the M1.5 block).
+
+---
+
+## Review of 7d252d5 — feat(supabase): M1.5 — RPCs (submit_order, update_order_items, cancel_order, process_order)
+
+**Verdict:** ✅ accept — the four write RPCs are behaviorally correct on **every** standing obligation, verified by execution against real orders. Two carried items: the RPC-only write model is only *enforced* once ⑩ RLS lands (M1.6, reviewed below), and the owner has directed the `current_role` rename (⑪).
+
+**Phase / commit goal (as I understood it):** The only sanctioned order write paths — submit / edit / cancel / process — all `security definer`, `search_path` pinned, with role/ownership/time checks against `auth.uid()`/`now()` inside the body (client never trusted).
+
+**What works — proven, not read. I drove the whole lifecycle under simulated salesman + accountant JWTs in one rolled-back transaction:**
+- **[submit] snapshot + numbering + window:** 5×₹100 → `total_paise=50000`; `order_ref = ORD-2026-1001` (IST-year via `at time zone 'Asia/Kolkata'`); `editable_until − submitted_at = exactly 02:00:00`; line snapshot `unit_price_paise=10000`. ✓
+- **[idempotent retry] (flag-3):** re-calling `submit_order` with the same `id` but qty 99 and different notes returned the original order untouched — db total stayed 50000, notes stayed `'first note'`. No merge. ✓✓
+- **[snapshot preservation across a catalog price change] (flag-1 — the delete-and-reinsert trap):** changed catalog price ₹100→₹200, then edited the surviving line; it kept `unit=10000 / line=50000` (NOT re-snapshotted to 20000). The diff-by-`product_id` implementation holds. ✓✓✓
+- **[qty bound] (flag-4):** qty 10000 rejected. ✓
+- **[role gating]:** salesman calling `process_order` rejected; accountant processed it (`status→processed`, `processed_by = caller`). ✓
+- **[post-lock]:** salesman editing a processed order rejected. ✓
+- **[guard interaction] (flag-2):** illegal processed→submitted blocked. ✓
+- **[audit trail]:** `order_events` recorded `submitted, items_changed, processed` in order; payloads carry `{sku, qty, unit_price_paise}` via the products join (flag-7). ✓
+
+Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably handled in code. Strongest commit in the project so far.
+
+**Blocking issues (on M1.5's own surface):** None — the RPCs are correct and search_path-pinned.
+
+**Carried / directive items:**
+1. **⑩ (systemic):** these RPCs are only the *enforced* write path once RLS is on **and** direct INSERT/UPDATE/DELETE on `orders`/`order_items`/`order_events` is **revoked** from `anon`/`authenticated` (data-model.md:140). *(Resolved by M1.6 — see below.)*
+2. **⑪ `current_role` rename — OWNER DIRECTIVE (Mridul, 2026-07-06). STILL OPEN as of HEAD.** The helper `current_role()` shadows a reserved SQL keyword: `select public.current_role()` works (verified NULL / fail-closed with no auth), but bare `current_role` (no parens) silently returns the Postgres **session** role, and `current_role()` unqualified is a hard syntax error — both confirmed live. Every call site (the 4 RPCs and all M1.6 policies) currently uses the **qualified** `public.current_role()`, so nothing is broken today — but per the owner, **rename it to `public.auth_profile_role()`** to kill the footgun before more policies accrete, and repoint every call site (4 RPCs + all RLS policies) + the spec prose (roles-and-permissions.md:49). This is an owner-mandated change, not optional.
+
+**Non-blocking suggestions:** revoke `EXECUTE` on the internal `security definer` helpers from `anon`/`authenticated` (advisor WARNs). *(Done in M1.6b.)*
+
+**Domain / correctness checks:** Immutable snapshots ✓ (flag-1 proven); idempotency ✓ (flag-3); qty bound ✓ (flag-4); state machine + guard ✓ (flag-2); numbering/IST-year ✓; money (bigint, server-recompute, client price ignored) ✓; event trail w/ sku ✓ (flag-7).
+
+**What I tried:** `pg_proc` install-check; then a self-rolling-back `DO` block — created two `auth.users` (→ auto-profiles; one promoted to accountant), a brand/product/retailer, set `request.jwt.claim.sub` per role, ran submit → idempotent-retry → price-change+edit → qty-bound → role-gate → process → guard → post-lock-edit → event-trail. All nine passed; the block `RAISE`d at the end so everything rolled back. (It consumed `order_no` 1001–1002 via non-transactional `nextval`; I `setval`'d the sequence back to 1001 afterward, so the first real order is still ORD-2026-1001.)
+
+**Open flags (cumulative):** ⑩ (resolved by M1.6). ⑪ `current_role` → `auth_profile_role` rename (OWNER DIRECTIVE, OPEN). ⑫ search_path (resolved by M1.6b).
+
+**Next-commit suggestion:** RLS landed as M1.6 (next block). After the ⑪ rename, I re-run the RLS protocol against the renamed helper.
+
+---
+
+## Review of 1c3863e — feat(supabase): M1.6 — RLS matrix across all 7 tables
+
+**Verdict:** ✅ accept — closes the ⑩ blocker; RLS enforcement verified by the full 6-step protocol against real authenticated roles. The `current_role` rename (⑪) is still owed.
+
+**Phase / commit goal (as I understood it):** Enable RLS on all seven tables and apply the roles-and-permissions.md matrix; revoke Supabase's default CRUD so writes to orders/order_items/order_events are RPC-only.
+
+**What works — verified live by SET ROLE authenticated + per-role JWTs (the 6-step protocol I promised since planning):**
+- **`revoke all … from anon, authenticated`** on all 7 tables *before* granting the matrix — so "RLS on + no policy" and "no grant" both fail closed. ✓ Correct ordering; directly fixes the fail-open state I proved at M1.1–1.3.
+- **RLS enabled on all 7** (list_tables + `pg_class.relrowsecurity`). ✓
+- **Ownership isolation:** salesman s1 sees exactly 1 order (own), s2 sees only `TEST-9002`; accountant sees both. ✓
+- **D2 at the DB layer:** salesman sees 34 priced products (the real seed) — the 8 unpriced are invisible; accountant sees all 42. Verified against the *seeded catalog*, not a synthetic pair. ✓✓
+- **Self-promotion blocked:** salesman `UPDATE profiles SET role='admin' WHERE id=self` raised (WITH CHECK pins role/active to the pre-update values); role stayed `salesman`. ✓ This is the exact escalation path I flagged at M1.1 — now closed.
+- **RPC-only writes enforced:** salesman direct `insert into orders` denied (SELECT-only grant, no policy); order_items/order_events carry no client write grant anywhere. ✓
+- **anon fully locked out:** anon read of profiles denied. ✓
+- Policy shape matches the matrix: retailer quick-add forced `verified=false, created_by=auth.uid()`; brands/products INSERT admin-only; accountant no profiles UPDATE. ✓
+
+**Blocking issues:** None — ⑩ is resolved.
+
+**Non-blocking / carried:**
+- **⑪ `current_role` rename (OWNER DIRECTIVE) still open** — every policy here calls `public.current_role()` qualified (works), but the rename to `public.auth_profile_role()` should sweep these policies too. Do it as one atomic rename migration (drop-and-recreate policies + function) so no call site is missed.
+- Minor: `profiles_select_active` uses `current_role() is not null` (any active staff can read all profiles). Matches the spec ("names appear on orders"), just noting the whole staff directory is readable by every salesman — acceptable for this app.
+
+**Domain / correctness checks:** RLS matrix — **PASSED** all six protocol steps ✓. State machine / snapshots — unaffected (writes still via RPC). Money — unaffected.
+
+**What I tried:** `get_advisors` (0 `rls_disabled_in_public`); a `DO` block that created 2 salesmen + 1 accountant, priced/unpriced products, two orders, then `set local role authenticated` + `request.jwt.claim.sub` per identity to assert ownership isolation, D2 visibility, self-promotion block, direct-write denial, and anon lockout; rolled back via RAISE.
+
+**Open flags (cumulative):** **⑩ RLS — ✅ CLOSED (verified).** ⑪ `current_role` → `auth_profile_role` rename (OWNER DIRECTIVE, OPEN). ⑫ (closed by M1.6b).
+
+**Next-commit suggestion:** the ⑪ rename migration; then app scaffolding (M2+).
+
+---
+
+## Review of 13b6bc2 — fix(supabase): M1.6b — close get_advisors(security) findings after RLS
+
+**Verdict:** ✅ accept — advisor surface cleaned to only the unavoidable, correctly-reasoned warnings; verified by re-running the advisor and the grant checks.
+
+**Phase / commit goal (as I understood it):** Clear the 17 post-RLS security-advisor findings: pin `search_path` on the three trigger functions, and stop `anon` from being able to execute the security-definer functions.
+
+**What works — verified live:**
+- **The two-step revoke is real and correct.** The first file revoked `EXECUTE … from PUBLIC`, which (as the message honestly documents) left Supabase's *direct* `anon`/`authenticated` function grants intact; the second file revokes explicitly by role name. I confirmed the end state: `has_function_privilege('anon','submit_order',…)=false`, `anon current_role=false`, while `authenticated` retains both. ✓
+- **`create_profile_for_new_user` granted to nobody** — correct: it's `RETURNS TRIGGER`, invoked only by the `on_auth_user_created` trigger (which doesn't need the session to hold EXECUTE). ✓
+- **search_path pinned** on `touch_updated_at` / `recompute_order_total` / `guard_order_transition` — closes ⑫. ✓
+- **Advisor re-run: 0 `rls_disabled_in_public`, 0 `function_search_path_mutable`, 0 anon-executable.** The **5 remaining WARNs** are all `authenticated`-can-execute-security-definer for `current_role` + the 4 RPCs. The BUILDER's call to accept these is **correct**: the RPCs *must* be authenticated-callable (that's the RPC-only-writes design), and `current_role` must stay security-definer + authenticated-callable to avoid the RLS self-recursion the spec calls out; it's read-only and returns only the caller's own role. Not bugs. ✓
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Security posture — anon has zero surface (no table grant, no function grant, no policy); authenticated surface is exactly the matrix + the 4 RPCs + the role helper. Clean.
+
+**What I tried:** read both migration files; `has_function_privilege` for anon/authenticated on the RPCs + `current_role`; `get_advisors(security)` re-run (5 accepted WARNs, nothing else).
+
+**Open flags (cumulative):** ⑫ ✅ CLOSED. ⑪ rename (OWNER DIRECTIVE, OPEN) — after the rename these 5 WARNs simply reappear under the new name, still accepted.
+
+**Next-commit suggestion:** the ⑪ rename.
+
+---
+
+## Review of 0ceffe1 — feat(supabase): M1.7 — seed Zebronics brand + 42 products
+
+**Verdict:** ✅ accept — a faithful, idempotent seed; verified row-by-row against the CSV source of truth, not by trusting the message.
+
+**Phase / commit goal (as I understood it):** Seed the Zebronics brand + all 42 catalog products from `data/ZebronicsPriceList.csv` per seed-data.md's transformation rules.
+
+**What works — verified live against the CSV:**
+- **Counts exact:** 42 products (42 distinct SKUs), 34 priced / 8 unpriced, `min/max price_paise = 6000 / 913800` (₹60 / ₹9,138), 1 brand. Category split **4/6/6/7/5/14** (Adaptors/Adaptors-with-Cable/Charging-Cables/Earphones/Power-Banks/Speakers) — matches the CSV. ✓
+- **Gap numbering correct** (the subtle part): Earphones run `ZEB-EAR-01…07` with `EAR-05`/`EAR-06` = NULL (unpriced hold their slots) and `EAR-07` priced (₹219) — not renumbered. The 8 NULLs sit at exactly `EAR-05/06, PWR-02/05, SPK-10/12/13/14`, matching my mechanical regeneration back at 6a1573c. ✓✓
+- **Verbatim names incl. the stress cases:** `ASTRA 40 BLACK` = `ZEB-SPK-04`, name `SPK-PSPK 44 PORTABLE BTH SPEAKER (ASTRA 40 BLACK)`, ₹1,029 (feeds the ₹4,478 worked order); typos preserved (Balck/Bannk/Lighting → 3 rows); doubled-space rows (CBL-01, CBL-04) collapsed. ✓
+- **Idempotent:** `insert … on conflict (sku) do update` — re-running is a no-op upsert onto identical values. ✓
+- SKU scheme `^ZEB-(ADP|AWC|CBL|EAR|PWR|SPK)-\d{2}$` holds across all 42. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- The message notes the drift-protected `scripts/seed.ts` loader (seed-data.md's re-run guard) is deferred until the Node app is scaffolded — reasonable, since a first load into an empty table has no drift to guard against. But log it: **when the app lands, the `--force-prices`/drift-warn loader is still owed**, or future price edits made in-DB could be silently clobbered by a re-seed. Carrying as flag ⑬.
+
+**Domain / correctness checks:** Catalog integrity — **PASSED** (42 SKUs, prices, categories, gap numbering, verbatim names all match the CSV) ✓. This satisfies the bulk of my M2 post-seed obligation early. Money — whole-rupee ×100 → paise, all integers ✓.
+
+**What I tried:** read the seed migration; live queries for distinct-SKU count, ASTRA/min/max rows, the full Earphone SKU→price sequence (gap check), typo-row count, and the category/price/null aggregates — all cross-checked against seed-data.md + the CSV.
+
+**Open flags (cumulative):** ⑪ `current_role` → `auth_profile_role` rename (OWNER DIRECTIVE, OPEN — the one thing owed before this milestone is clean). ⑬ (new, minor) drift-protected seed loader deferred to app-scaffold. ⑩/⑫ closed.
+
+**Next-commit suggestion:** the ⑪ rename migration (owner-directed), then app scaffolding. On the next order-bearing work I'll re-run the snapshot/idempotency/guard suite *through* the RLS wall with the renamed helper.
+
+---
