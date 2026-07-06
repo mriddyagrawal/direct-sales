@@ -66,10 +66,12 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 **BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
 
-**No 🔴 blocking items open.** All items are minor / deferred / owner-config. M1 backend + M2 seed verified complete against the live project; the app build-out (M1 app · M3 auth) is underway.
+**No 🔴 blocking items open.** All items are minor / deferred / owner-config. M1 backend + M2 seed verified complete against the live project; M4 (salesman order flow) is underway — the draft/pending/RPC-wrapper infra + UI primitives landed at 96880f5 with two 🟡 harden-before-consumer follow-ups (㉓, ㉔).
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
+| ㉓ | `order-rpcs.ts` offline classifier: a fetch failure supabase-js *resolves* (not throws) while `navigator.onLine` still reads `true` (wifi-no-internet / captive portal / DNS fail) is misclassified as an **authoritative server rejection** → not queued for retry → silent-loss risk (**proven by execution**). Discriminate on the presence of a Postgres error `code` (a real rejection carries a SQLSTATE; a transport failure has none), not `navigator.onLine`. | 🟡 non-blocking (infra not yet consumed) | app M4 infra (96880f5) | 🟡 open — close before/with S6/S7 retry wiring |
+| ㉔ | `toItemsPayload`/cart don't strip `qty<=0`, but Stepper+keypad can set 0 (= remove line). A zero-qty line reaching `submit_order` fails the DB `qty between 1 and 9999` check and **rejects the whole order**. Filter `qty>0` when building the payload (or drop zero keys on cart write). | 🟡 non-blocking (consumer not wired yet) | app M4 infra (96880f5) | 🟡 open — close before/with S3/S4 submit wiring |
 | ㉒ | `SUPABASE_SECRET_KEY` (new-style `sb_secret_…`) must be set or **username login fails** — the secret-key lookup can't run without it. | 🟡 was config / owner | app ㉑-fix (0db66fd) | ✅ **RESOLVED** at ba387fa — owner set it in `.env.local`; verified valid (lookup returns the email). Still add it to **Vercel env** before deploy. |
 | ㉑ | `email_for_username()` (username-login lookup) was `anon`-executable → a guessed username returned that account's email (**proven live**). | 🟡 was security | app D9 (39cf779) | ✅ **CLOSED** at 0db66fd — revoked anon/auth, service-role-only; harvest now denied (verified), advisor clear |
 | ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 was correctness-blocking | app auth (dcb3904) | ✅ **CLOSED** at 0dc60a3 — `redirectWithCookies` copies cookies onto all 4 redirects; build+lint clean |
@@ -1357,5 +1359,39 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No blocking items. ⑯ (leaked-password), ⑬ (seed loader), ⑭ (perf pass), ⑦⑧⑨ (M0 doc) remain; ㉒ resolved. My M4 test obligations now activate: the airplane-mode/idempotency/post-expiry-guard/`order_events` acceptance criteria, driven through the app.
 
 **Next-commit suggestion:** deliverable #1 — the cart store + localStorage draft + submit-queue infrastructure — then S3.
+
+---
+
+## Review of 96880f5 — feat(m4): draft/pending-order infra + Stepper/KeypadSheet/BottomSheet primitives
+
+**Verdict:** ⚠️ accept-with-followups — the infra is clean, spec-faithful, and the live RPC contract is verified end-to-end; two non-blocking hardening items (㉓, ㉔) must land before the consumer screens (S3–S7) wire this up. Nothing here is broken on its own base, so it's not a blocker — but both run the *wrong* direction of a fail-safe, so I'm not filing plain ✅.
+
+**Phase / commit goal:** M4 deliverable #1 — client-only cart drafts (`lib/cart.ts`), an offline pending-submission queue (`lib/pending-orders.ts`), thin wrappers over the four write RPCs that separate offline failures from server rejections (`lib/order-rpcs.ts`), plus three design-system primitives (`BottomSheet`, `Stepper`, `KeypadSheet`). Explicitly no DB contact — `submit_order` still sees each order for the first time already `submitted`.
+
+**Scope note:** reviewed the commit, **not** the working tree — `new-order/page.tsx` (+deleted `new-order.module.css`) is uncommitted WIP and out of scope here; the 9 committed files were clean in the tree, so my reads == the commit.
+
+**What works — verified by execution, not reading:**
+- **Live RPC contract matches all four wrappers exactly** (queried `pg_get_function_arguments` on `ugjwcbxyyuowiyhczcrh`): `submit_order(p_id,p_retailer_id,p_notes,p_items)`, `update_order_items(p_order_id,p_notes,p_items)`, `cancel_order(p_order_id,p_reason DEFAULT NULL)`, all `returns orders`. So the wrapper omitting `reason` is safe (SQL default fills it), and every `as OrderRow` cast is honest — the RPCs really return the row. ✓
+- **The renamed-helper trap is NOT tripped:** the migration text still shows `submit_order` calling `public.current_role()` (line 23), but the *live* body calls `auth_profile_role()` — confirmed via `pg_get_functiondef`. Traced the replay: `20260706T150800_rename_current_role.sql` renames the helper (OID preserved → the `150500` RLS policies follow it automatically) **and** recreates all four RPCs against the new name; `150900` recreates `cancel_order` again with `cancelled_by`. A fresh `db reset` lands exactly on live — no drift, no runtime break. ✓
+- **Spec fidelity:** client sends only `{product_id, qty}` (`toItemsPayload`) — never a price (snapshots are server-side); `orderId = crypto.randomUUID()` is minted once in `createDraft` and reused across retries (the idempotency contract — "never regenerate"); drafts + pending queue live entirely in `localStorage`, keyed by retailer for S3's resume-draft. Matches data-model.md "drafts never touch the DB." ✓
+- **`pending-orders` queue is idempotent on `orderId`** — `savePending` de-dupes by filtering the existing id before append; `removePending` filters it out. Re-saving the same order replaces rather than duplicates. ✓
+- **All storage reads are corruption-safe** — `loadDraft`/`listPending` wrap `JSON.parse` in try/catch → null/`[]`; every accessor guards `typeof window === "undefined"` for SSR. ✓
+- **Primitives are sound & spec-aligned:** `Stepper` clamps `[0..max]` with disabled bounds + ≥48px hit target; `KeypadSheet` caps at 3 digits / `max`, empty ⇒ 0 (removes line), own numeric keypad per S4; `BottomSheet` scrim-tap closes with `stopPropagation` on the sheet body. ✓
+
+**Offline classifier — tested across every failure shape supabase-js can emit** (extracted `isOfflineFailure`/`callRpc` verbatim, ran under node):
+- throw `TypeError` (transport) → `OfflineError` ✓ · resolved `{error}` + `navigator.onLine=false` (airplane) → `OfflineError` ✓ · real server rejection online → `Error(message)` shown plainly ✓ · success → data ✓.
+- **The gap (㉓):** a fetch failure that supabase-js *resolves* as `{error:{message:"Failed to fetch"}}` (a plain object, **not** a `TypeError` instance) while `navigator.onLine` still reads `true` — wifi-connected-but-no-internet, captive portal, DNS failure, flaky signal — falls through to `throw new Error(...)` and is treated as an **authoritative rejection**, so it would *not* be queued for retry. That's the silent-loss case resilience.md forbids, and getting it right is this infra's one job. `navigator.onLine=true` is famously unreliable (it means "has a link," not "can reach the server"). Robust fix: discriminate on **the presence of a Postgres error `code`** — a genuine rejection carries a SQLSTATE (`P0001` from `raise exception`, `23505`, …); a transport failure has none — rather than trusting `navigator.onLine`.
+
+**Second follow-up (㉔):** neither `toItemsPayload` nor the cart strips `qty<=0`, yet `Stepper`/`KeypadSheet` can legitimately set a line to 0 (= remove). A zero-qty line reaching `submit_order` fails the DB `qty between 1 and 9999` check and **rejects the whole order**. The consumer must filter `qty>0` when building the payload (or drop zero keys on cart write). Cheap to fix, nasty if missed.
+
+**Why not blocking:** both items live in infra that nothing consumes yet (the consumer `page.tsx` is uncommitted). The base isn't broken — cart, queue, and primitives each work standalone, and the dominant offline case (airplane → `navigator.onLine=false`) *is* handled. So: accept, but ㉓/㉔ must be closed **in or before** the S3–S7 commits that wire the submit path — not after.
+
+**Domain / correctness checks:** money stays integer paise (`cartTotalPaise` sums `price*qty`, display-only — real total is trigger-computed server-side, and the comment says so); no floats; no client-trusted prices; idempotency id preserved; zero draft rows in Postgres. All consistent with the invariants.
+
+**What I tried:** read all 9 committed files at the commit; queried the live project for the four RPC signatures + `submit_order`'s live body (`calls_current_role=false`, `calls_auth_profile_role=true`); grepped the migration set to prove the `current_role→auth_profile_role` replay is self-consistent; ran a verbatim node harness of the offline classifier across throw/resolve × online/offline × server-reject × success (5 cases, output matched the analysis exactly).
+
+**Open flags (cumulative):** No 🔴 blocking. **New:** ㉓ (offline misclassification → silent-loss risk), ㉔ (zero-qty line poisons submit) — both 🟡, close before/with the S3–S7 consumer. Carried: ⑯ (leaked-password), ⑬ (seed loader), ⑭ (perf pass), ⑦⑧⑨ (M0 doc). My M4 acceptance tests (airplane→exactly-one-row, double-tap→one row, countdown→0 flips read-only + forged post-expiry `update_order_items` rejected **server-side**, `order_events` reconstruction) activate once the consumer screens land.
+
+**Next-commit suggestion:** S3 (retailer pick + resume-draft sheet) or S4 (catalog + Stepper/keypad) — and fold ㉓/㉔ in as you wire the submit path.
 
 ---
