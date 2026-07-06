@@ -42,9 +42,9 @@ Light theme only (sunlight readability); dark optional and unbuilt in Phase 1.
 
 ### Layout & interaction constants
 
-- Touch targets **≥48px**. Quick-order stepper cells **44×50px**; review-screen compact steppers **40×42px**; keypad keys **54px**, max 3 digits, no OS keyboard.
+- Touch targets **≥48px**. Where visual cells are smaller — quick-order steppers **44×50px**, review-screen steppers **40×42px** — the builder must extend the **hit area** to ≥48px with invisible padding; visuals unchanged (BUILDER resolution: spec floor wins, design visuals win). Keypad keys **54px**, max 3 digits, no OS keyboard — the **UI qty cap of 999 is deliberately stricter than the DB's 1..9999 bound**; fail-safe, do not "fix" it in either direction.
 - Dashboard: 32px table header with 2px ink underrule; **40px rows** on hairlines with faint zebra; keyboard cursor = **2px accent bar down the row's left edge** (no glowing outline). `/` focuses search, `↑↓` move, `Enter` opens.
-- Mobile bottom tab bar (top-level screens only — Home / New Order / Sync / Profile): **70px**, hairline top, flat; active tab = ink icon + **2px accent top-rule**; **New Order is a solid accent block** (never floats, no shadow); **Sync tab carries an amber square** while phone-local orders are unsent, clears when pushed. The bar hides during the order-taking flow (back arrow + sticky Review bar instead).
+- Mobile bottom tab bar — **owner decision 2026-07-06: two destinations only, Home / New Order** (Sync and Profile tabs cut; the bar's slot grammar stays for the future Payments tab — see docs/future-plans.md). **70px**, hairline top, flat; active tab = ink icon + **2px accent top-rule**; **New Order is a solid accent block** (never floats, no shadow); the **amber unsent square sits on the Home tab** while phone-local orders are unsent (Home's pinned "Saved on phone" strip is the sync surface — there is no separate Sync screen). Sign out lives at the bottom of Home ("Signed in as Raju · Sign out"). The bar hides during the order-taking flow (back arrow + sticky Review bar instead).
 - Fields: white, 1px hairline border, 2px radius; focus = 1px accent, sharp; error = 1px red + plain-words helper below ("Enter the shop name").
 
 ### Status system (one vocabulary, both apps)
@@ -53,7 +53,7 @@ Flat tag, leading 8px status square, mono text:
 
 - `■ Submitted · editable 1h 12m` — accent square. Countdown in minutes, never seconds.
 - `■ Submitted · editable 8m` — amber square + amber text under ~10 minutes.
-- `■ Submitted · locked` — grey. Derived (window expiry **or** processed) — same chip either way.
+- `■ Submitted · locked` — grey. Shown **only** while status is `submitted` past its window; a processed order always shows the green `Processed` chip. **Chip = status** — the derived lock governs edit *permissions*, never chip display (BUILDER resolution 2026-07-06; the original extraction's "same chip either way" contradicted S7/S8).
 - `■ Processed` — green.
 - `■ Cancelled` — red.
 
@@ -93,8 +93,9 @@ Primary = filled accent. Secondary = hairline outline, ink text. Destructive = h
 
 ## 5. Deviations from / additions to the prompt (flagged, all defensible)
 
-1. **Bottom tab bar (Home / New Order / Sync / Profile)** — owner-requested addition during the design conversation (T3); not in the functional spec. "Sync" and "Profile" destinations have no spec'd screens yet — builder should treat Sync as the offline-pending queue view and Profile as name + sign-out, or park both behind the bar with Home/New Order only.
-2. **Typefaces**: prompt left type open; design pins Space Grotesk + JetBrains Mono (webfonts — budget for font loading on 4G; subset + `font-display: swap`).
+1. **Bottom tab bar** — owner-requested addition (T3), **resolved by the owner 2026-07-06: Home + New Order only**. Sync tab cut (Home's pinned unsent strip + the amber square on the Home tab carry sync truth); Profile tab cut (sign-out at the bottom of Home). Slot grammar reserved for the future Payments tab (docs/future-plans.md).
+2. **Typefaces**: prompt left type open; design pins Space Grotesk + JetBrains Mono. **Builder mandate:** subset both fonts, `font-display: swap`, and declare system fallback stacks (`system-ui` for structure; `ui-monospace, Menlo, Consolas, monospace` for figures) so first paint never waits on webfonts — the <2s-on-4G budget outranks typography.
 3. **Countdown chip** reads `Submitted · editable 1h 12m` — matches the prompt's decision (minutes only, amber <10m, never red).
 4. **Pick-slip qty is ~30pt**, beating the spec's ≥16pt minimum. Prices-off default honored; `ORDER COPY` header flip is an addition that prevents misfiled paper.
 5. **v1 vs instrument**: implement only the instrument grammar; use v1 sections (sec-s1…s8 renders) solely as state checklists.
+6. **Product mark — owner decision 2026-07-06:** the **receipt glyph** ([favicon.png](phase1/favicon.png) — zigzag-edged bill with two ink lines) is the icon *everywhere*: favicon, add-to-home-screen, and the S1 login block. This **overrides** the designer's GE-monogram decision; render it in ink or accent per context. Android maskable icons need a padded safe-zone variant at build time.
