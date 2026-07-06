@@ -77,6 +77,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — enable before pilot |
+| ⑲ | Self-referential `--font-structure`/`--font-figures` in globals.css (same name next/font assigns) → equal-specificity cycle; Space Grotesk may silently drop depending on CSS load order. Use distinct names or drop the redeclaration. | 🟡 minor / css | design system (7f65371) | 🟡 open — fix + verify on a text-heavy screen |
 | ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | ✅ **CLOSED** at dcb3904 — `design/**`+`archive/**` ignored; `npm run lint` exit 0 |
 | ⑮ | D8 filter must scope to **self**-cancels only (`cancelled_by = salesman_id`), else an accountant-cancelled order silently vanishes from the salesman's list. | 🔵 was design gap | M1 (3496c17) | ✅ **CLOSED** at M1.9 (a6ec10a) — `cancelled_by` added; self/office distinction verified live |
 | ⑪ | Rename `current_role()` → `auth_profile_role()` (reserved-keyword footgun). | 🔴 was blocking — owner directive | M1.5/M1.6 | ✅ **CLOSED** at M1.8 — rename complete; RLS (OID-bound) + RPCs re-verified live |
@@ -1038,5 +1039,33 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** **⑰ — ✅ CLOSED (lint exit 0).** **⑱ (new, BLOCKING-next) middleware redirect cookie-drop** — deactivated loop + intermittent logouts; fix before the login flow. ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain — non-blocking.
 
 **Next-commit suggestion:** fix ⑱ (copy cookies onto the authenticated redirects) as part of, or before, the login page + sign-in action — otherwise the first real deactivated login and any refresh-time bounce will misbehave.
+
+---
+
+## Review of 7f65371 — feat(app): design system foundation — fonts, tokens, primitives, app mark
+
+**Verdict:** ✅ accept — faithful, well-built instrument-grammar foundation. One non-blocking finding: a self-referential font CSS variable that's fragile (may silently drop Space Grotesk depending on CSS load order).
+
+**Phase / commit goal (as I understood it):** Replace the scaffold's Geist/default-token placeholders with the real instrument grammar — tokens, the two typefaces, the receipt-glyph app icons, and the first UI primitives.
+
+**What works — checked against design/phase1-design-spec.md §2:**
+- **Color tokens are exact:** accent `#1d4ed8`, amber `#b45309`, locked `#6b7580`, processed `#15803d`, error `#b91c1c`, ink `#14181f`, paper `#f2f3f5`, inactive `#8a94a0` — all match the spec table; plus a sensible `--color-hairline #d8dbdf` (the spec left the hairline hex unspecified). Type scale (21/700, 15/600, 13/500, 10px+0.08em), `--radius: 2px`, `--touch-target-min: 48px` all per spec. Light-theme-only (dark-mode block removed, with a comment). ✓
+- **Fonts via `next/font`** ([layout.tsx](src/app/layout.tsx)): Space Grotesk (structure) + JetBrains Mono (figures), which self-hosts + subsets + sets `font-display: swap`, with explicit `fallback` stacks — satisfying design-spec **deviation #2** (subset + swap + system fallback so first paint never blocks). The comment even cites it. ✓
+- **App mark = the receipt glyph, byte-verified:** `src/app/icon.png` and `apple-icon.png` sha = `39d6ec0…` = **the approved `assets/favicon.png`**; `public/icon-maskable.png` is a distinct padded variant. `manifest.ts`: `theme_color #14181F` (ink), `background_color #F2F3F5` (paper), `standalone`, both icons wired (any + maskable). Matches deviation #6 exactly. ✓
+- **Primitives are spec-faithful and accessible:** `Button` (5 variants mapping to the spec's Primary/Secondary/Destructive/filled-Destructive/Print-ink taxonomy; `loading` + `aria-busy` + disabled). `StatusTag` (flat tag + leading 8px square + mono, 5 tones, comment reaffirms "Chip = status"). `Field` (hairline + 2px radius, `aria-invalid`/`aria-describedby` error wiring, `useId`, and the mono SHOW/HIDE password toggle the S1 login screen calls for). ✓
+- **Build + lint both exit 0** (I ran them). ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **⑲ Self-referential font variable.** [globals.css](src/app/globals.css) declares `--font-structure: var(--font-structure), system-ui, sans-serif` (and the same for `--font-figures`) — but `next/font` already assigns `--font-structure` the font stack. I confirmed in the compiled CSS that **both** declarations ship: `.space_grotesk_…_variable{--font-structure:"Space Grotesk", system-ui, sans-serif}` (class, specificity 0,1,0) **and** `:root{…--font-structure:var(--font-structure), system-ui, sans-serif…}` (also 0,1,0), both on `<html>`. Equal specificity → the winner is decided by chunk load order; if the `:root` rule wins, `--font-structure` is a **cycle** (guaranteed-invalid), and `font-family: var(--font-structure)` falls back to the browser default — silently dropping Space Grotesk. It may render correctly in this build, but it's fragile and the `, system-ui, sans-serif` fallback is redundant (next/font's `fallback` option already provides one). **Fix:** give next/font a distinct name (`variable: "--font-space-grotesk"`) and set `--font-structure: var(--font-space-grotesk), system-ui, sans-serif`, or drop the globals redeclaration and use next/font's variable directly. (I verified the cycle statically in the compiled CSS; the exact visual outcome is load-order-dependent — a browser computed-style check on a text-heavy screen would settle it, which is worth doing once the login screen exists.)
+
+**Domain / correctness checks:** Design-grammar fidelity — tokens/type/radius/touch-target/light-only all per spec ✓; receipt-glyph mark per deviation #6 ✓; font-loading mandate (deviation #2) met via next/font ✓ (subject to ⑲). No data/logic surface.
+
+**What I tried:** read globals.css / layout.tsx / manifest.ts / the three primitives; `shasum` on the icons vs `assets/favicon.png` (identical receipt glyph); `npm run build` (exit 0) + `npm run lint` (exit 0); grepped the compiled `.next` CSS to confirm the `--font-structure` cycle survives to output with equal specificity.
+
+**Open flags (cumulative):** ⑱ (BLOCKING — fixed in 0dc60a3, reviewed next). **⑲ (new, non-blocking) self-referential font var — fix with distinct names.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
+
+**Next-commit suggestion:** the ⑱ cookie fix landed as 0dc60a3 (next). Then the S1 login screen (which will exercise these primitives + the auth flow end-to-end — where I'll also settle ⑲ with a real rendered check).
 
 ---
