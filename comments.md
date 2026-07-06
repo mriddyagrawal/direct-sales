@@ -66,11 +66,11 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 **BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
 
-**1 🔴 blocking item open (⑱ — middleware redirect cookie-drop; fix next commit).** The M1 backend + M2 seed are verified complete against the live project; the app build-out (M1 app · M3 auth) is underway.
+**No 🔴 blocking items open.** The M1 backend + M2 seed are verified complete against the live project; the app build-out (M1 app · M3 auth) is underway. Remaining items are minor/deferred.
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
-| ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 correctness | app auth (dcb3904) | 🔴 **open — fix in the next commit, before the login flow** |
+| ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 was correctness-blocking | app auth (dcb3904) | ✅ **CLOSED** at 0dc60a3 — `redirectWithCookies` copies cookies onto all 4 redirects; build+lint clean |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
 | ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, **6** unindexed FKs incl. `orders.cancelled_by`, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
@@ -1067,5 +1067,34 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** ⑱ (BLOCKING — fixed in 0dc60a3, reviewed next). **⑲ (new, non-blocking) self-referential font var — fix with distinct names.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain.
 
 **Next-commit suggestion:** the ⑱ cookie fix landed as 0dc60a3 (next). Then the S1 login screen (which will exercise these primitives + the auth flow end-to-end — where I'll also settle ⑲ with a real rendered check).
+
+---
+
+## Review of 0dc60a3 — fix(app): M1.9-app — middleware redirect cookie-drop (blocking, flag 18)
+
+**Verdict:** ✅ accept — closes the ⑱ blocker exactly as the @supabase/ssr contract requires. Build + lint clean.
+
+**Phase / commit goal (as I understood it):** Fix the middleware redirect branches so session-cookie mutations (refreshed tokens, `signOut()` clears) aren't dropped — killing the deactivated-user redirect loop and the intermittent refresh logouts.
+
+**What works — verified:**
+- **`redirectWithCookies(url)` helper** creates the redirect then copies `supabaseResponse.cookies.getAll()` onto it before returning — precisely the documented fix I recommended. ✓
+- **All four redirect call sites now route through it** — confirmed by grep: `return redirectWithCookies(url)` at lines 61/79/88/99, and **zero** bare `return NextResponse.redirect(...)` left. Routing the `!user` branch through it too (not strictly required) removes the asymmetry — a clean choice. ✓
+- **This resolves both failures I traced:** the deactivated path now carries `signOut()`'s cookie-clears → the browser drops its auth cookies → the redirected `/login` request has no user → falls through to the login page (no loop); and a token-refresh bounce now carries the rotated cookies → no premature logout. ✓
+- **30-day `cookieOptions` wired** ([cookie-options.ts](src/lib/supabase/cookie-options.ts)) and shared across browser/server/middleware clients — implements S1's "Keep me signed in ~30 DAYS" default; the commit **honestly notes** the login checkbox is currently UI-only, so it isn't mistaken for a wired session-vs-persistent toggle. ✓
+- `npm run build` exit 0, `npm run lint` exit 0 (I ran both at this commit). ✓
+
+**Blocking issues:** None — ⑱ is closed.
+
+**Non-blocking suggestions:**
+- **Remember-me is now always-on** (30-day maxAge applied globally); the S1 "uncheck → session-only" path isn't wired. The BUILDER flagged this; fine for the foundation, worth wiring when the login form's checkbox becomes functional.
+- Minor: partial `cookieOptions` (just `maxAge`) merges with @supabase/ssr's secure/sameSite/httpOnly-less defaults (auth cookies are intentionally JS-readable) — standard library behavior, so `secure`/`sameSite=lax` are preserved; no action, just noting I considered it.
+
+**Domain / correctness checks:** Auth/session — the cookie-propagation contract is now honored on every exit path; getUser gating + fail-closed (from dcb3904) unchanged. No data/money surface. (Fix is code-verified against the @supabase/ssr contract + the exact failure I described; a live loop-resolution repro would need a deactivated session in a browser.)
+
+**What I tried:** read the full diff; grep of `middleware.ts` (4× `redirectWithCookies`, 0 bare redirects); `git merge-base --is-ancestor` to confirm the fix is in HEAD; `npm run build`/`npm run lint` (both exit 0).
+
+**Open flags (cumulative):** **⑱ — ✅ CLOSED.** No blocking items. ⑲ (font var), ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) — all non-blocking.
+
+**Next-commit suggestion:** the S1 login screen + sign-in Server Action — the first end-to-end exercise of the auth flow (getUser gating, the redirect cookies, role routing) and the primitives; I'll drive it with the 3 real test accounts and settle ⑲ with a rendered-font check.
 
 ---
