@@ -66,10 +66,11 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 **BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
 
-**No 🔴 blocking items open.** The M1 backend + M2 seed are verified complete against the live project; the app build-out (M1 app · M3 auth) is underway. Remaining items are minor/deferred.
+**No 🔴 blocking items open.** One security followup (㉑ — low practical risk, but fix before pilot) plus minor/deferred items. M1 backend + M2 seed verified complete against the live project; the app build-out (M1 app · M3 auth) is underway.
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
+| ㉑ | `email_for_username()` (username-login lookup) is `anon`-executable → a guessed username returns that account's email (**proven live**). D9's "server action closes the harvest risk" is inaccurate. Use a **service-role** lookup + `revoke … from anon, authenticated`. | 🟡 security (low practical risk) | app D9 (39cf779) | 🟡 open — fix before pilot |
 | ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 was correctness-blocking | app auth (dcb3904) | ✅ **CLOSED** at 0dc60a3 — `redirectWithCookies` copies cookies onto all 4 redirects; build+lint clean |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
 | ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, **6** unindexed FKs incl. `orders.cancelled_by`, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
@@ -1200,5 +1201,36 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** **⑳ — ✅ CLOSED (verified).** No blocking items. ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password, PLAN Q#7) remain — non-blocking.
 
 **Next-commit suggestion:** continue the salesman flow — S3 (retailer picker) / S4 (quick order, the hero screen), where the write RPCs (`submit_order`) finally get exercised through the app; I'll verify the snapshot/idempotency behaviour end-to-end there.
+
+---
+
+## Review of 39cf779 — feat: D9 — login by username instead of email
+
+**Verdict:** ⚠️ accept-with-followups — username login is cleanly built and works, but D9's core **security claim is disproven by execution** (I harvested a real staff email as `anon`), and the proper fix (service-role lookup, revoke `anon`) should be carried into a near-term commit.
+
+**Phase / commit goal (as I understood it):** Switch login from email to a separately-chosen username: add `profiles.username`, an anon-callable `email_for_username()` RPC, and a Server Action that resolves username→email then signs in.
+
+**What works — verified live:**
+- **Feature is functional:** `username citext unique` + a `^[a-zA-Z0-9_.]{3,20}$` format check; `create_profile_for_new_user` now reads `raw_user_meta_data->>'username'`; the 3 test accounts are **backfilled** (`vikram`/`mriddy`/`mridul`, `null_usernames = 0`, citext installed — all confirmed live). ✓
+- **Good hygiene:** `email_for_username` is `security definer`, search_path pinned, active-only (deactivated/nonexistent both return NULL); the Server Action uses a **single generic** "Wrong username or password." for every failure (no form-level enumeration); `citext` makes "Raju"/"raju" collide correctly. ✓
+- **Nicely resolved my 345dce2 note:** `login/page.tsx` now reads `searchParams` **server-side** and passes `deactivated` as a prop, so `LoginForm` dropped `useSearchParams` — no more `Suspense fallback={null}` blanking the form; the fields now SSR. ✓ Field has `autoCapitalize="none"` + `spellCheck={false}` on username (good mobile UX). ✓
+- build + lint exit 0. ✓
+
+**Blocking issues:** None (the disclosure below is real but low-impact for this app).
+
+**Carried followup — the ㉑ security finding (proven):**
+- **`email_for_username` is `anon`-executable, so the username→email harvest D9 says it prevents is still wide open.** I called it *as the `anon` role*: `email_for_username('mridul')` → **`mridul289agrawal@gmail.com`**. The security advisor flags it too (`anon_security_definer_function_executable`). So an attacker with the public anon key (it ships in the client bundle) can POST to `/rest/v1/rpc/email_for_username` with a guessed username and get that account's email + confirmation it's active — **bypassing the Server Action entirely.** D9's statement that "calling from the Server Action … is what actually closes the enumeration/harvesting risk" is **inaccurate**: *how the app calls it* doesn't matter when the endpoint itself is anon-callable. And "the RPC being anon-callable is unavoidable (login is pre-auth)" is also not true.
+  - **Fix (makes the claim true + clears the advisor):** a Server Action runs server-side, so call the lookup with a **service-role client** (`SUPABASE_SERVICE_ROLE_KEY`, server-only), and `revoke execute on email_for_username from anon, authenticated` (grant `service_role` only, or just let the definer run as owner). Then the username→email mapping is never reachable with the anon key — genuinely closing the harvest path.
+  - **Severity:** low *practical* risk here (2–3 staff, guessable-anyway emails, password still required, RLS still blocks all table/data access for anon) — hence ⚠️ not ❌. But it's a real disclosure and a security-claim overstatement, and the fix is cheap. Do it before pilot. The `authenticated` grant is likewise unnecessary (same disclosure extended to any logged-in user) and should go with it. → flag ㉑.
+
+**Non-blocking suggestions:** none beyond ㉑.
+
+**Domain / correctness checks:** Auth — username→email→`signInWithPassword` works; form-level enumeration prevented by the generic message ✓; **RPC-level disclosure open** (㉑). Registration still email+password admin-created (D3) ✓. No money/state surface. Spec docs (design-spec + salesman-app EMAIL→USERNAME label) updated consistently. ✓
+
+**What I tried:** read the migration / actions.ts / LoginForm.tsx / page.tsx / D9; live checks — profiles usernames + `null_usernames=0` + `has_function_privilege('anon', …)=true`; **`set role anon; select email_for_username('mridul')` → returned the real gmail** (the harvest, proven); `get_advisors(security)` (confirms `anon`-executable `email_for_username`); `npm run build`/`lint` (exit 0).
+
+**Open flags (cumulative):** No blocking items. **㉑ (new, security) `email_for_username` anon-harvestable — use a service-role lookup + revoke anon; correct D9's "closed" claim.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password, PLAN Q#7) remain.
+
+**Next-commit suggestion:** the ㉑ service-role fix (small), then S3/S4 (where `submit_order` gets exercised through the app). A live login drive is now possible with the backfilled usernames if a test password is shared.
 
 ---
