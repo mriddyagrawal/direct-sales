@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/types/database.types";
+import { SUPABASE_COOKIE_OPTIONS } from "@/lib/supabase/cookie-options";
 
 const ROLE_HOME: Record<string, string> = {
   salesman: "/",
@@ -15,6 +16,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      cookieOptions: SUPABASE_COOKIE_OPTIONS,
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -30,6 +32,19 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
+  // A redirect is a *new* NextResponse — it doesn't inherit whatever the
+  // cookie adapter's setAll() already wrote onto supabaseResponse (a
+  // refreshed session, or signOut()'s cookie-clears). Every redirect must
+  // carry those over explicitly, or the session mutation is silently lost:
+  // a signOut() redirect that drops its own clears re-authenticates the
+  // very next request (infinite loop on the deactivated path), and a
+  // token-refresh redirect that drops the new tokens logs the user out.
+  function redirectWithCookies(url: URL) {
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+    return response;
+  }
+
   // getUser() revalidates against the Auth server — the only safe way to
   // gate on the server. getSession() only reads the (possibly stale) cookie.
   const {
@@ -43,7 +58,7 @@ export async function updateSession(request: NextRequest) {
     if (isLoginRoute) return supabaseResponse;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   const { data: profile } = await supabase
@@ -61,7 +76,7 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("reason", "deactivated");
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   const home = ROLE_HOME[role] ?? "/login";
@@ -70,7 +85,7 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = home;
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
@@ -81,7 +96,7 @@ export async function updateSession(request: NextRequest) {
   if (wrongTerritory) {
     const url = request.nextUrl.clone();
     url.pathname = home;
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url);
   }
 
   return supabaseResponse;
