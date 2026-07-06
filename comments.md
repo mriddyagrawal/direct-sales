@@ -75,6 +75,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
+| ⑮ | D8 filter is `status != 'cancelled'` (hides **all** cancels) but the rationale is about **self**-cancels — an accountant-cancelled order would silently vanish from the salesman's list. Decide: hide-all (intended?) vs scope-to-self (needs the cancelling actor, not just status). | 🟡 design gap | M1 (3496c17) | 🟡 open — resolve before the M4 order-list screen |
 | ⑪ | Rename `current_role()` → `auth_profile_role()` (reserved-keyword footgun). | 🔴 was blocking — owner directive | M1.5/M1.6 | ✅ **CLOSED** at M1.8 — rename complete; RLS (OID-bound) + RPCs re-verified live |
 | ⑩ | RLS fail-open on all 7 tables (anon-readable staff PII; authenticated self-promotion; direct writes bypassing RPCs). | 🔴 was blocking | M1.1–1.3 | ✅ **CLOSED** at M1.6/M1.6b — verified by the 6-step RLS protocol |
 | ⑫ | `search_path` unpinned on the three trigger functions. | 🟡 minor | M1.4 | ✅ CLOSED at M1.6b |
@@ -858,6 +859,33 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **What I tried:** `git show` the diff; `get_advisors(performance)` on the live project and matched every parked item to the actual lint rows (FK list exact; auth_rls_initplan = 5 policies; unused_index = orders_status_submitted_idx).
 
 **Open flags (cumulative):** No blocking items. ⑦⑧⑨ (minor M0 doc) open; ⑬ (deferred seed loader); **⑭ (new) RLS/index performance pass — parked in future-plans.md, deferred by design** (tracked, not owed). Note ⑧ still open — this commit adds a *performance* entry to future-plans.md, not the Payments-tab entry the design spec references.
+
+**Next-commit suggestion:** M2 app scaffolding.
+
+---
+
+## Review of 3496c17 — docs: D8 — hide self-cancelled orders from the salesman's own list
+
+**Verdict:** ✅ accept — sound, well-documented decision that correctly needs no migration. One substantive **design gap to resolve before the list screen is built** (non-blocking now, since nothing is implemented).
+
+**Phase / commit goal (as I understood it):** Record owner decision D8 — the salesman's own order list hides `status = 'cancelled'` by default (a self-cancel reads as "never happened"), as a client-query filter, not an RLS/schema change; park the "un-hide" view in future-plans.
+
+**What works:**
+- **The "no migration needed" claim is correct — verified against what M1 actually built.** `orders.status` carries `'cancelled'`; `cancel_order` sets it (I exercised this in the M1.5 test); the `orders_select_own` RLS policy already returns *all* of a salesman's own rows including cancelled — so a client-side `status != 'cancelled'` filter sits cleanly on top without touching RLS, the row, or the audit trail. Accountant/admin SELECT-all is untouched. ✓
+- Correctly keeps the cancel **soft** (row + `order_events` survive) — consistent with data-model.md and the derived-lock lifecycle. No conflict with the state machine.
+- Clean docs hygiene: D8 follows the D1–D7 context/decision/consequences format; salesman-app.md updated; the un-hide screen parked in future-plans.md; PLAN.md Unscheduled pointer now lists all three parked items. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **⑮ (design gap) — "self-cancelled" (title/rationale) vs `status != 'cancelled'` (mechanism) are not the same set.** The filter also hides orders an **accountant/admin** cancelled. `cancel_order` lets accountant/admin cancel a salesman's *submitted* order (with a reason) — I verified that path exists in M1.5. Under D8's blanket `status != 'cancelled'`, the salesman who submitted that order would see it **silently vanish** from their list, with no signal the office killed it — risking "where did my order go?" confusion or a duplicate re-submit. The rationale ("almost always a fat-finger self-correction") only holds for *self*-cancels. **Resolve before the list screen ships:** either (a) confirm hiding office-cancels from the salesman is intended (and say so in D8's consequences), or (b) scope the filter to self-cancels only — which needs the cancelling **actor** (from `order_events`/a "cancelled_by" signal), not `status` alone, so it's slightly more than a one-line filter. Flag this now so it's decided, not discovered at implementation.
+- **Minor consistency:** the same salesman-app.md section still enumerates `Cancelled` in its "Status chips" list for this screen, one line above the D8 rule that hides cancelled rows from it. A cancelled chip would only ever appear on the S7 detail screen (post-cancel) or a future un-hide view — worth a half-sentence so the chip list and the hide-rule don't read as contradictory.
+
+**Domain / correctness checks:** State machine / soft-cancel / audit trail — unaffected (query-shape only) ✓. RLS — unchanged; salesman retains DB-level access to their own cancelled rows (so the detail screen + any future un-hide view work without a policy change) ✓. Accountant visibility — full, unaffected ✓.
+
+**What I tried:** read the full diff (decisions.md / salesman-app.md / future-plans.md / PLAN.md); cross-checked the "no migration" claim against the M1 objects I already verified live (`cancel_order` behavior, `orders.status` CHECK, `orders_select_own` policy) and against `cancel_order`'s accountant/admin-cancel path (the basis for the ⑮ gap).
+
+**Open flags (cumulative):** No blocking items. **⑮ (new) self-cancel vs office-cancel filter scope** — decide before the salesman order-list screen (M4). ⑦⑧⑨ (minor M0 doc); ⑬ (deferred seed loader); ⑭ (parked perf pass). **⑧ still open** — future-plans.md now has geotag + perf-pass + cancelled-orders-view, but still no Payments entry the design spec points at.
 
 **Next-commit suggestion:** M2 app scaffolding.
 
