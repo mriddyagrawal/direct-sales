@@ -80,7 +80,7 @@ Realtime vs 30s polling for the dashboard · Tailwind vs vanilla CSS · PWA mani
 
 ## Unscheduled — [docs/future-plans.md](docs/future-plans.md)
 
-Owner-approved ideas parked outside the committed phases (currently: **order-punch geotagging** — fail-open GPS fix at submit, order tags only, quiet presentation; **RLS/index performance pass** — 4 harmless-at-current-scale `get_advisors(performance)` findings from M1, revisit alongside the billing decision below or if real volume growth makes them matter; **"Cancelled orders" view for the salesman** — the un-hide screen for D8's default-hidden self-cancels, unscheduled until a real ask surfaces).
+Owner-approved ideas parked outside the committed phases (currently: **order-punch geotagging** — fail-open GPS fix at submit, order tags only, quiet presentation; **RLS/index performance pass** — 4 harmless-at-current-scale `get_advisors(performance)` findings from M1, revisit alongside the billing decision below or if real volume growth makes them matter; **"Cancelled orders" view for the salesman** — the un-hide screen for D8's default-hidden self-cancels, unscheduled until a real ask surfaces; **username-only auth** — swap D9's real-email-lookup login for synthetic `username@…` emails, simpler but reverses working code + needs account recreation, deferred by owner 2026-07-07).
 
 ## Open questions
 
