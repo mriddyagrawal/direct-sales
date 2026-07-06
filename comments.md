@@ -525,3 +525,89 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 **Open flags (cumulative):** ⑦ sec-s6 gap, ⑧ Payments forward reference, ⑨ S1/S8 mark override — all carried, all doc-only, none blocking. Standing M1 test obligations remain. **M0 is complete** (owner-approved deliverable imported, spec extracted, decisions recorded); the highest-value next commit is M1 migrations, where my execution-based verification finally activates.
 
 ---
+
+## Review of cb24512 — feat(supabase): M1.1 — profiles table + shared helpers
+
+**Verdict:** ❌ reject — two blocking issues (a **live** RLS exposure; a reserved-keyword function name). The table, helpers, and trigger themselves are built correctly and verified against the live DB.
+
+**Phase / commit goal (as I understood it):** First M1 migration — `public.profiles` per data-model.md, the `current_role()` RLS role-helper, a generic `touch_updated_at()`, and an `auth.users`-insert trigger that auto-provisions a salesman profile (D3). Applied live to project `ugjwcbxyyuowiyhczcrh`.
+
+**What works — verified against the live DB, not the SQL text:**
+- `profiles` columns match the spec exactly: `id uuid PK → auth.users(id)`, `full_name text NOT NULL`, `role text NOT NULL default 'salesman'`, `active boolean NOT NULL default true`, `created_at timestamptz NOT NULL default now()`. Role CHECK is live: `role = ANY('admin','accountant','salesman')`. ✓
+- `current_role()`: `security definer`, `stable`, `search_path=public, pg_temp` pinned; returns NULL for a caller with no active profile → fail-closed as intended. ✓
+- `create_profile_for_new_user()`: `security definer`, search_path pinned; the `on_auth_user_created` AFTER INSERT trigger on `auth.users` **exists and is enabled** (`tgenabled='O'`) — the message's "verified installed … enabled" is accurate; the hosted-platform trigger risk did not materialize. ✓
+- Default role `salesman` + admin-promotes-in-Studio matches D3. ✓
+
+**Blocking issues (must fix before the RLS-policy migration / before any seed):**
+1. **RLS is NOT enabled on `public.profiles`, and the table is live-readable/writable via the API keys.** data-model.md:9 mandates "RLS is enabled on every table (default deny)"; the security advisor flags this ERROR-level (`rls_disabled_in_public`). I proved it is a *live fail-open* exposure, not a lint nag: `has_table_privilege('anon','public.profiles','SELECT') = true` and `has_table_privilege('authenticated','public.profiles','UPDATE') = true`, with RLS off. So right now anyone holding the public anon key can `SELECT` every staff row (id, name, role, active), and any signed-in user can `UPDATE profiles SET role='admin' WHERE id = auth.uid()` — privilege self-escalation. Fix is one line in this migration: `alter table public.profiles enable row level security;` (deny-all until policies land). See the M1.2 block for why the "defer RLS" rationale is backwards.
+2. **`current_role` collides with a PostgreSQL reserved keyword.** `select current_role()` (unqualified) is a hard **syntax error (42601)** — I ran it live; only `select public.current_role()` works. roles-and-permissions.md:49 describes the helper unqualified as `current_role()`. When the RLS-policy migration is written, an unqualified `current_role()` won't compile, and the paren-less `current_role` silently resolves to the Postgres *session* role (`authenticated`), breaking every role check (potentially fail-open). Rename the helper (`app_role()` / `current_app_role()`) before writing policies, and correct the spec prose.
+
+**Non-blocking suggestions:**
+- `touch_updated_at()` has an unpinned `search_path` (advisor WARN `function_search_path_mutable`) — pin `set search_path = public, pg_temp` to match the other two, even though it isn't `security definer`.
+- Revoke `EXECUTE` on `current_role()` and `create_profile_for_new_user()` from `anon`/`authenticated` (advisor WARN ×2 — both exposed at `/rest/v1/rpc/*`). They're internal; `create_profile_for_new_user` referencing `NEW` outside a trigger would error on a direct RPC call, but tightening the surface is free.
+
+**Domain / correctness checks:** State machine / numbering / money — N/A here. **RLS — FAILED** (item 1, proven live). Role helper — installed but mis-named (item 2). Snapshot/immutability — later migrations.
+
+**What I tried:** `get_advisors(security)`; `information_schema.columns` (profiles shape); `pg_proc.prosecdef/provolatile/proconfig` (all three functions); `pg_trigger.tgenabled` (`on_auth_user_created`); `pg_constraint` (role CHECK); `has_table_privilege('anon'|'authenticated', …)`; `select public.current_role()` (→ null) vs `select current_role()` (→ 42601).
+
+**Open flags (cumulative):** ⑦–⑨ (doc, unchanged). **⑩ (BLOCKING) RLS disabled with live anon/authenticated grants on every public table** — proven fail-open. **⑪ (BLOCKING) `current_role` reserved-keyword collision** — rename before RLS policies.
+
+**Next-commit suggestion:** the RLS migration — but first (a) rename `current_role` → `app_role`, (b) `enable row level security` on all seven tables immediately (deny-all), then add the roles-and-permissions.md matrix. Re-run `get_advisors` to confirm zero `rls_disabled_in_public` before any seed lands.
+
+---
+
+## Review of 97c8ae0 — feat(supabase): M1.2 — catalog tables (brands, products, retailers)
+
+**Verdict:** ❌ reject — DDL is flawless and verified live; blocked by the same live RLS exposure (⑩), and the commit message's stated rationale for deferring RLS is affirmatively wrong.
+
+**Phase / commit goal (as I understood it):** brands / products / retailers per data-model.md, plus the catalog-listing index.
+
+**What works — verified live:**
+- All three tables match the spec verbatim. `products.price_paise integer CHECK (price_paise > 0)` with NULL = TBD (D2) ✓; `retailers.verified boolean NOT NULL default false` (fail-closed — the flag-5 fix from bc9c10f) ✓; `created_by → profiles(id)` ✓; `tally_name` / `tally_ledger_name` Phase-2 headroom present ✓.
+- `products_brand_category_idx on (brand_id, category, active)` exists ✓.
+
+**Blocking issues:**
+1. **⑩ extended to brands/products/retailers** — all three are anon-SELECT/INSERT and authenticated-full-CRUD with RLS off (`has_table_privilege` confirmed). A signed-in salesman can rewrite catalog prices or flip `verified` on any retailer today.
+2. **The message's rationale is backwards.** It defers RLS "so tables are never enabled-without-policies." But *enabled-without-policies is the safe state* — RLS with zero policies denies everyone (fail-closed). The current *disabled-in-public* state is the unsafe one: with the default anon/authenticated grants (confirmed present), disabled RLS = fully open. The correct Supabase pattern is `enable row level security` in the same migration as `create table`, then add policies. Enable RLS on all seven tables now; the policy matrix can still land later without leaving a fail-open window.
+
+**Non-blocking suggestions:** none beyond ⑩'s remediation — the DDL itself needs no change.
+
+**Domain / correctness checks:** Catalog integrity — schema supports it (price>0, NULL-TBD, fail-closed verified all in place). Money — `price_paise integer` correct. **RLS — FAILED** (systemic).
+
+**What I tried:** `git show` DDL vs data-model.md; live `has_table_privilege` (anon/authenticated); `pg_indexes` (index present); `pg_constraint` dump.
+
+**Open flags (cumulative):** ⑩ now spans brands/products/retailers. ⑪ unchanged. ⑦–⑨ unchanged.
+
+**Next-commit suggestion:** as M1.1 — RLS enable + `current_role` rename + policy matrix, before seed.
+
+---
+
+## Review of 7e8c021 — feat(supabase): M1.3 — orders core (order_no_seq, orders, order_items, order_events)
+
+**Verdict:** ❌ reject — DDL is exactly to spec and verified live; blocked solely by the systemic RLS exposure (⑩) now reaching the transactional tables.
+
+**Phase / commit goal (as I understood it):** the transactional core — `order_no_seq`, `orders`, `order_items` (immutable snapshot columns), append-only `order_events`, and four indexes.
+
+**What works — verified live (this is the hardest schema in the spec, and it's faithful):**
+- `order_no_seq start 1001`, `last_value` still null (never advanced — correct, no orders yet; matches D1 unique+monotonic, gaps-ok). ✓
+- `orders`: `id uuid PK` (client-generated idempotency key), `status CHECK (submitted/processed/cancelled)` ✓, `UNIQUE(order_no)` + `UNIQUE(order_ref)` ✓, `total_paise bigint` ✓, `submitted_at`/`editable_until` NOT NULL ✓.
+- `order_items`: `qty CHECK (qty >= 1 AND qty <= 9999)` (flag-4 fat-finger bound) ✓; `line_total_paise bigint` ✓ (9999 × ₹9,138 overflows int4 — correctly widened) while `unit_price_paise integer` correctly stays int4; `UNIQUE(order_id, product_id)` ✓; snapshot columns `product_name` / `unit_price_paise` NOT NULL present ✓; `on delete cascade` ✓.
+- `order_events`: `bigint generated always as identity` PK ✓, `jsonb details default '{}'` ✓ — append-only shape.
+- All four indexes present (`orders_salesman_submitted_idx`, `orders_status_submitted_idx`, `order_items_order_idx`, `order_events_order_idx`). ✓
+
+Every 99d60ab / bc9c10f implementation flag (qty bound, bigint totals, client-UUID idempotency, snapshot columns) is physically present. Excellent fidelity.
+
+**Blocking issues:**
+1. **⑩ again:** orders / order_items / order_events are anon-SELECT/INSERT and authenticated-full-CRUD with RLS off. Until RLS + the RPC-only write model land, any anon key holder can read all orders and any signed-in user can INSERT/UPDATE/DELETE order rows directly — **bypassing the entire `security definer` RPC guard chain the design depends on**. Enable RLS on these three in the next migration.
+
+**Non-blocking suggestions:** none — the DDL needs no changes.
+
+**Domain / correctness checks:** Numbering (seq@1001, unique) ✓; money (bigint line/total, int4 unit) ✓; snapshot columns present (immutability enforced later by the RPC) ✓; state-machine enum ✓. **RLS — FAILED** (systemic ⑩).
+
+**What I tried:** `git show` vs data-model.md + order-lifecycle.md; live `pg_sequences`, `pg_constraint`, `information_schema.columns` (bigint check), `pg_indexes`, `has_table_privilege`.
+
+**Open flags (cumulative):** ⑩ spans all seven tables now; ⑪ `current_role` rename. Standing M1 obligations (snapshot / trigger-interaction / idempotent-retry tests) activate once M1.4 (triggers, already committed — next in my queue) and the write-RPC migration land.
+
+**Next-commit suggestion:** the RLS migration (enable all 7 + rename + policy matrix + write RPCs). Then I run the 6-step RLS protocol and the snapshot/trigger/retry tests against real authenticated clients.
+
+---
