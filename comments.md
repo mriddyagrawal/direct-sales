@@ -919,6 +919,38 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 
 **Open flags (cumulative):** **⑮ — ✅ CLOSED (verified).** No blocking items. ⑯ (new, config) enable leaked-password protection pre-pilot. ⑦⑧⑨ (minor M0 doc); ⑬ (deferred seed loader); ⑭ (parked perf pass, now 6 FKs). ⑧ still open (no Payments entry in future-plans.md).
 
-**Next-commit suggestion:** M2 app scaffolding.
+**Next-commit suggestion:** the Next.js app scaffold (the pending ⬜ half of PLAN's M1 — see the 1062a79 correction below), then auth wiring (M3 login).
+
+---
+
+## Review of 1062a79 — docs: mark M0/M1-backend/M2 complete in PLAN; archive M1 Supabase builder prompt
+
+**Verdict:** ✅ accept — the milestone status is honest and, on the substance, accurate (it does **not** overclaim — M1 and M3 are marked *partial*, not done). One minor doc-accuracy flag: the migration tally is off by one.
+
+**Phase / commit goal (as I understood it):** Add a Status column to the PLAN.md milestones table reflecting reality after the M1 backend, and record the builder prompt that drove M1.
+
+**What works — each status claim checked literally:**
+- **M0 ✅** "approved by Mridul 2026-07-06 (c82607e)" — matches the commit I reviewed and the recorded owner approval. ✓
+- **M1 ◑ Backend ✅ · app ⬜** — correctly **partial**. The Next.js app scaffold genuinely isn't started; the backend (schema/RPCs/triggers/RLS/seed/provisioning) is live and reviewer-verified. Honest, doesn't claim M1 done. ✓
+- **M2 ✅ Data done** — 42 products, salesman sees 34, checks pass (M1.7) — I verified this against the CSV. The deferred `scripts/seed.ts` loader is correctly still flagged (⑬). ✓
+- **M3 ◑ DB-side ✅ · login UI ⬜** — provisioning trigger + RLS-per-role verified, 3 test accounts exist, login flow pending. Accurate. ✓
+- **M4/M5/M6 ⬜** — accurate. ✓
+- **This corrects my own imprecision:** I'd been writing "next: M2 app scaffolding," but PLAN's **M1** is "Scaffold + schema" (the Next.js app is M1's pending half) and **M2** is "Seed." The app scaffold is the ⬜ part of M1, not M2. The new Status column makes the true shape clear — good.
+- Builder prompt recorded ([Prompts/supabase-setup-builder-prompt.md](Prompts/supabase-setup-builder-prompt.md)) — accurate provenance of the M1 handoff; it still says `current_role()` (pre-M1.8), correctly preserved as a historical artifact, not retro-edited. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **Migration count off by one.** The M1 status cell reads "**10 migrations** live & reviewer-verified (**M1.1–M1.8**)" — but there are **11** migration files (`git ls-files supabase/migrations/` = 11); `20260706T150900_orders_cancelled_by.sql` (M1.9, a6ec10a — reviewer-verified) is live and omitted. Fix to "**11 migrations (M1.1–M1.9)**". (My log verifies claims literally; this is exactly that kind of drift.)
+- The "Verified-complete detail … remaining flags (⑬ loader, ⑭ performance pass)" callout names only two open flags — ⑦⑧⑨ (M0 doc) and ⑯ (leaked-password) also remain. Fine as illustrative, but "see the ledger for the full list" would be truer.
+- Subject says "archive … builder prompt," but the file is added to `Prompts/`, not moved to `archive/`. Cosmetic wording.
+
+**Domain / correctness checks:** No schema/behavior/spec change — PLAN status + a recorded prompt. Nothing to execute. Milestone claims cross-checked against the live DB state and my prior verified reviews (all consistent except the count).
+
+**What I tried:** read the full diff; `git ls-files supabase/migrations/` → 11 files (vs the "10 / M1.1–M1.8" claim); cross-checked each milestone's Status cell against what I've verified live (M0 approval, M1 backend objects, M2 seed counts, M3 provisioning + test accounts).
+
+**Open flags (cumulative):** No blocking items. Doc-accuracy: migration count (11, not 10) — trivial, fix opportunistically (not ledgered). ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password toggle) remain — all non-blocking.
+
+**Next-commit suggestion:** the Next.js app scaffold — the pending half of M1 — then M3 login wiring. When the app lands, my deferred obligations activate: the `scripts/seed.ts` drift-guard (⑬) and end-to-end auth/RLS through the real client with the 3 test accounts.
 
 ---
