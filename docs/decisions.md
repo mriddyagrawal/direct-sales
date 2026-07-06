@@ -68,6 +68,21 @@ Decisions confirmed with the owner on **2026-07-06**. Each entry: context → de
 
 ---
 
+## D9 — Login by username; registration stays email+password
+
+**Context.** D3 fixed email+password, admin-created accounts (no self-signup) — that stays true for *registration*: the admin still creates each `auth.users` row with a real email (needed for any future password-reset/notification use). But the owner wants staff to *log in* with a separately-chosen username, not their email — and explicitly ruled out the shortcut of deriving it from the email's local-part (the pattern the owner's other project, `QuoteIt`, uses: a synthetic `username@quoteit.app` auth email with the username being everything before the `@`). That pattern conflates identity with the auth email and can't carry a real email at all — not what's wanted here.
+
+Supabase Auth has no native "log in by arbitrary field" — it authenticates by email or phone only. Community guidance (a Supabase GitHub discussion, checked before implementing) is explicit about the naive fix: a client-callable "get email for this username" endpoint exposes emails to the browser and can be scripted to harvest them by enumerating usernames.
+
+**Decision.**
+- `profiles.username` (new column, `citext` — case-insensitive, so "Raju"/"raju" collide correctly) — nullable + unique, freely chosen by the admin at account-creation time via Supabase Auth's user-metadata field (`{"username": "raju1"}` in the Dashboard "Add user" form), picked up by `create_profile_for_new_user`. Never derived from the email.
+- `public.email_for_username(p_username citext) returns text` — `security definer`, search_path pinned, granted to `anon` **and** `authenticated`. Necessarily anon-callable (login happens pre-auth) — this is the one deliberate exception to M1's "anon gets zero access" RLS posture, kept as narrow as possible: it returns only an email string, only for an **active** profile (a deactivated account's email is never handed back — same fail-closed shape as everywhere else), nothing else about the profile is exposed.
+- **The lookup + sign-in run together in a single Next.js Server Action** (`src/app/login/actions.ts`), not from the browser's Supabase client. The looked-up email is used internally by the action and never serialized back to client-visible network traffic — this is what actually closes the enumeration/harvesting risk the community guidance flags; the RPC being anon-callable is unavoidable, but *how it's called* is what determines whether emails ever reach a browser. Same generic "Wrong username or password" message whether the username doesn't exist, is deactivated, or the password is wrong.
+
+**Consequences.** One migration (`profiles.username` + the RPC + the trigger update), no RLS policy changes (the RPC bypasses RLS by design, same as every other security-definer function in this project). The login screen's field label changes from EMAIL to USERNAME (design/phase1-design-spec.md, docs/specs/salesman-app.md updated in the same commit). The 3 existing test accounts were backfilled with usernames (`vikram`, `mriddy`, `mridul`) — see docs/m1-test-accounts.md.
+
+---
+
 # Graveyard — rejected ideas (do not re-litigate)
 
 - **"Gapless" numbering via SEQUENCE** — not a real thing (see D1); and not needed once refs are internal.
@@ -76,3 +91,4 @@ Decisions confirmed with the owner on **2026-07-06**. Each entry: context → de
 - **Amazon-style catalog UI** — discovery-oriented B2C pattern; wrong model for a salesman who knows the catalog and is racing a shopkeeper's dictation. The Quick Order list stands.
 - **SQLite + local hosting** — no story for field access, auth, or realtime; was never a real contender against a managed Postgres.
 - **LOCKED as a stored status** — early drafts modeled DRAFT→SUBMITTED→LOCKED. Corrected: *locked is a derived condition* (past `editable_until`, or status `processed`), not a state something transitions into. See [specs/order-lifecycle.md](specs/order-lifecycle.md). The `comments.md` standing checklist predates this correction.
+- **Synthetic per-username auth email** (`username@yourapp.local`, the pattern the owner's `QuoteIt` project uses) — rejected for username login (D9): it makes the username just the email's local-part reconstructed, which the owner explicitly ruled out, and the auth email stops being a real, reachable address.

@@ -20,11 +20,15 @@ create table public.profiles (
   role       text not null default 'salesman'
              check (role in ('admin', 'accountant', 'salesman')),
   active     boolean not null default true,
+  username   citext unique
+             check (username ~ '^[a-zA-Z0-9_.]{3,20}$'),
   created_at timestamptz not null default now()
 );
 ```
 
 Created automatically by a trigger on `auth.users` insert (default role `salesman`); the admin promotes roles via Supabase Studio. No self-signup (D3).
+
+`username` (D9) is how staff **log in** — registration still happens by real email (D3), but the username is a separately-chosen identifier, never derived from the email. `citext` gives case-insensitive matching for free. Nullable: set from the admin-supplied user metadata (`{"username": "raju1"}`) at account-creation time by `create_profile_for_new_user`; if omitted there, set afterward in Studio the same way role promotion works — a `NULL` username simply can't sign in via the username-lookup path yet. See [roles-and-permissions.md](roles-and-permissions.md) for the login flow and the `email_for_username` RPC.
 
 ### `brands`
 

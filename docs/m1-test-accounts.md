@@ -9,11 +9,13 @@ first signup: the trigger auto-creates every new user as `salesman`, then a plai
 `update public.profiles set role = ...` (the SQL equivalent of editing the row in Supabase
 Studio) promotes the two staff accounts.
 
-| Email | Role | profiles.full_name |
-|---|---|---|
-| `kumarvikramagrawal@gmail.com` | `admin` | Vikram (admin) |
-| `mriddyagrawal@gmail.com` | `accountant` | Mriddy (accountant) |
-| `mridul289agrawal@gmail.com` | `salesman` | Mridul (salesman) |
+| Email (registration only) | Username (**use this to log in** — D9) | Role | profiles.full_name |
+|---|---|---|---|
+| `kumarvikramagrawal@gmail.com` | `vikram` | `admin` | Vikram (admin) |
+| `mriddyagrawal@gmail.com` | `mriddy` | `accountant` | Mriddy (accountant) |
+| `mridul289agrawal@gmail.com` | `mridul` | `salesman` | Mridul (salesman) |
+
+Since D9 (2026-07-07), the login screen asks for **username**, not email — the email above is only how the account was registered/how Supabase identifies it internally. Usernames were backfilled for these three via MCP `execute_sql`, not chosen through any in-app flow (there isn't one — D3, admin-created accounts only).
 
 All three are `active = true`. Passwords are whatever Mridul set when creating them in the
 Dashboard — ask him directly if you need to sign in as one of these for manual testing;

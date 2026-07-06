@@ -14,7 +14,7 @@ Login → Home (My Orders) → New Order → Pick Retailer → Quick Order List
 ## Screens
 
 ### 1. Login (`/login`)
-Email + password, "remember me" default on (long-lived session). No signup, no social buttons, no forgot-password self-service (admin resets, D3). Error state: wrong credentials, deactivated account.
+Username + password (D9 — a separately-chosen username, not the account's email; registration still uses email per D3), "remember me" default on (long-lived session). No signup, no social buttons, no forgot-password self-service (admin resets, D3). Error state: wrong username/password, deactivated account (same generic message — never reveal which).
 
 ### 2. Home — My Orders (`/`)
 - Primary action: **"New Order"** — big, thumb-reachable.

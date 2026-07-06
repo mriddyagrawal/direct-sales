@@ -259,6 +259,7 @@ export type Database = {
           full_name: string
           id: string
           role: string
+          username: string | null
         }
         Insert: {
           active?: boolean
@@ -266,6 +267,7 @@ export type Database = {
           full_name: string
           id: string
           role?: string
+          username?: string | null
         }
         Update: {
           active?: boolean
@@ -273,6 +275,7 @@ export type Database = {
           full_name?: string
           id?: string
           role?: string
+          username?: string | null
         }
         Relationships: []
       }
@@ -352,6 +355,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      email_for_username: { Args: { p_username: string }; Returns: string }
       process_order: {
         Args: { p_order_id: string }
         Returns: {

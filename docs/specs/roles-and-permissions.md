@@ -12,9 +12,9 @@ Supabase Auth email+password, admin-created accounts, no self-signup (D3). Postg
 
 ## Provisioning (runbook)
 
-1. Admin creates the user in Supabase Dashboard → Authentication → "Add user" (email + password, auto-confirm on).
-2. The `create_profile_for_new_user` trigger inserts a `profiles` row with role `salesman`.
-3. For the accountant/admin, the admin edits `profiles.role` in Supabase Studio.
+1. Admin creates the user in Supabase Dashboard → Authentication → "Add user" (email + password, auto-confirm on). **Also set a username in User Metadata** — `{"username": "raju1"}` (D9) — the login screen uses this, not the email; pick it freely, never just the email's local-part.
+2. The `create_profile_for_new_user` trigger inserts a `profiles` row with role `salesman` and `username` from that metadata (NULL if omitted — fix in Studio afterward, step 3-style).
+3. For the accountant/admin, the admin edits `profiles.role` (and `profiles.username` if missed at creation) in Supabase Studio.
 4. Deactivation = `profiles.active = false` (all policies check it); never delete rows — orders reference them.
 5. Password resets: admin-initiated from the dashboard (fine at this team size).
 
@@ -42,6 +42,17 @@ The mutating paths (`submit_order`, `update_order_items`, `cancel_order`, `proce
 3. Write the audit event atomically with the change.
 
 The `guard_order_transition` trigger backstops the RPCs, so even a future privileged code path cannot make an illegal transition silently.
+
+## Login flow (username, not email)
+
+Registration is still email+password (D3) — but staff **log in** with a separately-chosen `profiles.username` (D9), not their email. Supabase Auth has no native "sign in by arbitrary field," so:
+
+1. Client submits `{ username, password }` to a Next.js **Server Action** (never the browser's Supabase client directly).
+2. The action calls `public.email_for_username(username)` — `security definer`, granted to `anon` (unavoidable: this runs pre-authentication) **and** `authenticated`. It returns the email only for an **active** profile; NULL for a nonexistent *or* deactivated username — the two look identical from the outside.
+3. The action calls `signInWithPassword({ email, password })` with the looked-up email, using the same server-side Supabase client — so the email is used internally and **never reaches the browser**, closing the "harvest emails by scripting a username-lookup endpoint" risk that calling this RPC from client-side JS would carry.
+4. Same generic "Wrong username or password" message regardless of which of the three ways it failed (bad username, deactivated, bad password).
+
+`email_for_username` is the one deliberate exception to "anon gets zero access" in the RLS matrix below — scoped as narrowly as possible (returns only an email string, active profiles only).
 
 ## Session/config notes
 

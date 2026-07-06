@@ -65,7 +65,7 @@ Primary = filled accent. Secondary = hairline outline, ink text. Destructive = h
 
 ## 3. Screens (final instrument styling)
 
-**S1 · Login.** GE monogram block (accent), "Ganpati Enterprises / ORDER CAPTURE · FIELD SALES", mono field labels (EMAIL / PASSWORD + SHOW), "Keep me signed in — ~30 DAYS ON THIS PHONE" checked by default, full-width accent Sign in. Footer: *"Forgot password? Call the office to reset it."* Errors (wrong credentials, deactivated account) render as flat red-edged strips; submit shows an inline spinner in the accent block.
+**S1 · Login.** GE monogram block (accent), "Ganpati Enterprises / ORDER CAPTURE · FIELD SALES", mono field labels (USERNAME / PASSWORD + SHOW — **D9, 2026-07-07: username login, not email**; registration still uses email per D3), "Keep me signed in — ~30 DAYS ON THIS PHONE" checked by default, full-width accent Sign in. Footer: *"Forgot password? Call the office to reset it."* Errors (wrong username/password, deactivated account — same generic message) render as flat red-edged strips; submit shows an inline spinner in the accent block.
 
 **S2 · Home / My Orders.** Bottom tab bar (above). Offline order pinned above everything: amber-left-bar strip "Saved on phone — not submitted yet" + shop · items · total + mono microcopy `PENDING · WILL RETRY WHEN ONLINE · NO DUPLICATE` + "Sync now" link (v1 also specs a filled amber "Retry now" variant + quiet Offline pill in the header). Cards: ref (mono) + total (mono, right) on top, shop + item count below, status tag. `TODAY · 06 JUL` / `EARLIER` mono section labels (IST days). States: default, offline-pinned, empty ("No orders yet — take your first order — tap New Order below"; New Order stays tappable), loading skeleton (never a spinner).
 

@@ -1,74 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useActionState } from "react";
+import { signInWithUsername, type LoginState } from "./actions";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import styles from "./login.module.css";
 
-export function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const deactivated = searchParams.get("reason") === "deactivated";
+const initialState: LoginState = { error: null };
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(
-    deactivated ? "This account has been deactivated. Call the office." : null,
-  );
+interface LoginFormProps {
+  deactivated: boolean;
+}
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+export function LoginForm({ deactivated }: LoginFormProps) {
+  const [state, formAction, pending] = useActionState(signInWithUsername, initialState);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (signInError) {
-      setError("Wrong email or password.");
-      setLoading(false);
-      return;
-    }
-
-    // Role routing happens in the proxy (middleware) based on the caller's
-    // profile — a plain navigation to "/" lets it redirect accountant/admin
-    // to /dashboard as needed.
-    router.push("/");
-    router.refresh();
-  }
+  const error = state.error ?? (deactivated ? "This account has been deactivated. Call the office." : null);
 
   return (
-    <form onSubmit={handleSubmit} className={styles.form}>
+    <form action={formAction} className={styles.form}>
       {error && <p className={styles.errorStrip}>{error}</p>}
       <Field
-        label="Email"
-        type="email"
-        autoComplete="email"
+        label="Username"
+        name="username"
+        type="text"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
         required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
       />
-      <Field
-        label="Password"
-        type="password"
-        autoComplete="current-password"
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <Field label="Password" name="password" type="password" autoComplete="current-password" required />
       <label className={styles.remember}>
-        <input
-          type="checkbox"
-          checked={rememberMe}
-          onChange={(e) => setRememberMe(e.target.checked)}
-        />
+        <input type="checkbox" name="rememberMe" defaultChecked />
         Keep me signed in — ~30 DAYS ON THIS PHONE
       </label>
-      <Button type="submit" loading={loading} className={styles.submit}>
+      <Button type="submit" loading={pending} className={styles.submit}>
         Sign in
       </Button>
     </form>
