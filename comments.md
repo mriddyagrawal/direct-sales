@@ -77,7 +77,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open (S1 mark code now correct; spec text unreconciled) |
 | ⑳ | S2 salesman Home doesn't apply the D8 self-cancel filter — a self-cancelled order would still show in the list. Add `.or('status.neq.cancelled,cancelled_by.neq.<uid>')`. | 🟡 functional gap | app S2 (32c1c96) | 🟡 open — wire before S2 is done |
-| ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — enable before pilot |
+| ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — homed as PLAN Q#7 (owner enables before pilot) |
 | ⑲ | Self-referential `--font-structure`/`--font-figures` in globals.css (same name next/font assigns) → equal-specificity cycle; Space Grotesk may silently drop depending on CSS load order. Use distinct names or drop the redeclaration. | 🟡 was css | design system (7f65371) | ✅ **CLOSED** at 345dce2 — distinct names (`--font-space-grotesk`/`--font-jetbrains-mono`); no cycle, confirmed in served CSS |
 | ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | ✅ **CLOSED** at dcb3904 — `design/**`+`archive/**` ignored; `npm run lint` exit 0 |
 | ⑮ | D8 filter must scope to **self**-cancels only (`cancelled_by = salesman_id`), else an accountant-cancelled order silently vanishes from the salesman's list. | 🔵 was design gap | M1 (3496c17) | ✅ **CLOSED** at M1.9 (a6ec10a) — `cancelled_by` added; self/office distinction verified live |
@@ -1158,5 +1158,23 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No blocking items. **⑳ (new) S2 missing the D8 self-cancel filter.** ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password) remain — all non-blocking.
 
 **Next-commit suggestion:** wire the D8 filter on S2 (⑳); continue the flow (S3 retailer picker / S4 quick order). A live login drive (with a test credential) would let me confirm role-routing + RLS end-to-end through the browser.
+
+---
+
+## Review of b91a67e — docs: record leaked-password-protection as an owner go-live toggle
+
+**Verdict:** ✅ accept — accurate, correctly scoped; homes ⑯ as an owner action. Docs-only.
+
+**What works:**
+- Adds PLAN.md open question **#7** (owner-assigned): enable Supabase Auth's leaked-password / HaveIBeenPwned check. Gives ⑯ a durable home alongside the other go-live toggles. ✓
+- The rationale is **correct**: it's a Dashboard-only setting (Authentication → Providers → Email) with **no MCP tool** to toggle it — I confirmed the Supabase MCP surface has no auth-config mutator (same class as creating auth users, which also required the Dashboard). Recording it rather than faking a workaround is the right call. ✓
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**What I tried:** read the diff; confirmed against the available Supabase MCP tools that none expose Auth provider/security settings.
+
+**Open flags (cumulative):** No blocking items. ⑯ now homed (PLAN Q#7, owner enables before pilot). ⑳ (S2 D8 filter), ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass) remain — non-blocking.
+
+**Next-commit suggestion:** wire ⑳ (S2 D8 filter) and continue the salesman flow (S3/S4).
 
 ---
