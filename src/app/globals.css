@@ -1,13 +1,43 @@
+/*
+ * Design tokens — the "instrument, not a dashboard" grammar.
+ * Source: design/phase1-design-spec.md §2. Single source of truth for both
+ * apps; do not redeclare these values elsewhere.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Color (spec §2 "Color") */
+  --color-accent: #1d4ed8; /* editable status, primary action fill, focus, selection */
+  --color-amber: #b45309; /* pending/<10m countdown — amber = pending, never red */
+  --color-locked: #6b7580; /* Submitted · locked square + secondary/inactive text */
+  --color-processed: #15803d; /* Processed square + confirmation */
+  --color-error: #b91c1c; /* errors + Cancelled only — red is reserved */
+  --color-ink: #14181f; /* primary text, table header underrules, Print fill */
+  --color-paper: #f2f3f5; /* app ground */
+  --color-white: #ffffff; /* cards/sheets, on paper */
+  --color-inactive: #8a94a0; /* inactive tab icons/labels */
+  --color-hairline: #d8dbdf; /* hairline rules replace shadowed cards */
+
+  /* Type (spec §2 "Type scale") */
+  --font-structure: var(--font-structure), system-ui, sans-serif;
+  --font-figures: var(--font-figures), ui-monospace, Menlo, Consolas, monospace;
+
+  --text-name-size: 21px;
+  --text-name-weight: 700;
+  --text-header-size: 15px;
+  --text-header-weight: 600;
+  --text-body-size: 13px;
+  --text-body-weight: 500;
+  --text-section-label-size: 10px;
+  --text-section-label-tracking: 0.08em;
+
+  /* Layout & interaction constants (spec §2) */
+  --radius: 2px;
+  --touch-target-min: 48px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
 }
 
 html {
@@ -20,30 +50,21 @@ body {
   overflow-x: hidden;
 }
 
+/* Light theme only (sunlight readability) — no dark-mode media query. */
 body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
 }
 
 a {
   color: inherit;
   text-decoration: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
 }

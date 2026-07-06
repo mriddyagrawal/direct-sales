@@ -1,15 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Structure/labels/names typeface. next/font self-hosts + subsets + sets
+// font-display: swap by default, so first paint never blocks on the
+// webfont — the <2s-on-4G budget outranks typography (design spec
+// deviation #2). System fallback stack covers the gap until it loads.
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-structure",
   subsets: ["latin"],
+  fallback: ["system-ui", "sans-serif"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Every figure — refs, SKUs, prices, quantities, times, countdowns —
+// renders in this so numbers are tabular and column-aligned by construction.
+const jetBrainsMono = JetBrains_Mono({
+  variable: "--font-figures",
   subsets: ["latin"],
+  fallback: ["ui-monospace", "Menlo", "Consolas", "monospace"],
 });
 
 export const metadata: Metadata = {
@@ -23,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" className={`${spaceGrotesk.variable} ${jetBrainsMono.variable}`}>
       <body>{children}</body>
     </html>
   );
