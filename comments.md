@@ -71,11 +71,12 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
 | ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
-| ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, 5 unindexed FKs, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
+| ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, **6** unindexed FKs incl. `orders.cancelled_by`, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
-| ⑮ | D8 filter is `status != 'cancelled'` (hides **all** cancels) but the rationale is about **self**-cancels — an accountant-cancelled order would silently vanish from the salesman's list. Decide: hide-all (intended?) vs scope-to-self (needs the cancelling actor, not just status). | 🟡 design gap | M1 (3496c17) | 🟡 open — resolve before the M4 order-list screen |
+| ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — enable before pilot |
+| ⑮ | D8 filter must scope to **self**-cancels only (`cancelled_by = salesman_id`), else an accountant-cancelled order silently vanishes from the salesman's list. | 🔵 was design gap | M1 (3496c17) | ✅ **CLOSED** at M1.9 (a6ec10a) — `cancelled_by` added; self/office distinction verified live |
 | ⑪ | Rename `current_role()` → `auth_profile_role()` (reserved-keyword footgun). | 🔴 was blocking — owner directive | M1.5/M1.6 | ✅ **CLOSED** at M1.8 — rename complete; RLS (OID-bound) + RPCs re-verified live |
 | ⑩ | RLS fail-open on all 7 tables (anon-readable staff PII; authenticated self-promotion; direct writes bypassing RPCs). | 🔴 was blocking | M1.1–1.3 | ✅ **CLOSED** at M1.6/M1.6b — verified by the 6-step RLS protocol |
 | ⑫ | `search_path` unpinned on the three trigger functions. | 🟡 minor | M1.4 | ✅ CLOSED at M1.6b |
@@ -886,6 +887,37 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **What I tried:** read the full diff (decisions.md / salesman-app.md / future-plans.md / PLAN.md); cross-checked the "no migration" claim against the M1 objects I already verified live (`cancel_order` behavior, `orders.status` CHECK, `orders_select_own` policy) and against `cancel_order`'s accountant/admin-cancel path (the basis for the ⑮ gap).
 
 **Open flags (cumulative):** No blocking items. **⑮ (new) self-cancel vs office-cancel filter scope** — decide before the salesman order-list screen (M4). ⑦⑧⑨ (minor M0 doc); ⑬ (deferred seed loader); ⑭ (parked perf pass). **⑧ still open** — future-plans.md now has geotag + perf-pass + cancelled-orders-view, but still no Payments entry the design spec points at.
+
+**Next-commit suggestion:** M2 app scaffolding.
+
+---
+
+## Review of a6ec10a — fix(supabase): M1.9 — orders.cancelled_by; correct D8 to self-cancel-only
+
+**Verdict:** ✅ accept — resolves ⑮ correctly (the option-(b) scope-to-self path), verified by execution. Honest about the reversed "no migration" claim.
+
+**Phase / commit goal (as I understood it):** Add `orders.cancelled_by` so the D8 list-hide can distinguish a self-cancel from an office-cancel, correct D8 accordingly, and fix the chip-list contradiction I flagged.
+
+**What works — proven live, self-rolling-back transaction under real salesman + accountant JWTs:**
+- **Column added as specced:** `orders.cancelled_by uuid` (nullable, FK → profiles), mirroring `processed_by`. `information_schema` confirms nullable=YES. ✓
+- **`cancel_order` records the actor correctly:** salesman self-cancel → `cancelled_by = salesman` (`by_self=t`); accountant office-cancel → `cancelled_by = accountant`, **not** the salesman (`by_acct=t, by_salesman=f`). The two cases are now distinguishable by column, no `order_events` join needed. ✓✓
+- **The corrected D8 filter behaves exactly right:** as salesman s1, `... where not (status='cancelled' and cancelled_by = salesman_id)` returned **only the office-cancelled order** (`ORD-2026-1002`) and hid the self-cancelled one (`ORD-2026-1001`) — while the unfiltered RLS query still returned **both** (so the salesman retains DB access; the hide is purely client-query). This is the precise ⑮ resolution. ✓✓✓
+- **`cancel_order` recreated cleanly:** `security definer` + `search_path` preserved; `authenticated` retained EXECUTE (I called it as two different authenticated users successfully). Rest of the RPC body unchanged from M1.5/M1.8. ✓
+- **Chip contradiction (my minor note) fixed:** salesman-app.md now says the `Cancelled` chip only appears for office-cancels; self-cancels aren't in the list, so no contradiction. ✓
+- **data-model.md** orders DDL + RPC table updated to match; **D8** corrected with an honest consequence note ("the original 'no migration needed' claim undersold the design gap the REVIEWER caught"). Good log hygiene. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **New unindexed FK:** `orders.cancelled_by` has no covering index → it joins the ⑭ parked performance bucket (now **6** unindexed FKs, not 5). Same deferral rationale applies; no action now. Just keeping the parked list honest.
+- **⑯ (new, config) `auth_leaked_password_protection` is disabled** — the security advisor now surfaces this (a Supabase Auth Dashboard toggle: check new passwords against HaveIBeenPwned). Not a migration/code concern and the BUILDER noted it, but it has no durable home — enable it in the Auth settings before pilot (one click, free hardening). Low urgency for admin-set-password accounts, but worth doing.
+- Cosmetic: **two commits are both numbered "M1.9"** (this one and the earlier test-accounts doc `5a869d4`). Harmless, but the sequence now has a duplicate label.
+
+**Domain / correctness checks:** State machine / soft-cancel / audit trail — unchanged (still soft; `order_events` still records the cancel) ✓. RLS — unchanged; the new column is row-scoped-visible automatically (SELECT policies aren't column-scoped) ✓. D8 filter — now matches its own rationale, verified ✓. Money/numbering — untouched.
+
+**What I tried:** `git show`; a live `DO` block — 2 orders submitted by a salesman, one self-cancelled, one accountant-cancelled, asserting `cancelled_by` per case and running the corrected D8 filter (shows office-cancel only, hides self-cancel, RLS still returns both); `get_advisors(security)` (5 accepted WARNs unchanged + the leaked-password Auth notice).
+
+**Open flags (cumulative):** **⑮ — ✅ CLOSED (verified).** No blocking items. ⑯ (new, config) enable leaked-password protection pre-pilot. ⑦⑧⑨ (minor M0 doc); ⑬ (deferred seed loader); ⑭ (parked perf pass, now 6 FKs). ⑧ still open (no Payments entry in future-plans.md).
 
 **Next-commit suggestion:** M2 app scaffolding.
 
