@@ -76,7 +76,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
 | ⑨ | S1 screen body + renders still show the GE monogram that deviation #6 overrides with the receipt glyph; the desktop S8 "GE block" mark is unclarified. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open (S1 mark code now correct; spec text unreconciled) |
-| ⑳ | S2 salesman Home doesn't apply the D8 self-cancel filter — a self-cancelled order would still show in the list. Add `.or('status.neq.cancelled,cancelled_by.neq.<uid>')`. | 🟡 functional gap | app S2 (32c1c96) | 🟡 open — wire before S2 is done |
+| ⑳ | S2 salesman Home doesn't apply the D8 self-cancel filter — a self-cancelled order would still show in the list. Add `.or('status.neq.cancelled,cancelled_by.neq.<uid>')`. | 🟡 was functional gap | app S2 (32c1c96) | ✅ **CLOSED** at fefd9260 — filter applied; self-hidden/office-visible verified live |
 | ⑯ | `auth_leaked_password_protection` disabled — enable the HaveIBeenPwned check in Supabase Auth settings (Dashboard toggle, not a migration). | 🟡 minor / config | M1 (a6ec10a advisor) | 🟡 open — homed as PLAN Q#7 (owner enables before pilot) |
 | ⑲ | Self-referential `--font-structure`/`--font-figures` in globals.css (same name next/font assigns) → equal-specificity cycle; Space Grotesk may silently drop depending on CSS load order. Use distinct names or drop the redeclaration. | 🟡 was css | design system (7f65371) | ✅ **CLOSED** at 345dce2 — distinct names (`--font-space-grotesk`/`--font-jetbrains-mono`); no cycle, confirmed in served CSS |
 | ⑰ | `npm run lint` fails (exit 1) — but only on the frozen `design/phase1/support.js` deliverable; `src/` app code is clean. Add `design/**` to `eslint.config.mjs` `globalIgnores` so the lint gate is green. | 🟡 minor / tooling | app scaffold (54a3171) | ✅ **CLOSED** at dcb3904 — `design/**`+`archive/**` ignored; `npm run lint` exit 0 |
@@ -1176,5 +1176,29 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No blocking items. ⑯ now homed (PLAN Q#7, owner enables before pilot). ⑳ (S2 D8 filter), ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass) remain — non-blocking.
 
 **Next-commit suggestion:** wire ⑳ (S2 D8 filter) and continue the salesman flow (S3/S4).
+
+---
+
+## Review of fefd9260 — fix(app): S2 — apply D8 self-cancel filter; show full_name not email
+
+**Verdict:** ✅ accept — ⑳ closed; the D8 filter is correct and verified by execution.
+
+**What works:**
+- **D8 filter `.or('status.neq.cancelled,cancelled_by.neq.${user.id}')` — verified live.** I set up three of the salesman's own orders (submitted, self-cancelled, office-cancelled) and ran the exact filter (as SQL `status <> 'cancelled' OR cancelled_by <> s1`): it returned **`ORD-…1001(submitted)` + `…1003(OFFICE)`** and **hid `…1002(SELF)`** — precisely the corrected D8 behaviour. It's the De Morgan equivalent of the `NOT(status=cancelled AND cancelled_by=uid)` form I proved at a6ec10a. The commit's own reasoning is exactly right: the first clause covers every non-cancelled order regardless of `cancelled_by`; the second only decides which *cancelled* rows survive (office-cancel stays, self-cancel goes). No NULL edge issue — `cancel_order` always sets `cancelled_by`, so no cancelled row has a null there. ✓
+- **full_name fix:** the account line now shows `profile?.full_name ?? user?.email` ("Signed in as Mridul (salesman)"), matching the S2 spec's "Signed in as Raju" wording. ✓
+- build + lint exit 0. ✓
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- S2 now issues three reads per render (getUser + the new `profiles` full_name lookup + orders), and the middleware already fetched role/active for the same user. Fine for now, but caching role+name (JWT claim or passing from the layout) would cut the per-navigation round-trips — ties into the ⑭ perf theme. Minor.
+
+**Domain / correctness checks:** D8 — now correctly applied on S2, verified (self hidden, office visible) ✓. RLS — unchanged (the `.or` is an additional filter *within* the RLS-scoped own rows) ✓. No money/state surface.
+
+**What I tried:** read the diff; `npm run build`/`npm run lint` (both exit 0); a live `DO` block exercising the exact filter over submitted/self-cancel/office-cancel orders under the salesman's RLS context (rolled back; sequence restored).
+
+**Open flags (cumulative):** **⑳ — ✅ CLOSED (verified).** No blocking items. ⑦⑧⑨ (M0 doc), ⑬ (seed loader), ⑭ (perf pass), ⑯ (leaked-password, PLAN Q#7) remain — non-blocking.
+
+**Next-commit suggestion:** continue the salesman flow — S3 (retailer picker) / S4 (quick order, the hero screen), where the write RPCs (`submit_order`) finally get exercised through the app; I'll verify the snapshot/idempotency behaviour end-to-end there.
 
 ---
