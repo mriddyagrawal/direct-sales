@@ -57,3 +57,24 @@ Ideas the owner has approved in principle but deliberately **not** scheduled int
 **Decision context:** the bottom tab bar (design-spec deviation #1) is **Home + New Order only** for Phase 1, but its slot grammar **deliberately reserves room for a Payments tab** so adding one later doesn't reshuffle the bar. Nothing is built or speced — this entry exists so the design spec's forward-reference ("the future Payments tab — see docs/future-plans.md") resolves to something. Note the scope guard: **money stays in Tally.** Phase 4 (collections) is strictly *read-only outstanding visibility* with no payment *recording* in the app — so a real Payments tab would first need an owner decision on whether the app ever records payments at all, which today it does not.
 
 **Revisit when:** the owner decides the app should surface or record payment/collection data beyond Phase 4's read-only outstanding view.
+
+## Fulfillment & serial/QR capture at dispatch — new godown role (owner-approved 2026-07-07 · Phase 4+, structure TBD)
+
+**What:** capture the **serial / QR of each physical unit** as it's dispatched from the godown, tied to the order + party — an exact record of which units went where. **Mandatory for LG** (white goods are serial-tracked for warranty + LG's own distributor/warranty reporting); a **good-to-have tracking add for other brands** (Zebronics etc.).
+
+**Who captures — the GODOWN/WAREHOUSE staff, NOT the salesman (owner correction 2026-07-07).** The field salesman never touches the warehouse. So this needs a **new `warehouse`/`godown` role** (added later) with its own fulfillment screen. (Corrects the earlier "salesman scans" sketch.)
+
+**The cycle (owner's description):** order placed → (for LG, **admin-approved** — the Phase-3b gate) → the order surfaces to the godown as a **fulfillment/dispatch queue** → godown staff pick the units and **scan / enter each unit's serial** into the app → **the accountant takes those serials and enters them into Tally, where the bill/invoice is created** → the printed bill + goods go out to the party. So — for **any** brand, **the Tally bill is created at *dispatch* (once the items are physically out), driven off the captured serials — not at order-time.** (This refines [phase2-tally-sync-design.md](phase2-tally-sync-design.md)'s app→Tally trigger; **exact structure is undecided — decide properly when scheduled.**)
+
+**App = capture tool, not the final ledger:** serials flow onward — into **Tally** (initially via the accountant re-keying; a direct sync is a later optimization) and almost certainly into **LG's own distributor/warranty portal** (verify LG's required format — that's the real spec the LG capture must satisfy). Tally stays the accounting system of record; the app is the fast mobile capture surface that kills paper transcription.
+
+**Shape when built (all TBD):**
+- **New role** `warehouse`/`godown` + RLS + a fulfillment screen (queue of dispatchable orders; per-line serial entry).
+- **`order_item_serials`** table (per *unit*: `serial`, `order_item_id`, `captured_by`, `captured_at`, optional photo) — qty 3 ⇒ 3 serials. Additive.
+- **Capture UX:** barcode **scan** primary (LG serials are barcoded), **manual type** fallback, **photo** audit-only (OCR unreliable). Feasibility: `BarcodeDetector` works on **Android Chrome**, **not iOS Safari** (needs a JS decoder lib there) — a native app scans best but is out of the web stack.
+- **New order state** for "dispatched/fulfilled" (closes the loop; could carry the parked order-submit **geotag** as proof-of-delivery — see that entry).
+- **LG = required** (app-scan, or paper serials brought back as the fallback); **other brands = optional** tracking.
+
+**Don't over-build:** at <20 orders/day with LG a subset, volume is tiny — **manual serial entry alone is fine**; the scan is a speed-up, not a blocker. MVP = fulfillment queue + per-line serial entry (scan or type) + submit + a clean export for LG/accountant.
+
+**Depends on / revisit when:** **Phase 2 (Tally sync)** and **Phase 3b (LG)** are live — it rides on both. May graduate from this parking lot into a dedicated PLAN phase + design doc once the structure (roles, Tally trigger, LG-portal integration) is decided.
