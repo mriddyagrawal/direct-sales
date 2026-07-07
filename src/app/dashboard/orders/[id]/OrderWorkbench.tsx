@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { StatusTag } from "@/components/ui/StatusTag";
@@ -82,6 +82,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [tick] = useState(nowMs);
 
@@ -161,7 +162,11 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
     try {
       await updateOrderItems(order.id, notes, items, requiresReason ? reason.trim() : undefined);
       setMode("view");
-      router.refresh();
+      // Stay busy through the refresh (review flag ㉜(🅑)) — see
+      // ProductsPricing.tsx note; same dead-gap shape here.
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save changes.");
     } finally {
@@ -175,7 +180,9 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
     try {
       await processOrder(order.id);
       setConfirmProcess(false);
-      router.refresh();
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not process the order.");
     } finally {
@@ -193,7 +200,9 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
     try {
       await cancelOrder(order.id, cancelReason.trim());
       setConfirmCancel(false);
-      router.refresh();
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not cancel the order.");
     } finally {
@@ -333,7 +342,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
               <Button variant="secondary" onClick={cancelEdit}>
                 Discard
               </Button>
-              <Button variant="primary" onClick={handleSave} loading={saving}>
+              <Button variant="primary" onClick={handleSave} loading={saving || isPending}>
                 Save changes
               </Button>
             </div>
@@ -379,7 +388,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             <Button variant="secondary" onClick={() => setConfirmProcess(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleProcess} loading={saving}>
+            <Button variant="primary" onClick={handleProcess} loading={saving || isPending}>
               Mark processed
             </Button>
           </div>
@@ -401,7 +410,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             <Button variant="secondary" onClick={() => setConfirmCancel(false)}>
               Keep order
             </Button>
-            <Button variant="destructive-filled" onClick={handleCancel} loading={saving}>
+            <Button variant="destructive-filled" onClick={handleCancel} loading={saving || isPending}>
               Cancel order
             </Button>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Field } from "@/components/ui/Field";
@@ -18,13 +18,19 @@ interface EditForm {
 
 // S11 — verification queue. A pending row opens straight into inline edit;
 // fixing the spelling *is* the verification act (one motion, one Save).
-export function RetailersQueue({ initialRetailers }: { initialRetailers: RetailerRow[] }) {
+//
+// review flag ㉜(🅐): render straight from the `initialRetailers` prop, never
+// copied into useState — see the matching note in ProductsPricing.tsx.
+export function RetailersQueue({ initialRetailers: retailers }: { initialRetailers: RetailerRow[] }) {
   const router = useRouter();
-  const [retailers] = useState(initialRetailers);
   const [tab, setTab] = useState<FilterTab>("pending");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm>({ name: "", area: "", phone: "" });
   const [saving, setSaving] = useState(false);
+  // review flag ㉜(🅑): which specific row/action is busy, so the spinner
+  // lands on the button actually clicked rather than dimming the whole list.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const counts = {
@@ -69,26 +75,34 @@ export function RetailersQueue({ initialRetailers }: { initialRetailers: Retaile
         verified: true,
       })
       .eq("id", id);
-    setSaving(false);
     if (updateError) {
+      setSaving(false);
       setError(updateError.message);
       return;
     }
     setEditingId(null);
-    router.refresh();
+    setSaving(false);
+    // Stay busy through the refresh (㉜🅑) — see ProductsPricing.tsx note.
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   async function setActive(id: string, active: boolean) {
-    setSaving(true);
+    const key = `${id}:${active ? "reactivate" : "deactivate"}`;
+    setBusyKey(key);
     setError(null);
     const supabase = createClient();
     const { error: updateError } = await supabase.from("retailers").update({ active }).eq("id", id);
-    setSaving(false);
     if (updateError) {
+      setBusyKey(null);
       setError(updateError.message);
       return;
     }
-    router.refresh();
+    startTransition(() => {
+      router.refresh();
+      setBusyKey(null);
+    });
   }
 
   return (
@@ -132,7 +146,7 @@ export function RetailersQueue({ initialRetailers }: { initialRetailers: Retaile
         <div className={styles.list}>
           {filtered.map((r) => {
             if (editingId === r.id) {
-              const isPending = !r.verified;
+              const needsVerification = !r.verified;
               return (
                 <div key={r.id} className={styles.editCard}>
                   <div className={styles.editRow}>
@@ -142,7 +156,7 @@ export function RetailersQueue({ initialRetailers }: { initialRetailers: Retaile
                     <Field label="Area" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
                     <Field label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                   </div>
-                  {isPending && (
+                  {needsVerification && (
                     <p className={styles.helper}>
                       Fix the spelling now — this exact name becomes the Tally ledger mapping in Phase 2.
                     </p>
@@ -151,7 +165,7 @@ export function RetailersQueue({ initialRetailers }: { initialRetailers: Retaile
                     <Button variant="secondary" onClick={discardEdit}>
                       Discard
                     </Button>
-                    <Button variant="primary" onClick={() => saveAndVerify(r.id)} loading={saving}>
+                    <Button variant="primary" onClick={() => saveAndVerify(r.id)} loading={saving || isPending}>
                       Save &amp; verify
                     </Button>
                   </div>
@@ -159,18 +173,18 @@ export function RetailersQueue({ initialRetailers }: { initialRetailers: Retaile
               );
             }
 
-            const isPending = r.active && !r.verified;
+            const needsVerification = r.active && !r.verified;
             const isDeactivated = !r.active;
 
             return (
               <div
                 key={r.id}
                 className={`${styles.row} ${isDeactivated ? styles.rowDeactivated : ""}`}
-                onClick={isPending ? () => startEdit(r) : undefined}
-                role={isPending ? "button" : undefined}
-                tabIndex={isPending ? 0 : undefined}
+                onClick={needsVerification ? () => startEdit(r) : undefined}
+                role={needsVerification ? "button" : undefined}
+                tabIndex={needsVerification ? 0 : undefined}
                 onKeyDown={
-                  isPending
+                  needsVerification
                     ? (e) => {
                         if (e.key === "Enter" || e.key === " ") startEdit(r);
                       }
@@ -180,7 +194,7 @@ export function RetailersQueue({ initialRetailers }: { initialRetailers: Retaile
                 <div className={styles.rowInfo}>
                   <p className={styles.rowName}>
                     {r.name}
-                    {isPending && <span className={styles.newBadge}>NEW</span>}
+                    {needsVerification && <span className={styles.newBadge}>NEW</span>}
                     {isDeactivated && <span className={styles.deactivatedBadge}>DEACTIVATED</span>}
                   </p>
                   <p className={styles.rowMeta}>
@@ -189,15 +203,39 @@ export function RetailersQueue({ initialRetailers }: { initialRetailers: Retaile
                 </div>
                 <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
                   {isDeactivated ? (
-                    <Button variant="secondary" onClick={() => setActive(r.id, true)} disabled={saving}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setActive(r.id, true)}
+                      loading={busyKey === `${r.id}:reactivate`}
+                    >
                       Reactivate
                     </Button>
+                  ) : needsVerification ? (
+                    <>
+                      {/* review flag ㉜(🅒): pending rows previously offered only Edit +
+                          Deactivate — verifying only happened via the row's onClick, which
+                          isn't discoverable. This is the explicit primary action. */}
+                      <Button variant="primary" onClick={() => startEdit(r)}>
+                        Review &amp; verify
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setActive(r.id, false)}
+                        loading={busyKey === `${r.id}:deactivate`}
+                      >
+                        Deactivate
+                      </Button>
+                    </>
                   ) : (
                     <>
-                      <Button variant="secondary" onClick={() => startEdit(r)} disabled={saving}>
+                      <Button variant="secondary" onClick={() => startEdit(r)}>
                         Edit
                       </Button>
-                      <Button variant="destructive" onClick={() => setActive(r.id, false)} disabled={saving}>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setActive(r.id, false)}
+                        loading={busyKey === `${r.id}:deactivate`}
+                      >
                         Deactivate
                       </Button>
                     </>

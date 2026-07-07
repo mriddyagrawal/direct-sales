@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Field } from "@/components/ui/Field";
@@ -18,12 +18,17 @@ interface EditForm {
 // Owner-added — pricing lives in-app now, not Supabase Studio. Setting a
 // price on a TBD SKU makes it salesman-visible immediately (D2) — no
 // deploy, since products_select_salesman is a plain RLS predicate.
-export function ProductsPricing({ initialProducts }: { initialProducts: ProductRow[] }) {
+//
+// review flag ㉜(🅐): products must render straight from the `initialProducts`
+// prop, never copied into useState — a plain useState reads its initializer
+// once, so a post-save router.refresh() would deliver fresh server data the
+// component then ignores, leaving the row showing the stale pre-save value.
+export function ProductsPricing({ initialProducts: products }: { initialProducts: ProductRow[] }) {
   const router = useRouter();
-  const [products] = useState(initialProducts);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm>({ priceRupees: "", tallyName: "", active: true });
   const [saving, setSaving] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const groups: { category: string; products: ProductRow[] }[] = [];
@@ -70,13 +75,20 @@ export function ProductsPricing({ initialProducts }: { initialProducts: ProductR
         active: form.active,
       })
       .eq("id", id);
-    setSaving(false);
     if (updateError) {
+      setSaving(false);
       setError(updateError.message);
       return;
     }
     setEditingId(null);
-    router.refresh();
+    setSaving(false);
+    // Stay busy through the refresh (review flag ㉜(🅑)) — router.refresh()
+    // repaints asynchronously; isPending keeps the button spinning until the
+    // new data actually lands instead of going idle the instant the write
+    // resolves.
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   return (
@@ -109,6 +121,7 @@ export function ProductsPricing({ initialProducts }: { initialProducts: ProductR
                       label="Tally name"
                       value={form.tallyName}
                       onChange={(e) => setForm({ ...form, tallyName: e.target.value })}
+                      placeholder={p.name}
                     />
                   </div>
                   <button
@@ -122,7 +135,7 @@ export function ProductsPricing({ initialProducts }: { initialProducts: ProductR
                     <Button variant="secondary" onClick={cancelEdit}>
                       Cancel
                     </Button>
-                    <Button variant="primary" onClick={() => save(p.id)} loading={saving}>
+                    <Button variant="primary" onClick={() => save(p.id)} loading={saving || isPending}>
                       Save
                     </Button>
                   </div>
@@ -139,8 +152,7 @@ export function ProductsPricing({ initialProducts }: { initialProducts: ProductR
                     {!p.active && <span className={styles.inactiveBadge}>INACTIVE</span>}
                   </p>
                   <p className={styles.rowMeta}>
-                    {p.sku}
-                    {p.tally_name ? ` · ${p.tally_name}` : ""}
+                    {p.sku} · {p.tally_name ?? p.name}
                   </p>
                 </div>
                 <div className={styles.rowActions}>
