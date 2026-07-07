@@ -1,0 +1,358 @@
+"use client";
+
+import { useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/Button";
+import { formatRupees } from "@/lib/format";
+import { parsePricePaise } from "@/lib/price";
+import { normalizeCategory, effectiveTallyName } from "@/lib/catalog";
+import type { BrandOption } from "./ProductModal";
+import styles from "./ImportWizard.module.css";
+
+type Step = "upload" | "preview" | "applying" | "result" | "unreadable";
+type RowStatus = "new" | "updated" | "error";
+
+interface ParsedRow {
+  rowNo: number; // the actual spreadsheet row number, for the user to find it
+  category: string; // normalized (for valid rows) / raw (for error rows)
+  name: string;
+  tallyName: string; // effective (blank folded to display name)
+  pricePaise: number | null;
+  active: boolean;
+  status: RowStatus;
+  reason?: string;
+}
+
+interface Parsed {
+  rows: ParsedRow[];
+  untouched: number; // brand products absent from the file (never touched)
+}
+
+interface ImportWizardProps {
+  brands: BrandOption[];
+  onClose: () => void;
+  onDone: () => void;
+}
+
+function parseActive(v: string): boolean {
+  const t = v.trim().toLowerCase();
+  if (t === "") return true;
+  return !["false", "no", "0", "inactive", "n"].includes(t);
+}
+
+// M5.5 commit 4 — Excel import wizard (Upload → Preview → Result). Admin-only
+// (the button that opens it is admin-gated, and import_products re-checks the
+// role server-side). One brand per file. Parse + diff runs client-side against
+// the brand's current catalog keyed on (brand_id, effective tally_name); Apply
+// upserts the valid rows atomically via the import_products RPC — idempotent
+// (re-run = all Updated) and never deletes (untouched rows are only reported).
+export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
+  const [step, setStep] = useState<Step>("upload");
+  const [brandId, setBrandId] = useState(brands.length === 1 ? brands[0].id : "");
+  const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [result, setResult] = useState<{ added: number; updated: number; skipped: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const brandName = brands.find((b) => b.id === brandId)?.name ?? "products";
+
+  function downloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Category", "Display Name", "Tally Name", "Price", "Active"],
+      ["Speakers", "Example Speaker X1", "ZEB-SPK-X1", 557.5, "TRUE"],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Products");
+    XLSX.writeFile(wb, `${brandName.toLowerCase().replace(/\s+/g, "-")}-import-template.xlsx`);
+  }
+
+  async function handleFile(file: File) {
+    setError(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) return setStep("unreadable");
+
+      const grid = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" }) as unknown[][];
+      if (grid.length < 1) return setStep("unreadable");
+
+      const headers = (grid[0] ?? []).map((h) => String(h).trim().toLowerCase());
+      const iCat = headers.indexOf("category");
+      const iName = headers.indexOf("display name");
+      const iTally = headers.indexOf("tally name");
+      const iPrice = headers.indexOf("price");
+      const iActive = headers.indexOf("active");
+      // Category + Display Name are the minimum recognizable schema.
+      if (iCat === -1 || iName === -1) return setStep("unreadable");
+
+      // Diff against the brand's *current* catalog (fetched fresh, not the
+      // page's initial snapshot), keyed on (brand_id, tally_name).
+      const supabase = createClient();
+      const { data: existing } = await supabase.from("products").select("category, tally_name").eq("brand_id", brandId);
+      const brandCats = Array.from(new Set((existing ?? []).map((e) => e.category)));
+      const existingTally = new Set((existing ?? []).map((e) => e.tally_name));
+
+      const rows: ParsedRow[] = [];
+      const fileTallies = new Set<string>();
+      for (let r = 1; r < grid.length; r++) {
+        const cells = grid[r] ?? [];
+        const cell = (i: number) => (i === -1 ? "" : String(cells[i] ?? "").trim());
+        const cat = cell(iCat);
+        const name = cell(iName);
+        const priceCell = cell(iPrice);
+        const activeCell = cell(iActive);
+        if (!cat && !name && !cell(iTally) && !priceCell && !activeCell) continue; // blank row
+
+        const rowNo = r + 1; // 1-based, header is row 1
+        const effTally = effectiveTallyName(cell(iTally), name);
+        fileTallies.add(effTally);
+
+        const parsedPrice = parsePricePaise(priceCell);
+        let reason: string | undefined;
+        if (!name) reason = "Display name is required";
+        else if (!cat) reason = "Category is required";
+        else if (!parsedPrice.ok) reason = parsedPrice.error;
+
+        if (reason) {
+          rows.push({ rowNo, category: cat, name, tallyName: effTally, pricePaise: null, active: true, status: "error", reason });
+          continue;
+        }
+        rows.push({
+          rowNo,
+          category: normalizeCategory(cat, brandCats),
+          name,
+          tallyName: effTally,
+          pricePaise: parsedPrice.ok ? parsedPrice.paise : null,
+          active: parseActive(activeCell),
+          status: existingTally.has(effTally) ? "updated" : "new",
+        });
+      }
+
+      const untouched = (existing ?? []).filter((e) => !fileTallies.has(e.tally_name)).length;
+      setParsed({ rows, untouched });
+      setStep("preview");
+    } catch {
+      setStep("unreadable");
+    }
+  }
+
+  async function apply() {
+    if (!parsed) return;
+    setStep("applying");
+    setError(null);
+    const valid = parsed.rows
+      .filter((r) => r.status !== "error")
+      .map((r) => ({ category: r.category, name: r.name, tally_name: r.tallyName, price_paise: r.pricePaise, active: r.active }));
+
+    const supabase = createClient();
+    const { data, error: rpcError } = await supabase.rpc("import_products", { p_brand_id: brandId, p_rows: valid });
+    if (rpcError) {
+      setError(rpcError.message);
+      setStep("preview");
+      return;
+    }
+    const res = (data ?? { added: 0, updated: 0 }) as { added: number; updated: number };
+    setResult({ added: res.added, updated: res.updated, skipped: parsed.rows.filter((r) => r.status === "error").length });
+    setStep("result");
+  }
+
+  const counts = parsed
+    ? {
+        new: parsed.rows.filter((r) => r.status === "new").length,
+        updated: parsed.rows.filter((r) => r.status === "updated").length,
+        errors: parsed.rows.filter((r) => r.status === "error").length,
+      }
+    : { new: 0, updated: 0, errors: 0 };
+  const validCount = counts.new + counts.updated;
+
+  return (
+    <div className={styles.scrim} onClick={onClose}>
+      <div className={styles.panel} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className={styles.header}>
+          <h2 className={styles.heading}>Import products</h2>
+          <button type="button" className={styles.closeX} onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        {error && <p className={styles.errorStrip}>{error}</p>}
+
+        {step === "upload" && (
+          <div className={styles.body}>
+            <div className={styles.selectField}>
+              <label className={styles.label} htmlFor="iw-brand">
+                Brand · one per file
+              </label>
+              <select id="iw-brand" className={styles.select} value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+                <option value="" disabled>
+                  Choose a brand…
+                </option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div
+              className={`${styles.drop} ${dragOver ? styles.dropOver : ""} ${!brandId ? styles.dropDisabled : ""}`}
+              onClick={() => brandId && fileRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (brandId) setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const f = e.dataTransfer.files[0];
+                if (brandId && f) void handleFile(f);
+              }}
+            >
+              {brandId ? "Drag an .xlsx here, or click to choose" : "Pick a brand first"}
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className={styles.hiddenInput}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleFile(f);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+
+            <p className={styles.hint}>
+              Expected columns: <strong>Category · Display Name · Tally Name · Price · Active</strong>. Tally Name blank ⇒ uses
+              the display name; Price blank ⇒ TBD.
+            </p>
+            <button type="button" className={styles.linkBtn} onClick={downloadTemplate} disabled={!brandId}>
+              Download template
+            </button>
+          </div>
+        )}
+
+        {step === "preview" && parsed && (
+          <div className={styles.body}>
+            <div className={styles.summary}>
+              <span className={styles.summaryItem}>
+                <span className={`${styles.sq} ${styles.sqNew}`} /> New · {counts.new}
+              </span>
+              <span className={styles.summaryItem}>
+                <span className={`${styles.sq} ${styles.sqUpdated}`} /> Updated · {counts.updated}
+              </span>
+              <span className={styles.summaryItem}>
+                <span className={`${styles.sq} ${styles.sqError}`} /> Errors · {counts.errors}
+              </span>
+            </div>
+
+            <div className={styles.tableScroll}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th className={styles.numeric}>ROW</th>
+                    <th>STATUS</th>
+                    <th>CATEGORY</th>
+                    <th>DISPLAY NAME</th>
+                    <th>TALLY NAME</th>
+                    <th className={styles.numeric}>PRICE</th>
+                    <th>ACTIVE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsed.rows.map((row) => (
+                    <tr key={row.rowNo} className={row.status === "error" ? styles.errorRow : ""}>
+                      <td className={`${styles.mono} ${styles.numeric}`}>{row.rowNo}</td>
+                      <td>
+                        {row.status === "error" ? (
+                          <span className={styles.reason}>{row.reason}</span>
+                        ) : (
+                          <span className={styles.statusTag}>{row.status === "new" ? "New" : "Updated"}</span>
+                        )}
+                      </td>
+                      <td>{row.category || "—"}</td>
+                      <td className={styles.cellName}>{row.name || "—"}</td>
+                      <td className={styles.mono}>{row.tallyName || "—"}</td>
+                      <td className={`${styles.mono} ${styles.numeric}`}>
+                        {row.status === "error" ? "—" : row.pricePaise === null ? "TBD" : formatRupees(row.pricePaise)}
+                      </td>
+                      <td>{row.status === "error" ? "—" : row.active ? "Yes" : "No"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {parsed.untouched > 0 && (
+              <p className={styles.hint}>
+                {parsed.untouched} product{parsed.untouched === 1 ? "" : "s"} already in the catalog aren&apos;t in this file —
+                left untouched (deactivate discontinued ones manually).
+              </p>
+            )}
+
+            <div className={styles.actions}>
+              <Button variant="secondary" onClick={() => setStep("upload")}>
+                Back
+              </Button>
+              <div className={styles.applyGroup}>
+                {counts.errors > 0 && <span className={styles.skipNote}>{counts.errors} error rows will be skipped</span>}
+                <Button variant="primary" onClick={apply} disabled={validCount === 0}>
+                  {counts.errors > 0 ? `Apply ${validCount} valid rows` : `Apply import · ${validCount} rows`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === "applying" && (
+          <div className={styles.body}>
+            <p className={styles.applying}>Applying… don&apos;t close this window.</p>
+          </div>
+        )}
+
+        {step === "result" && result && (
+          <div className={styles.body}>
+            <div className={styles.resultGrid}>
+              <div className={styles.resultStat}>
+                <span className={styles.resultNum}>{result.added}</span>
+                <span className={styles.resultLabel}>Added</span>
+              </div>
+              <div className={styles.resultStat}>
+                <span className={styles.resultNum}>{result.updated}</span>
+                <span className={styles.resultLabel}>Updated</span>
+              </div>
+              <div className={styles.resultStat}>
+                <span className={styles.resultNum}>{result.skipped}</span>
+                <span className={styles.resultLabel}>Skipped</span>
+              </div>
+            </div>
+            <div className={styles.actions}>
+              <Button variant="primary" onClick={onDone}>
+                Done
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "unreadable" && (
+          <div className={styles.body}>
+            <p className={styles.errorStrip}>Couldn&apos;t read this file — not a valid .xlsx or the columns don&apos;t match.</p>
+            <button type="button" className={styles.linkBtn} onClick={downloadTemplate} disabled={!brandId}>
+              Download template
+            </button>
+            <div className={styles.actions}>
+              <Button variant="secondary" onClick={() => setStep("upload")}>
+                Try another file
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

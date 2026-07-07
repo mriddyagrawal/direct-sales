@@ -353,6 +353,10 @@ export type Database = {
         }
       }
       email_for_username: { Args: { p_username: string }; Returns: string }
+      import_products: {
+        Args: { p_brand_id: string; p_rows: Json }
+        Returns: Json
+      }
       process_order: {
         Args: { p_order_id: string }
         Returns: {

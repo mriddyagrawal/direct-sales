@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { formatRupees } from "@/lib/format";
 import { ProductModal, type BrandOption } from "./ProductModal";
+import { ImportWizard } from "./ImportWizard";
 import type { ProductRow } from "./page";
 import styles from "./ProductsPricing.module.css";
 
@@ -39,6 +40,7 @@ export function ProductsPricing({
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
+  const [importing, setImporting] = useState(false);
 
   const priced = products.filter((p) => p.price_paise !== null).length;
 
@@ -86,6 +88,9 @@ export function ProductsPricing({
         </span>
         {isAdmin && (
           <div className={styles.titleActions}>
+            <Button variant="secondary" onClick={() => setImporting(true)}>
+              Import
+            </Button>
             <Button variant="primary" onClick={() => setModal({ mode: "add" })}>
               + Add product
             </Button>
@@ -194,6 +199,17 @@ export function ProductsPricing({
           initial={modal.mode === "edit" ? modal.product : undefined}
           onClose={() => setModal(null)}
           onSaved={closeAndRefresh}
+        />
+      )}
+
+      {importing && (
+        <ImportWizard
+          brands={brands}
+          onClose={() => setImporting(false)}
+          onDone={() => {
+            setImporting(false);
+            router.refresh();
+          }}
         />
       )}
     </div>

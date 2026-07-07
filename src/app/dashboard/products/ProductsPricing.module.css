@@ -26,6 +26,8 @@
 
 .titleActions {
   margin-left: auto;
+  display: flex;
+  gap: 8px;
 }
 
 .clickable {
