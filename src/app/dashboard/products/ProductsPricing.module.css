@@ -30,132 +30,165 @@
   color: var(--color-error);
 }
 
-.categoryHeader {
-  font-family: var(--font-figures);
-  font-size: var(--text-section-label-size);
-  letter-spacing: var(--text-section-label-tracking);
-  text-transform: uppercase;
+.empty {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
   color: var(--color-locked);
+  padding: 24px 0;
+}
+
+/* Desktop ledger — same S8 grammar as OrdersList (hairlines, mono figures,
+   muted metadata, bold display name). Hidden on mobile in favour of cards. */
+.table {
+  display: none;
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 2px solid var(--color-ink);
+}
+
+.table thead th {
+  text-align: left;
+  font-family: var(--font-figures);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-locked);
+  height: 32px;
+  border-bottom: 2px solid var(--color-ink);
+}
+
+.table tbody tr {
+  height: 40px;
   border-bottom: 1px solid var(--color-hairline);
-  padding: 12px 0 6px;
-  margin-top: 8px;
 }
 
-.categoryHeader:first-child {
-  margin-top: 0;
+.table tbody tr:nth-child(even) {
+  background: rgba(20, 24, 31, 0.02);
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.rowInactive {
-  opacity: 0.55;
-}
-
-.rowInfo {
-  min-width: 0;
-}
-
-.rowName {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.table td {
   font-family: var(--font-structure);
   font-size: var(--text-body-size);
   color: var(--color-ink);
+  padding-right: 12px;
 }
 
-.rowMeta {
+.mono {
+  font-family: var(--font-figures);
+}
+
+.numeric {
+  text-align: right;
+}
+
+/* Column hierarchy: metadata (#, brand, category, tally) recedes; the display
+   name is the primary scan target. Scoped as `.table td.cellX` so the extra
+   class beats `.table td`'s own color on specificity (a bare `.cellMeta`
+   loses 0,1,0 vs 0,1,1 and silently never applies). */
+.table td.cellMeta {
+  color: var(--color-locked);
+  font-weight: 400;
+}
+
+.table td.cellName {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.tbd {
   font-family: var(--font-figures);
   font-size: 11px;
   color: var(--color-locked);
 }
 
-.tbdBadge {
-  padding: 2px 6px;
-  background: var(--color-amber);
-  color: var(--color-white);
-  font-family: var(--font-figures);
-  font-size: 9px;
-  font-weight: 700;
+.rowInactive td {
+  opacity: 0.55;
+}
+
+/* ACTIVE toggle — the one editable control in the commit-2 ledger. The
+   outline/weight carries the state, not a loud colour: Active reads as a
+   settled ink pill, Inactive as a muted, dashed one. */
+.toggle {
+  min-height: 26px;
+  padding: 0 10px;
   border-radius: var(--radius);
-}
-
-.inactiveBadge {
-  padding: 2px 6px;
-  background: var(--color-locked);
-  color: var(--color-white);
-  font-family: var(--font-figures);
-  font-size: 9px;
-  font-weight: 700;
-  border-radius: var(--radius);
-}
-
-.rowActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.price {
-  font-family: var(--font-figures);
-  font-size: 14px;
+  font-family: var(--font-structure);
+  font-size: 11px;
   font-weight: 600;
-  color: var(--color-ink);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  padding: 6px 8px;
   cursor: pointer;
-  min-width: 72px;
-  text-align: right;
 }
 
-.price:hover {
-  border-color: var(--color-hairline);
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
-.editCard {
+.toggleOn {
+  background: var(--color-white);
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+}
+
+.toggleOff {
+  background: none;
+  border: 1px dashed var(--color-locked);
+  color: var(--color-locked);
+}
+
+/* Mobile cards — desktop table has no room on a phone. */
+.cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius);
-  margin: 8px 0;
-}
-
-.editRow {
-  display: flex;
-  gap: 8px;
-}
-
-.editRow > * {
-  flex: 1;
-}
-
-.editActions {
-  display: flex;
-  gap: 8px;
-}
-
-.toggleButton {
-  min-height: 32px;
-  padding: 0 10px;
   background: var(--color-white);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius);
+}
+
+.cardInactive {
+  opacity: 0.6;
+}
+
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardName {
+  font-family: var(--font-structure);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.cardMeta {
   font-family: var(--font-structure);
   font-size: 12px;
-  font-weight: 600;
   color: var(--color-locked);
-  cursor: pointer;
+}
+
+.card .toggle {
+  align-self: flex-start;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: 24px;
+  }
+
+  .table {
+    display: table;
+  }
+
+  .cards {
+    display: none;
+  }
 }

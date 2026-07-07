@@ -8,20 +8,21 @@ export interface ProductRow {
   price_paise: number | null;
   active: boolean;
   tally_name: string;
+  brands: { name: string } | null;
 }
 
 // Owner-added deliverable — pricing deferred to Supabase Studio in the
 // original spec, overridden 2026-07-07: build an in-app screen instead.
-// accountant-dashboard.md §5 updated in the same commit as this page.
+// M5.5 reworked it into the catalog ledger (brand column, tally_name key).
 export default async function ProductsPage() {
   const supabase = await createClient();
   // products_select_staff (RLS) returns every row incl. unpriced/inactive —
   // the salesman-facing filter (active AND priced, D2) does not apply here.
   const { data } = await supabase
     .from("products")
-    .select("id, category, name, price_paise, active, tally_name")
+    .select("id, category, name, price_paise, active, tally_name, brands(name)")
     .order("category")
     .order("name");
 
-  return <ProductsPricing initialProducts={(data ?? []) as ProductRow[]} />;
+  return <ProductsPricing initialProducts={(data ?? []) as unknown as ProductRow[]} />;
 }
