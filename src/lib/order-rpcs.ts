@@ -109,3 +109,8 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Ord
     }),
   );
 }
+
+export async function processOrder(orderId: string): Promise<OrderRow> {
+  const supabase = createClient();
+  return callRpc(() => supabase.rpc("process_order", { p_order_id: orderId }));
+}

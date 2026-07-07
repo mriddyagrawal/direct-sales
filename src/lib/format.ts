@@ -35,6 +35,26 @@ export function formatOrderTimestamp(iso: string, now: Date = new Date()): strin
   return `${full}, ${time}`;
 }
 
+// Always the full "06 Jul 2026, 11:42" — unlike formatOrderTimestamp, never
+// abbreviated to just a time. The pick-slip footer ("Printed ...") needs an
+// unambiguous date even when printed today.
+export function formatFullTimestamp(iso: string): string {
+  const date = new Date(iso);
+  const full = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIME_ZONE,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+  return `${full}, ${time}`;
+}
+
 // Section labels for the order list: "TODAY · 06 JUL" or "EARLIER"
 // (design spec S2), grouped by IST calendar day.
 export function formatSectionLabel(iso: string, now: Date = new Date()): string {
