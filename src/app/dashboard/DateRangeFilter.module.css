@@ -1,0 +1,125 @@
+/* The picker: presets rail | calendar */
+.panel {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  background: var(--color-white);
+  overflow: hidden;
+  font-family: var(--font-structure);
+}
+
+.presets {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  border-right: 1px solid var(--color-hairline);
+}
+
+.preset {
+  text-align: left;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-hairline); /* every item, incl. "All", gets a closing line */
+  font-family: var(--font-structure);
+  font-size: 13px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.preset:hover {
+  background: rgba(20, 24, 31, 0.03);
+}
+
+.presetActive {
+  color: var(--color-accent);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.calendarSide {
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarWrap {
+  padding: 8px 12px;
+}
+
+/* Theme react-day-picker to the instrument grammar. Higher specificity than
+   the library's own `.rdp-root { --rdp-*: ... }` block, so these win
+   deterministically regardless of stylesheet order. */
+.calendarWrap :global(.rdp-root) {
+  --rdp-accent-color: var(--color-accent);
+  --rdp-accent-background-color: rgba(29, 78, 216, 0.1);
+  --rdp-range_start-color: var(--color-white);
+  --rdp-range_end-color: var(--color-white);
+  --rdp-range_middle-color: var(--color-ink);
+  --rdp-today-color: var(--color-accent);
+  --rdp-day-width: 40px;
+  --rdp-day-height: 40px;
+  --rdp-day_button-width: 36px;
+  --rdp-day_button-height: 36px;
+  --rdp-day_button-border-radius: var(--radius); /* 2px squares, not circles */
+  --rdp-weekday-text-transform: uppercase;
+  font-family: var(--font-figures); /* mono day numbers, like the ledger */
+  color: var(--color-ink);
+}
+
+/* The library bumps selected days to `font-size: large` + bold — that's what
+   made the digits jump in size. Match them to the unselected days. */
+.calendarWrap :global(.rdp-selected) {
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.readout {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.readoutLabel {
+  font-family: var(--font-figures);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-locked);
+}
+
+.readoutValue {
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+/* Mobile: FilterDropdown pins the popover to the viewport edges (full
+   container width, nothing overflows), so the panel itself switches from a
+   side-by-side rail+calendar row to a stacked column — presets wrap in a
+   horizontal strip above the calendar instead of a vertical rail beside it. */
+@media (max-width: 767px) {
+  .panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .presets {
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  .preset {
+    border-bottom: none;
+    padding: 8px 10px;
+  }
+
+  .presetActive {
+    box-shadow: inset 0 -2px 0 var(--color-accent);
+  }
+}
