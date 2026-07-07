@@ -10,6 +10,18 @@ Supabase Auth email+password, admin-created accounts, no self-signup (D3). Postg
 | `accountant` | The accountant (1) | See everything live; process/edit/cancel orders; price products; verify retailers; print pick slips. |
 | `admin` | The owner | Everything the accountant can, plus user management and catalog administration. |
 
+### What each role actually does, day to day
+
+- **Salesman** — the field rep. Lives in the mobile-first order flow: builds a Quick Order from the priced catalog, submits it, can still adjust it inside the edit window, and can look back at their own order history. Never sees an order they didn't create, never sees an unpriced SKU, never touches a table directly — every write is a checked RPC.
+- **Accountant** — the back-office operator. Lives in the dashboard: watches the live orders queue, opens the workbench to process/edit/cancel any order (with a mandatory reason once the salesman's window has closed), keeps the product price list current, clears the retailer-verification queue, and prints pick slips for the godown.
+- **Admin (owner)** — intended as **oversight and escalation, not daily operation**: keep an eye on the queue, step in for exceptions, and handle the things only an owner should (creating/deactivating accounts, changing a profile's role, catalog administration beyond day-to-day pricing).
+
+### Current reality: admin and accountant are functionally identical in-app
+
+Every RPC role check in the codebase (`submit_order`, `update_order_items`, `cancel_order`, `process_order`) branches on `v_role in ('accountant', 'admin')` — there is no admin-only branch anywhere, and the dashboard nav/UI does not differentiate the two roles at all. The *only* things admin can do that accountant can't are outside the app entirely: creating users and setting `profiles.role`/`username`, done by hand in Supabase Studio per the provisioning runbook below.
+
+So today, "admin only oversees/escalates" is an **organizational convention the owner has chosen to follow, not a permission the system enforces** — nothing stops an admin account from doing full-time accountant-style order processing, and nothing in the UI signals "you're the escalation path." **Decision: leave this as is (owner-confirmed 2026-07-07)** — see [decisions.md](../decisions.md) D11 for the full reasoning and what would need to change if a real enforced split is ever wanted.
+
 ## Provisioning (runbook)
 
 1. Admin creates the user in Supabase Dashboard → Authentication → "Add user" (email + password, auto-confirm on). **Also set a username in User Metadata** — `{"username": "raju1"}` (D9) — the login screen uses this, not the email; pick it freely, never just the email's local-part.

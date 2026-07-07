@@ -95,6 +95,16 @@ Supabase Auth has no native "log in by arbitrary field" — it authenticates by 
 
 ---
 
+## D11 — Admin/accountant stay functionally identical in-app; oversight-only is a convention, not an enforced permission
+
+**Context.** The owner asked for a permissions overview across salesman/accountant/admin, framing admin's intended purpose as "oversee, and help in extreme cases" rather than day-to-day operation. Checking the actual RPCs (`submit_order`, `update_order_items`, `cancel_order`, `process_order`) showed every role check branches on `v_role in ('accountant', 'admin')` — there is no admin-only code path anywhere, and the dashboard UI/nav doesn't differentiate the two roles at all. The only admin-exclusive capability is provisioning (creating users, setting `profiles.role`/`username`), and that happens entirely outside the app, by hand in Supabase Studio.
+
+**Decision.** Leave it as is (owner-confirmed 2026-07-07). Admin and accountant keep identical in-app permissions. "Admin is for oversight/escalation, accountant runs the queue" remains a role the owner chooses to play, not something the system enforces — nothing technical stops an admin account from doing full-time accountant work, and no UI cue distinguishes the two.
+
+**Consequences.** No code change. If a real enforced split is ever wanted (e.g., admin's view emphasizes exceptions/audit rather than the live queue, or accountant loses some capability admin keeps), that's a future product decision — this entry records that the gap was noticed and deliberately left alone, so it isn't rediscovered as a bug later.
+
+---
+
 # Graveyard — rejected ideas (do not re-litigate)
 
 - **"Gapless" numbering via SEQUENCE** — not a real thing (see D1); and not needed once refs are internal.
