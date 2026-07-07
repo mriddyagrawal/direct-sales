@@ -46,12 +46,12 @@ Packed by: ____________   Checked by: ____________
 ### 4. Retailers (`/dashboard/retailers`)
 - List with `verified` filter; **verification queue** surfaces salesman quick-adds: edit name/area/phone (canonical spelling — this becomes the Tally ledger mapping in Phase 2), then mark verified. Deactivate (never delete) dead shops.
 
-### 5. Catalog administration — deliberately not built in Phase 1
-Pricing the 8 TBD SKUs, price revisions, and deactivating products happen in **Supabase Studio** (table editor) with the admin/accountant logged in. A dedicated in-app catalog screen is deferred until Studio actually hurts. Setting `price_paise` on a TBD SKU makes it appear to salesmen immediately (D2) — no deploy, no restart.
+### 5. Products (`/dashboard/products`) — pricing (owner override, 2026-07-07)
+**Overridden the same day this build started:** an in-app screen, not Supabase Studio. Ledger of every SKU (including the 8 unpriced/TBD, and inactive ones — `products_select_staff` returns all of them, unlike the salesman's active-AND-priced filter, D2). Inline-edit **price** (entered as whole ₹ rupees, stored as integer paise; non-integer or negative input rejected), **active**, and **tally_name**. Setting a price on a TBD SKU makes it appear to salesmen immediately (D2) — no deploy, no restart. Writes are a direct RLS-scoped `UPDATE` (same category as retailers — not RPC-only).
 
 ## Non-functional
 
-- Target ≥ 1280px; must remain usable at 1024. No mobile layout required in Phase 1 (the accountant works at a desk).
+- Target ≥ 1280px on desktop; **also required to be usable on a phone** (owner override, 2026-07-07 — the original "no mobile layout required" is superseded). Desktop keeps dense tables; phone gets scrollable card lists and a stacked workbench.
 - Times in IST everywhere; "Today" = IST calendar day.
 - Keyboard: `/` focuses search; Enter opens selected row. (Small, but this user lives in Tally — keyboard speed is respect.)
 
