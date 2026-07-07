@@ -1734,3 +1734,24 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next:** M6 (deploy + pilot). Pre-pilot checklist worth surfacing: ⑯ (leaked-password toggle), ㉒ (SUPABASE_SECRET_KEY in Vercel env), ㉛ (sequence grants), and driving the deferred live drills (airplane-mode, real login, ≤5s/print/phone).
 
 ---
+
+## Review of db3bd07 — docs: capture Phase-3 multi-brand design note + reference it from PLAN
+
+**Verdict:** ✅ accept — a forward-looking (**not-built**) Phase-3 design note; every premise checks out live, it's internally consistent, and it correctly flags that it revises D4 at build time. No code, no new open items.
+
+**Premises verified live:**
+- "Schema is already multi-brand-ready" — `products.brand_id` is **NOT NULL** with **0** rows missing a brand; `brands` holds exactly **Zebronics**. So multi-brand is genuinely additive (D4). ✓
+- "The one real schema change is `orders.brand_id`" — confirmed **absent** today (brand is only derivable from items, D4's Phase-1 stance); `brands.code` also **absent** — so "add these" is accurate, not a duplicate. Backfill existing orders → Zebronics is correct (only brand). ✓
+
+**Design is sound + consistent:**
+- One-order-one-brand enforced **server-side** in `submit_order`/`update_order_items` (each line's `product.brand_id` must equal `orders.brand_id`) — right layer, matches the RPC-only write model + "reject in the RPC, not just the UI." ✓
+- **Ref numbering — Option A** (global `order_no_seq` + brand code, `ORD-ZEB-2026-1042`) recommended over B (per-brand counters). A is the correct call: `order_no` stays globally unique + monotonic (gaps fine, D1), so a spoken/printed number is unambiguous across brands; B needs `unique(brand_id, order_no)` + per-brand counters. Left as an **owner-pending** decision, with a note to **record a D4 revision** at build — good discipline, doesn't silently contradict D4. ✓
+- "Number doesn't reset annually (D1); avoid a per-year/per-brand-per-year axis" — accurate (the year is a cosmetic label, not a counter reset). "What does NOT change" (snapshots, RLS, integer paise, lifecycle) — correct; multi-brand = data + one migration. ✓
+
+**PLAN link:** Phase 3's goal line now points at the note and drops the stale "order refs stay brand-free" (which Option A revises) — consistent, no leftover contradiction. ✓
+
+**Open flags:** none new — a not-built design note. The A-vs-B ref-numbering choice is parked as a **Phase-3-time owner decision**, not a current open item. No 🔴 blocking; standing deferred set unchanged (㉛, ⑯, ⑬, ⑭, ⑦⑧⑨).
+
+**Next:** M6 (deploy + pilot) whenever it starts.
+
+---
