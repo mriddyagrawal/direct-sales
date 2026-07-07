@@ -281,6 +281,15 @@
     margin-bottom: -12px;
   }
 
+  .filterGroup {
+    /* Only the tabs need to touch the table's top rule (for the folder-tab
+       overlap) — the salesman/date/search boxes don't, and sitting flush
+       against it left them with no breathing room. Nudge this group back
+       up by a couple px within the row (align-items:center on .filters
+       means adding margin-bottom here shifts it up, not down). */
+    margin-bottom: 2px;
+  }
+
   .table {
     display: table;
   }
