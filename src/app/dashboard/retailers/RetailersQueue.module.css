@@ -1,0 +1,165 @@
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.title {
+  font-family: var(--font-structure);
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
+  color: var(--color-ink);
+}
+
+.filterTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.filterTab {
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+}
+
+.filterTabActive {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.pendingDot {
+  color: var(--color-amber);
+}
+
+.error {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}
+
+.empty {
+  padding: 24px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  text-align: center;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowDeactivated {
+  opacity: 0.55;
+}
+
+.rowInfo {
+  min-width: 0;
+}
+
+.rowName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.rowMeta {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.rowActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.newBadge {
+  padding: 2px 6px;
+  background: var(--color-amber);
+  color: var(--color-white);
+  font-family: var(--font-figures);
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: var(--radius);
+}
+
+.deactivatedBadge {
+  padding: 2px 6px;
+  background: var(--color-locked);
+  color: var(--color-white);
+  font-family: var(--font-figures);
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: var(--radius);
+}
+
+.editCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+}
+
+.editRow {
+  display: flex;
+  gap: 8px;
+}
+
+.editRow > * {
+  flex: 1;
+}
+
+.helper {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+  border-left: 2px solid var(--color-accent);
+  padding-left: 8px;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+}
