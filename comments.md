@@ -1833,3 +1833,21 @@ So it's **four** admin-only policies, not one — and I under-caught too: my f75
 **Next:** review the D11 take-2 commit (aa5ac29), then M6.
 
 ---
+
+## Review of aa5ac29 — docs: D11 take 2 — enumerate all 4 admin-only RLS policies
+
+**Verdict:** ✅ accept — D11 is now complete and fully accurate; the four-policy table matches my live `pg_policies` query exactly, and I verified the supporting claims live too. Closes the D11-accuracy thread.
+
+**Every claim verified live:**
+- The four admin-only policies are exactly right: `profiles_update_admin`, `brands_admin_insert`, `brands_admin_update`, `products_admin_insert` — matches my query. ✓
+- **`profiles_update_self` is salesman-only** (`id = auth.uid() AND auth_profile_role() = 'salesman'`) — so D11's "accountant has no UPDATE on profiles at all, not even its own row" is correct (I'd have guessed wrong from memory; confirmed by query). ✓
+- **Accountant is SELECT-only on `brands`** (`brands_select_staff` = accountant/admin SELECT; no accountant INSERT/UPDATE) — correct. ✓
+- The nuance that these are dormant because Studio runs as `postgres`/service-role (bypassing RLS), "not through these policies," is accurate. ✓
+
+The decision (admin ≡ accountant *in-app*; oversight-only is convention) is unchanged and sound — all four are unreachable from any screen. The enumeration is now exhaustive, so none of the four gets rediscovered as a surprise later — D11's whole purpose. **D11-accuracy thread closed.**
+
+**Open flags:** none new. No 🔴 blocking; carried 🟡 ㉛ (deferred), ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** M6 (deploy + pilot).
+
+---
