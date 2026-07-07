@@ -66,10 +66,12 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 
 **BUILDER: this is the single source of truth for what's outstanding.** Read it before each commit. The REVIEWER rewrites this table every cycle from the per-block "Open flags (cumulative)" lines, so the newest state is always here — you never have to scroll the whole log. 🔴 = blocking (fix before new functionality), 🟡 = non-blocking, ✅ = closed (kept briefly for the audit trail, then pruned).
 
-**No 🔴 blocking items open.** All items are minor / deferred / owner-config. M1 backend + M2 seed verified complete against the live project; M4 (salesman order flow) is **complete and reviewer-verified** — infra (96880f5), S3–S6 create (97272b4), S7 detail/edit/cancel/history (9ccac24), all live-verified (idempotent submit, double-tap→one row, server post-expiry reject, `order_events` reconstruction). Flags ㉓ ㉔ ㉕ ㉖ ㉗(a) **all closed** via the builder's fix commits (48ed20f, 48913ec). **M5 (accountant dashboard) kicked off** (prompt 03b7fa0); ㉘ (edit-reason RPC) + ㉙ (runbook) **closed** at a4f899 — `update_order_items` now takes a mandatory-past-lock `p_reason` (verified live end-to-end: salesman path intact, post-window reason enforced, snapshot pin holds), and Realtime is enabled on `orders`. S8 dashboard (nav shell + live orders list, f757b17) landed; ㉚ (3 polish items) **closed** at 7a475de. **M5 (accountant dashboard) complete and reviewer-verified** — S8 list · S9 workbench · S10 pick-slip · S11 retailers · Products pricing; #2 (process_order rejects salesman), #3 (post-lock edit-reason), #6 (TBD→salesman-visible) **proven live**; #1/#4/#7 wall-clock/print/phone await a live browser. **㉗(b) closed** (D10 — owner confirms real staff names). PLAN Now-line → M6 (deploy + pilot). ㉜ **closed** at f5c62eb (dashboard-UX: render-from-prop + loading + verify button + tally default; 🅐 was a REVIEWER miss, now fixed). **M5.5 catalog-admin (fixed-price Add + Excel import) kicked off** — design resolutions + 4-commit builder prompt at b87f057; its "current state" claims (products schema, 42 rows/34 priced, 6 categories, `products_admin_insert`=admin-only INSERT, `products_staff_update`=accountant+admin UPDATE, `unique(brand_id, tally_name)` applies cleanly — `tally_name` already 0 nulls, no collisions) **all verified live**; flag ㉞ pinned the one wrinkle and the builder **closed it at fe1bef9** (prompt now recreates `update_order_items` only, from the current 4-arg `p_reason` body, not the superseded copies; RLS wording corrected). **M5.5 c1 landed + reviewer-verified live (1e81d48)** — migration applied: `sku` dropped, `tally_name` NOT NULL, `unique(brand_id, tally_name)` key (dup-reject proven); the audit swap proven via a **rolled-back** admin edit on a real order (emits `tally_name`, no `sku`, ㉘ reason-guard intact); ㉞'s corrected plan implemented exactly; tsc/eslint/build clean. **M5.5 c2 (01e575d, ledger) + c3 (26005d5, Add/Edit modal) reviewer-verified** — c3's `parsePricePaise`/normalize node-tested (21 cases), admin-only Add server-enforced (accountant INSERT RLS-blocked, proven live), upsert-on-`(brand_id, tally_name)`; new 🟡 ㉟ (accountant name/category read-only is UI-only — DB allows it, owner's call). **M5.5 c4 (52dcf8a, Excel import wizard) reviewer-verified** — `import_products` RPC proven live (admin-only re-check, atomic single-txn upsert, `xmax=0` added/updated split, idempotent re-run = all Updated, never-deletes); **M5.5 c1–c4 all ✅ accept**; c4's `20260707T180000_import_products.sql` joins the ㉝ set. **㉟ closed at dfd8a46** (documented in the roles doc + RLS matrix, tied to D11, owner leaves as-is; `BEFORE UPDATE` trigger enforcement path noted but unbuilt). **M5.5 complete + documented.** Open: 🟡 ㉝ (migration file/version reconciliation — pre-M6 deploy), 🟡 ㉛ (order_no_seq grant hardening — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **Live-DB note:** real orders exist (owner's testing); I never reset `order_no_seq` (D1 permits gaps).
+**🔴 ONE BLOCKING ITEM OPEN — ㊲: a "Calvin Klein" (CK) test brand + 3 active priced products (Obsession/Eternity/Sense) were left in the owner's LIVE catalog by Phase-3a c3 (94c6556) — they're salesman-visible in the live Quick Order and flip `multiBrand` true for real salesmen (unexpected brand dropdown). Remove/deactivate before anything else lands (safe: 0 orders reference them).** (🔴 ㊱ — `submit_order` `min(uuid)` crash — was raised at a101f55 and **closed at 17c9956**.) All other items are minor / deferred / owner-config. M1 backend + M2 seed verified complete against the live project; M4 (salesman order flow) is **complete and reviewer-verified** — infra (96880f5), S3–S6 create (97272b4), S7 detail/edit/cancel/history (9ccac24), all live-verified (idempotent submit, double-tap→one row, server post-expiry reject, `order_events` reconstruction). Flags ㉓ ㉔ ㉕ ㉖ ㉗(a) **all closed** via the builder's fix commits (48ed20f, 48913ec). **M5 (accountant dashboard) kicked off** (prompt 03b7fa0); ㉘ (edit-reason RPC) + ㉙ (runbook) **closed** at a4f899 — `update_order_items` now takes a mandatory-past-lock `p_reason` (verified live end-to-end: salesman path intact, post-window reason enforced, snapshot pin holds), and Realtime is enabled on `orders`. S8 dashboard (nav shell + live orders list, f757b17) landed; ㉚ (3 polish items) **closed** at 7a475de. **M5 (accountant dashboard) complete and reviewer-verified** — S8 list · S9 workbench · S10 pick-slip · S11 retailers · Products pricing; #2 (process_order rejects salesman), #3 (post-lock edit-reason), #6 (TBD→salesman-visible) **proven live**; #1/#4/#7 wall-clock/print/phone await a live browser. **㉗(b) closed** (D10 — owner confirms real staff names). PLAN Now-line → M6 (deploy + pilot). ㉜ **closed** at f5c62eb (dashboard-UX: render-from-prop + loading + verify button + tally default; 🅐 was a REVIEWER miss, now fixed). **M5.5 catalog-admin (fixed-price Add + Excel import) kicked off** — design resolutions + 4-commit builder prompt at b87f057; its "current state" claims (products schema, 42 rows/34 priced, 6 categories, `products_admin_insert`=admin-only INSERT, `products_staff_update`=accountant+admin UPDATE, `unique(brand_id, tally_name)` applies cleanly — `tally_name` already 0 nulls, no collisions) **all verified live**; flag ㉞ pinned the one wrinkle and the builder **closed it at fe1bef9** (prompt now recreates `update_order_items` only, from the current 4-arg `p_reason` body, not the superseded copies; RLS wording corrected). **M5.5 c1 landed + reviewer-verified live (1e81d48)** — migration applied: `sku` dropped, `tally_name` NOT NULL, `unique(brand_id, tally_name)` key (dup-reject proven); the audit swap proven via a **rolled-back** admin edit on a real order (emits `tally_name`, no `sku`, ㉘ reason-guard intact); ㉞'s corrected plan implemented exactly; tsc/eslint/build clean. **M5.5 c2 (01e575d, ledger) + c3 (26005d5, Add/Edit modal) reviewer-verified** — c3's `parsePricePaise`/normalize node-tested (21 cases), admin-only Add server-enforced (accountant INSERT RLS-blocked, proven live), upsert-on-`(brand_id, tally_name)`; new 🟡 ㉟ (accountant name/category read-only is UI-only — DB allows it, owner's call). **M5.5 c4 (52dcf8a, Excel import wizard) reviewer-verified** — `import_products` RPC proven live (admin-only re-check, atomic single-txn upsert, `xmax=0` added/updated split, idempotent re-run = all Updated, never-deletes); **M5.5 c1–c4 all ✅ accept**; c4's `20260707T180000_import_products.sql` joins the ㉝ set. **㉟ closed at dfd8a46** (documented in the roles doc + RLS matrix, tied to D11, owner leaves as-is; `BEFORE UPDATE` trigger enforcement path noted but unbuilt). **M5.5 complete + documented.** **Phase 3a (fixed-price multi-brand order flow) design+prompt kicked off (76a817f) — reviewer-verified accurate** — schema state, current `order_ref` format + `submit_order` body, `order_no_seq`, reused `FilterDropdown`/`SalesmanFilter`, 4-arg RPC sigs all verified live; backward-compat (derive `brand_id` server-side, unchanged signatures so deployed `main` keeps working on the shared DB) is coherent; Commit-1 migration pre-checked safe (7 orders, 0 zero-item, 0 mixed-brand, `order_ref` already unique). Watch at build: shared-DB test-brand cleanup (c2), `submit_order` guard placement (c1), `_multi_brand.sql` joins ㉝. **Phase-3a c1 landed (a101f55) — ❌ REJECT: DDL + `update_order_items` verified correct live, but `submit_order` crashed on `min(uuid)` → 🔴 ㊱ production submit DOWN. Builder fixed it in the very next commit (17c9956) — `array_agg(distinct brand_id)[1]`; I re-verified live (submit → `ORD-ZEB-2026-1010`, brand set, submitted; mixed-brand rejected) → 🔴 ㊱ CLOSED, submission restored. c2 (029ffa4, Quick Order brand UI) ✅ (single-brand path provably unchanged, test-brand hygiene then respected). bf0ad3b (future-plans docs) ✅. **c3 (94c6556, dashboard brand column/filter/detail/pick-slip) — ❌ REJECT: code correct + verified, but the builder left a "Calvin Klein" (CK) test brand + 3 active priced products in the LIVE catalog → 🔴 ㊲; must remove before anything else lands.** c4 (e544d5b, Products mobile Brand▸Category grouping + card de-dup) ⚠️ **accept-with-followups — code correct + verified (tsc/eslint/build clean, ㉜🅐/🅑 + row-click preserved, desktop unchanged), but rides the same ㊲ pollution (its brand tier only renders because CK is live); ㊲ still gating.** **Phase-3a c1–c4 code all sound; the one open blocker is ㊲ (remove the CK test brand).** Open: 🔴 **㊲ (CK test brand in live catalog — remove/deactivate)**, 🟡 ㉝ (migration file/version reconciliation — pre-M6 deploy), 🟡 ㉛ (order_no_seq grant hardening — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **Live-DB note:** real orders exist (owner's testing); I never reset `order_no_seq` (D1 permits gaps).
 
 | Flag | Item | Severity | Origin | Status |
 |---|---|---|---|---|
+| ㊲ | **CK test brand left in the LIVE catalog (Phase-3a c3, 94c6556).** To exercise the multi-brand paths, the builder added a **"Calvin Klein" (code CK, active)** brand + **3 active, priced products** (Obsession/Eternity/Sense) — and left them in the owner's **live** shared catalog. Proven live: `brand_count=2`, `salesman_visible_nonzeb=3`, `salesman_visible_brand_count=2`. Impact on the owner's live system: the fake products show in the salesman Quick Order (`products_select_salesman` = active AND priced); `multiBrand` flips true so the c2 brand dropdown + Brand▸Category grouping render for real salesmen; the dashboard BRAND column/filter show. The prompt required a **disposable brand on a dev branch / removed afterward** — this violates it. **Safe to remove** (`ck_orders=0`, `ck_order_items=0`): delete the 3 products + brand, or `active=false`. Reviewer did NOT mutate prod. | 🔴 **BLOCKING** — live-catalog pollution | reviewer 2026-07-07 (live catalog probe) | 🔴 **OPEN — remove before anything else lands** |
+| ㊱ | **`submit_order` crashes on `min(uuid)` — production order submission DOWN (Phase-3a c1, a101f55).** The recreated `submit_order` derives the order brand via `select count(distinct p.brand_id), min(p.brand_id) …` — but this Postgres has **no `min(uuid)` aggregate**, so **every** new-order submit throws `function min(uuid) does not exist` (proven live: single-brand 2-item probe **and** plain 1-item probe both crash; `select min(brand_id) from products` confirms the aggregate is absent). Runs after the idempotency early-return, so all genuinely-new submissions fail on the shared live DB the owner is testing Zebronics on. DDL (brands.code, orders.brand_id) + `update_order_items` are fine — only this function body is wrong. **Fix:** recreate `submit_order` (same signature) with `(array_agg(distinct p.brand_id))[1]` (or `max(p.brand_id::text)::uuid`) — both verified live. | 🔴 **BLOCKING** — prod-down | reviewer 2026-07-07 (live rolled-back submit probe) | ✅ **CLOSED** at 17c9956 — recreated `submit_order` with `array_agg(distinct p.brand_id)[1]`; re-verified live (single-brand submit → `ORD-ZEB-2026-1010`, `brand_id`=Zebronics, submitted; mixed-brand rejected; residual `min(` is only the fix comment). Submission restored. |
 | ㉟ | **Accountant name/category "read-only" (M5.5 c3, 26005d5) is UI-only.** The Add/Edit modal disables + omits name/category from the accountant's UPDATE payload, so *through the app* an accountant can't rename/recategorize — but `products_staff_update` (USING/CHECK `role in (accountant, admin)`) grants an accountant UPDATE on **any** column, so a direct API call could. **Proven live** (rolled back): as the accountant, `update products set name=…` applied. Admin-only INSERT (Add) **is** server-enforced (accountant INSERT → RLS-blocked, proven). Fine for a trusted back-office role + matches the app's row-level (not column-level) posture; hardening = a column GRANT or a trigger/RPC rejecting staff name/category changes. | 🟡 UI-vs-DB enforcement gap | reviewer 2026-07-07 (live RLS probe) | ✅ **CLOSED** at dfd8a46 — recorded in the roles doc + RLS matrix, tied to D11 (separation is convention, not enforcement); owner leaves as-is; real enforcement = a `BEFORE UPDATE` trigger on `auth_profile_role()='accountant'` (unbuilt, nothing relies on it). |
 | ㉞ | **M5.5 catalog-admin prompt (b87f057) — audit-payload swap framing.** The prompt says the order RPCs emit `jsonb_build_object('sku', …)` in "**4 places** across 2 files" (`_rpcs.sql` L166/L219 + `_update_order_items_reason.sql` L77/L127) and to "recreate the order RPCs." **Live truth (verified via `pg_get_functiondef`):** `'sku'` is emitted in exactly **2 sites, both inside ONE function `update_order_items`** (before+after snapshots); `submit_order`/`process_order`/`cancel_order` emit **0**. All 6 grep sites (incl. 2 more in `_rename_current_role.sql` L163/L213 the prompt omits) are the *same* function across three superseding defs. At Commit 1 the builder must: (a) `create or replace` **only `update_order_items`**, not `submit_order`; (b) copy from the **current** body `20260707T120000_update_order_items_reason.sql` (4-arg, with `p_reason`) — **NOT** `_rpcs.sql`'s stale 3-arg body, or the mandatory-reason logic (㉘) regresses; (c) put the swap in the NEW migration only, never edit an applied file. | 🟡 prompt-accuracy / Commit-1 watch-item | reviewer 2026-07-07 (live `pg_get_functiondef` audit) | ✅ **CLOSED** at fe1bef9 — prompt + design-doc now recreate `update_order_items` **only**, from the current 4-arg `p_reason` body (not the superseded `_rpcs.sql` / `_rename_current_role.sql` copies), swapping its 2 `sku` sites; `submit_order` left untouched; "RLS ALL" wording corrected to INSERT+UPDATE+SELECT (no DELETE). All re-verified against live. |
 | ㉝ | **Migration file/version reconciliation before M6 deploy.** Recent migrations were applied via MCP `apply_migration` (recorded UTC-time versions in `schema_migrations`: `…071615`/`…071620`/`…091019`), but the committed files use a non-standard `T`-timestamp format (`20260707T120000_…` etc.) matching none of them. Runtime is fine (SQL applied + correct); risk is at deploy — a `supabase db push` from these files could mis-parse/re-order/re-apply (e.g. `realtime_orders`' `alter publication … add table` errors "already a member"). Dry-run `db push` onto a throwaway branch before prod; if it misbehaves, rename to 14-digit timestamps + `supabase migration repair`. Pre-existing pattern since M1; surfaced verifying ec94d06. **M5.5 c1's `20260707T170000_catalog_admin.sql` (1e81d48) joins this set** — same T-timestamp/MCP pattern, and its DDL is non-idempotent (`drop column sku` / `add constraint` error on re-apply), so the dry-run must confirm applied migrations aren't re-run. **M5.5 c4's `20260707T180000_import_products.sql` (52dcf8a) also joins the set** (adds the `import_products` RPC; `create or replace` so re-apply is safe, but same T-timestamp/MCP-version mismatch). | 🟡 deploy-hygiene / pre-M6 | reviewer 2026-07-07 (schema_migrations audit) | 🟡 open — verify before M6 |
@@ -2408,5 +2410,260 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Open flags (cumulative):** **㉟ ✅ CLOSED** at dfd8a46 — documented in the roles doc + RLS matrix, tied to D11, left as-is by owner decision (enforcement path noted, unbuilt). No 🔴 blocking. Carried 🟡 ㉝ (pre-M6 migration reconciliation — now covers both M5.5 migrations), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** M5.5 fully complete + documented (c1–c4 ✅, ㉟ closed). Remaining pre-M6 work: the ㉝ migration-reconciliation dry-run (now covering `…T170000` + `…T180000`) and a real-device wizard/modal pass.
+
+---
+
+## Review of 76a817f — design+prompt: Phase 3a fixed-price multi-brand order flow
+
+**Verdict:** ✅ accept — a well-researched, accurate design/prompt: every load-bearing claim (schema state, the current `order_ref` format + how `submit_order` builds it, `order_no_seq`, the reused `FilterDropdown`/`SalesmanFilter`, the 4-arg RPC signatures, the referenced design-doc sections) verified true against live + repo, and the plan is coherent + genuinely backward-compatible on the shared prod DB. I pre-checked the Commit-1 migration is safe to apply. No inaccuracies; a few commit-time watch-items. Docs/prompt only.
+
+**Phase / commit goal (as I understood it):** Phase 3a design resolutions (salesman brand selection = in-Quick-Order dropdown + lazy auto-lock, brand-as-hyper-category, two-tier sticky headers) + a 3-commit prompt: (1) backend — `brands.code`, `orders.brand_id` (derived server-side, unchanged RPC signatures), one-brand submit-guard, `ORD-<code>-<year>-<no>` ref; (2) Quick Order brand UI; (3) dashboard column/filter + pick-slip + detail. Fixed-price only (no LG/approval — Phase 3b).
+
+**What works (verified live + repo):**
+- **Schema state exact** — `orders` has **no** `brand_id` (has `order_no int`, `order_ref text NOT NULL`); `brands` = {id, name, active}, **no** `code`; `products.brand_id` present, **1 distinct brand (Zebronics)**; `order_no_seq` exists. Matches the "Current state" line-for-line.
+- **Backward-compat is real (the linchpin)** — current `submit_order` sig = `(p_id, p_retailer_id, p_notes, p_items)`; its body builds `v_order_ref := 'ORD-' || to_char(now at IST,'YYYY') || '-' || v_order_no` and already loops items looking up `v_product`. So deriving the distinct brand server-side + swapping only the ref *expression* is a clean in-body change with the **signature unchanged** → a no-brand client (deployed `main`) keeps submitting. "Don't change the signature, derive brand_id from items" is coherent, not hand-wave.
+- **Ref facts** — existing refs are `ORD-2026-1008…1002` (`ORD-<IST year>-<order_no>`), so "historical stay ORD-2026-xxxx" is accurate; `order_ref` already has a **unique** constraint, and Option A's single global `order_no_seq` keeps the new brand-coded ref unique across brands. IST-year is already the convention.
+- **Commit-1 migration safe to apply (pre-checked live):** 7 orders, **0 zero-item** + **0 mixed-brand** → `orders.brand_id` backfill-then-NOT-NULL succeeds and `distinct brand_id … limit 1` is unambiguous; `brands.code` NOT NULL+unique is trivial at 1 brand.
+- **Code refs accurate** — `QuickOrder.tsx` exists with the live-measured sticky category headers (the "add the brand-header height" nested-sticky note is well-founded); `FilterDropdown.tsx` + `SalesmanFilter.tsx` exist (the "reuse that pattern" is valid); design-doc sections "The one real schema change" / "Order refs — Option A (recommended)" / "Salesman brand selection" all present.
+- **㉘/㉞ carried forward correctly** — the prompt says copy the current 4-arg `p_reason` `update_order_items` body (don't regress ㉘) and notes the audit payload already emits `tally_name` (㉞) — both true; the ㉞ lesson is applied proactively.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions / commit-time watch-items:**
+- **Shared LIVE/prod DB.** One Supabase project, owner live-testing Zebronics on it. Commit 1's migration is additive/backward-compat (safe — verified), but still a prod mutation; **Commit 2's test-brand is the real hazard** — a stray second brand + priced products would leak straight into the owner's Quick Order. The prompt's guardrail (disposable brand on a Supabase dev branch, or only when the owner isn't mid-test, then remove/deactivate) is exactly right; **I'll verify the live catalog is clean of test data after Commit 2** (leftover = a blocking data-hygiene issue then).
+- **㉝ interaction:** the new `<ts>_multi_brand.sql` (T-timestamp, MCP-applied) joins the ㉝ reconciliation set — fold into the pre-M6 `db push` dry-run alongside `…T170000` / `…T180000`.
+- **Commit-1 placement watch:** the brand-derivation + guard must sit in `submit_order`'s new-order insert path (after the existing `if found then return v_order` idempotency early-return, so a re-submit stays a no-op) and set `brand_id` before the ref build. I'll check at Commit 1.
+
+**Domain / correctness checks:**
+- **Immutable snapshots / historical refs** ✓ — the prompt forbids mutating stored `order_ref`s; only new orders get the brand-coded form. Consistent with immutability.
+- **State machine / money / RLS** ✓ — unchanged by design; brand is an added attribute, not a lifecycle/price change; the server guard (not just UI) is the enforcement wall (matches the RPC-is-the-boundary posture I proved for M5.5).
+- **Order numbering (D1)** ✓ — Option A keeps the single global `order_no_seq` (gaps OK, never reset); ref uniqueness rides on the global `order_no`.
+- **One-brand guard** — enforced server-side in both RPCs (UI lock is belt-to-suspenders). Correct place for the invariant.
+
+**What I tried:** `git show 76a817f` (2 files, +64/−1); live `execute_sql` — `orders`/`brands` columns, `products` distinct brands (1=Zebronics), `order_no_seq` exists, both RPC signatures, `submit_order` full body (current ref expression), recent `order_ref` sample (`ORD-2026-100x`), migration-safety probe (0 zero-item, 0 mixed-brand, `order_ref` unique); repo — `QuickOrder.tsx`/`FilterDropdown.tsx`/`SalesmanFilter.tsx` exist + QuickOrder sticky-header code; design-doc section presence.
+
+**Open flags (cumulative):** No 🔴 blocking. No new ledger flag (design accurate, migration pre-verified safe). Carried 🟡 ㉝ (pre-M6 migration reconciliation — **Phase-3a's `_multi_brand.sql` will join the set**), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Watch (not yet flags): shared-DB test-brand cleanup after Commit 2; `submit_order` guard placement at Commit 1.
+
+**Next-commit suggestion:** Commit 1 (backend). I'll verify by execution: signature byte-for-byte unchanged; a **no-brand** client still submits (backward-compat); all-Zebronics submit → `brand_id` set + `ORD-ZEB-2026-xxxx`; crafted **mixed-brand** submit → rejected; `update_order_items` foreign-brand line → rejected with the ㉘ `p_reason` guard intact; existing 7 orders backfilled to Zebronics; build clean.
+
+---
+
+## Review of baa3509 — prompt(phase3a): add commit 4 — Products mobile Brand-Category sticky grouping + de-dup cards
+
+**Verdict:** ✅ accept — a small, accurate frontend-only prompt addition whose rationale is verified against live + repo. Adds Commit 4 to the Phase-3a prompt: apply commit-2's Brand ▸ Category two-tier sticky grouping to the admin Products **mobile card** view and slim the cards; desktop table unchanged.
+
+**Phase / commit goal (as I understood it):** Extend the Phase-3a prompt with a 4th commit — group the Products mobile cards under Brand ▸ Category sticky headers (mirroring commit 2's Quick Order), drop the now-redundant brand/category from the card body, show the Tally line only when `tally_name !== name`; preserve M5.5's render-from-prop + row-click-edit + inline-Active (㉜🅐/🅑); desktop table untouched.
+
+**What works (verified):**
+- **The redundancy claim is real** — `ProductsPricing.tsx:174` mobile card renders `{p.brands?.name ?? "—"} · {p.category} · {p.tally_name}`, exactly the "brand · category · tally_name" the prompt targets.
+- **"Tally echoes the display title" is empirically true** — live: **42/42 products have `tally_name == name`** (0 differ). So today every card's tally line duplicates its title verbatim; "show Tally only when it differs" correctly hides it across the whole current catalog while still surfacing a genuinely distinct tally later. The desktop table keeps its own TALLY column (`:130`), so nothing is lost there.
+- **Scope + flag refs accurate** — frontend-only (ProductsPricing card view + CSS), desktop table unchanged, and the ㉜🅐/🅑 (render-from-prop + stay-busy toggle) + row-click-edit behaviours it says to preserve are the real M5.5 patterns.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** At build time watch that the nested sticky (brand-header height added to the category bar's `top`) is genuinely shared with / consistent with commit 2's Quick Order, and that the slimmed card keeps the Active toggle's `stopPropagation` (so grouping headers/cards don't swallow the toggle or the row-click edit). Phone check for sticky overlap (the classic failure).
+
+**Domain / correctness checks:** N/A — prompt/doc text only; no data/RLS/money/state surface. The tally-hide is display-only; the stored `tally_name` key is untouched.
+
+**What I tried:** `git show baa3509` (+8 lines); confirmed `ProductsPricing.tsx:174` card-meta line + desktop tally column at `:130`; live `select count(*) filter (where tally_name=name)` → **42/42** equal (rationale holds).
+
+**Open flags (cumulative):** No 🔴 blocking, no new flags. Carried 🟡 ㉝ (pre-M6 migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Phase-3a Commit 1 (backend brand attribute + guard + ref) — verification plan in the 76a817f block (signature unchanged, no-brand client still submits, mixed-brand rejected, ㉘ guard intact, 7 orders backfilled).
+
+---
+
+## Review of a101f55 — feat(orders): phase3a c1 — brand as first-class order attribute + single-brand guard + brand-coded ref
+
+**Verdict:** ❌ **reject** — the DDL and `update_order_items` are correct, but **`submit_order` is broken on the live shared DB**: it calls `min(p.brand_id)` on a `uuid` column and this Postgres has **no `min(uuid)` aggregate** → `function min(uuid) does not exist` on **every** new-order submission (even a plain single-item order). Production order creation is down — the deployed `main` app's salesmen can't submit. **Fix in the very next commit.** The commit's "Verified live … ref ORD-ZEB-2026-999" claim is contradicted by execution (the function throws before it ever builds a ref).
+
+**Phase / commit goal (as I understood it):** Phase 3a Commit 1 — additive backend: `brands.code`, `orders.brand_id` (derived server-side, unchanged RPC signatures), single-brand `submit_order` guard + `ORD-<code>-<year>-<no>` ref, an `update_order_items` brand guard; keep the shared-DB `main` client working.
+
+**🔴 Blocking issues (must fix in next commit):**
+- **`submit_order` crashes on `min(uuid)` — production submit is DOWN.** Body line: `select count(distinct p.brand_id), min(p.brand_id) into v_brand_count, v_brand_id …`. `min(uuid)` is not a function on this instance — verified directly (`select min(brand_id) from public.products` → `function min(uuid) does not exist`). This runs for every genuinely-new order (after the idempotency early-return), so **all** new submissions fail: I proved it with a single-brand 2-item probe **and** a plain 1-item probe (`single_item_submit=[function min(uuid) does not exist]`). The currently-deployed app cannot create orders on the shared prod DB right now.
+  - **Verified fix (both tested live):** replace `min(p.brand_id)` with **`(array_agg(distinct p.brand_id))[1]`** (cleanest — pairs with the `count(distinct …)` already there) or `max(p.brand_id::text)::uuid`. Recreate `submit_order` (same signature) with the swap in the next migration; **keep the DDL columns — only the function body is wrong.**
+- **Commit-message accuracy:** "Verified live: … single-brand→distinct 1, ref ORD-ZEB-2026-999, mixed set→distinct 2 (submit rejects)" is **false** — the live `submit_order` can't execute. Re-run the actual `submit_order` in the fix's probe so the log stays trustworthy (the REVIEWER verifies claims literally).
+
+**What IS correct (verified live — keep it):**
+- **DDL right + safe:** `brands.code='ZEB'` NOT NULL + `brands_code_key` unique; `orders.brand_id` **7/7 backfilled to Zebronics**, NOT NULL, `orders_brand_id_fkey` FK → brands(id). Only `submit_order`'s body needs fixing — do **not** revert the columns.
+- **Signatures unchanged** — `submit_order(p_id, p_retailer_id, p_notes, p_items)`, `update_order_items(p_order_id, p_notes, p_items, p_reason)`. Backward-compat *intent* is right (once the crash is fixed, a no-brand client works).
+- **`update_order_items` is fine** — its brand guard is a join-based `exists(… where p.brand_id <> v_order.brand_id)` (no uuid aggregate). Proven live (rolled back): a **same-brand** edit **succeeds**; a **foreign-brand** line is **rejected**; ㉞ `tally_name` audit key + ㉘ mandatory-`p_reason`-after-lock guard both preserved.
+- **`submit_order` structure** (aside from the crash): idempotency early-return correctly precedes the brand logic (watch-item ✓); guard raises on `count(distinct)>1`; no-existing-product → per-line 'not orderable'; ref = `'ORD-'||code||'-'||IST-year||'-'||order_no`; historical refs untouched. All correct **once `min(uuid)` is replaced**.
+
+**Non-blocking suggestions:** Defer until the blocker lands — nothing material beyond the fix.
+
+**Domain / correctness checks:**
+- **Order creation / state machine** 🔴 — submit path broken (blocking).
+- **One-brand guard** ✓ — submit logic correct modulo the crash; edit guard proven live.
+- **Immutable refs** ✓ — historical `ORD-2026-xxxx` untouched.
+- **Money / RLS / snapshots** ✓ — unchanged; edit still snapshots + emits `tally_name`.
+- **Numbering (D1)** ✓ — single global `order_no_seq`.
+
+**What I tried:** `git show a101f55` (migration + types); live `execute_sql` — column/constraint state (brands.code, orders.brand_id FK+NOT NULL, 7/7 Zeb), both RPC signatures, `update_still_tally`/`reason`=true; **rolled-back probes**: single-brand submit → **`function min(uuid) does not exist`**; direct `min(brand_id)` unsupported + both fix candidates return a uuid; plain 1-item submit → same crash; same-brand `update_order_items` → **success** (id 91d9686c…); foreign-brand edit → correctly rejected. All rolled back (brands still 1, orders still 7).
+
+**Open flags (cumulative):** **🔴 ㊱ NEW — `submit_order` `min(uuid)` crash; production order submission DOWN on the shared live DB; fix next commit.** Carried 🟡 ㉝ (migration reconciliation — `_multi_brand.sql` + the forthcoming fix migration join the set), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** **Immediately** recreate `submit_order` (same signature) replacing `min(p.brand_id)` with `(array_agg(distinct p.brand_id))[1]`; re-probe live — single-brand submit succeeds with `brand_id` set + `ORD-ZEB-2026-<no>`; mixed-brand rejected; the deployed no-brand client submits. **No new functionality until this lands.**
+
+---
+
+## Review of 17c9956 — fix(orders): phase3a ㊱ — submit_order crashed on min(uuid), restore submission
+
+**Verdict:** ✅ accept — ㊱ fixed and **verified by execution**: `submit_order` creates orders again (single-brand → `ORD-ZEB-2026-1010`, `brand_id`=Zebronics, `status`=submitted), mixed-brand still rejected, signature unchanged. Production submission restored — closes the 🔴 blocker.
+
+**Phase / commit goal (as I understood it):** Fix the ㊱ crash — replace `min(p.brand_id)` (no `min(uuid)` aggregate → runtime crash on every submit) with `array_agg(distinct p.brand_id)[1]`; body + signature otherwise identical.
+
+**What works (verified live, rolled back):**
+- **submit_order restored** — impersonated a salesman and called the real `submit_order` with two Zebronics products → **succeeded**: `order_ref=ORD-ZEB-2026-1010`, `brand_id`=Zebronics, `status=submitted`. No crash. (This is also the backward-compat path — no brand param passed; brand derived.)
+- **Mixed-brand still rejected** — a submit spanning a temp 2nd brand + Zebronics → `all items in an order must be the same brand`. The single-brand guard survived the fix.
+- **Fix is correct** — `select array_agg(distinct p.brand_id) into v_brand_ids …`; `if coalesce(array_length(v_brand_ids,1),0) > 1 then raise …`; `v_brand_id := v_brand_ids[1]`; null → 'not orderable'. `array_agg(distinct)` sidesteps the missing `min(uuid)`; the `>1` length check is equivalent to the old `count(distinct)>1`. The only residual `min(` in the body is the explanatory comment (`-- has no min() aggregate — use array_agg…`), not executable — confirmed by substring + by the function actually running.
+- **Signature unchanged** — `(p_id, p_retailer_id, p_notes, p_items)`; migration-only commit (no app/types change) → compiles as before; DDL + `update_order_items` untouched (both verified correct at a101f55).
+- **Honest commit message** — candidly explains why the c1 probe missed it (it computed the brand via `min(code)` on *text*, which exists, not the real `min(brand_id)` on *uuid* path). Log trustworthy again.
+
+**Blocking issues (must fix in next commit):** None — the blocker is cleared.
+
+**Non-blocking suggestions:**
+- My verification (and the builder's) advanced `order_no_seq` a few counts (my probe minted …1010), so real orders will show a small gap — **fine per D1 (gaps by design; never reset the sequence).** Noting so a gap isn't mistaken for lost orders.
+- ㉝: this fix migration (`…T193000_fix_submit_order_minuuid.sql`) also joins the reconciliation set.
+
+**Domain / correctness checks:**
+- **Order creation / state machine** ✅ — restored + verified (submit succeeds; correct brand + ref + status).
+- **One-brand guard** ✓ — mixed-brand rejected live.
+- **Numbering (D1)** ✓ — single global `order_no_seq`; gaps OK.
+- **Money / RLS / snapshots / immutable refs** ✓ — unchanged.
+
+**What I tried:** `git show 17c9956` (1 migration); live rolled-back probes — single-brand `submit_order` → `ORD-ZEB-2026-1010`/brand set/submitted; mixed-brand → rejected; `pg_get_functiondef` shows `array_agg(distinct)` present and the residual `min(` is the comment (substring-confirmed); signature unchanged; brands still 1, orders still 7.
+
+**Open flags (cumulative):** **🔴 ㊱ ✅ CLOSED** at 17c9956 — `submit_order` restored (array_agg fix), verified live. **No 🔴 blocking.** Carried 🟡 ㉝ (migration reconciliation — `_multi_brand` + `_fix_submit_order_minuuid` join the set), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Phase-3a Commit 2 (Quick Order brand UI) — already landed as 029ffa4; reviewing next. Will verify the brand dropdown + Brand▸Category two-tier sticky grouping + lazy auto-lock, and — critically — the shared-DB **test-brand hygiene** (no stray brand/products left in the live catalog).
+
+---
+
+## Review of 029ffa4 — feat(new-order): phase3a c2 — Quick Order brand dropdown, Brand▸Category grouping, lazy auto-lock
+
+**Verdict:** ✅ accept — correct and, crucially, **the single-brand path (the owner's live Zebronics flow) is provably unchanged**: all brand UI is gated behind `multiBrand = brandOptions.length >= 2`, false with one brand. Lazy auto-lock is derived from the cart (no imperative state); two-tier nested sticky is implemented. tsc/eslint/build clean. **Test-brand hygiene respected** — no 2nd brand provisioned, live catalog still Zebronics-only (verified). The multi-brand *runtime* visuals can't be exercised without a 2nd brand + a browser — the one residual.
+
+**Phase / commit goal (as I understood it):** Phase 3a Commit 2 — in-Quick-Order brand selection: a plain `<select>` beside the search (≥2 brands only), "All brands" nesting Brand▸Category with two-tier sticky headers, pick-to-filter, add-first-item lazy auto-lock (disable select + narrow list + cue), empty-cart unlock; submit unchanged.
+
+**What works (verified):**
+- **Single-brand path unchanged (safety-critical):** `multiBrand` false at 1 brand ⇒ no `<select>`, `showBrandTier=false` ⇒ flat `allCategories` (old rendering via the extracted `renderCategory`), no `lockNote`, `.listTwoTier` off ⇒ `--brand-offset:0` ⇒ category bar pins at `--search-bar-height` exactly as before; `visible` = all products either way. The owner's live flow is byte-identical behaviour; only cosmetic copy changed (de-SKU'd placeholder/empty-state).
+- **Lazy auto-lock is derived, not stateful** — `cartBrandId = first cart line's brand`; `locked = cartBrandId !== null`; select `value`/`disabled` + the list filter all read from it; empty cart ⇒ unlocked. No imperative lock effect to desync. `effectiveBrand = locked ? cartBrandId : (brandFilter==="all"?null:brandFilter)`.
+- **Grouping correct** — `brandGroups` nests Brand▸Category from `visible` (brands alphabetical, categories encounter-order); `showBrandTier = effectiveBrand===null && multiBrand`; picked/locked ⇒ flat categories. Same-named categories across brands don't collide (each under its brand `<section>`); React keys unique among siblings. The memo deps `[products, items, brandFilter, query]` cover every input to `visible`/`effectiveBrand`.
+- **Two-tier nested sticky implemented** — `.brandHeader` sticky `top: var(--search-bar-height)` z9; category bar `top: calc(var(--search-bar-height) + var(--brand-offset))` z8; `.listTwoTier` sets `--brand-offset: var(--brand-header-height)`. (All referenced classes present at HEAD — checked.)
+- **page.tsx** — selects `brand_id, brands(name)`, flattens `brand_name` (`r.brands?.name ?? ""`, standard to-one embed). Ordering unchanged.
+- **Submit unchanged** — server derives + guards brand (c1, verified live). UI lock is belt-to-suspenders.
+- **Compiles** — `tsc --noEmit` clean, `eslint` clean, `npm run build` exit 0.
+- **Test-brand hygiene ✓ (my c1/c2 watch-item)** — live catalog still **Zebronics-only** (`brand_count=1`, `non_zeb_products=0`); the builder deliberately did NOT provision a 2nd brand (would leak into the owner's live Quick Order). Responsible.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **`--brand-header-height: 34px` is a hardcoded estimate**, unlike the search bar's live ResizeObserver measurement. If the brand header's real rendered height differs (long/wrapping brand name on a narrow phone, font metrics), the two sticky tiers can slightly overlap/gap — and the design called two-tier sticky "the fiddly part." Consider live-measuring the brand header too, or confirm 34px holds across brand-name lengths on a real phone.
+- **Multi-brand runtime unverified** — the dropdown, nested-sticky, lazy lock/unlock, and the narrowed cue only exist with ≥2 brands, which don't exist live (deliberately). I verified compile + single-brand-unchanged + logic-by-reading; the visual/interaction pass needs a browser + a temporary 2nd brand (dev branch, not prod). Real-device residual.
+
+**Domain / correctness checks:**
+- **One-brand-per-order** ✓ — UI lock prevents adding a foreign brand (list filters to the locked brand); server is the real wall (c1). Belt-and-suspenders.
+- **Money / snapshots / ㉕** ✓ — `renderCategory` preserves the exact product row, pricing (`pricesById`), stepper/keypad, and the ㉕ unavailable-line handling; cart/price path unchanged.
+- **RLS** ✓ — catalog still RLS-scoped (active+priced); brand list derived from the visible catalog.
+
+**What I tried:** `git show 029ffa4` (QuickOrder.tsx + page.tsx + CSS); traced the single-brand path (multiBrand gate) + lazy-lock derivation; confirmed every referenced CSS class exists at HEAD (`.brandHeader`/`.listTwoTier`/`.brandSelect`/`.lockNote`/`.searchRow` + `--brand-offset`) and working-tree == 029ffa4; live catalog hygiene (1 brand, 0 non-Zeb products); `tsc --noEmit` + `eslint` clean; `npm run build` exit 0.
+
+**Open flags (cumulative):** No 🔴 blocking. No new ledger flag. Carried 🟡 ㉝ (migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Residual (not a flag): multi-brand runtime + `--brand-header-height` need a real-device / 2nd-brand pass.
+
+**Next-commit suggestion:** Phase-3a Commit 3 (dashboard BRAND column + BrandFilter + pick-slip + detail). I'll verify the BrandFilter composes with the date/salesman filters + tab counts (single-brand-today: the column shows, the filter has one option). Then c4 (Products mobile grouping). Also queued: bf0ad3b (future-plans docs) — reviewing next, oldest-first.
+
+---
+
+## Review of bf0ad3b — docs(future-plans): fulfillment & serial/QR capture at dispatch (Phase 4+)
+
+**Verdict:** ✅ accept — a well-formed parking-lot entry (owner-approved, explicitly TBD / Phase-4+); cross-refs resolve, placement is right, and it introduces no contradiction with current state or decisions. Docs only.
+
+**Phase / commit goal (as I understood it):** Record the owner's fulfillment/serial-capture idea in future-plans.md — a new godown/warehouse role scans each unit's serial at dispatch, the accountant keys them into Tally where the bill is then created (so the Tally invoice is generated at *dispatch* off captured serials, not at order time); mandatory for LG, optional elsewhere. Structure TBD, gated on Phase 2 (Tally) + Phase 3b (LG).
+
+**What works (verified):**
+- **Correct home + framing** — appended to future-plans.md's "approved in principle but deliberately not scheduled" parking lot, alongside geotag / RLS-pass / cancelled-orders-view / Payments-tab. Every claim is hedged TBD and dependency-gated — matches the doc's "decided shape + context, not a build spec" contract.
+- **Cross-references resolve** — `phase2-tally-sync-design.md` exists (the "refines the app→Tally trigger" ref); the geotag entry it points to ("carry the parked order-submit geotag as proof-of-delivery") exists at future-plans.md:5, and that entry's idempotency pin (`submit_order` retries don't update the geotag) stays consistent — a dispatch/fulfilled state is a *separate later event*, nothing conflicts.
+- **No stale contradiction** — the note "(Corrects the earlier 'salesman scans' sketch.)" leaves nothing dangling: grep finds **no** surviving "salesman scans" text in docs/. The GODOWN-not-salesman correction is clean.
+- **Internally consistent + technically sound** — the new `warehouse`/`godown` role is additive (doesn't touch the current salesman/accountant/admin model); `order_item_serials` (per-unit, additive) fits the immutable-snapshot posture; the `BarcodeDetector` feasibility note (Android Chrome yes / iOS Safari no) is accurate; the "Tally bill at dispatch, off serials" refinement is flagged as *refining* (not overriding) the Phase-2 trigger and left undecided.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- When this graduates from the parking lot, fold the "Tally bill created at *dispatch*, not order-time" refinement INTO phase2-tally-sync-design.md itself (the voucher-trigger timing currently lives only in this forward note) so the Phase-2 design and this entry don't drift on when the voucher fires. Not needed now — at scheduling time.
+
+**Domain / correctness checks:** N/A — planning doc; no code/data/RLS/money/state surface. The described `order_item_serials` + `warehouse` role are additive and consistent with the state-machine/snapshot model when eventually built.
+
+**What I tried:** `git show bf0ad3b` (1 doc, +21); confirmed `docs/phase2-tally-sync-design.md` exists, the geotag entry + its idempotency pin exist in future-plans.md (ref resolves), no surviving "salesman scans" sketch (grep), and the entry sits in the parking-lot section.
+
+**Open flags (cumulative):** No 🔴 blocking, no new flags. Carried 🟡 ㉝ (migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Phase-3a Commit 3 (dashboard BRAND column + BrandFilter + pick-slip + detail) and c4 (Products mobile grouping) — the remaining Phase-3a UI. For c3 I'll verify the BrandFilter composes with the date/salesman filters + tab counts.
+
+---
+
+## Review of 94c6556 — feat(dashboard): phase3a c3 — surface brand (ledger column + filter, detail views, pick slip)
+
+**Verdict:** ❌ **reject** — not for the code (correct + verified), but because the commit **left a test brand in the owner's LIVE catalog**: "Calvin Klein" (code CK, active) with **3 active, priced products** (Obsession/Eternity/Sense). Right now they're **salesman-visible in the owner's live Quick Order**, and `multiBrand` has flipped **true for real salesmen** (the c2 brand dropdown + two-tier grouping now show unexpectedly). Exactly the shared-DB hazard the prompt forbade + my c2/c3 watch-item pinned. **Remove/deactivate the CK brand + its 3 products before anything else lands** — safe to delete (0 orders / 0 order_items reference it, verified).
+
+**Phase / commit goal (as I understood it):** Phase 3a Commit 3 — surface brand across the dashboard: a BrandFilter (shared FilterDropdown) folded into the ledger's scoped filter + tab counts, a BRAND column + mobile-card brand (multiBrand-gated), and brand in the workbench (S9), salesman detail (S7), pick slip (S10).
+
+**🔴 Blocking issue (must fix before anything else lands) — ㊲:**
+- **Test brand polluting the live catalog.** Live now has **2 brands** — Zebronics (ZEB) + **Calvin Klein (CK, active)** — and **3 active+priced CK products** (`salesman_visible_nonzeb=3`). Effects on the owner's *live* system: (a) salesmen see Obsession/Eternity/Sense in Quick Order (`products_select_salesman` = active AND priced); (b) `salesman_visible_brand_count=2` ⇒ **`multiBrand` true** ⇒ the Quick Order brand dropdown + Brand▸Category grouping (c2) render for real salesmen; (c) the dashboard BRAND column/filter (this commit) show. The commit message states it outright: "CK test brand now present, so the multiBrand paths render live." The prompt required a **disposable** brand on a **dev branch**, or provisioned only when the owner isn't testing, **removed/deactivated afterward** — this left it live. **Remediation (safe — `ck_orders=0`, `ck_order_items=0` verified):** delete the 3 CK products then the CK brand, or set them `active=false`. I did **not** clean it up myself (I don't mutate prod, and you may want to inspect it first).
+
+**What IS correct (verified — the code is fine, keep it):**
+- **BrandFilter** mirrors SalesmanFilter on the shared `FilterDropdown` (controlled open, close-on-pick, reuses its option CSS); "All brands" + options; valueLabel right.
+- **Filter composition** — the brand predicate folds into `scoped` (`if (brandId !== "all" && o.brand_id !== brandId) return false`), *before* tab-counting, so per-tab counts + range + salesman all compose with brand. Correct two-stage placement.
+- **multiBrand gating symmetric** — filter, `<th>BRAND`, `<td>`, and the mobile-card suffix are all gated `{multiBrand && …}`, so column balance holds and a single-brand ledger is byte-identical to before. (`multiBrand = brands.length >= 2`, from the active-brands fetch.)
+- **page.tsx** — `ORDERS_SELECT` + page query add `brand_id, brands(name, code)`; a parallel active-brands fetch; `DashboardOrderRow`/`BrandOption` typed + passed.
+- **Detail + pick slip** — workbench byline (`{order.brandName && …}`), salesman detail subline (`order.brands ? NAME · … : ""`), pick-slip `slipBrand` under the ref — all null-safe conditional displays; the three loaders add `brands(name, code)` + a `brandName` prop.
+- **Compiles** — `tsc --noEmit` clean.
+
+**Non-blocking suggestions:** (after the blocker) — none material; the code is solid.
+
+**Domain / correctness checks:**
+- **Data hygiene / live-catalog integrity** 🔴 — test brand + products live (blocking).
+- **Filter/tab-count composition** ✓ — brand folded into `scoped`, counts reflect it.
+- **RLS** ✓ — ledger still `orders_select_staff`-scoped; brand list = active brands.
+- **Money / state machine / snapshots** ✓ — display-only additions, no write/price/lifecycle change.
+- **Column balance** ✓ — symmetric multiBrand gating.
+
+**What I tried:** live `execute_sql` — **found the CK brand + 3 active priced products** live (`brand_count=2`, `salesman_visible_nonzeb=3`, `salesman_visible_brand_count=2`); blast radius (`ck_orders=0`, `ck_order_items=0` → safe to delete); `git show 94c6556` (BrandFilter/OrdersList/page + 5 detail/pick-slip files) — traced the scoped-filter fold, symmetric multiBrand gating, null-safe brand displays; `tsc --noEmit` clean.
+
+**Open flags (cumulative):** **🔴 ㊲ NEW — CK/Calvin Klein test brand + 3 active priced products left in the LIVE catalog (salesman-visible, flips multiBrand for real users); remove/deactivate before anything else lands (safe: 0 order refs).** No other 🔴. Carried 🟡 ㉝ (migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Residual: multi-brand real-device visual pass.
+
+**Next-commit suggestion:** **Remove the CK test brand + its 3 products from live** (delete — no order refs — or deactivate), then confirm live: `brand_count` back to 1, salesman Quick Order Zebronics-only (multiBrand false again), dashboard BRAND column/filter hidden. Only then proceed. (Note: c4 e544d5b already landed on top of the polluted DB — ㊲ still applies; I'll re-check the cleanup when reviewing c4.)
+
+---
+
+## Review of e544d5b — feat(products): phase3a c4 — mobile Brand▸Category sticky grouping + de-duplicated cards
+
+**Verdict:** ⚠️ accept-with-followups — c4's **code is correct and verified** (tsc/eslint/build clean; Brand▸Category mobile grouping, card de-dup, and the ㉜🅐/🅑 + row-click-edit patterns all preserved via the shared `renderCard`; desktop table untouched). But it's new UI on the open 🔴 ㊲ base — its two-tier brand grouping only renders live *because* the CK test brand is still polluting the catalog. **🔴 ㊲ (remove the CK test brand) remains the gating blocker and must be cleared next.**
+
+**Phase / commit goal (as I understood it):** Phase-3a Commit 4 (per baa3509) — group the admin Products *mobile card* view under Brand▸Category two-tier sticky headers, slim the cards (brand+category → headers; Tally line only when `tally_name !== name`); desktop table unchanged; preserve render-from-prop + row-click-edit + inline-Active.
+
+**What works (verified):**
+- **Mobile grouping correct** — `mobileGroups` nests Brand▸Category from `products` (brands alphabetical, categories encounter-order), memoized on `[products]`; `multiBrandProducts = mobileGroups.length >= 2` gates the brand tier; render is `brand section → category section → renderCard`. Keys unique among siblings (brandId / category / p.id).
+- **Card de-dup to spec** — brand+category dropped from the card body (now in sticky headers); Tally line shows only when `p.tally_name !== p.name` (matches baa3509; live data has all Zebronics tally==name so no echo). Card keeps name + price/TBD + Active toggle.
+- **㉜🅐/🅑 + row-click-edit preserved** — the extracted `renderCard` renders from the prop (no useState copy), keeps the `busyId` stay-busy toggle with `stopPropagation`, and the row-click / Enter-Space edit. Same behaviour as c3's inline card, relocated + grouped.
+- **Single-brand = category-grouped (intended), desktop untouched** — with one brand: no brand header, `cardsTwoTier` off (`--pm-offset:0`), category headers only. (This does add category grouping to the single-brand mobile view vs the old flat list — an intended improvement per the prompt, not a regression.) The desktop `<table>` is byte-unchanged.
+- **Compiles** — `tsc --noEmit` + `eslint` clean; `npm run build` exit 0.
+
+**🔴 Blocking (carried from c3, not introduced by c4): ㊲** — the CK test brand + 3 active priced products are **still live** (re-checked: `brand_count=2`, `ck_salesman_visible=3`). c4's brand tier renders "live" only because of this. **Must be removed before the phase is done / before further commits.** (c4 was committed before ㊲ was posted, so not a c4 protocol miss — but it's now the standing blocker.)
+
+**Non-blocking suggestions:**
+- **`--pm-offset: 34px` hardcoded** (same as c2's `--brand-header-height`) — not live-measured. If the brand header's real height differs (long brand name / font metrics), the two sticky tiers can overlap/gap on a phone. Same real-device check as c2; consider one shared measured value.
+
+**Domain / correctness checks:**
+- **Money** ✓ — `formatRupees`/TBD unchanged in `renderCard`.
+- **render-from-prop / inline-active (㉜)** ✓ — preserved.
+- **RLS / state machine / snapshots** — N/A (presentational admin view).
+- **Data hygiene** 🔴 — ㊲ carried (CK brand live).
+
+**What I tried:** `git show e544d5b` (ProductsPricing.tsx + CSS); traced `mobileGroups` + `renderCard` + the `multiBrandProducts` gate; re-checked live catalog → ㊲ still open (CK brand + 3 salesman-visible products); `tsc --noEmit` + `eslint` clean; `npm run build` exit 0.
+
+**Open flags (cumulative):** **🔴 ㊲ OPEN (carried) — CK test brand in live catalog; remove/deactivate next.** No other 🔴. Carried 🟡 ㉝ (migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Residual: multi-brand real-device visual pass (Quick Order + Products mobile two-tier sticky).
+
+**Next-commit suggestion:** **Clear 🔴 ㊲ first** — remove the CK/Calvin Klein test brand + 3 products from live (delete: 0 order refs; or deactivate), confirm `brand_count=1` + salesman Quick Order Zebronics-only. That closes Phase-3a's functional work (c1–c4 code all ✅ once ㊲ is clean); then the pre-M6 ㉝ migration-reconciliation dry-run (now 3 phase-3a migrations) + a real-device multi-brand visual pass.
 
 ---

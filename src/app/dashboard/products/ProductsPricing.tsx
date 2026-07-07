@@ -56,9 +56,74 @@ export function ProductsPricing({
     return map;
   }, [products]);
 
+  // Mobile-only Brand ▸ Category grouping (desktop keeps the flat table).
+  // Brands alphabetical; categories in encounter order (products arrive
+  // ordered by category, then name).
+  const mobileGroups = useMemo(() => {
+    const byBrand = new Map<string, { brandName: string; cats: Map<string, ProductRow[]> }>();
+    for (const p of products) {
+      let bg = byBrand.get(p.brand_id);
+      if (!bg) {
+        bg = { brandName: p.brands?.name ?? "—", cats: new Map() };
+        byBrand.set(p.brand_id, bg);
+      }
+      const cat = bg.cats.get(p.category) ?? [];
+      if (cat.length === 0) bg.cats.set(p.category, cat);
+      cat.push(p);
+    }
+    return [...byBrand.entries()]
+      .map(([brandId, bg]) => ({
+        brandId,
+        brandName: bg.brandName,
+        categories: [...bg.cats.entries()].map(([category, ps]) => ({ category, products: ps })),
+      }))
+      .sort((a, b) => a.brandName.localeCompare(b.brandName));
+  }, [products]);
+  const multiBrandProducts = mobileGroups.length >= 2;
+
   function closeAndRefresh() {
     setModal(null);
     router.refresh();
+  }
+
+  function renderCard(p: ProductRow) {
+    return (
+      <div
+        key={p.id}
+        className={`${styles.card} ${styles.clickable} ${!p.active ? styles.cardInactive : ""}`}
+        role="button"
+        tabIndex={0}
+        onClick={() => setModal({ mode: "edit", product: p })}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setModal({ mode: "edit", product: p });
+          }
+        }}
+      >
+        <div className={styles.cardTop}>
+          <span className={styles.cardName}>{p.name}</span>
+          <span className={styles.mono}>
+            {p.price_paise === null ? <span className={styles.tbd}>TBD</span> : formatRupees(p.price_paise)}
+          </span>
+        </div>
+        {/* Brand + category now live in the sticky headers; show a Tally line
+            only when it actually differs from the display name (it defaults to
+            the name, so echoing it is noise). */}
+        {p.tally_name !== p.name && <div className={styles.cardTally}>{p.tally_name}</div>}
+        <button
+          type="button"
+          className={`${styles.toggle} ${p.active ? styles.toggleOn : styles.toggleOff}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleActive(p);
+          }}
+          disabled={busyId === p.id}
+        >
+          {p.active ? "Active" : "Inactive"}
+        </button>
+      </div>
+    );
   }
 
   async function toggleActive(p: ProductRow) {
@@ -149,42 +214,17 @@ export function ProductsPricing({
             </tbody>
           </table>
 
-          <div className={styles.cards}>
-            {products.map((p) => (
-              <div
-                key={p.id}
-                className={`${styles.card} ${styles.clickable} ${!p.active ? styles.cardInactive : ""}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => setModal({ mode: "edit", product: p })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setModal({ mode: "edit", product: p });
-                  }
-                }}
-              >
-                <div className={styles.cardTop}>
-                  <span className={styles.cardName}>{p.name}</span>
-                  <span className={styles.mono}>
-                    {p.price_paise === null ? <span className={styles.tbd}>TBD</span> : formatRupees(p.price_paise)}
-                  </span>
-                </div>
-                <div className={styles.cardMeta}>
-                  {p.brands?.name ?? "—"} · {p.category} · {p.tally_name}
-                </div>
-                <button
-                  type="button"
-                  className={`${styles.toggle} ${p.active ? styles.toggleOn : styles.toggleOff}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleActive(p);
-                  }}
-                  disabled={busyId === p.id}
-                >
-                  {p.active ? "Active" : "Inactive"}
-                </button>
-              </div>
+          <div className={`${styles.cards} ${multiBrandProducts ? styles.cardsTwoTier : ""}`}>
+            {mobileGroups.map((bg) => (
+              <section key={bg.brandId}>
+                {multiBrandProducts && <div className={styles.mBrandHeader}>{bg.brandName}</div>}
+                {bg.categories.map((c) => (
+                  <section key={c.category}>
+                    <div className={styles.mCatHeader}>{c.category}</div>
+                    {c.products.map(renderCard)}
+                  </section>
+                ))}
+              </section>
             ))}
           </div>
         </>

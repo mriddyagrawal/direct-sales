@@ -69,11 +69,21 @@ Phase 5 was *tiered discounts off a list price, no free-typing*. LG is the oppos
 
 `order_items`/snapshots, the RPC-only write model, the RLS matrix, money (integer paise), the lifecycle/states and edit window — **for the brand/ref change** above. (The LG **`manual` pricing mode** *does* touch the RPC's price source and adds the `pending_approval` + `approved` states — see that section.) Adding a brand at runtime = **new CSV in `data/` + a `brands` row (+`code`) + brand-prefixed SKUs** — data, per D4 and [seed-data.md](specs/seed-data.md).
 
+## Salesman brand selection — lazy constraint, not an upfront gate (owner, 2026-07-07)
+**No brand picker at order start** — front-loading the choice constrains before the salesman has committed and fights the notebook-beating speed rule. Brand selection lives **inside Quick Order (S4)**, next to the search:
+- **A compact brand dropdown beside the search bar** (shrink the search to fit) — a **plain OS `<select>`, tap-to-pick, NOT typable** (unlike the M5.5 admin category typeahead — different context). Default **"All brands"**.
+- **Brand = a "hyper-category" grouping, NOT a per-item tag** (the rows are already congested). In "All brands" the catalog nests **Brand ▸ Category ▸ items** — a bigger **Zebronics** section wrapping its `Adaptors` / `Speakers` / … sub-sections, then a **Luminous** section, etc. (This also fixes same-named categories across brands colliding — each lives under its own brand.) **Both tiers are sticky on scroll (nested):** the brand header pins at the top with a **heavier/distinct treatment above** the navy category bars, and the category bar's live-measured sticky `top` must now **account for the brand-header height** (two-tier sticky — the fiddly part).
+- **Pick a brand ⇒ filter** to it (browsing aid; cart empty, nothing locked). With one brand showing, the brand hyper-section collapses to just its categories (the brand is already named in the dropdown).
+- **Add the first item (any qty) ⇒ brand auto-locks** to that item's brand: the dropdown snaps to it and **disables** (can't clear/change while the cart holds items), the list filters to that brand (single-brand ⇒ categories only). A subtle cue explains why the list narrowed.
+- **Empty the cart ⇒ brand unlocks.**
+- Enforces **one-brand-per-order** as a pleasant front-end, but the **server `submit_order` brand-guard stays the real wall** (UI reflects the rule; the RPC enforces it). `orders.brand_id` = the locked brand; the ref carries its **brand code** (Option A).
+- Only **active brands with ≥1 priced product** appear (no empty selections). Mobile: a native `<select>` at 2–5 brands; mind the search-bar shrink on narrow phones.
+
 ## Build scope when Phase 3 lands
 
 1. **One migration:** `orders.brand_id` (+ backfill → Zebronics), `brands.code`, the `submit_order`/`update_order_items` brand-guard, and the new ref format in `submit_order`.
 2. **Seed** the new brand (CSV + brand row + SKU prefix).
-3. **UI:** brand picker at order start (S3/S4 entry) scoping the Quick Order catalog; dashboard brand filter/column; brand in the pick-slip header.
+3. **UI:** the **in-Quick-Order brand dropdown + lazy auto-lock** (see "Salesman brand selection" above), **not** an order-start picker; dashboard brand filter/column; brand in the pick-slip header.
 4. **Update D4** in decisions.md (ref format flips to brand-coded; record the A-vs-B choice).
 
 ## Open decision

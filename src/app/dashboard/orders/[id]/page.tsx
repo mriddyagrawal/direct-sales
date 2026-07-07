@@ -45,6 +45,7 @@ interface WorkbenchOrderRow {
   salesman: { full_name: string } | null;
   processed_by_profile: { full_name: string } | null;
   cancelled_by_profile: { full_name: string } | null;
+  brands: { name: string; code: string } | null;
   order_items: OrderItemRow[];
   order_events: EventRow[];
 }
@@ -65,6 +66,7 @@ export default async function WorkbenchPage({ params }: { params: Promise<{ id: 
           "salesman:profiles!orders_salesman_id_fkey(full_name), " +
           "processed_by_profile:profiles!orders_processed_by_fkey(full_name), " +
           "cancelled_by_profile:profiles!orders_cancelled_by_fkey(full_name), " +
+          "brands(name, code), " +
           "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, position), " +
           "order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))",
       )
@@ -101,6 +103,7 @@ export default async function WorkbenchPage({ params }: { params: Promise<{ id: 
         retailerArea: order.retailers?.area ?? null,
         retailerPhone: order.retailers?.phone ?? null,
         retailerVerified: order.retailers?.verified ?? true,
+        brandName: order.brands?.name ?? null,
       }}
       items={items}
       events={events}

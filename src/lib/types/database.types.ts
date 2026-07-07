@@ -17,16 +17,19 @@ export type Database = {
       brands: {
         Row: {
           active: boolean
+          code: string
           id: string
           name: string
         }
         Insert: {
           active?: boolean
+          code: string
           id?: string
           name: string
         }
         Update: {
           active?: boolean
+          code?: string
           id?: string
           name?: string
         }
@@ -124,6 +127,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
           editable_until: string
@@ -141,6 +145,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          brand_id: string
           cancelled_at?: string | null
           cancelled_by?: string | null
           editable_until: string
@@ -158,6 +163,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          brand_id?: string
           cancelled_at?: string | null
           cancelled_by?: string | null
           editable_until?: string
@@ -175,6 +181,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_cancelled_by_fkey"
             columns: ["cancelled_by"]
@@ -329,6 +342,7 @@ export type Database = {
       cancel_order: {
         Args: { p_order_id: string; p_reason?: string }
         Returns: {
+          brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
           editable_until: string
@@ -360,6 +374,7 @@ export type Database = {
       process_order: {
         Args: { p_order_id: string }
         Returns: {
+          brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
           editable_until: string
@@ -391,6 +406,7 @@ export type Database = {
           p_retailer_id: string
         }
         Returns: {
+          brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
           editable_until: string
@@ -422,6 +438,7 @@ export type Database = {
           p_reason?: string
         }
         Returns: {
+          brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
           editable_until: string

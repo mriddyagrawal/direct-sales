@@ -11,30 +11,33 @@ import { nowMs } from "@/lib/cart";
 import { DEFAULT_RANGE } from "@/lib/date-range";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { SalesmanFilter } from "./SalesmanFilter";
-import type { DashboardOrderRow, SalesmanOption } from "./page";
+import { BrandFilter } from "./BrandFilter";
+import type { BrandOption, DashboardOrderRow, SalesmanOption } from "./page";
 import styles from "./OrdersList.module.css";
 
 type StatusFilter = "all" | "submitted" | "processed" | "cancelled";
 
 const ORDERS_SELECT =
-  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name)";
+  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
 
 interface OrdersListProps {
   initialOrders: DashboardOrderRow[];
   salesmen: SalesmanOption[];
+  brands: BrandOption[];
 }
 
 // S8 — live orders ledger. New rows arrive via Supabase Realtime (postgres_
 // changes on `orders`, RLS-scoped) within acceptance criterion #1's 5s
 // budget; updates (Mark processed / Cancel / Edit, from this dashboard or
 // any other open one) patch the row in place, no manual refresh needed.
-export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
+export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps) {
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [salesmanId, setSalesmanId] = useState("all");
+  const [brandId, setBrandId] = useState("all");
   const [range, setRange] = useState<DateRange | undefined>(DEFAULT_RANGE);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [tick, setTick] = useState(nowMs);
@@ -105,8 +108,13 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
   // per-tab counts below, so a count reflects the salesman/range/search
   // scope regardless of which tab is active); `finalFiltered` narrows that
   // by the active tab and is what the table/keyboard-nav actually render.
+  // Brand UI only appears once ≥2 brands are orderable — with a single brand
+  // (Zebronics-only) the ledger is unchanged (no BRAND column/filter noise).
+  const multiBrand = brands.length >= 2;
+
   const scoped = orders.filter((o) => {
     if (salesmanId !== "all" && o.salesman_id !== salesmanId) return false;
+    if (brandId !== "all" && o.brand_id !== brandId) return false;
     if (range?.from) {
       const key = istDateKey(new Date(o.submitted_at));
       const fromKey = istDateKey(range.from);
@@ -179,6 +187,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
         </div>
         <div className={styles.filterGroup}>
           <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />
+          {multiBrand && <BrandFilter brands={brands} value={brandId} onChange={setBrandId} />}
           <DateRangeFilter value={range} onChange={setRange} />
           <input
             ref={searchRef}
@@ -200,6 +209,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
                 <th>REF</th>
                 <th>SUBMITTED</th>
                 <th>SALESMAN</th>
+                {multiBrand && <th>BRAND</th>}
                 <th>RETAILER</th>
                 <th className={styles.numeric}>TOTAL</th>
                 <th>STATUS</th>
@@ -224,6 +234,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
                     <td className={styles.mono}>{order.order_ref}</td>
                     <td className={`${styles.mono} ${styles.cellMeta}`}>{formatOrderTimestamp(order.submitted_at, now)}</td>
                     <td className={styles.cellMeta}>{order.profiles?.full_name ?? "—"}</td>
+                    {multiBrand && <td className={styles.cellMeta}>{order.brands?.name ?? "—"}</td>}
                     <td className={styles.cellRetailer}>
                       {order.retailers?.name ?? "—"}
                       {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
@@ -256,6 +267,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
                     {order.retailers?.name ?? "—"}
                     {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>} ·{" "}
                     {order.profiles?.full_name ?? "—"}
+                    {multiBrand && ` · ${order.brands?.name ?? "—"}`}
                   </div>
                   <div className={styles.cardBottom}>
                     <span className={styles.mono}>{formatOrderTimestamp(order.submitted_at, now)}</span>

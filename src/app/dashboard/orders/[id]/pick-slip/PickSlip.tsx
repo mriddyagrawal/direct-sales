@@ -21,6 +21,7 @@ interface PickSlipProps {
   retailerArea: string | null;
   retailerPhone: string | null;
   salesmanName: string;
+  brandName: string | null;
   items: PickSlipItem[];
 }
 
@@ -36,6 +37,7 @@ export function PickSlip({
   retailerArea,
   retailerPhone,
   salesmanName,
+  brandName,
   items,
 }: PickSlipProps) {
   const [pricesOn, setPricesOn] = useState(false);
@@ -75,6 +77,7 @@ export function PickSlip({
           <div>
             <p className={styles.brand}>GANPATI ENTERPRISES</p>
             <p className={styles.ref}>{orderRef}</p>
+            {brandName && <p className={styles.slipBrand}>{brandName}</p>}
           </div>
           <span className={styles.badge}>{pricesOn ? "ORDER COPY" : "PICK SLIP"}</span>
         </div>

@@ -53,6 +53,7 @@ interface WorkbenchOrderData {
   retailerArea: string | null;
   retailerPhone: string | null;
   retailerVerified: boolean;
+  brandName: string | null;
 }
 
 interface OrderWorkbenchProps {
@@ -220,7 +221,8 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
         <div>
           <p className={styles.ref}>{order.orderRef}</p>
           <p className={styles.byline}>
-            by {order.salesmanName} · submitted {formatOrderTimestamp(order.submittedAt, now)}
+            by {order.salesmanName}
+            {order.brandName && ` · ${order.brandName}`} · submitted {formatOrderTimestamp(order.submittedAt, now)}
             {editable && ` · editable until ${formatOrderTimestamp(order.editableUntil, now)}`}
             {order.status === "processed" &&
               order.processedAt &&

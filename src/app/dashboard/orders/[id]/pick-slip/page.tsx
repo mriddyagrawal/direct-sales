@@ -17,6 +17,7 @@ interface PickSlipOrderRow {
   total_paise: number;
   retailers: { name: string; area: string | null; phone: string | null } | null;
   salesman: { full_name: string } | null;
+  brands: { name: string; code: string } | null;
   order_items: PickSlipItemRow[];
 }
 
@@ -27,7 +28,7 @@ export default async function PickSlipPage({ params }: { params: Promise<{ id: s
   const { data } = await supabase
     .from("orders")
     .select(
-      "order_ref, submitted_at, notes, total_paise, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), order_items(product_name, qty, unit_price_paise, line_total_paise, position)",
+      "order_ref, submitted_at, notes, total_paise, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code), order_items(product_name, qty, unit_price_paise, line_total_paise, position)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -47,6 +48,7 @@ export default async function PickSlipPage({ params }: { params: Promise<{ id: s
       retailerArea={order.retailers?.area ?? null}
       retailerPhone={order.retailers?.phone ?? null}
       salesmanName={order.salesman?.full_name ?? "Unknown"}
+      brandName={order.brands?.name ?? null}
       items={items}
     />
   );
