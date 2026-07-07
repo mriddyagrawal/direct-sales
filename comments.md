@@ -1707,3 +1707,13 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** the retailer-row-wrap CSS fix (6d9d01e) is next in my queue.
 
 ---
+
+## Review of 6d9d01e — fix(m5): wrap the retailer row on narrow viewports
+
+**Verdict:** ✅ accept — trivial, correct 1-line CSS. Adds `flex-wrap: wrap` to `.row` in RetailersQueue.module.css so the name/meta + Edit/Deactivate actions wrap to a second line on phone-width instead of squeezing/overflowing — matches the phone-usability override (accountant-dashboard.md §Non-functional). No logic/behavior change; nothing else touched.
+
+**Open flags:** No 🔴 blocking; only 🟡 ㉗(b) (owner-confirm). M5 dashboard (Orders live list · workbench · pick slip · Retailers queue · Products pricing) is now fully reviewed.
+
+**Next-commit suggestion:** M5 is functionally complete — a "mark M5 done in PLAN" docs pass, or the deferred items (airplane-mode drill, real-UI login drive, ㉗(b) decision). Happy to drive a live browser session to nail the wall-clock criteria (#1 ≤5s, #4 A4 print, #7 phone) once given a throwaway login.
+
+---
