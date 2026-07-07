@@ -84,7 +84,7 @@ On every wake: `git log` since the last reviewed sha → review each new commit 
 | ㉒ | `SUPABASE_SECRET_KEY` (new-style `sb_secret_…`) must be set or **username login fails** — the secret-key lookup can't run without it. | 🟡 was config / owner | app ㉑-fix (0db66fd) | ✅ **RESOLVED** at ba387fa — owner set it in `.env.local`; verified valid (lookup returns the email). Still add it to **Vercel env** before deploy. |
 | ㉑ | `email_for_username()` (username-login lookup) was `anon`-executable → a guessed username returned that account's email (**proven live**). | 🟡 was security | app D9 (39cf779) | ✅ **CLOSED** at 0db66fd — revoked anon/auth, service-role-only; harvest now denied (verified), advisor clear |
 | ⑱ | `middleware.ts` redirect branches don't copy `supabaseResponse` cookies onto the redirect → deactivated-user **infinite redirect loop** + intermittent token-refresh logouts. Copy cookies onto each authenticated redirect. | 🔴 was correctness-blocking | app auth (dcb3904) | ✅ **CLOSED** at 0dc60a3 — `redirectWithCookies` copies cookies onto all 4 redirects; build+lint clean |
-| ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open (deferred to app scaffold) |
+| ⑬ | Drift-protected `scripts/seed.ts` loader (seed-data.md's `--force-prices`/warn-on-drift re-run guard) deferred until the Node app is scaffolded. Re-seeding before it exists could clobber in-DB price edits. | 🟡 minor / deferred | M1.7 | 🟡 open — **rationale superseded-in-intent** by the catalog-admin in-app import (739ee8e): owner wants *intentional* overwrite, so the drift-protection this asked for is moot; the import may subsume the CLI loader entirely |
 | ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (multiple permissive policies, unwrapped `auth.uid()`, **6** unindexed FKs incl. `orders.cancelled_by`, 1 unused index). Verified accurate + harmless at current scale. | 🟡 minor / deferred | M1 (7cc9e4c) | 🟡 parked in [docs/future-plans.md](docs/future-plans.md); revisit with Pro-billing decision |
 | ⑦ | `sec-s6` render absent vs the "sec-s1…s8" range label in the design spec. | 🟡 minor / doc | M0 (c82607e) | 🟡 open |
 | ⑧ | Design spec cites a "future Payments tab — see docs/future-plans.md" entry that doesn't exist yet. | 🟡 minor / doc | M0 (5d8e58c) | 🟡 open |
@@ -1909,5 +1909,27 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Open flags:** none new — UX-polish prompt, no correctness/spec defect (unlike the dashboard-UX prompt, which had the real 🅐 bug). No 🔴 blocking; carried 🟡 ㉝ (pre-M6), ㉛, ⑯ ⑬ ⑭ ⑦⑧⑨.
 
 **Next:** the fix commits (on the owner's new branch) — I'll verify density/tap-targets/sticky + the header changes when they land.
+
+---
+
+## Review of 739ee8e — docs: catalog-admin design — manual add + CSV/Excel import (admin-only)
+
+**Verdict:** ✅ accept — a well-reasoned, accurate, forward-consistent design capture (not built). Its recommended upsert key is feasible against live data (verified), and it ties several threads together cleanly.
+
+**Verified + consistent:**
+- **Accurate premise:** the Products tab can price/edit but can't **add** products today — correct (no add path; exactly why `products_admin_insert` has been dormant). This design is what puts that admin-only policy to use. ✓
+- **Admin RLS covers it, no service-role:** admin INSERTs via `products_admin_insert`, UPDATEs via `products_staff_update` — matches the D11 enumeration I just finalized ("accountant has UPDATE not INSERT; admin has both"). "Admin-only, revisit for accountant" is spot-on. *(Minor: it says admin has "`ALL` on products" — precisely it's INSERT+UPDATE+SELECT, no DELETE, which is fine under deactivate-not-delete.)* ✓
+- **The recommended upsert key `(brand_id, tally_name)` is immediately feasible** — queried live: all **42/42** products have a unique `(brand_id, tally_name)` (and unique name), **0 dup keys**. So dropping `sku` and adding `unique(brand_id, tally_name)` applies cleanly to today's data — no dedup needed. ✓
+- **Recontextualizes ec94d06:** the `tally_name = name` backfill I reviewed earlier is the **groundwork** for making `tally_name` NOT-NULL + the upsert key ("blank ⇒ display name" + backfill = always populated). The two commits now read as one plan. ✓
+- **Import design is sound:** brand-scoped (one brand/file), upsert-not-duplicate, never-deletes (reports absent rows — same safety as the seed), **transactional dry-run preview** (all-or-nothing so a bad file can't half-corrupt the catalog), admin Server Action, downloadable template, `.xlsx` via server-side parser. ✓
+
+**Threads it touches (flagged correctly):**
+- **Bears on ⑬:** the doc notes this in-app import could **subsume** the deferred CLI seed loader, and the owner **wants intentional overwrite** ("overwrite any items") — which directly addresses ⑬'s original worry (a re-seed clobbering in-DB price edits). So ⑬'s drift-protection ask is **superseded in intent**; I've annotated ⑬ in the ledger accordingly (left open — nothing built).
+- **Revises seed-data.md** ("tally_name empty until Phase 2") and the seed script's `sku`-based upsert + `sku ~ '^ZEB-'` check — correctly flagged as build-time changes; ties to Phase-3 `pricing_mode` (hide Price for `manual` brands). ✓
+- Leaves the real decisions **open** (upsert key, drop sku, categories-table-vs-dropdown, dry-run, Excel-now-vs-later) — appropriate for an unbuilt feature. ✓
+
+**Open flags:** none new — not-built design note; ⑬ annotated (superseded-in-intent). No 🔴 blocking; carried 🟡 ㉝ (pre-M6), ㉛, ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** M6 / the salesman-new-order UX fixes, whichever lands.
 
 ---
