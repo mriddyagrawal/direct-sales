@@ -19,6 +19,12 @@ function toItemsPayload(items: Record<string, number>) {
 // sees the request — retryable. A rejection returned BY the server (window
 // expired, product now unpriced, etc.) is authoritative and must be shown
 // plainly, never silently queued for retry.
+//
+// review flag ㉗: this message is deliberately neutral — only submitOrder's
+// caller (NewOrderFlow, create mode) actually queues + auto-retries via
+// lib/pending-orders.ts. update_order_items/cancel_order have no such queue;
+// a caller-specific "will retry automatically" claim belongs in their own UI
+// copy, not baked in here where it would overpromise for edit/cancel.
 export class OfflineError extends Error {}
 
 interface RpcErrorLike {
@@ -48,12 +54,12 @@ async function callRpc<T>(fn: () => PromiseLike<{ data: T | null; error: RpcErro
   try {
     result = await fn();
   } catch (error) {
-    if (isOfflineFailure(error)) throw new OfflineError("You're offline — this will retry automatically.");
+    if (isOfflineFailure(error)) throw new OfflineError("You're offline. Check your connection and try again.");
     throw error;
   }
   if (result.error) {
     if (isOfflineFailure(result.error)) {
-      throw new OfflineError("You're offline — this will retry automatically.");
+      throw new OfflineError("You're offline. Check your connection and try again.");
     }
     throw new Error(result.error.message);
   }

@@ -143,7 +143,13 @@ export function Review({
 
         {isOffline && (
           <p className={styles.offlineStrip}>
-            Saved on phone — not submitted yet. Retrying never creates a duplicate.
+            {isEdit
+              ? // review flag ㉗ — edit-mode offline has no persistent retry
+                // queue (only a new order queues); don't claim auto-retry or
+                // "saved" durability it doesn't have. Keep this screen open
+                // and retry, or come back once you have signal.
+                "Not saved yet — you're offline. Keep this screen open and tap Retry once you have signal."
+              : "Saved on phone — not submitted yet. Retrying never creates a duplicate."}
           </p>
         )}
         {submitError && !isOffline && <p className={styles.errorStrip}>{submitError}</p>}

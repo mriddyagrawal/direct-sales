@@ -13,6 +13,8 @@ export interface PendingOrder {
   itemCount: number;
   totalPaise: number; // display-only estimate from catalog prices at submit time
   savedAt: number;
+  lastError?: string; // review flag ㉖ — a real server rejection (not offline) must stay
+                       // visible with its reason, never discarded silently
 }
 
 const KEY = "directsales:pending-orders";
@@ -44,6 +46,19 @@ export function removePending(orderId: string): void {
   if (typeof window === "undefined") return;
   const rest = listPending().filter((o) => o.orderId !== orderId);
   window.localStorage.setItem(KEY, JSON.stringify(rest));
+  notifyChange();
+}
+
+// A genuine server rejection (product went unpriced/inactive since the
+// order was queued, etc.) is permanent — retrying the identical payload
+// forever would never succeed. But discarding the entry silently reads
+// exactly like success from the salesman's side, which is the "no silent
+// loss" failure resilience.md forbids (review flag ㉖). Keep it, tagged
+// with why, so it stays visible until the salesman acts on it.
+export function markPendingFailed(orderId: string, message: string): void {
+  if (typeof window === "undefined") return;
+  const list = listPending().map((o) => (o.orderId === orderId ? { ...o, lastError: message } : o));
+  window.localStorage.setItem(KEY, JSON.stringify(list));
   notifyChange();
 }
 
