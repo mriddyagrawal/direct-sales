@@ -145,6 +145,19 @@
   text-align: right;
 }
 
+/* Column weight/color hierarchy (S8 desktop ledger) — SUBMITTED + SALESMAN
+   recede as metadata; RETAILER is the primary scan target. REF/TOTAL are
+   unstyled here on purpose (stay full-ink via .mono/.table td). */
+.cellMeta {
+  color: var(--color-locked);
+  font-weight: 400;
+}
+
+.cellRetailer {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
 .newBadge {
   margin-left: 6px;
   padding: 2px 6px;

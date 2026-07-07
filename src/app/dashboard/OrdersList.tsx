@@ -216,9 +216,9 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
                     <td className={styles.mono}>{order.order_ref}</td>
-                    <td className={styles.mono}>{formatOrderTimestamp(order.submitted_at, now)}</td>
-                    <td>{order.profiles?.full_name ?? "—"}</td>
-                    <td>
+                    <td className={`${styles.mono} ${styles.cellMeta}`}>{formatOrderTimestamp(order.submitted_at, now)}</td>
+                    <td className={styles.cellMeta}>{order.profiles?.full_name ?? "—"}</td>
+                    <td className={styles.cellRetailer}>
                       {order.retailers?.name ?? "—"}
                       {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
                     </td>
