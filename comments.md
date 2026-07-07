@@ -1522,3 +1522,37 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** still the bottom-bar CSS fix (a5fd608's prompt) — app-shell layout + no-horizontal-scroll check when it lands.
 
 ---
+
+## Review of 4cdeb82 — fix: bottom tab bar hidden until scroll (app-shell layout)
+
+**Verdict:** ✅ accept — implements a5fd608's prescription faithfully; DOM structure verified correct. *(This commit landed between Monitor pings and I nearly flagged 13d5058's "bottom-bar fixed" claim as drift on the assumption it hadn't landed — checked `git log` first, and the fix is real. Verify, don't assume.)*
+
+**What changed (matches the prompt exactly):** `overflow-x: hidden` removed from `html,body` (the sticky-breaker; `max-width:100vw` kept as the horizontal guard); `.page` `min-height:100vh`→`height:100dvh`; `.content` gains `flex:1; min-height:0; overflow-y:auto` (the flexbox "won't shrink to scroll" fix); `.empty` gets `min-height:0`; `.account` + `.bar` get `flex-shrink:0`; `.bar` drops `position:sticky; bottom:0` and adds `padding-bottom: env(safe-area-inset-bottom,0px)`.
+
+**Structure verified against the DOM ([page.tsx:54–95](src/app/page.tsx#L54)):** `.page` (100dvh flex-col) → `PendingOrdersStrip` · `.content`/`.empty` (the `flex:1` scroll region = orders list) · `.account` (shrink:0) · `BottomTabBar .bar` (shrink:0). So the list scrolls internally while footer + nav stay pinned and visible on load — exactly the app-shell intended. Scope is right: only Home mounts `BottomTabBar`, so only `page.module.css` needed the shell (the S3–S7 flow screens use `FlowHeader`, no tab bar).
+
+**What I could not verify here (no browser):** the visual outcome — bar visible on load + **no horizontal scrollbar** now that the global `overflow-x:hidden` is gone. `max-width:100vw` is retained as a guard, the layout is single-column mobile, and this fix came from the owner's real device testing — so I accept the rendered result on that basis; the CSS structure itself is correct. If a wide element (long unbroken SKU/name, the keypad grid) ever pokes past the viewport, clip that element per the prompt's own note.
+
+**Nit (trivial):** `PendingOrdersStrip` is the one direct `.page` child without `flex-shrink:0`; with many failed/pending strips on a very short viewport it could be squeezed. Realistically 0–2 entries above the scroll region — immaterial.
+
+**Open flags:** unchanged — no 🔴 blocking; only 🟡 ㉗(b).
+
+---
+
+## Review of 13d5058 — docs: mark M4 complete in PLAN; mirror the current review ledger
+
+**Verdict:** ✅ accept — accurate against my review record; the ledger mirror matches comments.md.
+
+**Claims cross-checked against what I actually verified:**
+- M4 (S3–S7) marked ✅ Done, all commits reviewer-accepted — matches. "idempotent submit, double-tap→one row, post-expiry server-side reject **proven live by the REVIEWER**" — accurate; I proved all three live against the real DB.
+- "Two device bugs found in real phone testing fixed along the way: sticky bottom-bar visibility, and `crypto.randomUUID()` in insecure context" — **both accurate**: 4cdeb82 (reviewed above ✅) and 2c69d999 (✅). I verified 4cdeb82 exists and is correct before accepting this claim.
+- Airplane-mode drill "deferred (owner, later); not blocking" with "idempotency and the offline-classifier path already reviewer-proven by execution" — honest: I proved idempotency + the classifier by execution but did **not** drive a true end-to-end airplane-mode pass; the deferral is stated in the row, not hidden.
+- Owner's 90-second stopwatch test "passed" — the owner's own testimony; not something I verify.
+
+**Ledger mirror is faithful:** ㉗(b) added as the sole open owner-confirm; the closed list correctly adds ㉓ ㉔ ㉕ ㉖ ㉗(a); ㉒ resolved (Vercel-env note retained); ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ carried accurately. "Next: M5 — accountant dashboard" matches the M4 prompt's scoping.
+
+**One soft note:** the M4 gate text still reads "All 6 acceptance criteria, incl. … airplane-mode drills," and the row marks ✅ Done with that drill explicitly deferred — technically one gate criterion is carried, not met. Transparently stated in the row, so not drift; just flagging that "Done" here = "Done minus a deferred, non-blocking manual drill."
+
+**Open flags:** unchanged — no 🔴 blocking; only 🟡 ㉗(b) (owner-confirm). M4 is fully reviewer-verified bar the deferred airplane-mode drill + the real-UI login drive I've offered.
+
+---
