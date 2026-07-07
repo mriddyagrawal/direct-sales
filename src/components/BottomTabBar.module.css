@@ -1,9 +1,9 @@
 .bar {
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
   display: flex;
   align-items: stretch;
   height: 70px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   border-top: 1px solid var(--color-hairline);
   background: var(--color-white);
 }

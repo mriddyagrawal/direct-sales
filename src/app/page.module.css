@@ -1,11 +1,13 @@
 .page {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100dvh;
 }
 
 .content {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -27,6 +29,7 @@
 
 .empty {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -44,6 +47,7 @@
 }
 
 .account {
+  flex-shrink: 0;
   padding: 16px;
   border-top: 1px solid var(--color-hairline);
   font-family: var(--font-structure);
