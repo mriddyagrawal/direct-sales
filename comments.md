@@ -2056,3 +2056,33 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Commit 3 (two-stage filtering — `scoped` = salesman+range+search, `finalFiltered` = + status tab; per-tab counts from `scoped` with `submitted+processed+cancelled===all`; folder-tab active state) — where I'll verify the counts stay consistent across tab switches and under a live Realtime insert.
 
 ---
+
+## Review of 659359b — feat(dashboard): live per-tab counts + folder-tab strip (S8 revamp commit 3)
+
+**Verdict:** ✅ accept — the two-stage split is correct, and the `submitted+processed+cancelled===all` invariant it relies on is **structurally guaranteed** (verified live: the DB CHECK + NOT NULL). Build/tsc/eslint clean.
+
+**Phase / commit goal (as I understood it):** Commit 3 — refactor filtering into `scoped` (salesman+range+search, no status) to drive live per-tab counts, and `finalFiltered` (scoped narrowed by the active tab) for the table/keyboard-nav; render each tab as `Label + muted count`; replace the accent-box active state with a white hairline "folder tab" whose bottom edge overlaps the table's new 2px top rule so it reads as physically connected. Frontend-only (2 files).
+
+**What works (verified):**
+- **Counts are stable across tab switches — by construction** ([OrdersList.tsx:106-128](src/app/dashboard/OrdersList.tsx#L106)). `scoped` filters on salesman + range + search only; `tabCounts` (`all`/`submitted`/`processed`/`cancelled`) all derive from `scoped`, which has **no dependency on `status`**. Switching tabs mutates only `status`, which changes `finalFiltered` but leaves `scoped`/`tabCounts` untouched — so the numbers can't flicker as you click between tabs. Correct.
+- **`submitted + processed + cancelled === all` is a real invariant, not luck — verified LIVE.** The claim rests on `orders.status` being exactly 3 values; I checked the catalog, not the commit message: `orders_status_check` = `CHECK (status = ANY (ARRAY['submitted','processed','cancelled']))` **and** `status` is `NOT NULL` (live distinct today: `{submitted, cancelled}`). So every `scoped` row lands in exactly one of the three named buckets — no null row, no fourth value — and the three sub-counts partition `all` exactly. The commit's "holds structurally, not just by construction" is accurate.
+- **Live update path intact** — `scoped`/`tabCounts`/`finalFiltered` are plain derived values recomputed in the render body (no `useMemo` freezing them), off the same `orders` state that the existing Realtime subscription patches on INSERT/UPDATE. A new order arriving bumps `orders` → re-render → counts recompute. Verified by reading the data flow (Realtime enablement on `orders` was confirmed live in a prior review, ㉘).
+- **`finalFiltered` still feeds keyboard-nav correctly** — `status === "all" ? scoped : scoped.filter(...)`; the downstream `selectedIndex` clamp is unchanged, so Arrow/Enter still operate on exactly what's rendered.
+- **Folder-tab CSS matches the spec** ([OrdersList.module.css:59-95](src/app/dashboard/OrdersList.module.css#L59)) — inactive `.filterTab` now `background:none; border:none` (plain text, ink label); `.filterTabActive` is the only boxed one: white bg, `1px hairline` top/left/right, `border-bottom:none`, top-only radius, `margin-bottom:-1px` + `z-index:1` to overlap the table's new `border-top: 2px solid --color-ink` by ~1px. Outline (not color) is the active signal, label stays ink both states — exactly the prompt's "folder tab connected to the ledger." Count rendered in muted mono (`.tabCount`, `--color-locked`, `--font-figures`).
+- **`npm run build`** → `✓ Compiled successfully`; **`tsc --noEmit`** exit 0; **`eslint OrdersList.tsx`** clean.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **Latent coupling for the deferred Phase-3 statuses.** The `sum===all` guarantee holds *only while the CHECK enumerates exactly the tabbed statuses*. The prompt itself says Phase-3 will add `pending_approval`/`approved` and asks to keep the tab list data-driven — the day someone widens `orders_status_check` **without** adding a matching tab, `all` will silently exceed `submitted+processed+cancelled` (the new-status rows count in `all` but no tab shows them). Not a bug today (verified 3-value CHECK), but when the tab list is made data-driven, derive it from the status enum so the two can't drift. Worth a one-line note in `docs/specs/order-lifecycle.md`.
+- **Cosmetic double-gap in the tab label** — the JSX keeps a literal `{" "}` between label and count, and `.filterTab` is now `display:flex; gap:4px`, so there's both a space glyph and the flex gap (`All  7`). Harmless, trivially removable — drop the `{" "}` now that the gap spaces them.
+
+**Domain / correctness checks:** Order state machine — the tab set (`submitted/processed/cancelled`) is verified to match the live status domain exactly (CHECK above); no state introduced or bypassed. Money/RLS/snapshots — N/A (presentational; no data-layer change, `ORDERS_SELECT` unchanged). Mobile — folder-tab connect is desktop-table-only (the `-12px` flush + top rule live under `≥768px`); mobile cards keep plain tabs, consistent with commit 2.
+
+**What I tried:** `git show 659359b` (full diff, 2 files); live `pg_get_constraintdef` on `orders` CHECK constraints + `information_schema` nullability + `array_agg(distinct status)` (→ `orders_status_check` enumerates the 3 values, `status NOT NULL`, live `{submitted,cancelled}`); traced `scoped`→`tabCounts`→`finalFiltered` data flow for tab-switch stability + Realtime recompute; `npx tsc --noEmit` (0); `npx eslint OrdersList.tsx` (clean); `npm run build` (compiled successfully). Folder-tab pixel overlap verified by CSS reading (no browser this session).
+
+**Open flags (cumulative):** none new. No 🔴 blocking. Carried 🟡 ㉝ (pre-M6 migration reconciliation), ㉛ (order_no_seq grant hardening — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Commit 4 (SalesmanFilter on the shared `FilterDropdown` — the controlled/close-on-pick path; drop LINES incl. `order_items(count)` from `ORDERS_SELECT` **and** `page.tsx`'s fetch; delete `/date-demo`) — I'll verify the two filter boxes are truly identical, that `/date-demo` 404s, and that no `order_items(count)` join survives anywhere.
+
+---
