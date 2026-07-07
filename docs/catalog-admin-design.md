@@ -55,3 +55,17 @@ The key must be stable, present on every row, unique within a brand. Options:
 4. **Excel (.xlsx) primary** ✓ — SheetJS server-side (parses CSV too, for free). Cleaner than CSV (no BOM/encoding hazards); read the first sheet, trim blank rows, coerce the Price cell (number-or-text). Cap file size.
 
 UI: **manual add = small modal; import = large overlay/sheet** (needs the preview table). Both on the admin **Products** page. Claude Design brief: [Prompts/products-admin-design-prompt.md](../Prompts/products-admin-design-prompt.md).
+
+## Resolutions — owner review of the Claude Design output (2026-07-07, session 2)
+These settle the open points and **supersede** any conflicting text above. Builder prompt: [Prompts/catalog-admin-m5.5-builder-prompt.md](../Prompts/catalog-admin-m5.5-builder-prompt.md).
+
+- **Scope = Zebronics + other *fixed*-price brands only.** NO manual-pricing / `pricing_mode` / `requires_approval` / approval / "per order" / LG — all Phase 3. The design mocks show LG rows + "per order"; **don't build those.** Use the existing `products.brand_id`.
+- **`sku` drop has a backend dependency (do it first).** The order RPCs build `order_events` payloads `jsonb_build_object('sku', p.sku, …)` in **4 places** — `20260706T150400_rpcs.sql` (L166, L219) and `20260707T120000_update_order_items_reason.sql` (L77, L127). Migration must **swap those to `tally_name`** (recreate the functions), update the event catalog in [specs/order-lifecycle.md](specs/order-lifecycle.md) (`{ tally_name, qty, unit_price_paise }`), **then** drop `sku`. Old events keep their `sku` key; new ones carry `tally_name`.
+- **Match key = `(brand_id, tally_name)` only** — no display-name-fallback *matching*. `tally_name` is always populated: blank on input ⇒ **write the display name into `tally_name` at save time** (so the ledger shows the real value, never "—"). New key ⇒ insert; existing ⇒ update; same⇒same is a harmless no-op (the 40+10-from-Tally case).
+- **Price = up to 2 decimals ⇒ paise; reject >2 decimals** (message: "Price can have at most 2 decimal places"). ₹557.5 is valid (55 750 paise). Blank ⇒ TBD (D2). **Also fix the existing `ProductsPricing.save()` whole-rupee validation** (`/^\d+$/`, ×100) to match.
+- **Category = brand-scoped typeahead combobox**, **grayed out until a brand is chosen**, type-to-filter that brand's existing categories or type a new one; **normalize on save** (trim + case-insensitive dedupe so "speakers" folds into existing "Speakers").
+- **Edit existing = row-click → the same modal as Add, pre-filled** ("Edit product"). Keep the **ACTIVE toggle inline** in the ledger. Accountant: price/tally/active editable, name/category read-only; admin: all fields. (Replaces the current inline edit-card.)
+- **Manual add of a duplicate `(brand, tally_name)` ⇒ upsert (update)** — same engine as import.
+- **Import apply = the valid rows (atomically), error rows skipped** (honest degrade, per mock 5f "Apply K valid rows · Z skipped"), **idempotent** (re-run = all Updated, no dups), **never deletes** (untouched-count line). Parse `.xlsx` with SheetJS.
+- **Admin-only** for both Add + Import (INSERT via `products_admin_insert`); accountant = ledger + UPDATE (price/tally/active), no Add/Import. Recorded in [specs/roles-and-permissions.md](specs/roles-and-permissions.md).
+- **Wording:** "N products", not "N SKUs" (the `sku` field is gone).

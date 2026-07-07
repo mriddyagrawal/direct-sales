@@ -14,7 +14,7 @@ Supabase Auth email+password, admin-created accounts, no self-signup (D3). Postg
 
 - **Salesman** — the field rep. Lives in the mobile-first order flow: builds a Quick Order from the priced catalog, submits it, can still adjust it inside the edit window, and can look back at their own order history. Never sees an order they didn't create, never sees an unpriced SKU, never touches a table directly — every write is a checked RPC.
 - **Accountant** — the back-office operator. Lives in the dashboard: watches the live orders queue, opens the workbench to process/edit/cancel any order (with a mandatory reason once the salesman's window has closed), keeps the product price list current, clears the retailer-verification queue, and prints pick slips for the godown.
-- **Admin (owner)** — intended as **oversight and escalation, not daily operation**: keep an eye on the queue, step in for exceptions, and handle the things only an owner should (creating/deactivating accounts, changing a profile's role, catalog administration beyond day-to-day pricing).
+- **Admin (owner)** — intended as **oversight and escalation, not daily operation**: keep an eye on the queue, step in for exceptions, and handle the things only an owner should (creating/deactivating accounts, changing a profile's role, catalog administration beyond day-to-day pricing). **The M5.5 catalog-admin surfaces — "+ Add product" and Excel "Import" — are admin-only in-app** (both INSERT products via `products_admin_insert`, which is admin-scoped). The accountant sees the Products ledger and edits price / `tally_name` / `active` on existing rows (`products_staff_update`), but has no Add or Import.
 
 ### Current reality: admin and accountant are functionally identical in-app
 
