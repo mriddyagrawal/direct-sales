@@ -33,9 +33,30 @@ Add **`brands.code text unique`** (short stable token, e.g. `ZEB`, `LG`). Then t
 
 **Recommendation: Option A.** Owner to confirm A vs B before build.
 
+## Pricing mode per brand — Zebronics `fixed`, LG `manual` (owner, 2026-07-07)
+
+Zebronics is catalog-priced; **LG requires the salesman to enter the price per line** — **no fixed price list, no reference/MRP to pre-fill, no floor/min** (owner-confirmed). That breaks the current invariant ("client never sends a price; the RPC snapshots from the catalog"), so pricing becomes a **per-brand mode**:
+
+- **`fixed`** (Zebronics, default): the RPC snapshots `unit_price_paise` from the catalog; any client-sent price is ignored — today's behavior, untamperable.
+- **`manual`** (LG): the salesman enters the unit price per line (blank entry); that price *is* the price. `submit_order` / `update_order_items` **accept the client price for manual-brand lines**, validate `> 0` (a fat-finger sanity ceiling only — **no floor**), snapshot it into `order_items.unit_price_paise`, and audit who entered it in `order_events`. The trust boundary relaxes **only** for manual brands; Zebronics keeps its can't-be-tampered guarantee.
+
+Carry the flag as `brands.pricing_mode text not null default 'fixed' check (pricing_mode in ('fixed','manual'))`. `order_items.unit_price_paise` already works for both — only the *source* differs.
+
+### Approval gate — manual-priced orders need admin sign-off
+A **manual-priced (LG) order must be approved by the admin in the dashboard before it goes forward** (before it can be processed / booked into Tally). Owner specified **admin**, not accountant. Wiring:
+- Add a **`pending_approval`** status. ⚠️ PLAN Phase 5 calls this "status headroom," but the live `orders.status` CHECK is only `('submitted','processed','cancelled')` — so this is a real migration to extend the enum, not free headroom.
+- A manual-brand order lands in `pending_approval` at submit; only the **admin** can approve → `submitted` (then the normal process path). A fixed-brand (Zebronics) order skips this, straight to `submitted` as today.
+- Dashboard gets an **approvals view/filter** (admin-only: approve / reject-with-reason); the action writes an `order_events` entry.
+
+### Relationship to Phase 5
+Phase 5 was *tiered discounts off a list price, no free-typing*. LG is the opposite — free manual entry, no tiers, no floor — gated by **admin approval** instead of a discount-floor rule. They can coexist later (fixed+tiered for some brands, manual+approval for others).
+
+### Open (design when built)
+- Can the salesman edit / see "awaiting approval" on a `pending_approval` order? What does **reject** do (back to salesman? cancelled)? Exact event names. Whether the 2h edit window applies before approval.
+
 ## What does NOT change
 
-`order_items`/snapshots, the RPC-only write model, the RLS matrix, money (integer paise), the lifecycle/states and edit window. Adding a brand at runtime = **new CSV in `data/` + a `brands` row (+`code`) + brand-prefixed SKUs** — data, per D4 and [seed-data.md](specs/seed-data.md).
+`order_items`/snapshots, the RPC-only write model, the RLS matrix, money (integer paise), the lifecycle/states and edit window — **for the brand/ref change** above. (The LG **`manual` pricing mode** *does* touch the RPC's price source and adds a `pending_approval` state — see that section.) Adding a brand at runtime = **new CSV in `data/` + a `brands` row (+`code`) + brand-prefixed SKUs** — data, per D4 and [seed-data.md](specs/seed-data.md).
 
 ## Build scope when Phase 3 lands
 
