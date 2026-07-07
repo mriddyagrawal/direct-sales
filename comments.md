@@ -1485,3 +1485,22 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Open flags (cumulative):** No 🔴 blocking. ㉓ ㉔ ㉕ ㉖ ㉗(a) all **closed** — the entire M4 create/edit/cancel/resilience surface is now reviewer-verified. Remaining: 🟡 ㉗(b) owner-confirm (staff-name visibility in history); carried ⑯ (leaked-password, pre-pilot owner toggle), ⑬ (seed loader), ⑭ (perf pass), ⑦⑧⑨ (M0 doc). Still offered: a real end-to-end login+order drive once a throwaway salesman password exists (the one undriven step).
 
 ---
+
+## Review of a5fd608 — docs: builder fix-prompt for the sticky bottom-bar (overflow-x breaks sticky)
+
+**Verdict:** ✅ accept — docs-only builder fix-prompt (new `Prompts/fix-bottombar-builder-prompt.md`, 16 lines). Sound diagnosis, premises match the current code exactly, and it prescribes the standard robust app-shell fix. No behavior change in this commit; no spec risk.
+
+**Premises verified against the live tree (not assumed):**
+- [globals.css:51–53](src/app/globals.css#L51) really is `html, body { overflow-x: hidden }`. ✓
+- [BottomTabBar.module.css:1–6](src/components/BottomTabBar.module.css#L1) `.bar` really is `position: sticky; bottom: 0; height: 70px`. ✓
+- [page.module.css:1–4](src/app/page.module.css#L1) `.page` really is `display:flex; flex-direction:column; min-height: 100vh`. ✓
+
+**Diagnosis is correct CSS.** With `overflow-x: hidden` against a default `overflow-y: visible`, the spec computes `overflow-y` to `auto` — so `body` becomes a scroll container, and a scroll-container ancestor is exactly what perturbs `position: sticky` on a descendant bar. The prescribed fix is the canonical mobile app-shell: `height: 100dvh` flex-column shell, a `flex:1; overflow-y:auto; min-height:0` scrolling region (the `min-height:0` note is the real flexbox "won't shrink to allow internal scroll" gotcha — correctly called out), the bar demoted to a normal always-visible flex child (drop sticky), and the global `overflow-x:hidden` removed. `100dvh` also fixes the mobile URL-bar gap and `env(safe-area-inset-bottom)` is the right iOS touch. All accurate; the visual outcome is unchanged (always-visible bottom nav) but achieved more robustly.
+
+**The one risk it (correctly) flags for the fix commit:** removing the global `overflow-x: hidden` can expose a horizontal scrollbar if any element overflows sideways — the prompt says to clip that specific element instead. I'll verify on the actual fix commit that no horizontal scroll appears and the bar is visible on load (its own stated acceptance check). I can't drive a browser here, so bug/fix efficacy rests on the (sound) CSS reasoning + verified premises; the rendered result gets checked when the code lands.
+
+**Open flags:** unchanged — no 🔴 blocking; only 🟡 ㉗(b) (owner-confirm) open. This prompt introduces none.
+
+**Next-commit suggestion:** the bottom-bar CSS fix itself — I'll verify the app-shell layout + no-horizontal-scroll then.
+
+---
