@@ -21,6 +21,7 @@ interface QuickOrderProps {
   retailerArea: string | null;
   items: Record<string, number>;
   snapshotPrices?: Record<string, number>;
+  snapshotNames?: Record<string, string>;
   onChangeQty: (productId: string, qty: number) => void;
   onReview: () => void;
   onBack: () => void;
@@ -34,6 +35,7 @@ export function QuickOrder({
   retailerArea,
   items,
   snapshotPrices,
+  snapshotNames,
   onChangeQty,
   onReview,
   onBack,
@@ -63,6 +65,16 @@ export function QuickOrder({
   const totalPaise = cartTotalPaise(items, pricesById);
   const keypadProduct = products.find((p) => p.id === keypadProductId) ?? null;
 
+  // ㉕ — a line whose product has left the active+priced catalog mid-window
+  // (edit mode only; a create-mode draft has no snapshot to fall back on
+  // and is pruned by NewOrderFlow instead) must still be visible — it's
+  // still in `items` and still counted in the total — so it can be seen
+  // and removed, rather than silently vanishing while still being sent.
+  const catalogIds = useMemo(() => new Set(products.map((p) => p.id)), [products]);
+  const unavailable = Object.keys(items)
+    .filter((id) => !catalogIds.has(id) && snapshotNames?.[id])
+    .map((id) => ({ id, name: snapshotNames![id], qty: items[id], price: pricesById[id] ?? 0 }));
+
   return (
     <div className={styles.page}>
       <FlowHeader
@@ -85,6 +97,27 @@ export function QuickOrder({
       </div>
 
       <div className={styles.list}>
+        {unavailable.length > 0 && (
+          <section>
+            <div className={styles.categoryHeader}>
+              <span>NO LONGER AVAILABLE</span>
+              <span>{unavailable.length}</span>
+            </div>
+            {unavailable.map((line) => (
+              <div key={line.id} className={styles.productRow}>
+                <div className={styles.productInfo}>
+                  <p className={styles.productName}>{line.name}</p>
+                  <p className={styles.productPrice}>
+                    {line.qty} × {formatRupees(line.price)} · no longer orderable
+                  </p>
+                </div>
+                <button type="button" className={styles.removeGhost} onClick={() => onChangeQty(line.id, 0)}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
         {groups.length === 0 ? (
           <div className={styles.empty}>
             <p>No products match &quot;{query}&quot;.</p>

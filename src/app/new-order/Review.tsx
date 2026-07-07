@@ -15,6 +15,7 @@ const UI_QTY_CAP = 999;
 interface ReviewProps {
   products: ProductOption[];
   snapshotPrices?: Record<string, number>;
+  snapshotNames?: Record<string, string>;
   items: Record<string, number>;
   notes: string;
   retailerName: string;
@@ -35,6 +36,7 @@ interface ReviewProps {
 export function Review({
   products,
   snapshotPrices,
+  snapshotNames,
   items,
   notes,
   retailerName,
@@ -55,9 +57,18 @@ export function Review({
     return { ...map, ...snapshotPrices };
   }, [products, snapshotPrices]);
 
+  // ㉕ — a line whose product left the catalog mid-window (edit mode only)
+  // still has to appear here: it's still in `items`, still counted in
+  // `total` below, and still gets sent to update_order_items. Fall back to
+  // the order's own snapshot name rather than dropping the line silently.
   const lines = Object.entries(items)
-    .map(([productId, qty]) => ({ productId, qty, product: byId.get(productId) }))
-    .filter((l): l is { productId: string; qty: number; product: ProductOption } => !!l.product);
+    .map(([productId, qty]) => {
+      const product = byId.get(productId);
+      const name = product?.name ?? snapshotNames?.[productId];
+      if (!name) return null;
+      return { productId, qty, name, orderable: !!product };
+    })
+    .filter((l): l is { productId: string; qty: number; name: string; orderable: boolean } => l !== null);
 
   const total = cartTotalPaise(items, pricesById);
   const isOffline = submitError === "offline";
@@ -79,23 +90,28 @@ export function Review({
         </div>
 
         <div>
-          {lines.map(({ productId, qty, product }) => {
-            const rate = pricesById[productId] ?? product.price_paise;
+          {lines.map(({ productId, qty, name, orderable }) => {
+            const rate = pricesById[productId] ?? 0;
             return (
               <div key={productId} className={styles.line}>
                 <div className={styles.lineInfo}>
-                  <p className={styles.lineName}>{product.name}</p>
-                  <p className={styles.lineRate}>@ {formatRupees(rate)}</p>
+                  <p className={styles.lineName}>{name}</p>
+                  <p className={styles.lineRate}>
+                    @ {formatRupees(rate)}
+                    {!orderable && " · no longer orderable"}
+                  </p>
                 </div>
                 <div className={styles.lineActions}>
-                  <Stepper qty={qty} max={UI_QTY_CAP} onChange={(next) => onChangeQty(productId, next)} onTapQuantity={() => {}} />
+                  {orderable && (
+                    <Stepper qty={qty} max={UI_QTY_CAP} onChange={(next) => onChangeQty(productId, next)} onTapQuantity={() => {}} />
+                  )}
                   <button
                     type="button"
                     className={styles.remove}
                     onClick={() => onChangeQty(productId, 0)}
-                    aria-label={`Remove ${product.name}`}
+                    aria-label={`Remove ${name}`}
                   >
-                    ✕
+                    {orderable ? "✕" : "Remove"}
                   </button>
                 </div>
                 <span className={styles.lineAmount}>{formatRupees(rate * qty)}</span>

@@ -118,6 +118,20 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
 
   const pricesById: Record<string, number> = {};
   for (const p of products) pricesById[p.id] = p.price_paise;
+  const catalogIds = new Set(products.map((p) => p.id));
+
+  // ㉕ (create mode only) — a resumed draft can name a product that's since
+  // left the active+priced catalog. Unlike an edit, a create-draft has no
+  // order_items snapshot to fall back on for its name/price, so there's
+  // nothing meaningful to show or submit for it; drop it here rather than
+  // let it ride along invisibly and reject the whole submit_order call.
+  function pruneStaleItems(draft: DraftCart): DraftCart {
+    const items: Record<string, number> = {};
+    for (const [id, qty] of Object.entries(draft.items)) {
+      if (catalogIds.has(id)) items[id] = qty;
+    }
+    return { ...draft, items };
+  }
 
   const [state, dispatch] = useReducer(flowReducer, null, (): FlowState => ({
     step: isEdit ? "order" : "retailer",
@@ -147,8 +161,10 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
     if (isEdit) return;
     const lastRetailerId = getLastActiveRetailerId();
     if (!lastRetailerId) return;
-    const draft = loadDraft(lastRetailerId);
-    if (!draft || Object.keys(draft.items).length === 0) return;
+    const loaded = loadDraft(lastRetailerId);
+    if (!loaded) return;
+    const draft = pruneStaleItems(loaded);
+    if (Object.keys(draft.items).length === 0) return;
     const offline = listPending().some((p) => p.orderId === draft.orderId);
     const retailer = retailers.find((r) => r.id === lastRetailerId);
     dispatch({ type: "RESUME_ON_MOUNT", draft, retailerArea: retailer?.area ?? null, offline });
@@ -164,8 +180,9 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
 
   function handleSelectRetailer(retailer: SelectedRetailer) {
     const existing = loadDraft(retailer.id);
-    if (existing && Object.keys(existing.items).length > 0) {
-      dispatch({ type: "OFFER_RESUME", draft: existing });
+    const pruned = existing ? pruneStaleItems(existing) : null;
+    if (pruned && Object.keys(pruned.items).length > 0) {
+      dispatch({ type: "OFFER_RESUME", draft: pruned });
       return;
     }
     const draft = createDraft(retailer.id, retailer.name);
@@ -285,6 +302,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         retailerArea={retailerArea}
         items={cart.items}
         snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}
+        snapshotNames={isEdit ? editOrder!.snapshotNames : undefined}
         onChangeQty={handleChangeQty}
         onReview={() => goto("review")}
         onBack={() => (isEdit ? router.push(`/orders/${cart.orderId}`) : goto("retailer"))}
@@ -297,6 +315,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
       <Review
         products={products}
         snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}
+        snapshotNames={isEdit ? editOrder!.snapshotNames : undefined}
         items={cart.items}
         notes={cart.notes}
         retailerName={cart.retailerName}

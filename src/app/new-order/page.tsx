@@ -25,10 +25,15 @@ export interface EditOrderData {
   notes: string;
   items: Record<string, number>;
   snapshotPrices: Record<string, number>; // existing lines' original unit_price_paise — the price at order time is the deal
+  snapshotNames: Record<string, string>; // review flag ㉕ — a line whose product has since gone inactive/unpriced
+                                          // won't be in the fetched catalog; carry its name so it still renders
+                                          // (as removable, not orderable) instead of silently vanishing from the
+                                          // list while still counted in the total and sent to update_order_items.
 }
 
 interface OrderItemRow {
   product_id: string;
+  product_name: string;
   qty: number;
   unit_price_paise: number;
 }
@@ -90,7 +95,7 @@ export default async function NewOrderPage({
     const { data } = await supabase
       .from("orders")
       .select(
-        "id, retailer_id, notes, status, editable_until, retailers(name, area), order_items(product_id, qty, unit_price_paise)",
+        "id, retailer_id, notes, status, editable_until, retailers(name, area), order_items(product_id, product_name, qty, unit_price_paise)",
       )
       .eq("id", edit)
       .maybeSingle();
@@ -103,9 +108,11 @@ export default async function NewOrderPage({
 
     const items: Record<string, number> = {};
     const snapshotPrices: Record<string, number> = {};
+    const snapshotNames: Record<string, string> = {};
     for (const item of row.order_items) {
       items[item.product_id] = item.qty;
       snapshotPrices[item.product_id] = item.unit_price_paise;
+      snapshotNames[item.product_id] = item.product_name;
     }
 
     editOrder = {
@@ -116,6 +123,7 @@ export default async function NewOrderPage({
       notes: row.notes,
       items,
       snapshotPrices,
+      snapshotNames,
     };
   }
 
