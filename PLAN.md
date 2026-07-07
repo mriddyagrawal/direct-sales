@@ -61,7 +61,7 @@ Realtime vs 30s polling for the dashboard · Tailwind vs vanilla CSS · PWA mani
 2. **Voucher type decision (with the accountant):** recommended = import as **Sales Order** vouchers — matches the real flow (order → pick → deliver → bill) and leaves statutory invoicing inside Tally; alternative = direct Sales Invoice import.
 3. **Path A (build):** dashboard exports selected processed orders as a Tally XML file; accountant imports via Gateway of Tally. Always tested against a **test company file** first.
 4. **Idempotency:** exported orders are marked (`exported_at`); re-export warns; voucher narration carries `order_ref` for traceability both ways.
-5. **Path C (only if A hurts):** a tiny local sync agent on the office PC pulls processed orders and POSTs XML to Tally's local HTTP port. At <20 orders/day, Path A's two clicks may be the permanent answer.
+5. **Path C (only if A hurts):** a tiny local sync agent on the office PC pulls processed orders and POSTs XML to Tally's local HTTP port. At <20 orders/day, Path A's two clicks may be the permanent answer. **Topology + directional-sync design (incl. Tally→app master/balance pulls): [docs/phase2-tally-sync-design.md](docs/phase2-tally-sync-design.md).**
 6. ~~Path B — browser pushes to `localhost:9000`~~ — dead end (CORS/Private Network Access/mixed content); see graveyard in [decisions.md](docs/decisions.md).
 
 **Acceptance:** an order placed on a phone appears in the Tally test company with correct party, items, quantities, and inclusive rates — zero re-typing; re-export creates no duplicate vouchers.
