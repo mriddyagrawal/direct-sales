@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { StatusTag } from "@/components/ui/StatusTag";
-import { formatRupees } from "@/lib/format";
-import { formatCountdown } from "@/lib/format";
+import { formatRupees, formatCountdown } from "@/lib/format";
 import styles from "./Confirmation.module.css";
 
 interface ConfirmationProps {
