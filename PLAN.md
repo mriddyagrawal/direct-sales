@@ -70,7 +70,7 @@ Realtime vs 30s polling for the dashboard · Tailwind vs vanilla CSS · PWA mani
 
 ## Phase 3 — Multi-brand
 
-**Goal:** cover the other brands' visit rounds (D4 confirmed rounds are brand-separate). Mostly data, not code: new CSV in `data/` → seed with brand SKU prefix → brand picker at order start (a round is one brand) → dashboard/pick-slip brand context. Order refs stay brand-free.
+**Goal:** cover the other brands' visit rounds (D4 confirmed rounds are brand-separate). Mostly data, not code: new CSV in `data/` → seed with brand SKU prefix → brand picker at order start (a round is one brand) → dashboard/pick-slip brand context. **Architecture worked out in [docs/phase3-multi-brand-design.md](docs/phase3-multi-brand-design.md)** — the one real schema change is a first-class `orders.brand_id` (+ a submit brand-guard enforcing one-brand-per-order), and order refs gain a **brand code** (`ORD-ZEB-2026-1042`; global-sequence Option A recommended over per-brand Option B), revising D4's original brand-free ref.
 
 **Acceptance:** two brands live; a salesman starts the right brand round in ≤1 tap; pick slips are unambiguous about brand.
 
