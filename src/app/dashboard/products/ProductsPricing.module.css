@@ -148,17 +148,56 @@
   color: var(--color-locked);
 }
 
-/* Mobile cards — desktop table has no room on a phone. */
+/* Mobile cards — desktop table has no room on a phone. Grouped under
+   Brand ▸ Category sticky headers (mobile nav is a fixed *bottom* bar, so
+   both tiers pin flush at the viewport top). */
 .cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: block;
+  --pm-offset: 0px;
+}
+
+/* Two-tier (≥2 brands): category headers pin below the brand header. Keep the
+   offset in sync with .mBrandHeader's rendered height. */
+.cardsTwoTier {
+  --pm-offset: 34px;
+}
+
+.mBrandHeader {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-white);
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-ink);
+  border-bottom: 2px solid var(--color-ink);
+  /* Full-bleed: cancel .page's 16px inset so the band spans edge-to-edge. */
+  margin: 0 -16px;
+  padding: 8px 16px;
+}
+
+.mCatHeader {
+  position: sticky;
+  top: var(--pm-offset);
+  z-index: 2;
+  background: var(--color-white);
+  font-family: var(--font-figures);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  border-bottom: 1px solid var(--color-hairline);
+  margin: 8px -16px 8px;
+  padding: 6px 16px 4px;
 }
 
 .card {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-bottom: 8px;
   padding: 12px;
   background: var(--color-white);
   border: 1px solid var(--color-hairline);
@@ -183,8 +222,8 @@
   color: var(--color-ink);
 }
 
-.cardMeta {
-  font-family: var(--font-structure);
+.cardTally {
+  font-family: var(--font-figures);
   font-size: 12px;
   color: var(--color-locked);
 }
