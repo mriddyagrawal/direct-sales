@@ -14,15 +14,7 @@ type StatusFilter = "all" | "submitted" | "processed" | "cancelled";
 type DateFilter = "all" | "today" | "yesterday";
 
 const ORDERS_SELECT =
-  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), order_items(count)";
-
-interface RawOrderUpdate {
-  id: string;
-  status: string;
-  total_paise: number;
-  editable_until: string;
-  cancelled_by: string | null;
-}
+  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), order_items(count)";
 
 interface OrdersListProps {
   initialOrders: DashboardOrderRow[];
@@ -68,20 +60,15 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
       }, 5000);
     }
 
-    function handleUpdate(raw: RawOrderUpdate) {
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === raw.id
-            ? {
-                ...o,
-                status: raw.status,
-                total_paise: raw.total_paise,
-                editable_until: raw.editable_until,
-                cancelled_by: raw.cancelled_by,
-              }
-            : o,
-        ),
-      );
+    // Refetch (not patch-in-place) on UPDATE too — the raw payload lacks
+    // joined fields like order_items(count), so a line-count change (an
+    // edit adding/removing items) would otherwise go stale until a manual
+    // refresh (review flag ㉚.3).
+    async function handleUpdate(orderId: string) {
+      const { data } = await supabase.from("orders").select(ORDERS_SELECT).eq("id", orderId).maybeSingle();
+      if (!data) return;
+      const row = data as unknown as DashboardOrderRow;
+      setOrders((prev) => prev.map((o) => (o.id === row.id ? row : o)));
     }
 
     const channel = supabase
@@ -94,7 +81,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
-        (payload) => handleUpdate(payload.new as RawOrderUpdate),
+        (payload) => void handleUpdate((payload.new as { id: string }).id),
       )
       .subscribe();
 
@@ -108,12 +95,9 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
   const yesterdayKey = istDateKey(new Date(tick - 24 * 60 * 60 * 1000));
 
   const q = query.trim().toLowerCase();
-  const filtered = orders.filter((o) => {
+  const finalFiltered = orders.filter((o) => {
     if (status !== "all" && o.status !== status) return false;
-    if (salesmanId !== "all") {
-      // profiles!orders_salesman_id_fkey doesn't carry the id in this select
-      // shape — matched by name below via the salesmen list instead.
-    }
+    if (salesmanId !== "all" && o.salesman_id !== salesmanId) return false;
     if (dateFilter !== "all") {
       const key = istDateKey(new Date(o.submitted_at));
       if (dateFilter === "today" && key !== todayKey) return false;
@@ -126,11 +110,6 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
     return true;
   });
 
-  // Salesman filter needs the id, so join by name against the fetched list
-  // (the orders select embeds only full_name via the FK relationship).
-  const salesmanName = salesmen.find((s) => s.id === salesmanId)?.full_name;
-  const finalFiltered = salesmanName ? filtered.filter((o) => o.profiles?.full_name === salesmanName) : filtered;
-
   // Derived, not effect-synced: a filter change can shrink the list out from
   // under a stale selectedIndex — clamp it for rendering/Enter instead of a
   // second setState round-trip.
@@ -138,13 +117,16 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const isFormField = target?.tagName === "INPUT" || target?.tagName === "SELECT" || target?.tagName === "TEXTAREA";
+
       if (e.key === "/" && document.activeElement !== searchRef.current) {
         e.preventDefault();
         searchRef.current?.focus();
-      } else if (e.key === "ArrowDown") {
+      } else if (e.key === "ArrowDown" && !isFormField) {
         e.preventDefault();
         setSelectedIndex((i) => Math.min(finalFiltered.length - 1, i + 1));
-      } else if (e.key === "ArrowUp") {
+      } else if (e.key === "ArrowUp" && !isFormField) {
         e.preventDefault();
         setSelectedIndex((i) => Math.max(0, i - 1));
       } else if (e.key === "Enter" && finalFiltered[safeIndex]) {

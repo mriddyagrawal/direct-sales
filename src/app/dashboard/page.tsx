@@ -9,6 +9,7 @@ export interface DashboardOrderRow {
   status: string;
   editable_until: string;
   cancelled_by: string | null;
+  salesman_id: string;
   retailers: { name: string; verified: boolean } | null;
   profiles: { full_name: string } | null;
   order_items: { count: number }[];
@@ -29,7 +30,7 @@ export default async function DashboardPage() {
     supabase
       .from("orders")
       .select(
-        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), order_items(count)",
+        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), order_items(count)",
       )
       .order("submitted_at", { ascending: false })
       .limit(300),
