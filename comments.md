@@ -1777,3 +1777,19 @@ All cited line refs are accurate; no spec violations; the "don't re-introduce fr
 **Next-commit suggestion:** the fixes themselves — I'll confirm the frozen `useState` is gone (render derives from props) and re-verify the write paths + #6 still hold.
 
 ---
+
+## Review of f75937c — docs: capture role/job overview + D11 (admin/accountant parity is deliberate)
+
+**Verdict:** ✅ accept — an accurate plain-language role overview + a sound, well-reasoned D11. One minor completeness note on D11's enumeration.
+
+**Verified accurate:**
+- The "day to day" descriptions match what I've verified across M1–M5: salesman in the RLS-scoped, RPC-only mobile order flow; accountant in the dashboard queue/workbench/pricing/verify/pick-slips; admin as oversight/escalation + provisioning. ✓
+- **D11's core claim holds:** the four order RPCs (`submit_order` salesman-only; `process_order`/`update_order_items`/`cancel_order` gated on `v_role in ('accountant','admin')`) have **no admin-only branch** — read all four; admin and accountant are treated identically, and the dashboard nav/UI doesn't branch on role. So "admin = oversight only" is genuinely an org convention, not enforced — accurate, and a good thing to record deliberately (so it's not mistaken for a bug). ✓
+
+**Minor completeness note (serves D11's own purpose):** D11 says the *only* admin-vs-accountant difference is "outside the app entirely: creating users and setting `profiles.role`/`username`." It misses one **in-DB** admin-exclusive grant: **`products_admin_insert`** (RLS: `INSERT` on `products` is admin-only; accountant has only `products_staff_update`). It's dormant — no in-app add-product path, and the seed runs as `service_role` — which is exactly why it's easy to overlook. Since D11 exists so this asymmetry "isn't rediscovered as a bug later," the record is more complete if it lists `products_admin_insert` alongside the user/role items. (`profiles_update_admin` — the role-change path — is already covered by "setting `profiles.role`.") Suggestion only; the decision itself is sound.
+
+**Open flags:** none new — docs. No 🔴 blocking; carried 🟡 ㉜ (dashboard-UX, fix before prod), ㉛ ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** the ㉜ dashboard-UX fix commit is what I'm watching for.
+
+---
