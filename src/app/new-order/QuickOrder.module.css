@@ -25,7 +25,36 @@
   gap: 4px;
 }
 
+.searchRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* Plain OS select (tap-to-pick, not typable) — shares the search bar's row
+   and shrinks the input to fit. Capped width so long brand names don't
+   crowd the search on a narrow phone. */
+.brandSelect {
+  flex: 0 0 auto;
+  max-width: 42%;
+  min-height: 44px;
+  padding: 0 8px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.brandSelect:disabled {
+  color: var(--color-locked);
+  background: rgba(20, 24, 31, 0.03);
+}
+
 .searchInput {
+  flex: 1;
+  min-width: 0;
   min-height: 44px;
   padding: 0 12px;
   background: var(--color-paper);
@@ -48,9 +77,46 @@
   color: var(--color-locked);
 }
 
+/* Subtle cue shown when adding the first item narrows the list to one brand. */
+.lockNote {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--color-accent);
+}
+
 .list {
   flex: 1;
   padding: 0 16px;
+  /* Fixed brand-header height — the nested category bar's sticky `top` adds
+     this when the brand tier is shown (see .listTwoTier). Keep in sync with
+     .brandHeader's rendered height. */
+  --brand-header-height: 34px;
+  --brand-offset: 0px;
+}
+
+/* Two-tier mode ("All brands", ≥2 brands): category bars pin BELOW the
+   brand header, so their sticky top gains the brand-header height. */
+.listTwoTier {
+  --brand-offset: var(--brand-header-height);
+}
+
+/* Brand header — the heavier, distinct top tier above the navy category
+   bars. Full-bleed (same −16px trick as the category bar). */
+.brandHeader {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  color: var(--color-ink);
+  background: var(--color-white);
+  border-bottom: 2px solid var(--color-ink);
+  margin: 0 -16px;
+  padding: 8px 16px;
+  position: sticky;
+  top: var(--search-bar-height);
+  z-index: 9;
 }
 
 .categoryHeader {
@@ -71,8 +137,10 @@
   margin: 8px -16px 0;
   padding: 8px 16px 4px;
   position: sticky;
-  top: var(--search-bar-height);
-  z-index: 9;
+  /* In two-tier mode, pin below the brand header (offset by its height);
+     otherwise flush under the search bar. */
+  top: calc(var(--search-bar-height) + var(--brand-offset));
+  z-index: 8;
   background: var(--color-white);
 }
 

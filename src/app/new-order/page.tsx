@@ -7,6 +7,8 @@ export interface ProductOption {
   category: string;
   name: string;
   price_paise: number;
+  brand_id: string;
+  brand_name: string;
 }
 
 export interface RetailerOption {
@@ -67,7 +69,11 @@ export default async function NewOrderPage({
   // an unpriced/inactive product; no extra filter needed here, just the
   // ordering the design spec wants (category groups, CSV order within them).
   const [{ data: productRows }, { data: retailerRows }, { data: recentRows }] = await Promise.all([
-    supabase.from("products").select("id, category, name, price_paise").order("category").order("created_at"),
+    supabase
+      .from("products")
+      .select("id, category, name, price_paise, brand_id, brands(name)")
+      .order("category")
+      .order("created_at"),
     supabase.from("retailers").select("id, name, area, verified").order("name"),
     supabase
       .from("orders")
@@ -76,7 +82,23 @@ export default async function NewOrderPage({
       .limit(30),
   ]);
 
-  const products = (productRows ?? []) as ProductOption[];
+  const products = (
+    (productRows ?? []) as unknown as Array<{
+      id: string;
+      category: string;
+      name: string;
+      price_paise: number;
+      brand_id: string;
+      brands: { name: string } | null;
+    }>
+  ).map((r) => ({
+    id: r.id,
+    category: r.category,
+    name: r.name,
+    price_paise: r.price_paise,
+    brand_id: r.brand_id,
+    brand_name: r.brands?.name ?? "",
+  })) as ProductOption[];
   const retailers = (retailerRows ?? []) as RetailerOption[];
 
   const seen = new Set<string>();
