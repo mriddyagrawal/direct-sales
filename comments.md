@@ -1670,3 +1670,22 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** already landed — S11 retailers (711ef1d) + Products pricing (983554a); I'll verify the verify-flow + the TBD-price→salesman-visible criterion (#6) live there.
 
 ---
+
+## Review of 711ef1d — feat(m5): retailer verification queue (S11)
+
+**Verdict:** ✅ accept — a clean S11: pending-first queue, verify-by-editing in one motion, deactivate-never-delete, correct RLS-scoped writes. `eslint` clean. No new flags.
+
+**Verified:**
+- **Verify flow = fix-the-name (acceptance #5):** tabs all/pending/verified/deactivated (default pending = `active && !verified`); a pending row opens **straight into inline edit**; `saveAndVerify` writes `{name, area, phone, verified:true}` in one Save — fixing the canonical spelling *is* the verification, and the helper text pins why (future Tally-ledger mapping). NEW badge clears once `verified` flips. ✓
+- **Order history preserved:** verification only mutates the `retailers` row; orders reference `retailer_id` (unchanged), so a verified shop's past orders stay intact. ✓
+- **Deactivate, never delete:** `setActive(id,false/true)` toggles `active`; deactivated rows dim + show Reactivate; no DELETE path anywhere. ✓
+- **Writes are correctly RLS-scoped, not RPC:** direct `supabase.from("retailers").update(...)` via the browser client — retailers aren't in the RPC-only set (orders/order_items/order_events are), and `retailers_staff_update` (accountant/admin, verified live) authorizes it; a salesman has no UPDATE policy (default-deny) and can't reach `/dashboard` anyway. The page fetches all retailers under accountant RLS. ✓
+- Good a11y on the clickable pending row (role=button, tabIndex, Enter/Space); `rowActions` `stopPropagation` so Edit/Deactivate don't also trigger the row's open-edit. `eslint` exit 0.
+
+**Minor (no flag):** the page comment says accountant/admin have "RLS ALL" on retailers — it's actually SELECT+INSERT+UPDATE (no DELETE, by the deactivate-not-delete design); functionally fine, just imprecise wording.
+
+**Open flags:** No 🔴 blocking; only 🟡 ㉗(b) (owner-confirm).
+
+**Next-commit suggestion:** already landed — Products pricing (983554a); I'll drive criterion #6 (set a TBD price → salesman sees the SKU) live.
+
+---
