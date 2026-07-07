@@ -2,16 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { DateRange } from "react-day-picker";
 import { createClient } from "@/lib/supabase/client";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatRupees, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
+import { DEFAULT_RANGE, rangeLabel } from "@/lib/date-range";
+import { DateRangeFilter } from "./DateRangeFilter";
 import type { DashboardOrderRow, SalesmanOption } from "./page";
 import styles from "./OrdersList.module.css";
 
 type StatusFilter = "all" | "submitted" | "processed" | "cancelled";
-type DateFilter = "all" | "today" | "yesterday";
 
 const ORDERS_SELECT =
   "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), order_items(count)";
@@ -32,7 +34,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [salesmanId, setSalesmanId] = useState("all");
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [range, setRange] = useState<DateRange | undefined>(DEFAULT_RANGE);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [tick, setTick] = useState(nowMs);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -91,17 +93,20 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
   }, []);
 
   const now = useMemo(() => new Date(tick), [tick]);
-  const todayKey = istDateKey(now);
-  const yesterdayKey = istDateKey(new Date(tick - 24 * 60 * 60 * 1000));
 
+  // Bounded-initial-fetch seam: page.tsx currently fetches the last 300
+  // orders unconditionally and everything below filters client-side — fine
+  // at pilot scale, but the seam to swap in a server-side range query lives
+  // right here if order volume ever outgrows a single client-side fetch.
   const q = query.trim().toLowerCase();
   const finalFiltered = orders.filter((o) => {
     if (status !== "all" && o.status !== status) return false;
     if (salesmanId !== "all" && o.salesman_id !== salesmanId) return false;
-    if (dateFilter !== "all") {
+    if (range?.from) {
       const key = istDateKey(new Date(o.submitted_at));
-      if (dateFilter === "today" && key !== todayKey) return false;
-      if (dateFilter === "yesterday" && key !== yesterdayKey) return false;
+      const fromKey = istDateKey(range.from);
+      const toKey = istDateKey(range.to ?? range.from);
+      if (key < fromKey || key > toKey) return false;
     }
     if (q) {
       const haystack = `${o.order_ref} ${o.retailers?.name ?? ""}`.toLowerCase();
@@ -144,7 +149,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
         <h1 className={styles.title}>Orders</h1>
         <span className={styles.liveTag}>LIVE</span>
         <span className={styles.count}>
-          {finalFiltered.length} {finalFiltered.length === 1 ? "order" : "orders"}
+          {finalFiltered.length} {finalFiltered.length === 1 ? "order" : "orders"} · {rangeLabel(range)}
         </span>
       </div>
 
@@ -161,26 +166,24 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
             </button>
           ))}
         </div>
-        <select className={styles.select} value={salesmanId} onChange={(e) => setSalesmanId(e.target.value)}>
-          <option value="all">All salesmen</option>
-          {salesmen.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.full_name}
-            </option>
-          ))}
-        </select>
-        <select className={styles.select} value={dateFilter} onChange={(e) => setDateFilter(e.target.value as DateFilter)}>
-          <option value="all">All dates</option>
-          <option value="today">Today</option>
-          <option value="yesterday">Yesterday</option>
-        </select>
-        <input
-          ref={searchRef}
-          className={styles.search}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search ref or retailer (/)"
-        />
+        <div className={styles.filterGroup}>
+          <select className={styles.select} value={salesmanId} onChange={(e) => setSalesmanId(e.target.value)}>
+            <option value="all">All salesmen</option>
+            {salesmen.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.full_name}
+              </option>
+            ))}
+          </select>
+          <DateRangeFilter value={range} onChange={setRange} />
+          <input
+            ref={searchRef}
+            className={styles.search}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search ref or retailer (/)"
+          />
+        </div>
       </div>
 
       {finalFiltered.length === 0 ? (

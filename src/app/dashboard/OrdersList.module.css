@@ -39,12 +39,20 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
 .filterTabs {
   display: flex;
   gap: 4px;
+}
+
+.filterGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .filterTab {
@@ -237,6 +245,15 @@
 @media (min-width: 768px) {
   .page {
     padding: 24px;
+  }
+
+  .filters {
+    /* Sits flush on the table's top rule (no gap), so the active tab
+       (commit 3's folder-tab strip) can visually connect to the ledger
+       below it — cancels .page's own 12px gap for just this pair of
+       siblings. Desktop-only: the mobile card list has no "top rule" for
+       a tab to connect to, so mobile keeps the normal gap. */
+    margin-bottom: -12px;
   }
 
   .table {
