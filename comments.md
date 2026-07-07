@@ -1933,3 +1933,21 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next:** M6 / the salesman-new-order UX fixes, whichever lands.
 
 ---
+
+## Review of 4e4f215 — fix(salesman): new-order flow density, in-cart color, sticky category headers, drop STEP labels
+
+**Verdict:** ✅ accept — all four fbd360e items correctly implemented; tap targets preserved, and I independently verified the sticky-offset arithmetic (the one thing the builder flagged as needing a device). `tsc` + `eslint` clean. On branch `ui/salesman-dashboard`.
+
+**Verified:**
+- **① Density:** `.productRow` `10px 0`→`6px 0`, `.categoryHeader` `12px 0 6px`→`8px 0 4px`. **Tap targets intact** — `Stepper.module.css` hard-sets the buttons to `min-width/min-height: 48px` (both controls), so the row can't render shorter than 48px regardless of padding; density and hit-area are decoupled exactly as the commit claims. ✓
+- **② In-cart color:** `#eff6ff`→`#dbeafe` (clearly more saturated); 2px accent left-bar kept. ✓
+- **③ Sticky category headers — correct, and I checked the math:** grey→`--color-ink`, size→12px, `position:sticky; top:var(--search-bar-height); z-index:9`. The header sits flush below the **already-sticky** search bar (`.searchBar` = `position:sticky; top:0; z-index:10` — header z:9 < bar z:10, so it tucks under). The variable-height caveat the prompt raised is fixed properly: the result-count line is now **always rendered** (a non-breaking space when idle) with `line-height:14px`, so the bar height is constant. And `--search-bar-height: 83px` is **exactly right** — summing the actual CSS: `20px` vertical padding + `44px` input + `4px` gap + `14px` result line + `1px` border = **83px**. No gap/overlap between the two stickies, to the pixel. ✓
+- **④ STEP labels dropped:** `FlowHeader.subtitle` now optional (`subtitle?`, conditional render); S3 "Select retailer"/"Add new shop" + S5 "Review order" show a bare title; S4 shows **retailer name + area** (`subtitle={retailerArea ?? undefined}`). Back arrow kept everywhere. `design/phase1-design-spec.md §3` updated same-commit (changelog discipline). ✓
+
+**On what couldn't be verified headless:** the builder was refreshingly explicit — actual color saturation, real row density, and sticky stacking "want real-device confirmation given this exact codebase's prior sticky bug (M4 bottom-bar)." Right call. I independently confirmed the **sticky arithmetic** (83px = the bar's real height; bar is sticky at top:0) — the exact failure mode that bit at M4 — so the structural risk is low; what's left is pure visual polish a phone will settle.
+
+**Open flags:** none new. No 🔴 blocking; carried 🟡 ㉝ (pre-M6), ㉛, ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** more new-order UX commits on `ui/salesman-dashboard`, or M6.
+
+---
