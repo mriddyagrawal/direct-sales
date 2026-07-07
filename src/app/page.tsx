@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { OrderCard } from "@/components/OrderCard";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SignOutButton } from "@/components/SignOutButton";
+import { PendingOrdersStrip } from "@/components/PendingOrdersStrip";
 import { formatSectionLabel } from "@/lib/format";
 import { getOrderStatusTag } from "@/lib/order-status";
 import styles from "./page.module.css";
@@ -52,6 +53,7 @@ export default async function Home() {
 
   return (
     <div className={styles.page}>
+      <PendingOrdersStrip />
       {orders.length === 0 ? (
         <div className={styles.empty}>
           <p className={styles.emptyText}>
@@ -71,6 +73,7 @@ export default async function Home() {
               <div key={order.id}>
                 {showLabel && <p className={styles.sectionLabel}>{label}</p>}
                 <OrderCard
+                  id={order.id}
                   orderRef={order.order_ref}
                   totalPaise={order.total_paise}
                   retailerName={order.retailers?.name ?? "Unknown retailer"}

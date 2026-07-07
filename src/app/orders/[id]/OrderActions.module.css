@@ -1,0 +1,36 @@
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.actions > * {
+  flex: 1;
+}
+
+.confirmTitle {
+  font-family: var(--font-structure);
+  font-size: var(--text-header-size);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.confirmBody {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 12px;
+}
+
+.confirmActions > * {
+  flex: 1;
+}
+
+.error {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}
