@@ -1689,3 +1689,21 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** already landed — Products pricing (983554a); I'll drive criterion #6 (set a TBD price → salesman sees the SKU) live.
 
 ---
+
+## Review of 983554a — feat(m5): products pricing tab (owner-added deliverable)
+
+**Verdict:** ✅ accept — the owner-added Products tab, with **acceptance #6 proven live end-to-end**. Spec deviations recorded with changelog discipline; `eslint` clean.
+
+**Acceptance #6 — verified live (rolled-back RLS transaction):** on a real TBD SKU (`ZEB-EAR-05`): `salesman_sees_before = false` (D2 hides unpriced), the **accountant's UPDATE affected 1 row** (`products_staff_update` authorizes it), and `salesman_sees_after = true` — the salesman sees the SKU the instant a price is set, no deploy. Rolled back, so the SKU stays TBD. ✓ This is exactly criterion #6 ("set a TBD price → the newly-priced SKU shows in Quick Order").
+
+**Verified by reading + live RLS:**
+- **All SKUs, incl. TBD/inactive:** `page.tsx` fetches every product (`products_select_staff` returns all — unlike the salesman's active+priced filter), ordered by category then name (the client's consecutive-category grouping relies on that). TBD + INACTIVE badges. ✓
+- **Money is correct:** input is whole ₹ rupees, validated `/^\d+$/` (rejects non-integer/negative **before** the write), stored as integer **paise** (`×100`); blank = TBD (`null`); paise→rupees on edit. The `₹0` edge is caught by the DB `price_paise > 0` check (surfaced as an error). ✓
+- **RLS-scoped direct UPDATE** (not RPC — products/retailers aren't in the RPC-only set): `supabase.from("products").update({price_paise, tally_name, active})`, authorized by `products_staff_update` (accountant/admin; a salesman has no update policy). ✓
+- **Spec updated same-commit (changelog discipline, per the M5 prompt §0):** accountant-dashboard.md §5 rewritten from "deferred to Supabase Studio" to the in-app screen, and §Non-functional records the phone/responsive override. Both owner deviations now live in the spec. ✓
+
+**Open flags:** No 🔴 blocking; only 🟡 ㉗(b) (owner-confirm). All 7 M5 acceptance criteria now have reviewer coverage — #1 (Realtime plumbing, wall-clock pending a live session), #2 (`process_order` rejects salesman — proven), #3 (post-lock edit reason — proven), #4 (A4 print-CSS + qty size), #5 (verify-by-edit + history preserved), #6 (TBD→visible — **proven live**), #7 (responsive on phone).
+
+**Next-commit suggestion:** the retailer-row-wrap CSS fix (6d9d01e) is next in my queue.
+
+---
