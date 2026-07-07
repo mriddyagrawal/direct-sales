@@ -1951,3 +1951,23 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next:** more new-order UX commits on `ui/salesman-dashboard`, or M6.
 
 ---
+
+## Review of dd4b0fb — docs: lock catalog-admin decisions + add Claude Design brief for Products add/import
+
+**Verdict:** ✅ accept — the locked decisions match the design note + the feasibility I verified, and the design brief is faithful to the app's actual design tokens and grammar. Docs-only, forward-consistent.
+
+**Locked decisions (catalog-admin-design.md):**
+- Upsert key `(brand_id, tally_name)` + drop `sku` + `tally_name` NOT NULL default=display name + `unique(brand_id, tally_name)` — exactly the recommendation, and I verified live it's feasible (**42/42 unique, 0 dup keys**). ✓
+- Category = simple text + dropdown + add-new (no `categories` table); import dry-run built; Excel-primary via SheetJS (parses CSV too). All matching the design note, now owner-confirmed; the SheetJS impl notes (first sheet, trim blanks, coerce the Price cell, cap file size) are sound. ✓
+
+**Claude Design brief (products-admin-design-prompt.md) — palette verified against tokens:**
+- Every hex matches `globals.css` exactly: accent `#1d4ed8` = `--color-accent`, ink `#14181f` = `--color-ink`, paper `#f2f3f5` = `--color-paper`, hairline `#d8dbdf` = `--color-hairline`, amber `#b45309` = `--color-amber`. Mockups will match the built app, not drift. ✓
+- The **"amber = pending only — avoid it in the import preview"** guard matches globals.css's own comment ("amber = pending, never red") — a real cross-app consistency catch (New=accent, Updated=ink/grey, Error=red). ✓
+- Grammar (hairlines, 2px corners, mono figures, flat tags w/ leading square, one filled-accent action, phone = full-screen sheet with the table scrolling in its own container, never the page body) matches the S8/S9 instrument language. ✓
+- Content is real (Zebronics + LG, real product names, ₹ en-IN, some TBD) and forward-consistent — the LG "prices entered per order" note aligns with the Phase-3 `manual` pricing decision (20400cd); blank price = "hidden from salesmen" aligns with D2. ✓
+
+**Open flags:** none new — design-input docs; the feature (the `tally_name` NOT NULL + drop-`sku` migration, the add/import UI) is build-time work. No 🔴 blocking; carried 🟡 ㉝ (pre-M6), ㉛, ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** M6 / whatever lands on `ui/salesman-dashboard`.
+
+---
