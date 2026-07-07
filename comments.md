@@ -2086,3 +2086,34 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Commit 4 (SalesmanFilter on the shared `FilterDropdown` — the controlled/close-on-pick path; drop LINES incl. `order_items(count)` from `ORDERS_SELECT` **and** `page.tsx`'s fetch; delete `/date-demo`) — I'll verify the two filter boxes are truly identical, that `/date-demo` 404s, and that no `order_items(count)` join survives anywhere.
 
 ---
+
+## Review of 90dc13f — feat(dashboard): matching SalesmanFilter dropdown, drop LINES, remove /date-demo spike (S8 revamp commit 4)
+
+**Verdict:** ✅ accept — completes the S8 revamp (4/4). SalesmanFilter matches DATE on the shared shell, LINES is removed **everywhere** (I grep-verified — no orphan), the legit line-item fetches are untouched, and `/date-demo` is gone from the route list. Build/tsc/eslint clean.
+
+**Phase / commit goal (as I understood it):** The last S8 commit — replace the native salesman `<select>` with a `SalesmanFilter` built on the shared `FilterDropdown` (so it's pixel-identical to DATE) that closes on pick; strip the LINES column and its `order_items(count)` join from every consumer (table, mobile card, both selects, the `DashboardOrderRow` interface); delete the now-absorbed `/date-demo` spike.
+
+**What works (verified by execution):**
+- **SalesmanFilter is the shared shell, close-on-pick** ([SalesmanFilter.tsx](src/app/dashboard/SalesmanFilter.tsx)) — uses `FilterDropdown` **controlled** (`open`/`onOpenChange`), and `select(id)` calls `onChange(id)` then `setOpen(false)`, so a pick closes it (vs DateRangeFilter's uncontrolled stay-open). Both boxes pass no `width` → default 280px, same trigger CSS (mono caption / bold ellipsized value / chevron) → **visually identical**, exactly the prompt's requirement. `valueLabel` = selected `full_name` or `All salesmen`; active option marked via `optionActive`. Controlled outside-click/Esc still close it (FilterDropdown routes both through `onOpenChange`).
+- **LINES fully removed — grep-verified, no orphan** — `<th>LINES</th>`, its `<td>`, the mobile card `· N lines`, `order_items(count)` from **both** `ORDERS_SELECT` (OrdersList) **and** `page.tsx`'s initial fetch, and the `order_items: {count}[]` field on `DashboardOrderRow` are all gone. `grep -rn order_items src/app/dashboard/` returns **zero** hits in `OrdersList.tsx`/`page.tsx` (remaining hits are the legit detail/pick-slip line fetches + one code comment). `tsc --noEmit` exit 0 confirms no dangling `order.order_items` reference survives.
+- **Column counts stay balanced** — header now 6 (`REF · SUBMITTED · SALESMAN · RETAILER · TOTAL · STATUS`), body 6 `<td>` (ref, timestamp, salesman, retailer, total, status). No off-by-one misalignment from the removed cell. The `839aff5` weight/color hierarchy (SUBMITTED/SALESMAN muted via `cellMeta`, RETAILER bold via `cellRetailer`) is intact — untouched by this diff.
+- **Legit `order_items` uses untouched** — `dashboard/orders/[id]/page.tsx` (full line rows), `dashboard/orders/[id]/pick-slip/page.tsx`, and `orders/[id]/page.tsx` all still fetch real line-item data (product_name/qty/price/position), not a count. Correctly distinguished from the dropped count-join and left alone.
+- **Realtime UPDATE refetch rationale kept honest** ([OrdersList.tsx:66-70](src/app/dashboard/OrdersList.tsx#L66)) — the comment explaining *why* an UPDATE refetches the joined row (rather than patching the raw payload) previously cited `order_items(count)`; with that gone, it's correctly re-pointed to `retailers(name, verified)` — still a joined field absent from the raw `postgres_changes` payload, so the refetch (flag ㉚.3's fix) is **still justified and still present**. Good: the builder updated the reason instead of silently leaving a now-false comment or dropping a still-needed refetch.
+- **`/date-demo` deleted** — directory gone (`ls` → no such file), and the production build's route list no longer lists `/date-demo` (was `○ /date-demo` through commit 3). The "`/date-demo` 404s" acceptance criterion holds.
+- **`npm run build`** → `✓ Compiled successfully`; **`tsc --noEmit`** exit 0; **`eslint`** (SalesmanFilter + OrdersList + page.tsx) clean.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **Dead CSS: `.select`.** Both native `<select>`s (salesman + date) are now gone, so `.select` in `OrdersList.module.css` is unreferenced (`grep styles.select` → none). Harmless, but prune it in the next dashboard-CSS touch to keep the module honest.
+- **Visual identity of the two boxes is CSS-reasoned, not browser-rendered** (no browser this session) — both go through the same `FilterDropdown` trigger at the same default width, so identity follows structurally; still worth a glance on device that the SALESMAN value ("Mridul") and a long DATE range ellipsize the same way in the 280px box.
+
+**Domain / correctness checks:** Money/RLS/state-machine/snapshots — **N/A** (presentational; the only data-layer change is *narrowing* two SELECTs by removing the count-join — no new columns, no write path, no RLS surface). Removing `order_items(count)` slightly lightens each query (drops a correlated aggregate). No functional data change to the rows themselves.
+
+**What I tried:** `git show 90dc13f --stat` + full TSX/CSS/page diffs; `ls src/app/date-demo` (gone); `grep -rn order_items src/app/dashboard/` (no orphan in OrdersList/page; legit detail+pick-slip fetches present); counted header `<th>` vs body `<td>` (6=6, balanced); `grep styles.select` (dead CSS confirmed); `npx tsc --noEmit` (0); `npx eslint` on the 3 files (clean); `npm run build` (compiled successfully, `/date-demo` absent from route list). Filter-box visual identity reasoned from the shared shell (no browser).
+
+**Open flags (cumulative):** none new. No 🔴 blocking. Carried 🟡 ㉝ (pre-M6 migration reconciliation), ㉛ (order_no_seq grant hardening — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **S8 orders-revamp complete + reviewer-verified across all 4 commits (3b4f861 → c76c120 → 659359b → 90dc13f, 4× ✅).**
+
+**Next-commit suggestion:** S8 revamp is done; the two open non-blocking S8 notes worth folding into a future pass — the Phase-3-status/tab data-driven coupling (commit-3 block) and the `.select` dead-CSS prune. Otherwise the meaningful open work is M6 (deploy + pilot), which surfaces 🟡 ㉝ (migration file/version reconciliation) as the pre-deploy gate.
+
+---
