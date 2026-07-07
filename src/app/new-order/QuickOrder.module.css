@@ -113,10 +113,24 @@
   cursor: pointer;
 }
 
+/* A single chevron built from two borders (the standard CSS-corner
+   trick), not a Unicode glyph — glyphs like ﹀/︿ render inconsistently
+   across phone fonts. Points down at rest; rotates 180° on expand (same
+   "one shape, rotates on toggle" pattern Wikipedia's collapsible-section
+   arrows use) instead of swapping between two different characters. */
 .expandHint {
   flex-shrink: 0;
-  color: var(--color-locked);
-  font-size: 10px;
+  width: 7px;
+  height: 7px;
+  margin-right: 3px;
+  border-right: 1.5px solid var(--color-locked);
+  border-bottom: 1.5px solid var(--color-locked);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.expandHintOpen {
+  transform: rotate(225deg);
 }
 
 .stepperRow {

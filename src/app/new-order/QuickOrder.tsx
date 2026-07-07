@@ -182,9 +182,10 @@ export function QuickOrder({
                           {inCart && ` · ${qty} in cart`}
                         </p>
                       </div>
-                      <span className={styles.expandHint} aria-hidden>
-                        {expanded ? "︿" : "﹀"}
-                      </span>
+                      <span
+                        className={`${styles.expandHint} ${expanded ? styles.expandHintOpen : ""}`}
+                        aria-hidden
+                      />
                     </button>
                     {expanded && (
                       <div className={styles.stepperRow}>
