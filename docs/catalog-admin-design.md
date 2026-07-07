@@ -48,9 +48,10 @@ The key must be stable, present on every row, unique within a brand. Options:
 - **Admin-only** (owner). Accountant has UPDATE (can price) but not INSERT; revisit if they should add items.
 - For `manual`-pricing brands the catalog price is moot — hide the Price field/column.
 
-## Open decisions
-1. Upsert key: **(brand, tally_name)** [rec] vs (brand, name) vs keep `sku`.
-2. Drop the generated `sku`? [rec: yes]
-3. Category: dropdown-of-existing + add-new [rec] vs a real `categories` table (cleaner grouping/sort, more machinery).
-4. Build the import preview/dry-run? [rec: yes — cheap insurance for overwrite semantics].
-5. Excel (.xlsx) now, or CSV-only first? (Excel = one parser dependency.)
+## Decisions (owner-confirmed 2026-07-07)
+1. **Upsert key = `(brand_id, tally_name)`** ✓ — and **drop the invented `sku`** ✓. Requires `tally_name` → NOT NULL default = display name (backfill Zebronics), `unique(brand_id, tally_name)`.
+2. **Category = simple** ✓ — text with a dropdown-of-existing + "add new"; **no `categories` table for now** (revisit only if controlling the salesman-facing category *order* becomes a real need).
+3. **Import preview / dry-run: build it** ✓ (New / Updated / Errors summary + per-row table; "apply the valid rows" when errors exist).
+4. **Excel (.xlsx) primary** ✓ — SheetJS server-side (parses CSV too, for free). Cleaner than CSV (no BOM/encoding hazards); read the first sheet, trim blank rows, coerce the Price cell (number-or-text). Cap file size.
+
+UI: **manual add = small modal; import = large overlay/sheet** (needs the preview table). Both on the admin **Products** page. Claude Design brief: [Prompts/products-admin-design-prompt.md](../Prompts/products-admin-design-prompt.md).
