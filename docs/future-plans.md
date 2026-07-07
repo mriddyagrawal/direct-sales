@@ -49,3 +49,11 @@ Ideas the owner has approved in principle but deliberately **not** scheduled int
 **Scope when scheduled:** ① migration dropping `email_for_username` + its grant; ② rewrite `src/app/login/actions.ts` to build `username@<fixed-domain>` client-side (or in the action) instead of looking it up; ③ delete `service.ts`, the `SUPABASE_SECRET_KEY` env requirement, and `server-only`; ④ recreate the 3+ accounts with synthetic emails (owner, Dashboard); ⑤ rewrite D9 to record the reversal. Note the hard dependency: this only works because a **single fixed domain** is assumed — if real, reachable per-user emails are ever needed (email password-reset, notifications), stay on D9 instead.
 
 **Revisit when:** the auth machinery actually causes friction (a secret-key rotation headache, a new dev tripping over the lookup), or a batch of new staff accounts is being created anyway so the recreation cost is already being paid.
+
+## Payments tab — reserved bottom-bar slot (2026-07-06)
+
+**What:** a possible future third destination in the salesman bottom tab bar (and its dashboard counterpart) for payment/collection data against a retailer.
+
+**Decision context:** the bottom tab bar (design-spec deviation #1) is **Home + New Order only** for Phase 1, but its slot grammar **deliberately reserves room for a Payments tab** so adding one later doesn't reshuffle the bar. Nothing is built or speced — this entry exists so the design spec's forward-reference ("the future Payments tab — see docs/future-plans.md") resolves to something. Note the scope guard: **money stays in Tally.** Phase 4 (collections) is strictly *read-only outstanding visibility* with no payment *recording* in the app — so a real Payments tab would first need an owner decision on whether the app ever records payments at all, which today it does not.
+
+**Revisit when:** the owner decides the app should surface or record payment/collection data beyond Phase 4's read-only outstanding view.
