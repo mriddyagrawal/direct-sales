@@ -1,4 +1,11 @@
 .page {
+  /* Fixed search-bar height — kept in sync with .searchBar's actual
+     rendered height (padding 20px + 44px input + 4px gap + 14px result
+     line) so .categoryHeader's sticky offset never drifts from it. The
+     result line is always rendered in QuickOrder.tsx (just visually
+     empty when not searching) specifically so this height stays constant
+     instead of varying by search state. */
+  --search-bar-height: 83px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -36,6 +43,7 @@
 .resultMeta {
   font-family: var(--font-figures);
   font-size: 11px;
+  line-height: 14px;
   color: var(--color-locked);
 }
 
@@ -49,13 +57,17 @@
   justify-content: space-between;
   align-items: baseline;
   font-family: var(--font-figures);
-  font-size: var(--text-section-label-size);
+  font-size: 12px;
   letter-spacing: var(--text-section-label-tracking);
   text-transform: uppercase;
-  color: var(--color-locked);
+  color: var(--color-ink);
   border-bottom: 1px solid var(--color-hairline);
-  padding: 12px 0 6px;
+  padding: 8px 0 4px;
   margin-top: 8px;
+  position: sticky;
+  top: var(--search-bar-height);
+  z-index: 9;
+  background: var(--color-white);
 }
 
 .categoryHeader:first-child {
@@ -67,12 +79,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--color-hairline);
 }
 
 .productRowActive {
-  background: #eff6ff;
+  background: #dbeafe;
   border-left: 2px solid var(--color-accent);
   padding-left: 8px;
   margin-left: -8px;

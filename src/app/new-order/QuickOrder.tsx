@@ -77,11 +77,7 @@ export function QuickOrder({
 
   return (
     <div className={styles.page}>
-      <FlowHeader
-        title={retailerName}
-        subtitle={`${retailerArea ? retailerArea.toUpperCase() + " · " : ""}NEW ORDER`}
-        onBack={onBack}
-      />
+      <FlowHeader title={retailerName} subtitle={retailerArea ?? undefined} onBack={onBack} />
       <div className={styles.searchBar}>
         <input
           className={styles.searchInput}
@@ -89,11 +85,13 @@ export function QuickOrder({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search name or SKU"
         />
-        {q !== "" && (
-          <span className={styles.resultMeta}>
-            {filtered.length} of {products.length} products
-          </span>
-        )}
+        {/* Always rendered (not conditionally) so the search bar's height —
+            and therefore .categoryHeader's sticky offset, which is pinned
+            to it via --search-bar-height — never shifts between the
+            "searching" and "idle" states. */}
+        <span className={styles.resultMeta}>
+          {q !== "" ? `${filtered.length} of ${products.length} products` : " "}
+        </span>
       </div>
 
       <div className={styles.list}>

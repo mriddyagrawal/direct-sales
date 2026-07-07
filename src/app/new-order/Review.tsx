@@ -75,7 +75,7 @@ export function Review({
 
   return (
     <div className={styles.page}>
-      <FlowHeader title="Review order" subtitle="NEW ORDER · STEP 3 / 3" onBack={onBack} />
+      <FlowHeader title="Review order" onBack={onBack} />
       <div className={styles.content}>
         <div className={styles.retailerHeader}>
           <div>

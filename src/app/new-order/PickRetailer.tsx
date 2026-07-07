@@ -80,7 +80,7 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
   if (showQuickAdd) {
     return (
       <div className={styles.page}>
-        <FlowHeader title="Add new shop" subtitle="NEW ORDER · STEP 1 / 3" onBack={() => setShowQuickAdd(false)} />
+        <FlowHeader title="Add new shop" onBack={() => setShowQuickAdd(false)} />
         <div className={styles.content}>
           <Field label="Shop name *" value={name} onChange={(e) => setName(e.target.value)} placeholder="Shop name" />
           <div className={styles.row}>
@@ -101,7 +101,7 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
 
   return (
     <div className={styles.page}>
-      <FlowHeader title="Select retailer" subtitle="NEW ORDER · STEP 1 / 3" onBack={onBack} />
+      <FlowHeader title="Select retailer" onBack={onBack} />
       <div className={styles.content}>
         <Field
           label="Search"
