@@ -8,7 +8,7 @@ import { StatusTag } from "@/components/ui/StatusTag";
 import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatRupees, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
-import { DEFAULT_RANGE, rangeLabel } from "@/lib/date-range";
+import { DEFAULT_RANGE } from "@/lib/date-range";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { SalesmanFilter } from "./SalesmanFilter";
 import type { DashboardOrderRow, SalesmanOption } from "./page";
@@ -161,10 +161,6 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
     <div className={styles.page}>
       <div className={styles.titleRow}>
         <h1 className={styles.title}>Orders</h1>
-        <span className={styles.liveTag}>LIVE</span>
-        <span className={styles.count}>
-          {finalFiltered.length} {finalFiltered.length === 1 ? "order" : "orders"} · {rangeLabel(range)}
-        </span>
       </div>
 
       <div className={styles.filters}>

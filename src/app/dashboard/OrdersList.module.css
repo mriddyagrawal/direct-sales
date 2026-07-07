@@ -18,23 +18,6 @@
   color: var(--color-ink);
 }
 
-.liveTag {
-  font-family: var(--font-figures);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--color-processed);
-  border: 1px solid var(--color-processed);
-  border-radius: var(--radius);
-  padding: 2px 6px;
-}
-
-.count {
-  font-family: var(--font-figures);
-  font-size: 12px;
-  color: var(--color-locked);
-}
-
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -92,17 +75,6 @@
   margin-bottom: -1px;
   position: relative;
   z-index: 1;
-}
-
-.select {
-  min-height: 32px;
-  padding: 0 8px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-ink);
 }
 
 .search {
