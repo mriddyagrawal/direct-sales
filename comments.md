@@ -2117,3 +2117,28 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** S8 revamp is done; the two open non-blocking S8 notes worth folding into a future pass — the Phase-3-status/tab data-driven coupling (commit-3 block) and the `.select` dead-CSS prune. Otherwise the meaningful open work is M6 (deploy + pilot), which surfaces 🟡 ㉝ (migration file/version reconciliation) as the pre-deploy gate.
 
 ---
+
+## Review of 30ac3cb — fix(dashboard): restore a small gap between the filter boxes and the table's top rule
+
+**Verdict:** ✅ accept — a one-rule cosmetic follow-up to commit 2's flush layout, correctly scoped desktop-only, and it doesn't disturb the folder-tab connection. Build clean.
+
+**Phase / commit goal (as I understood it):** Commit 2 pulled the whole `.filters` row flush onto the table's top rule (`margin-bottom: -12px`) so commit 3's active folder-tab could overlap it — but that also dragged the SALESMAN/DATE/search cluster down against the rule with no breathing room. This nudges just `.filterGroup` back up ~2px so only the active tab still touches the rule.
+
+**What works (verified):**
+- **Desktop-only, mobile untouched** — the new `.filterGroup { margin-bottom: 2px }` is at line 284, **inside** the `@media (min-width: 768px)` block (opens line 270, brackets the desktop `.filters`/`.table {display:table}` rules). The base `.filterGroup` (line 51, no bottom margin) is unchanged, so the mobile card layout is unaffected — consistent with the whole flush treatment being a desktop-table concern.
+- **The cross-axis reasoning is correct** — `.filters` is `display:flex; align-items:center`, so a flex child's `margin-bottom` shifts it *up* on the cross axis (the margin box is what's centered). ~2px up = the intended breathing room. The active tab keeps its own `.filterTabActive { margin-bottom:-1px; z-index:1 }` overlap onto the table's `border-top`, so the folder-tab-connected-to-ledger effect is preserved — only the sibling filter cluster moves.
+- **`npm run build`** → `✓ Compiled successfully`. (Pure CSS-module change; no TS/logic surface — tsc/eslint N/A to a CSS value.)
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** None. Pixel result (2px of breathing room, tab still visually seated on the rule) wants a real device to confirm — the structural logic is sound and I verified placement + compile.
+
+**Domain / correctness checks:** N/A — presentational CSS only, no data/state/money/RLS surface.
+
+**What I tried:** `git show 30ac3cb` (1 file, +9 CSS lines); `grep` for `@media`/`.filters`/`.filterGroup`/`display: table` line numbers to confirm the new rule is inside the desktop media query (284, between 270 and 294); `npm run build` (compiled successfully). Visual result reasoned from the flex `align-items:center` model (no browser this session).
+
+**Open flags (cumulative):** none new. No 🔴 blocking. Carried 🟡 ㉝ (pre-M6 migration reconciliation), ㉛ (order_no_seq grant hardening — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** As before — M6 (deploy + pilot) is the meaningful open work, gated by 🟡 ㉝; the small S8 dead-CSS/`{" "}` cleanups can ride along a future dashboard-CSS touch.
+
+---
