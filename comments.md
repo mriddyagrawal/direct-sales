@@ -2271,3 +2271,40 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Commit 2 (Products ledger table) — already landed as `01e575d`; reviewing next, oldest-first.
 
 ---
+
+## Review of 01e575d — feat(products): M5.5 c2 — Products catalog ledger + inline ACTIVE toggle
+
+**Verdict:** ✅ accept — replaces the grouped price-edit cards with the S8-grammar ledger (# · BRAND · CATEGORY · DISPLAY · TALLY · PRICE · ACTIVE) to spec; preserves the ㉜🅐 render-from-prop + ㉜🅑 stay-busy-through-refresh patterns; money via `formatRupees`/TBD; the only write is the inline ACTIVE toggle (permitted for accountant+admin by `products_staff_update`). Isolated tsc / eslint / build clean.
+
+**Phase / commit goal (as I understood it):** M5.5 Commit 2 — rework the Products page into the design's ledger table (screen 1): 7 columns, header "Products · N products · M priced", PRICE = `formatRupees`-or-TBD, a BRAND column from `brands(name)` (no Zebronics hardcode), an inline ACTIVE toggle; defer price/tally/name editing + "+ Add product" to the c3 modal.
+
+**What works (verified):**
+- **Ledger to spec** — desktop `<table>` with exactly # · BRAND · CATEGORY · DISPLAY NAME · TALLY NAME · PRICE · ACTIVE (7 `<th>` = 7 `<td>` balanced; the "8th" `<th>` in a grep is `<thead>`). Mobile `.cards` fallback + empty state ("No products in the catalog."); `rowInactive` styling when `!p.active`.
+- **Counts derived at render** — `const priced = products.filter(p => p.price_paise !== null).length` → header `{products.length} products · {priced} priced`; not hardcoded, recomputes from the prop; "products", not "SKUs".
+- **Money display correct** — `p.price_paise === null ? TBD : formatRupees(p.price_paise)` in both table + card (paise→rupees en-IN; raw paise never shown). No money is *written* here anymore — the old `/^\d+$/` whole-rupee `save()` is **deleted** (price editing moves to the c3 modal with the ≤2-dec rule), so that stale validation is gone by removal.
+- **㉜🅐 render-from-prop preserved** — renders straight from `initialProducts` (no `useState` copy), so a post-write `router.refresh()` repaints with fresh data. **㉜🅑 stay-busy** — per-row `busyId` disables only the toggled row; `startTransition(() => { router.refresh(); setBusyId(null); })` clears busy after the refresh is queued (mirrors `RetailersQueue.setActive`). No whole-table dim, no stale-row bug.
+- **ACTIVE toggle + RLS** — `supabase.from("products").update({ active: !p.active }).eq("id", p.id)` via the browser session; `products_staff_update` (USING+CHECK `role IN (accountant, admin)`, verified live at ㉞) permits both. On error: clears busy + surfaces `updateError.message`. Writes only `active`.
+- **BRAND column** — `page.tsx` select adds `brands(name)`; row renders `p.brands?.name ?? "—"`; `ProductRow` gains `brands: { name: string } | null`.
+- **Compiles** — isolated `tsc --noEmit` on a throwaway `git worktree` at 01e575d = clean (the live checkout already carried the builder's in-flight c3 files, so I isolated c2 to test it honestly, then removed the worktree); `eslint` clean; the session `npm run build` (includes c2) exit 0. Removed `Field`/`Button` imports are fully unused now — no dangling refs.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- The `brands(name)` embed is cast `as unknown as ProductRow[]`. For a to-one forward FK (products.brand_id → brands), PostgREST returns `brands` as an **object** (or null) at runtime, so `p.brands?.name` is correct — the double-cast just papers over the generated types modelling the embed as an array. The one thing I couldn't verify headlessly is that the brand name actually paints (vs "—") in a browser; low risk given the standard to-one shape, worth an eyeball on the deployed screen.
+- `#` is a render ordinal (`index + 1`) over the (category, name)-sorted list — fine for a ledger, but it renumbers if a filter/sort is added later; not a stable catalog number.
+- Toggle label shows the pre-write state until the refresh lands (button busy meanwhile) — correct per ㉜🅑 (no optimistic flip); just noting the ~one-refresh visual latency.
+
+**Domain / correctness checks:**
+- **Money math** ✓ — display-only via `formatRupees` (integer paise → rupees); no float, no raw paise, and no money written on this screen.
+- **RLS** ✓ — ACTIVE write goes through `products_staff_update` (accountant+admin); no admin-only surface here (the admin-only INSERT is c3/c4).
+- **render-from-prop (㉜🅐/🅑)** ✓ — preserved and correctly applied to the toggle.
+- **Catalog integrity** ✓ — every brand's rows shown via the BRAND column; Zebronics not hardcoded.
+- Immutable snapshots / state machine — N/A (no order surface).
+
+**What I tried:** `git show 01e575d` (3 files); `git worktree add --detach <tmp> 01e575d` + symlinked node_modules → isolated `tsc --noEmit` clean (then `worktree remove`); `eslint` on the two source files; column-count grep (7 = 7); confirmed the write-path + the `products_staff_update` qual (accountant+admin, from the live pull at ㉞); session `npm run build` (exit 0, includes c2).
+
+**Open flags (cumulative):** No 🔴 blocking. No new flags. Carried 🟡 ㉝ (pre-M6 migration reconciliation — M5.5 c1's migration in the set), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (㉞ closed.)
+
+**Next-commit suggestion:** Commit 3 (row-click Add/Edit modal) — already landed as `26005d5`; reviewing next. Will verify the ≤2-dec→paise price rule, blank-tally⇒display-name, brand-scoped category typeahead + normalize, admin-only "+ Add" (upsert-on-dup), and accountant read-only name/category.
+
+---
