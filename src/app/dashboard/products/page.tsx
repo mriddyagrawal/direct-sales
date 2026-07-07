@@ -5,10 +5,9 @@ export interface ProductRow {
   id: string;
   category: string;
   name: string;
-  sku: string;
   price_paise: number | null;
   active: boolean;
-  tally_name: string | null;
+  tally_name: string;
 }
 
 // Owner-added deliverable — pricing deferred to Supabase Studio in the
@@ -20,7 +19,7 @@ export default async function ProductsPage() {
   // the salesman-facing filter (active AND priced, D2) does not apply here.
   const { data } = await supabase
     .from("products")
-    .select("id, category, name, sku, price_paise, active, tally_name")
+    .select("id, category, name, price_paise, active, tally_name")
     .order("category")
     .order("name");
 

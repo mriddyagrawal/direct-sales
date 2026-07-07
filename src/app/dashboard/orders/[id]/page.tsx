@@ -5,7 +5,6 @@ import { OrderWorkbench } from "./OrderWorkbench";
 export interface CatalogProduct {
   id: string;
   name: string;
-  sku: string;
   category: string;
   price_paise: number | null;
   active: boolean;
@@ -71,7 +70,7 @@ export default async function WorkbenchPage({ params }: { params: Promise<{ id: 
       )
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("products").select("id, name, sku, category, price_paise, active").order("category").order("name"),
+    supabase.from("products").select("id, name, category, price_paise, active").order("category").order("name"),
   ]);
 
   const order = data as unknown as WorkbenchOrderRow | null;

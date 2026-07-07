@@ -70,8 +70,11 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
     const { error: updateError } = await supabase
       .from("products")
       .update({
+        // tally_name is NOT NULL (M5.5) and is the catalog key — blank folds
+        // to the display name rather than clearing it (matches the Add/Edit
+        // modal's rule; commit 3 replaces this inline card with that modal).
         price_paise: pricePaise,
-        tally_name: form.tallyName.trim() || null,
+        tally_name: form.tallyName.trim() || products.find((x) => x.id === id)?.name,
         active: form.active,
       })
       .eq("id", id);
@@ -151,9 +154,7 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
                     {p.price_paise === null && <span className={styles.tbdBadge}>TBD</span>}
                     {!p.active && <span className={styles.inactiveBadge}>INACTIVE</span>}
                   </p>
-                  <p className={styles.rowMeta}>
-                    {p.sku} · {p.tally_name ?? p.name}
-                  </p>
+                  <p className={styles.rowMeta}>{p.tally_name}</p>
                 </div>
                 <div className={styles.rowActions}>
                   <button type="button" className={styles.price} onClick={() => startEdit(p)}>

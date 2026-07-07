@@ -71,7 +71,7 @@ export function QuickOrder({
   }, [products, snapshotPrices]);
 
   const q = normalize(query.trim());
-  const filtered = q === "" ? products : products.filter((p) => normalize(p.name).includes(q) || normalize(p.sku).includes(q));
+  const filtered = q === "" ? products : products.filter((p) => normalize(p.name).includes(q));
 
   const groups: { category: string; products: ProductOption[] }[] = [];
   for (const p of filtered) {

@@ -19,7 +19,9 @@ How [data/ZebronicsPriceList.csv](../../data/ZebronicsPriceList.csv) becomes row
 | **SKU generation** | `ZEB-<CODE>-<NN>`: codes `ADP`, `AWC`, `CBL`, `EAR`, `PWR`, `SPK`; `NN` = 2-digit position within category in CSV row order (`ZEB-SPK-04` = ASTRA 40). SKUs are **stable forever** — they are the upsert key and future Tally-mapping anchor. |
 | **Name policy** | Verbatim from CSV except: trim ends, collapse internal whitespace runs. **Typos are preserved** ("Balck", "Bannk", "Lighting") — they may mirror the accountant's Tally stock-item names, and guessing wrong makes Phase 2 mapping worse. Display names may be cleaned later, *after* cross-checking Tally masters; `tally_name` will hold the exact Tally string (open question in [PLAN.md](../../PLAN.md)). |
 | **Price** | `TBD` → `price_paise = NULL` (hidden from salesmen, D2). Otherwise whole-rupee integer × 100 → paise (`523` → `52300`). Reject anything else (non-numeric, negative, fractional) loudly. |
-| **Flags** | `active = true` for all; `tally_name = NULL`. |
+| **Flags** | `active = true` for all; `tally_name = NULL` at seed time. |
+
+> **M5.5 update (2026-07-07):** `tally_name` is no longer nullable and the invented `sku` is gone. The catalog admin (M5.5) made `tally_name` **NOT NULL** with `unique(brand_id, tally_name)` as the upsert key, **backfilling every existing row `tally_name = name`** (admin corrects to the real Tally string as needed). The `sku` column was **dropped** (with its `ZEB-…` unique constraint). The `sku`-based upsert and `sku ~ '^ZEB-…'` check below describe the original seed run only — the live key is now `(brand_id, tally_name)`, and adding/importing products happens in-app on the Products page rather than via the CLI seed.
 
 ## Script contract (`scripts/seed.ts`)
 

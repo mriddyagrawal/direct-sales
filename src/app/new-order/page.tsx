@@ -6,7 +6,6 @@ export interface ProductOption {
   id: string;
   category: string;
   name: string;
-  sku: string;
   price_paise: number;
 }
 
@@ -68,7 +67,7 @@ export default async function NewOrderPage({
   // an unpriced/inactive product; no extra filter needed here, just the
   // ordering the design spec wants (category groups, CSV order within them).
   const [{ data: productRows }, { data: retailerRows }, { data: recentRows }] = await Promise.all([
-    supabase.from("products").select("id, category, name, sku, price_paise").order("category").order("created_at"),
+    supabase.from("products").select("id, category, name, price_paise").order("category").order("created_at"),
     supabase.from("retailers").select("id, name, area, verified").order("name"),
     supabase
       .from("orders")

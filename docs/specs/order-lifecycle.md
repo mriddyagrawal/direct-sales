@@ -97,7 +97,7 @@ Additive schema: `orders.approved_at timestamptz`, `orders.approved_by uuid refe
 | `cancelled` | either | `{ reason? }` (required from accountant) |
 | `retailer_quick_added` | salesman | `{ retailer_id, name }` — logged on the first order for an unverified retailer |
 
-`before`/`after` arrays hold `{ sku, qty, unit_price_paise }` — enough to reconstruct any dispute without archaeology. (`order_items` doesn't store `sku`, so the RPCs join `products` at event-write time — do not "simplify" payloads to bare `product_id`s; the trail must stay human-readable.)
+`before`/`after` arrays hold `{ tally_name, qty, unit_price_paise }` — enough to reconstruct any dispute without archaeology. (`order_items` doesn't store `tally_name`, so the RPCs join `products` at event-write time — do not "simplify" payloads to bare `product_id`s; the trail must stay human-readable.) **History note:** events written before M5.5 (2026-07-07) used a `sku` key instead — the invented `sku` code was dropped and the payload key swapped to `tally_name` (the Tally stock-item name); the reader (`src/lib/order-events.ts`) accepts either key, so the full history still renders.
 
 ## Edge cases
 

@@ -214,8 +214,7 @@ export type Database = {
           id: string
           name: string
           price_paise: number | null
-          sku: string
-          tally_name: string | null
+          tally_name: string
           updated_at: string
         }
         Insert: {
@@ -226,8 +225,7 @@ export type Database = {
           id?: string
           name: string
           price_paise?: number | null
-          sku: string
-          tally_name?: string | null
+          tally_name: string
           updated_at?: string
         }
         Update: {
@@ -238,8 +236,7 @@ export type Database = {
           id?: string
           name?: string
           price_paise?: number | null
-          sku?: string
-          tally_name?: string | null
+          tally_name?: string
           updated_at?: string
         }
         Relationships: [

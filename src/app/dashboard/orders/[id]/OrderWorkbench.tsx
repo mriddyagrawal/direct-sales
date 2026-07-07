@@ -116,7 +116,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
       ? []
       : catalog
           .filter((p) => p.active && p.price_paise !== null && !items[p.id])
-          .filter((p) => p.name.toLowerCase().includes(addQ) || p.sku.toLowerCase().includes(addQ))
+          .filter((p) => p.name.toLowerCase().includes(addQ))
           .slice(0, 8);
 
   const events2: OrderEventRow[] = events.map((e) => ({

@@ -1,10 +1,16 @@
 import { formatOrderTimestamp } from "@/lib/format";
 
+// M5.5 swapped the audit-payload key from `sku` (dropped) to `tally_name`.
+// Old order_events retain their `sku` key; new ones carry `tally_name` — read
+// whichever is present so the whole history renders (order-lifecycle.md).
 interface EventLine {
-  sku: string;
+  tally_name?: string;
+  sku?: string;
   qty: number;
   unit_price_paise: number;
 }
+
+const lineLabel = (l: EventLine): string => l.tally_name ?? l.sku ?? "item";
 
 export interface OrderEventRow {
   id: number;
@@ -16,20 +22,20 @@ export interface OrderEventRow {
 }
 
 function diffLines(before: EventLine[], after: EventLine[]): string {
-  const beforeBySku = new Map(before.map((l) => [l.sku, l]));
-  const afterBySku = new Map(after.map((l) => [l.sku, l]));
+  const beforeByKey = new Map(before.map((l) => [lineLabel(l), l]));
+  const afterByKey = new Map(after.map((l) => [lineLabel(l), l]));
   const changes: string[] = [];
 
-  for (const [sku, afterLine] of afterBySku) {
-    const beforeLine = beforeBySku.get(sku);
+  for (const [key, afterLine] of afterByKey) {
+    const beforeLine = beforeByKey.get(key);
     if (!beforeLine) {
-      changes.push(`${sku} added ×${afterLine.qty}`);
+      changes.push(`${key} added ×${afterLine.qty}`);
     } else if (beforeLine.qty !== afterLine.qty) {
-      changes.push(`${sku} qty ${beforeLine.qty}→${afterLine.qty}`);
+      changes.push(`${key} qty ${beforeLine.qty}→${afterLine.qty}`);
     }
   }
-  for (const [sku] of beforeBySku) {
-    if (!afterBySku.has(sku)) changes.push(`${sku} removed`);
+  for (const [key] of beforeByKey) {
+    if (!afterByKey.has(key)) changes.push(`${key} removed`);
   }
 
   return changes.length > 0 ? changes.join(", ") : "no line changes";
