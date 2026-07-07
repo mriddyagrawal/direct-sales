@@ -47,6 +47,14 @@ In `src/app/new-order/QuickOrder.tsx` (+ its module CSS):
 
 **Acceptance:** the ledger shows a BRAND column and filters by brand (counts + range + salesman still compose); the salesman + accountant detail views and the pick slip show the brand; `npm run build` clean.
 
+## Commit 4 — Admin Products page (mobile): Brand ▸ Category sticky grouping + de-duplicated cards
+Frontend-only — `src/app/dashboard/products/ProductsPricing.tsx` mobile **card** view + its CSS. Today each card repeats **brand · category · tally_name**, which is mostly redundant (tally defaults to the display name, so it echoes the card title; brand + category repeat on every row). Apply the **same Brand ▸ Category two-tier sticky grouping as commit 2's Quick Order** (share the helper/approach where practical):
+- Group the mobile cards under **Brand ▸ Category** sticky headers — brand header heavier and above, category under it with its sticky `top` **offset by the brand-header height**. **Desktop table is unchanged** (its columns already avoid the redundancy).
+- **Slim the card:** drop brand + category from the card body (now in the headers); show a **Tally line only when it differs** (`tally_name !== name`); keep display name + price + the inline **Active** toggle.
+- Preserve M5.5's render-from-prop + row-click-edit + inline-active behaviour (flags ㉜🅐/🅑).
+
+**Acceptance:** on a phone the Products list groups under sticky **Brand ▸ Category** headers (both tiers pin, no overlap); a card shows **no** repeated brand/category and **no** tally line when `tally == name`, but a **distinct** tally still shows; desktop table unchanged; row-click edit + Active toggle still work; `npm run build` clean.
+
 ---
 
 ## Guardrails recap
