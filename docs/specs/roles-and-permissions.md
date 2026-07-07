@@ -31,6 +31,16 @@ All four are **dormant in practice**: no in-app screen calls any of them today �
 
 So today, "admin only oversees/escalates" is an **organizational convention the owner has chosen to follow, not a permission the system enforces** — nothing stops an admin account from doing full-time accountant-style order processing, and nothing in the UI signals "you're the escalation path." **Decision: leave this as is (owner-confirmed 2026-07-07)** — see [decisions.md](../decisions.md) D11 for the full reasoning and what would need to change if a real enforced split is ever wanted.
 
+### Phase 3 (multi-brand) breaks this: order approval is genuinely admin-only
+
+**Not built — ships with LG (Phase 3); recorded here so the role model is designed once.** Approval-required brands (LG today: a manual-pricing brand where the salesman types the price) need the **owner to sign off on an order before it can be processed** (booked into Tally). This is the **first in-app capability that is truly admin-exclusive** — unlike the four dormant RLS policies above, it is exercised through a real screen — so it is the exact point at which "admin and accountant are functionally identical in-app" (D11) stops holding:
+
+- **Only `admin` may approve** (`pending_approval → approved`) via a new `approve_order` RPC whose role check is `v_role = 'admin'` (**not** `in ('accountant','admin')`). The accountant **cannot** approve — approval is the owner's price sign-off, deliberately reserved.
+- **The accountant still processes**, but `process_order` on an approval-brand order is **blocked until it is `approved`**. Non-approval brands (Zebronics) are untouched: `submitted → processed`, no approval step.
+- Driven by a brand property **`brands.requires_approval boolean`** (Zebronics `false`, LG `true`) — full design in [../phase3-multi-brand-design.md](../phase3-multi-brand-design.md); state machine in [order-lifecycle.md](order-lifecycle.md).
+
+When built, `approve_order` is the **first admin-only RPC branch** in the codebase (every existing RPC checks `in ('accountant','admin')`), and the `guard_order_transition` trigger must also reject any `→ approved` written by a non-admin — so the rule holds even outside the RPC.
+
 ## Provisioning (runbook)
 
 1. Admin creates the user in Supabase Dashboard → Authentication → "Add user" (email + password, auto-confirm on). **Also set a username in User Metadata** — `{"username": "raju1"}` (D9) — the login screen uses this, not the email; pick it freely, never just the email's local-part.

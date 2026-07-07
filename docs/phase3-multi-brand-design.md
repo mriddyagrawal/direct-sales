@@ -43,20 +43,31 @@ Zebronics is catalog-priced; **LG requires the salesman to enter the price per l
 Carry the flag as `brands.pricing_mode text not null default 'fixed' check (pricing_mode in ('fixed','manual'))`. `order_items.unit_price_paise` already works for both — only the *source* differs.
 
 ### Approval gate — manual-priced orders need admin sign-off
-A **manual-priced (LG) order must be approved by the admin in the dashboard before it goes forward** (before it can be processed / booked into Tally). Owner specified **admin**, not accountant. Wiring:
-- Add a **`pending_approval`** status. ⚠️ PLAN Phase 5 calls this "status headroom," but the live `orders.status` CHECK is only `('submitted','processed','cancelled')` — so this is a real migration to extend the enum, not free headroom.
-- A manual-brand order lands in `pending_approval` at submit; only the **admin** can approve → `submitted` (then the normal process path). A fixed-brand (Zebronics) order skips this, straight to `submitted` as today.
-- Dashboard gets an **approvals view/filter** (admin-only: approve / reject-with-reason); the action writes an `order_events` entry.
+A **manual-priced (LG) order must be approved by the admin before it can be processed** (booked into Tally). Owner specified **admin**, not accountant. Model it as **two new statuses**, not one:
+- **`pending_approval`** — where a `requires_approval` brand's order lands at submit (Zebronics skips straight to `submitted` as today). Salesman-editable within the 2h window, derived-locked after — behaves like `submitted`.
+- **`approved`** — admin has signed off; salesman read-only; only now can the accountant `process_order` it — behaves like `processed` for the salesman.
+
+⚠️ The live `orders.status` CHECK is only `('submitted','processed','cancelled')` — adding both is a **real migration**, not the "status headroom" PLAN Phase 5 implies.
+
+Wiring:
+- Drive it off a brand flag **`brands.requires_approval boolean not null default false`** (kept separate from `pricing_mode` — for LG they coincide, but they're independent concepts). `submit_order` sets the initial status from it.
+- New **admin-only `approve_order` RPC** (`v_role = 'admin'`): `pending_approval → approved`, stamp `approved_at`/`approved_by`, log event `approved`. Approval **beats the timer** — it locks the salesman out immediately, exactly as `process_order` already does.
+- `process_order` accepts `submitted` (fixed brands) **or** `approved` (approval brands); it rejects `pending_approval` ("must be approved first").
+- Dashboard gets a **Pending approval** filter/tab (admin acts there). Additive columns: `orders.approved_at timestamptz`, `orders.approved_by uuid references profiles(id)`.
+- **Reject** is *not* a separate state at launch: an admin who won't approve **cancels with a reason** (existing accountant/admin path) and the salesman re-submits. Add a keep-the-row reject/return loop only if it's actually wanted.
 
 ### Relationship to Phase 5
 Phase 5 was *tiered discounts off a list price, no free-typing*. LG is the opposite — free manual entry, no tiers, no floor — gated by **admin approval** instead of a discount-floor rule. They can coexist later (fixed+tiered for some brands, manual+approval for others).
 
-### Open (design when built)
-- Can the salesman edit / see "awaiting approval" on a `pending_approval` order? What does **reject** do (back to salesman? cancelled)? Exact event names. Whether the 2h edit window applies before approval.
+### Resolved (2026-07-07, owner discussion)
+- Salesman **can** edit a `pending_approval` order (and sees a **Pending approval** chip) within the normal 2h window. ✅
+- The 2h window **applies**, and **approval beats it** — approving locks the salesman out immediately, like processing. ✅
+- **Reject** = cancel-with-reason (no separate status); the approval event name is `approved`. ✅
+- Approve moves to a distinct **`approved`** state (not back to `submitted`), so an approved LG order is never confused with a fresh Zebronics one and can't be re-edited. ✅
 
 ## What does NOT change
 
-`order_items`/snapshots, the RPC-only write model, the RLS matrix, money (integer paise), the lifecycle/states and edit window — **for the brand/ref change** above. (The LG **`manual` pricing mode** *does* touch the RPC's price source and adds a `pending_approval` state — see that section.) Adding a brand at runtime = **new CSV in `data/` + a `brands` row (+`code`) + brand-prefixed SKUs** — data, per D4 and [seed-data.md](specs/seed-data.md).
+`order_items`/snapshots, the RPC-only write model, the RLS matrix, money (integer paise), the lifecycle/states and edit window — **for the brand/ref change** above. (The LG **`manual` pricing mode** *does* touch the RPC's price source and adds the `pending_approval` + `approved` states — see that section.) Adding a brand at runtime = **new CSV in `data/` + a `brands` row (+`code`) + brand-prefixed SKUs** — data, per D4 and [seed-data.md](specs/seed-data.md).
 
 ## Build scope when Phase 3 lands
 

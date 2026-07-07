@@ -37,6 +37,29 @@ locked_for_salesman(order) :=
 
 Everything else is illegal and rejected by the `guard_order_transition` trigger (including `processed → submitted`, any resurrection of `cancelled`, and any status write outside the RPCs).
 
+## Phase 3 (multi-brand) — approval states (NOT built)
+
+Recorded here so the state machine is designed once; ships with LG (Phase 3), not now. Today only `submitted / processed / cancelled` are reachable. See [roles-and-permissions.md](roles-and-permissions.md) (admin-only approval) and [phase3-multi-brand-design.md](../phase3-multi-brand-design.md) (full design).
+
+Approval-required brands (`brands.requires_approval = true`, e.g. LG) insert an admin sign-off between submit and process. **Two** new stored statuses (not one):
+
+- **`pending_approval`** — an approval-brand order lands here at submit (a `requires_approval = false` brand like Zebronics still lands in `submitted`). Behaves like `submitted` for the salesman: editable within the window, derived-locked after it.
+- **`approved`** — the admin has signed off. Behaves like `processed` for the salesman: read-only. Only now can the accountant process it.
+
+| Transition | Actor | Notes |
+|---|---|---|
+| *(client draft)* → `pending_approval` | owning salesman | only when the order's brand has `requires_approval` |
+| `pending_approval` → `approved` | **admin only** | `approve_order` RPC; stamps `approved_at/by`; **beats the timer** — locks the salesman out immediately, exactly as `process_order` does; event `approved` |
+| `pending_approval` → `cancelled` | salesman while editable / accountant-admin any time | reason required from accountant/admin |
+| `approved` → `processed` | accountant / admin | the normal process path, now gated on prior approval |
+| `approved` → `cancelled` | accountant / admin | reason required |
+
+`process_order` on a `pending_approval` order is **rejected** ("must be approved first"). `pending_approval → processed` (skipping approval) and `submitted → approved` (a non-approval brand has nothing to approve) are both illegal.
+
+Derived lock extends to: `status IN ('processed','cancelled','approved') OR (status IN ('submitted','pending_approval') AND now() >= editable_until)`.
+
+Additive schema: `orders.approved_at timestamptz`, `orders.approved_by uuid references profiles(id)`, `brands.requires_approval boolean not null default false`. New event `approved` (actor admin). **Reject is deliberately not a separate state at launch** — an admin who won't approve **cancels with a reason** (existing path) and the salesman re-submits; revisit only if a keep-the-row reject/return loop is actually wanted.
+
 ## Editing rules
 
 | Order condition | Owning salesman | Accountant / admin |
