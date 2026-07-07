@@ -55,22 +55,43 @@
   gap: 8px;
 }
 
+/* Folder-tab strip (S8 revamp commit 3). Inactive tabs are plain text — no
+   box at all. The active tab is the only one that draws anything: a white,
+   hairline box with square-ish top corners and no bottom border, sized to
+   overlap the table's 2px top rule by ~1px so it reads as a physical tab
+   connected to the ledger below it. The outline is the active signal, not
+   color — label stays ink either way, only weight/box change. */
 .filterTab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   min-height: 32px;
   padding: 0 10px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
+  background: none;
+  border: none;
   font-family: var(--font-structure);
   font-size: 12px;
-  font-weight: 600;
-  color: var(--color-locked);
+  font-weight: 500;
+  color: var(--color-ink);
   cursor: pointer;
 }
 
+.tabCount {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
 .filterTabActive {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
+  font-weight: 600;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding-bottom: 5px;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
 }
 
 .select {
@@ -113,6 +134,10 @@
   display: none;
   width: 100%;
   border-collapse: collapse;
+  /* The folder-tab strip's baseline (.filterTabActive overlaps this by
+     ~1px) — without an explicit top rule here, the active tab would have
+     nothing to visually connect to. */
+  border-top: 2px solid var(--color-ink);
 }
 
 .table thead th {

@@ -99,8 +99,12 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
   // at pilot scale, but the seam to swap in a server-side range query lives
   // right here if order volume ever outgrows a single client-side fetch.
   const q = query.trim().toLowerCase();
-  const finalFiltered = orders.filter((o) => {
-    if (status !== "all" && o.status !== status) return false;
+
+  // Two stages: `scoped` = everything except the status tab (drives the
+  // per-tab counts below, so a count reflects the salesman/range/search
+  // scope regardless of which tab is active); `finalFiltered` narrows that
+  // by the active tab and is what the table/keyboard-nav actually render.
+  const scoped = orders.filter((o) => {
     if (salesmanId !== "all" && o.salesman_id !== salesmanId) return false;
     if (range?.from) {
       const key = istDateKey(new Date(o.submitted_at));
@@ -114,6 +118,15 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
     }
     return true;
   });
+
+  const tabCounts: Record<StatusFilter, number> = {
+    all: scoped.length,
+    submitted: scoped.filter((o) => o.status === "submitted").length,
+    processed: scoped.filter((o) => o.status === "processed").length,
+    cancelled: scoped.filter((o) => o.status === "cancelled").length,
+  };
+
+  const finalFiltered = status === "all" ? scoped : scoped.filter((o) => o.status === status);
 
   // Derived, not effect-synced: a filter change can shrink the list out from
   // under a stale selectedIndex — clamp it for rendering/Enter instead of a
@@ -162,7 +175,8 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
               className={`${styles.filterTab} ${status === s ? styles.filterTabActive : ""}`}
               onClick={() => setStatus(s)}
             >
-              {s === "all" ? "All" : s[0].toUpperCase() + s.slice(1)}
+              {s === "all" ? "All" : s[0].toUpperCase() + s.slice(1)}{" "}
+              <span className={styles.tabCount}>{tabCounts[s]}</span>
             </button>
           ))}
         </div>
