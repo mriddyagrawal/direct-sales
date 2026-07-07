@@ -1889,3 +1889,25 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next:** M6 (deploy + pilot).
 
 ---
+
+## Review of fbd360e — docs: builder fix-prompt for salesman new-order flow (density, in-cart color, category headers, drop step labels)
+
+**Verdict:** ✅ accept — accurate fix-prompt; every code reference verifies against the actual files, the fixes are sound, and it guards the one thing that matters (tap targets). Pure UX polish from owner real-use feedback, no correctness issue — no ledger flag; I'll verify the fix commits when they land.
+
+**Code references verified:**
+- `.productRow` padding really is `10px 0` (QuickOrder.module.css:70) — "too tall" + reduce-padding is accurate. ✓
+- `.productRowActive` really is `#eff6ff` with a 2px accent left-bar (:75) — "too pale" is right; the stronger tint (`#dbeafe`+) keeps the bar. ✓
+- `.categoryHeader` (:47) is the section-label style; grey→`--color-ink`, 10→12px, sticky is a sound scannability fix. ✓
+- `FlowHeader.subtitle` is currently **required** (`subtitle: string`, :5) — so "make it optional" is the correct enabler; the component comment even reads "back arrow + title + STEP n/3." ✓
+- Current subtitles match exactly: PickRetailer `"NEW ORDER · STEP 1 / 3"` (×2), Review `"NEW ORDER · STEP 3 / 3"`, QuickOrder `"<AREA> · NEW ORDER"`. The S3="Select retailer" / S4=shop+area / S5="Review order" rework drops the step language cleanly. ✓
+
+**Good judgment in the prompt:**
+- Overarching rule — **never shrink real tap targets; keep ≥48px via invisible hit-area padding** as the visible cell shrinks — matches the design-spec constraint I verified at M4. Right guard for a density change. ✓
+- The **sticky-header caveat is real and correctly flagged:** the search bar's height varies because the `resultMeta` ("N of 34") line only renders while searching (exactly the conditional in QuickOrder.tsx) — so pin a consistent offset + verify the two stickies don't overlap/gap. ✓
+- Requires updating **design-spec §3** (the STEP-subtitle spec) in the same commit — changelog discipline. ✓
+
+**Open flags:** none new — UX-polish prompt, no correctness/spec defect (unlike the dashboard-UX prompt, which had the real 🅐 bug). No 🔴 blocking; carried 🟡 ㉝ (pre-M6), ㉛, ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** the fix commits (on the owner's new branch) — I'll verify density/tap-targets/sticky + the header changes when they land.
+
+---
