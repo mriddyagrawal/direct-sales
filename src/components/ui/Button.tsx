@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 import styles from "./Button.module.css";
 
-type ButtonVariant = "primary" | "secondary" | "destructive" | "destructive-filled" | "ink";
+type ButtonVariant = "primary" | "secondary" | "destructive" | "destructive-filled" | "ink" | "amber";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;

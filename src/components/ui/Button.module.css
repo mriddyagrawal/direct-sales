@@ -46,6 +46,11 @@
   color: var(--color-white);
 }
 
+.amber {
+  background: var(--color-amber);
+  color: var(--color-white);
+}
+
 .spinner {
   width: 16px;
   height: 16px;

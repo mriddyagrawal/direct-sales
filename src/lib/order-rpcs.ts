@@ -6,9 +6,13 @@ type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
 // Thin wrappers around the four write RPCs (supabase/migrations/
 // 20260706T150400_rpcs.sql). The client only ever sends product_id + qty —
 // prices are snapshotted server-side from the catalog inside the RPC; never
-// collect or send a price here.
+// collect or send a price here. A zero/removed line must never reach the
+// payload — the DB's `qty between 1 and 9999` check would reject the whole
+// order (review flag ㉔); filter defensively here, not just at the caller.
 function toItemsPayload(items: Record<string, number>) {
-  return Object.entries(items).map(([product_id, qty]) => ({ product_id, qty }));
+  return Object.entries(items)
+    .filter(([, qty]) => qty > 0)
+    .map(([product_id, qty]) => ({ product_id, qty }));
 }
 
 // A network failure (offline, DNS, timeout) throws before the server ever
@@ -17,15 +21,29 @@ function toItemsPayload(items: Record<string, number>) {
 // plainly, never silently queued for retry.
 export class OfflineError extends Error {}
 
-function isOfflineFailure(error: unknown): boolean {
-  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
-  // supabase-js surfaces a fetch-level failure (no HTTP response at all) as
-  // a plain TypeError ("Failed to fetch" / "Load failed"), distinct from a
-  // PostgrestError (which has a `code`/`message` from Postgres itself).
-  return error instanceof TypeError;
+interface RpcErrorLike {
+  message: string;
+  code?: string;
 }
 
-async function callRpc<T>(fn: () => PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T> {
+// review flag ㉓: navigator.onLine alone is not reliable — it reports "has a
+// link," not "can reach the server," so a captive portal/DNS failure/flaky
+// signal can resolve (not throw) with an error while onLine still reads
+// true. A genuine Postgres rejection always carries a SQLSTATE in `code`
+// (P0001 from `raise exception`, 23505 from a constraint, ...); a resolved
+// transport failure has none. Treat "no code" as offline too, or a real
+// rejection would occasionally get misclassified as a real one and vice
+// versa — silently dropping a submission that should have retried.
+function isOfflineFailure(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
+  if (error && typeof error === "object" && "message" in error) {
+    return !(error as RpcErrorLike).code;
+  }
+  return false;
+}
+
+async function callRpc<T>(fn: () => PromiseLike<{ data: T | null; error: RpcErrorLike | null }>): Promise<T> {
   let result;
   try {
     result = await fn();

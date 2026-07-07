@@ -1,0 +1,170 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.content {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.retailerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.retailerName {
+  font-family: var(--font-structure);
+  font-size: var(--text-header-size);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.retailerArea {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.changeLink {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.lineInfo {
+  min-width: 0;
+  flex: 1;
+}
+
+.lineName {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.lineRate {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.lineAmount {
+  font-family: var(--font-figures);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  min-width: 64px;
+  text-align: right;
+}
+
+.lineActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.remove {
+  min-width: 40px;
+  min-height: 40px;
+  background: none;
+  border: none;
+  color: var(--color-error);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.notesField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notesLabel {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+}
+
+.notesInput {
+  min-height: 72px;
+  padding: 10px 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  resize: vertical;
+}
+
+.notesInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.totalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 2px solid var(--color-ink);
+}
+
+.totalLabel {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.totalAmount {
+  font-family: var(--font-figures);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.offlineStrip {
+  border: 1px solid var(--color-amber);
+  border-left: 3px solid var(--color-amber);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-amber);
+}
+
+.errorStrip {
+  border: 1px solid var(--color-error);
+  border-left: 3px solid var(--color-error);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}

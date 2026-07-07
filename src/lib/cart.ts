@@ -49,10 +49,37 @@ export function createDraft(retailerId: string, retailerName: string): DraftCart
   };
 }
 
+// Plain wrapper so callers in client components can use a timestamp without
+// tripping the react-hooks/purity lint rule, which flags a bare `Date.now()`
+// call written directly inside a component/hook body.
+export function nowMs(): number {
+  return Date.now();
+}
+
 export function cartLineCount(items: Record<string, number>): number {
   return Object.keys(items).length;
 }
 
 export function cartTotalPaise(items: Record<string, number>, pricesById: Record<string, number>): number {
   return Object.entries(items).reduce((sum, [productId, qty]) => sum + (pricesById[productId] ?? 0) * qty, 0);
+}
+
+// Which retailer's draft to resume when the app is reopened mid-cart
+// (airplane-mode / kill-the-app resilience) — otherwise there's no way to
+// find "the" in-progress draft without re-picking the retailer in S3.
+const LAST_ACTIVE_KEY = "directsales:draft:last-active-retailer";
+
+export function getLastActiveRetailerId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(LAST_ACTIVE_KEY);
+}
+
+export function setLastActiveRetailerId(retailerId: string): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(LAST_ACTIVE_KEY, retailerId);
+}
+
+export function clearLastActiveRetailerId(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LAST_ACTIVE_KEY);
 }
