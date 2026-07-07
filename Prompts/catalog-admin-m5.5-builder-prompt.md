@@ -9,7 +9,7 @@ Let the **admin** grow the Products catalog two ways — a **manual Add/Edit mod
 - **Money:** integer paise in the DB; **≤2 decimals accepted → paise, >2 rejected**; display via existing `formatRupees`.
 - **Never delete/deactivate on import** — report untouched rows, don't touch them.
 - **Upsert idempotent on `(brand_id, tally_name)`** — re-running the same file is a no-op.
-- Stack: Next 16 App Router, React 19, CSS Modules, `@supabase/ssr`. Admin has RLS `ALL` on products, so writes go through the admin's own session (no service role). Tokens/primitives: `Field`, `Button` in `src/components/ui/`, `formatRupees` in `src/lib/format.ts`, design tokens in `globals.css`.
+- Stack: Next 16 App Router, React 19, CSS Modules, `@supabase/ssr`. Admin holds INSERT (`products_admin_insert`) + UPDATE (`products_staff_update`) + SELECT on products (no DELETE — there is no literal `ALL` policy), so the upsert runs through the admin's own session — no service role. Tokens/primitives: `Field`, `Button` in `src/components/ui/`, `formatRupees` in `src/lib/format.ts`, design tokens in `globals.css`.
 - Each commit compiles and leaves the app runnable; the reviewer verifies by execution (desktop **and** phone).
 
 ## Current state (verified against the live DB)
@@ -22,13 +22,13 @@ New migration `supabase/migrations/<ts>_catalog_admin.sql`, applied via the Supa
 1. `update products set tally_name = name where tally_name is null;`
 2. `alter table products alter column tally_name set not null;`
 3. `alter table products add constraint products_brand_tally_key unique (brand_id, tally_name);`
-4. **Recreate the order RPCs** to swap the audit payload key. In `20260706T150400_rpcs.sql` (L166, L219) and `20260707T120000_update_order_items_reason.sql` (L77, L127) the functions build `jsonb_build_object('sku', p.sku, 'qty', oi.qty, 'unit_price_paise', oi.unit_price_paise)` — change each to `jsonb_build_object('tally_name', p.tally_name, 'qty', oi.qty, 'unit_price_paise', oi.unit_price_paise)`. Use `create or replace function` for the affected functions inside the new migration.
+4. **Swap the audit payload key — `update_order_items` ONLY** (reviewer ㉞, verified live). It is the **only** function that emits `sku`; `submit_order` / `process_order` / `cancel_order` emit **none** — do **not** touch them (recreating them risks a needless regression). Its **live** definition is the **4-arg `p_reason` body** in `20260707T120000_update_order_items_reason.sql`, which supersedes the 3-arg copies in `20260706T150400_rpcs.sql` and `20260706T150800_rename_current_role.sql` — **do NOT copy from those: they lack the mandatory-`p_reason`-after-lock logic (㉘) and copying them regresses it.** In the new migration, `create or replace function update_order_items(...)` from that **current 4-arg body verbatim**, changing only its **two** `jsonb_build_object('sku', p.sku, …)` sites to `jsonb_build_object('tally_name', p.tally_name, …)`.
 5. `alter table products drop column sku;` (drops the column + its unique constraint). Remove any `sku ~ '^ZEB-'` post-seed check if present.
 6. Regenerate `src/lib/types/database.types.ts` (MCP `generate_typescript_types`).
 7. **Keep the app compiling:** `ProductsPricing.tsx` L155 renders `{p.sku}` and `page.tsx` selects `sku` — remove those minimal references now (full ledger rework is commit 2).
 8. Docs: update the event catalog in [docs/specs/order-lifecycle.md](../docs/specs/order-lifecycle.md) (`before`/`after` = `{ tally_name, qty, unit_price_paise }`) and the `tally_name` note in [docs/specs/seed-data.md](../docs/specs/seed-data.md).
 
-**Acceptance:** migration applies; `submit_order` / `update_order_items` still work end-to-end and now emit `tally_name` in `order_events` (verify by submitting + editing a test order and reading the event row); `products` has no `sku`; `unique(brand_id, tally_name)` rejects a dup; types regenerated; `npm run build` clean.
+**Acceptance:** migration applies; a submitted **and edited** test order works end-to-end and the **edit** now emits `tally_name` (not `sku`) in its `order_events` row — `submit_order` is unchanged (it never emitted `sku`) and its `p_reason`-after-lock guard (㉘) still fires; `products` has no `sku`; `unique(brand_id, tally_name)` rejects a dup; types regenerated; `npm run build` clean.
 
 ## Commit 2 — Products ledger table
 Rework the Products page into the ledger from screen 1 (this replaces the grouped card list):
