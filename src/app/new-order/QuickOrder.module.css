@@ -82,9 +82,7 @@
 
 .productRow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
   padding: 6px 0;
   border-bottom: 1px solid var(--color-hairline);
 }
@@ -95,6 +93,36 @@
   padding-left: 8px;
   margin-left: -8px;
   margin-right: -2px;
+}
+
+/* Collapsed by default (test/salesman-ui-collapse) — the whole head is the
+   tap target that reveals .stepperRow below it; kept ≥48px tall even
+   though the visible row is tighter (design spec §2's tap-target rule). */
+.productHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.expandHint {
+  flex-shrink: 0;
+  color: var(--color-locked);
+  font-size: 10px;
+}
+
+.stepperRow {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
 }
 
 .productInfo {

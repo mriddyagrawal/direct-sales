@@ -45,6 +45,26 @@ export function QuickOrder({
   const pageRef = useRef<HTMLDivElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
 
+  // test/salesman-ui-collapse — rows collapse to name + price by default;
+  // tapping one reveals the stepper below it (same "appears on demand" shape
+  // as the search bar's result-count line). Independent per row (not an
+  // accordion) so a salesman can leave several open while dictating a list.
+  // Seeded once from whatever already has a qty (e.g. reopening a draft) so
+  // existing lines are visible without an extra tap; purely user-driven
+  // after that.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+    () => new Set(Object.keys(items).filter((id) => items[id] > 0)),
+  );
+
+  function toggleExpanded(productId: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  }
+
   // Keep --search-bar-height equal to the search bar's real rendered
   // height so the sticky category headers pin flush beneath it. The bar
   // grows/shrinks when the "N of M products" line appears while searching;
@@ -151,18 +171,31 @@ export function QuickOrder({
               {group.products.map((p) => {
                 const qty = items[p.id] ?? 0;
                 const inCart = qty > 0;
+                const expanded = expandedIds.has(p.id);
                 return (
                   <div key={p.id} className={`${styles.productRow} ${inCart ? styles.productRowActive : ""}`}>
-                    <div className={styles.productInfo}>
-                      <p className={`${styles.productName} ${inCart ? styles.productNameActive : ""}`}>{p.name}</p>
-                      <p className={styles.productPrice}>{formatRupees(pricesById[p.id] ?? p.price_paise)}</p>
-                    </div>
-                    <Stepper
-                      qty={qty}
-                      max={UI_QTY_CAP}
-                      onChange={(next) => onChangeQty(p.id, next)}
-                      onTapQuantity={() => setKeypadProductId(p.id)}
-                    />
+                    <button type="button" className={styles.productHead} onClick={() => toggleExpanded(p.id)}>
+                      <div className={styles.productInfo}>
+                        <p className={`${styles.productName} ${inCart ? styles.productNameActive : ""}`}>{p.name}</p>
+                        <p className={styles.productPrice}>
+                          {formatRupees(pricesById[p.id] ?? p.price_paise)}
+                          {inCart && ` · ${qty} in cart`}
+                        </p>
+                      </div>
+                      <span className={styles.expandHint} aria-hidden>
+                        {expanded ? "︿" : "﹀"}
+                      </span>
+                    </button>
+                    {expanded && (
+                      <div className={styles.stepperRow}>
+                        <Stepper
+                          qty={qty}
+                          max={UI_QTY_CAP}
+                          onChange={(next) => onChangeQty(p.id, next)}
+                          onTapQuantity={() => setKeypadProductId(p.id)}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
