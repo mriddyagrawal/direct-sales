@@ -2445,3 +2445,28 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Commit 1 (backend). I'll verify by execution: signature byte-for-byte unchanged; a **no-brand** client still submits (backward-compat); all-Zebronics submit → `brand_id` set + `ORD-ZEB-2026-xxxx`; crafted **mixed-brand** submit → rejected; `update_order_items` foreign-brand line → rejected with the ㉘ `p_reason` guard intact; existing 7 orders backfilled to Zebronics; build clean.
 
 ---
+
+## Review of baa3509 — prompt(phase3a): add commit 4 — Products mobile Brand-Category sticky grouping + de-dup cards
+
+**Verdict:** ✅ accept — a small, accurate frontend-only prompt addition whose rationale is verified against live + repo. Adds Commit 4 to the Phase-3a prompt: apply commit-2's Brand ▸ Category two-tier sticky grouping to the admin Products **mobile card** view and slim the cards; desktop table unchanged.
+
+**Phase / commit goal (as I understood it):** Extend the Phase-3a prompt with a 4th commit — group the Products mobile cards under Brand ▸ Category sticky headers (mirroring commit 2's Quick Order), drop the now-redundant brand/category from the card body, show the Tally line only when `tally_name !== name`; preserve M5.5's render-from-prop + row-click-edit + inline-Active (㉜🅐/🅑); desktop table untouched.
+
+**What works (verified):**
+- **The redundancy claim is real** — `ProductsPricing.tsx:174` mobile card renders `{p.brands?.name ?? "—"} · {p.category} · {p.tally_name}`, exactly the "brand · category · tally_name" the prompt targets.
+- **"Tally echoes the display title" is empirically true** — live: **42/42 products have `tally_name == name`** (0 differ). So today every card's tally line duplicates its title verbatim; "show Tally only when it differs" correctly hides it across the whole current catalog while still surfacing a genuinely distinct tally later. The desktop table keeps its own TALLY column (`:130`), so nothing is lost there.
+- **Scope + flag refs accurate** — frontend-only (ProductsPricing card view + CSS), desktop table unchanged, and the ㉜🅐/🅑 (render-from-prop + stay-busy toggle) + row-click-edit behaviours it says to preserve are the real M5.5 patterns.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** At build time watch that the nested sticky (brand-header height added to the category bar's `top`) is genuinely shared with / consistent with commit 2's Quick Order, and that the slimmed card keeps the Active toggle's `stopPropagation` (so grouping headers/cards don't swallow the toggle or the row-click edit). Phone check for sticky overlap (the classic failure).
+
+**Domain / correctness checks:** N/A — prompt/doc text only; no data/RLS/money/state surface. The tally-hide is display-only; the stored `tally_name` key is untouched.
+
+**What I tried:** `git show baa3509` (+8 lines); confirmed `ProductsPricing.tsx:174` card-meta line + desktop tally column at `:130`; live `select count(*) filter (where tally_name=name)` → **42/42** equal (rationale holds).
+
+**Open flags (cumulative):** No 🔴 blocking, no new flags. Carried 🟡 ㉝ (pre-M6 migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Phase-3a Commit 1 (backend brand attribute + guard + ref) — verification plan in the 76a817f block (signature unchanged, no-brand client still submits, mixed-brand rejected, ㉘ guard intact, 7 orders backfilled).
+
+---
