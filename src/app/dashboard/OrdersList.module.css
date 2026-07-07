@@ -147,13 +147,17 @@
 
 /* Column weight/color hierarchy (S8 desktop ledger) — SUBMITTED + SALESMAN
    recede as metadata; RETAILER is the primary scan target. REF/TOTAL are
-   unstyled here on purpose (stay full-ink via .mono/.table td). */
-.cellMeta {
-  color: var(--color-locked);
+   unstyled here on purpose (stay full-ink via .mono/.table td).
+   Scoped as `.table td.cellX` (not just `.cellX`) so the extra class beats
+   `.table td`'s own color rule on specificity — a bare `.cellMeta { color }`
+   loses that fight (0,1,0 vs 0,1,1) and silently never applies, which is
+   why the table read as one flat color before this fix. */
+.table td.cellMeta {
+  color: #747b88;
   font-weight: 400;
 }
 
-.cellRetailer {
+.table td.cellRetailer {
   color: var(--color-ink);
   font-weight: 600;
 }
