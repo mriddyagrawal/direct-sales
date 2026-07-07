@@ -19,7 +19,14 @@
   color: var(--color-ink);
   cursor: pointer;
   padding: 0;
-  margin: -12px;
+  /* Horizontal-only tuck: pulls the 48px tap target toward the left
+     edge without a vertical negative margin (the old `margin: -12px`
+     shrank the button's margin box vertically and threw its glyph off
+     the title block's center). Vertical centering is now purely
+     align-items:center on .header, so the arrow sits dead-center of the
+     one- or two-line title on every page. */
+  margin: 0 0 0 -12px;
+  flex-shrink: 0;
 }
 
 .titles {

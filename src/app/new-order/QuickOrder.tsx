@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FlowHeader } from "@/components/ui/FlowHeader";
 import { Stepper } from "@/components/ui/Stepper";
 import { KeypadSheet } from "@/components/ui/KeypadSheet";
@@ -42,6 +42,25 @@ export function QuickOrder({
 }: QuickOrderProps) {
   const [query, setQuery] = useState("");
   const [keypadProductId, setKeypadProductId] = useState<string | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const searchBarRef = useRef<HTMLDivElement>(null);
+
+  // Keep --search-bar-height equal to the search bar's real rendered
+  // height so the sticky category headers pin flush beneath it. The bar
+  // grows/shrinks when the "N of M products" line appears while searching;
+  // a ResizeObserver writes the live height to the page's CSS var (a plain
+  // DOM style mutation — no React state, no re-render), so the offset is
+  // always exact without reserving a blank line.
+  useEffect(() => {
+    const bar = searchBarRef.current;
+    const page = pageRef.current;
+    if (!bar || !page) return;
+    const sync = () => page.style.setProperty("--search-bar-height", `${bar.offsetHeight}px`);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
 
   // Snapshot prices (existing lines, if editing) win over the live catalog
   // price — a catalog re-price never rewrites what a survivor line shows.
@@ -76,22 +95,20 @@ export function QuickOrder({
     .map((id) => ({ id, name: snapshotNames![id], qty: items[id], price: pricesById[id] ?? 0 }));
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={pageRef}>
       <FlowHeader title={retailerName} subtitle={retailerArea ?? undefined} onBack={onBack} />
-      <div className={styles.searchBar}>
+      <div className={styles.searchBar} ref={searchBarRef}>
         <input
           className={styles.searchInput}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search name or SKU"
         />
-        {/* Always rendered (not conditionally) so the search bar's height —
-            and therefore .categoryHeader's sticky offset, which is pinned
-            to it via --search-bar-height — never shifts between the
-            "searching" and "idle" states. */}
-        <span className={styles.resultMeta}>
-          {q !== "" ? `${filtered.length} of ${products.length} products` : " "}
-        </span>
+        {q !== "" && (
+          <span className={styles.resultMeta}>
+            {filtered.length} of {products.length} products
+          </span>
+        )}
       </div>
 
       <div className={styles.list}>

@@ -1,11 +1,12 @@
 .page {
-  /* Fixed search-bar height — kept in sync with .searchBar's actual
-     rendered height (padding 20px + 44px input + 4px gap + 14px result
-     line) so .categoryHeader's sticky offset never drifts from it. The
-     result line is always rendered in QuickOrder.tsx (just visually
-     empty when not searching) specifically so this height stays constant
-     instead of varying by search state. */
-  --search-bar-height: 83px;
+  /* Sticky category headers pin just under the search bar. The search
+     bar's height changes with state (the "N of M products" line only
+     shows while searching), so QuickOrder.tsx measures it live with a
+     ResizeObserver and writes the real px here — the category header's
+     `top: var(--search-bar-height)` then always tracks it exactly, with
+     no reserved blank line. This 64px is only the SSR/no-JS fallback
+     (padding 20px + 44px input, idle state). */
+  --search-bar-height: 64px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -60,10 +61,15 @@
   font-size: 12px;
   letter-spacing: var(--text-section-label-tracking);
   text-transform: uppercase;
-  color: var(--color-ink);
+  color: var(--color-accent);
   border-bottom: 1px solid var(--color-hairline);
-  padding: 8px 0 4px;
-  margin-top: 8px;
+  /* Full-bleed: .list insets its children 16px; the −16px side margins
+     pull the white band + hairline rule out to the screen edges while
+     the matching 16px side padding keeps the label/count at the content
+     inset — so the sticky strip spans edge-to-edge and product rows
+     scrolling under it never peek through a side gutter. */
+  margin: 8px -16px 0;
+  padding: 8px 16px 4px;
   position: sticky;
   top: var(--search-bar-height);
   z-index: 9;
