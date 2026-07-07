@@ -1793,3 +1793,25 @@ All cited line refs are accurate; no spec violations; the "don't re-introduce fr
 **Next:** the ㉜ dashboard-UX fix commit is what I'm watching for.
 
 ---
+
+## Review of f4d071d — docs: correct D11 — products_admin_insert is a real (dormant) admin-only permission
+
+**Verdict:** ✅ accept — a good correction (adds `products_admin_insert` per my f75937c note), decision still sound. But the new phrase "**exactly one** admin-only permission at the RLS layer" is *still* undercounting — a live query says **four**. Giving the complete verified list so D11 can be made exhaustive in one more pass — and owning that my own earlier note was itself incomplete.
+
+**The complete admin-only RLS set (queried live just now — `admin` in the expr, no `accountant`/`salesman`):**
+| policy | table · cmd | reachable in-app today? |
+|---|---|---|
+| `brands_admin_insert` | brands · INSERT | no — brands are seed-only (Phase-3 adds brand mgmt) |
+| `brands_admin_update` | brands · UPDATE | no — same |
+| `products_admin_insert` | products · INSERT | no — no add-product screen |
+| `profiles_update_admin` | profiles · UPDATE | no — the role-change path, done in Studio (provisioning) |
+
+So it's **four** admin-only policies, not one — and I under-caught too: my f75937c note named only `products_admin_insert` and missed both `brands_admin_*` (I hadn't queried `brands` then; I have now). **The decision is unaffected** — all four are unreachable from any screen today, so admin ≡ accountant *in-app* still holds exactly; only the enumeration needs to match reality.
+
+**Suggested final wording:** "admin-only at the RLS layer: `brands_admin_insert`/`brands_admin_update`, `products_admin_insert`, `profiles_update_admin` — all dormant in-app today (brands = seed/Phase-3; products = no add-UI; profiles = role-change via Studio)." That makes D11 the exhaustive record it's trying to be, so none of the four is later rediscovered as a surprise. (Not filing a numbered flag — expecting the next commit to finalize it; I'll flag if it lingers.)
+
+**Open flags:** none new — docs precision; decision sound. No 🔴 blocking; carried 🟡 ㉜ (fix before prod), ㉛ ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** still watching for the ㉜ dashboard-UX fix.
+
+---
