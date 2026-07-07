@@ -46,4 +46,4 @@ A deactivated account can't log in (`email_for_username` returns NULL for inacti
 
 ## Why it's these steps
 
-Supabase Auth only authenticates by email/phone — there's no native "log in by arbitrary field." So login does: client → `public.email_for_username(username)` (anon-callable, returns the email only for an **active** profile) → `signInWithPassword({ email, password })`. The username lives on `public.profiles.username` (`citext`, unique). A nonexistent username and a deactivated one look identical (both return NULL) — no account enumeration.
+Supabase Auth only authenticates by email/phone — there's no native "log in by arbitrary field." So login does: client → a Next.js Server Action → `public.email_for_username(username)` (called with a **server-only, service-role client** — `anon`/`authenticated` have **no** grant on it since the ㉑ fix, so it's never reachable from the browser) → `signInWithPassword({ email, password })`, returning the email only for an **active** profile. The username lives on `public.profiles.username` (`citext`, unique). A nonexistent username and a deactivated one look identical (both return NULL) — no account enumeration.

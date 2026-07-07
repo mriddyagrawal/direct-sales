@@ -414,7 +414,12 @@ export type Database = {
         }
       }
       update_order_items: {
-        Args: { p_items: Json; p_notes: string; p_order_id: string }
+        Args: {
+          p_items: Json
+          p_notes: string
+          p_order_id: string
+          p_reason?: string
+        }
         Returns: {
           cancelled_at: string | null
           cancelled_by: string | null

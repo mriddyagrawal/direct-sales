@@ -87,6 +87,7 @@ export async function updateOrderItems(
   orderId: string,
   notes: string,
   items: Record<string, number>,
+  reason?: string,
 ): Promise<OrderRow> {
   const supabase = createClient();
   return callRpc(() =>
@@ -94,6 +95,7 @@ export async function updateOrderItems(
       p_order_id: orderId,
       p_notes: notes,
       p_items: toItemsPayload(items),
+      p_reason: reason,
     }),
   );
 }

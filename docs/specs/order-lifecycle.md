@@ -42,8 +42,8 @@ Everything else is illegal and rejected by the `guard_order_transition` trigger 
 | Order condition | Owning salesman | Accountant / admin |
 |---|---|---|
 | `submitted`, `now() < editable_until` | May edit **items and notes** (not the retailer — cancel and re-order instead) via `update_order_items`; may cancel. | May edit, process, cancel. |
-| `submitted`, past window | Read-only. | May edit (event `edited_after_lock`, with before/after in `details`), process, cancel. |
-| `processed` / `cancelled` | Read-only. | `processed`: may still edit with `edited_after_lock` event (e.g. retailer phoned a correction that's already in Tally — the trail is what matters); may cancel with reason. |
+| `submitted`, past window | Read-only. | May edit **with a required reason** (event `edited_after_lock`, with before/after + `reason` in `details`), process, cancel. |
+| `processed` / `cancelled` | Read-only. | `processed`: may still edit with a required reason, logged as `edited_after_lock` (e.g. retailer phoned a correction that's already in Tally — the trail is what matters); may cancel with reason. |
 
 - **Snapshot semantics on edit:** lines that survive an edit keep their **original** snapshot price (the price at order time is the deal); newly added lines snapshot the catalog price at edit time. Totals recomputed server-side. **Implementation pin (review flag):** the naive delete-all-and-reinsert re-snapshots survivors at *current* catalog prices, silently violating this rule — `update_order_items` must diff by `product_id`, updating qty on survivors (snapshot columns untouched) and inserting only genuinely new lines. Dedicated test required: submit → change the catalog price → edit qty → the line still shows the original price.
 - **Concurrency:** at this scale (D6) last-write-wins within the window is acceptable; every write lands in `order_events`, so nothing is ever silently lost. `process_order` during an in-flight salesman edit wins — the salesman's next write is rejected by the guards.
@@ -69,7 +69,7 @@ Everything else is illegal and rejected by the `guard_order_transition` trigger 
 |---|---|---|
 | `submitted` | salesman | `{ item_count, total_paise }` |
 | `items_changed` | salesman (within window) | `{ before: [...], after: [...] }` |
-| `edited_after_lock` | accountant/admin | `{ before: [...], after: [...], reason? }` |
+| `edited_after_lock` | accountant/admin | `{ before: [...], after: [...], reason }` — **`reason` is required, not optional**: `update_order_items` (M5.1) raises if `p_reason` is null/blank whenever it would log this action, matching accountant-dashboard.md's acceptance criterion #3 |
 | `processed` | accountant/admin | `{}` |
 | `cancelled` | either | `{ reason? }` (required from accountant) |
 | `retailer_quick_added` | salesman | `{ retailer_id, name }` — logged on the first order for an unverified retailer |
