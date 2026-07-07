@@ -1504,3 +1504,21 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** the bottom-bar CSS fix itself — I'll verify the app-shell layout + no-horizontal-scroll then.
 
 ---
+
+## Review of 2c69d999 — fix: crypto.randomUUID() throws in an insecure context, breaking S3 taps
+
+**Verdict:** ✅ accept — correct root-cause fix, proven by execution; unblocks LAN/mobile testing. Closes a gap I'd noted-but-under-weighted at 96880f5.
+
+**The bug:** `createDraft()` called `crypto.randomUUID()` directly, which is spec-gated to secure contexts (https / http://localhost). A phone hitting the dev server at `http://<lan-ip>:3001` is insecure → the method is absent → the call throws inside the retailer-select click handler. (At 96880f5 I wrote "crypto.randomUUID — fine on HTTPS/localhost, note only" — I flagged the gating but judged it immaterial because Vercel is HTTPS, under-weighting plain-LAN device testing, which is exactly where it bit. Good catch by the builder via real mobile testing.)
+
+**The fix:** `generateOrderId()` uses `crypto.randomUUID()` when present, else builds a v4 UUID from `crypto.getRandomValues()` — which, unlike `randomUUID`, is **not** secure-context-gated, so it works over LAN http. The bit-twiddling is correct RFC 4122 v4 (`bytes[6]=…|0x40` version, `bytes[8]=…|0x80` variant).
+
+**Verified by execution** (verbatim fallback under node, forced down the `getRandomValues` branch): **200,000** generated → **0** invalid-format (all match `^…-4…-[89ab]…$`), **200,000 unique** (no collisions). Samples e.g. `1b2a2d20-6ca9-43d9-8f43-fd08384b97a4`. Postgres accepts these as `uuid`, so the idempotency-key / PK contract holds. `grep randomUUID src/` confirms cart.ts is the **only** call site — no other unguarded usage remains.
+
+**Notes:** the commit's secondary theory (one uncaught throw makes the whole page's React tree go inert so every later tap no-ops) is plausible but I didn't independently reproduce the mobile-LAN React behavior — immaterial, since the fix removes the throw entirely. The fallback assumes `crypto.getRandomValues` exists; safe here — `createDraft` is client-only (click handlers / reducer), never SSR, and `getRandomValues` is universally available in browsers (no secure-context gate).
+
+**Open flags:** unchanged — no 🔴 blocking; only 🟡 ㉗(b) (owner-confirm) open.
+
+**Next-commit suggestion:** still the bottom-bar CSS fix (a5fd608's prompt) — app-shell layout + no-horizontal-scroll check when it lands.
+
+---
