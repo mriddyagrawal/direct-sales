@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/Button";
 import { formatRupees } from "@/lib/format";
+import { ProductModal, type BrandOption } from "./ProductModal";
 import type { ProductRow } from "./page";
 import styles from "./ProductsPricing.module.css";
+
+type ModalState = { mode: "add" } | { mode: "edit"; product: ProductRow } | null;
 
 // M5.5 commit 2 — Products catalog ledger (S8 grammar: hairlines, mono
 // figures, muted metadata, bold display name). Replaces the grouped
@@ -16,19 +20,44 @@ import styles from "./ProductsPricing.module.css";
 // server data the table actually shows (a plain useState would read its
 // initializer once and ignore the refresh, leaving a stale row).
 //
-// The only editable surface here is the inline ACTIVE toggle. Price / tally /
-// name editing and "+ Add product" arrive in commit 3 as the row-click
-// Add/Edit modal (per the M5.5 prompt) — until then this screen is a
-// read-only ledger plus that toggle.
-export function ProductsPricing({ initialProducts: products }: { initialProducts: ProductRow[] }) {
+// Editable surfaces: the inline ACTIVE toggle, plus the shared Add/Edit modal
+// — "+ Add product" (admin-only) and row-click to edit any row (accountant
+// edits price/tally/active; admin edits all fields).
+export function ProductsPricing({
+  initialProducts: products,
+  brands,
+  isAdmin,
+}: {
+  initialProducts: ProductRow[];
+  brands: BrandOption[];
+  isAdmin: boolean;
+}) {
   const router = useRouter();
   // review flag ㉜🅑: which row is mid-write, so the toggle it lives on stays
   // busy through the refresh rather than dimming the whole table.
   const [busyId, setBusyId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalState>(null);
 
   const priced = products.filter((p) => p.price_paise !== null).length;
+
+  // Brand-scoped existing categories drive the modal's typeahead + the
+  // "speakers"→"Speakers" normalization (derived from the full catalog).
+  const categoriesByBrand = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const p of products) {
+      const list = (map[p.brand_id] ??= []);
+      if (!list.includes(p.category)) list.push(p.category);
+    }
+    for (const k of Object.keys(map)) map[k].sort((a, b) => a.localeCompare(b));
+    return map;
+  }, [products]);
+
+  function closeAndRefresh() {
+    setModal(null);
+    router.refresh();
+  }
 
   async function toggleActive(p: ProductRow) {
     setBusyId(p.id);
@@ -55,6 +84,13 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
         <span className={styles.count}>
           {products.length} products · {priced} priced
         </span>
+        {isAdmin && (
+          <div className={styles.titleActions}>
+            <Button variant="primary" onClick={() => setModal({ mode: "add" })}>
+              + Add product
+            </Button>
+          </div>
+        )}
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
@@ -77,7 +113,11 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
             </thead>
             <tbody>
               {products.map((p, index) => (
-                <tr key={p.id} className={!p.active ? styles.rowInactive : ""}>
+                <tr
+                  key={p.id}
+                  className={`${styles.clickable} ${!p.active ? styles.rowInactive : ""}`}
+                  onClick={() => setModal({ mode: "edit", product: p })}
+                >
                   <td className={`${styles.mono} ${styles.numeric} ${styles.cellMeta}`}>{index + 1}</td>
                   <td className={styles.cellMeta}>{p.brands?.name ?? "—"}</td>
                   <td className={styles.cellMeta}>{p.category}</td>
@@ -90,7 +130,10 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
                     <button
                       type="button"
                       className={`${styles.toggle} ${p.active ? styles.toggleOn : styles.toggleOff}`}
-                      onClick={() => toggleActive(p)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleActive(p);
+                      }}
                       disabled={busyId === p.id}
                     >
                       {p.active ? "Active" : "Inactive"}
@@ -103,7 +146,19 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
 
           <div className={styles.cards}>
             {products.map((p) => (
-              <div key={p.id} className={`${styles.card} ${!p.active ? styles.cardInactive : ""}`}>
+              <div
+                key={p.id}
+                className={`${styles.card} ${styles.clickable} ${!p.active ? styles.cardInactive : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setModal({ mode: "edit", product: p })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setModal({ mode: "edit", product: p });
+                  }
+                }}
+              >
                 <div className={styles.cardTop}>
                   <span className={styles.cardName}>{p.name}</span>
                   <span className={styles.mono}>
@@ -116,7 +171,10 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
                 <button
                   type="button"
                   className={`${styles.toggle} ${p.active ? styles.toggleOn : styles.toggleOff}`}
-                  onClick={() => toggleActive(p)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleActive(p);
+                  }}
                   disabled={busyId === p.id}
                 >
                   {p.active ? "Active" : "Inactive"}
@@ -125,6 +183,18 @@ export function ProductsPricing({ initialProducts: products }: { initialProducts
             ))}
           </div>
         </>
+      )}
+
+      {modal && (
+        <ProductModal
+          mode={modal.mode}
+          isAdmin={isAdmin}
+          brands={brands}
+          categoriesByBrand={categoriesByBrand}
+          initial={modal.mode === "edit" ? modal.product : undefined}
+          onClose={() => setModal(null)}
+          onSaved={closeAndRefresh}
+        />
       )}
     </div>
   );

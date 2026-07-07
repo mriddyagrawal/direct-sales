@@ -24,6 +24,18 @@
   color: var(--color-locked);
 }
 
+.titleActions {
+  margin-left: auto;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.table tbody tr.clickable:hover {
+  background: rgba(29, 78, 216, 0.05);
+}
+
 .error {
   font-family: var(--font-structure);
   font-size: 12px;
