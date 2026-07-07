@@ -1,0 +1,21 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 60px; /* clears the mobile bottom tab bar */
+}
+
+@media (min-width: 768px) {
+  .shell {
+    flex-direction: row;
+  }
+
+  .main {
+    padding-bottom: 0;
+  }
+}

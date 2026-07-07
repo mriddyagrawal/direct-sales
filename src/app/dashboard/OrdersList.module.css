@@ -1,0 +1,236 @@
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.title {
+  font-family: var(--font-structure);
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
+  color: var(--color-ink);
+}
+
+.liveTag {
+  font-family: var(--font-figures);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-processed);
+  border: 1px solid var(--color-processed);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+}
+
+.count {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterTabs {
+  display: flex;
+  gap: 4px;
+}
+
+.filterTab {
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+}
+
+.filterTabActive {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.select {
+  min-height: 32px;
+  padding: 0 8px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.search {
+  flex: 1;
+  min-width: 160px;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.empty {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+  padding: 24px 0;
+}
+
+.table {
+  display: none;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead th {
+  text-align: left;
+  font-family: var(--font-figures);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-locked);
+  height: 32px;
+  border-bottom: 2px solid var(--color-ink);
+}
+
+.table tbody tr {
+  height: 40px;
+  border-bottom: 1px solid var(--color-hairline);
+  cursor: pointer;
+}
+
+.table tbody tr:nth-child(even) {
+  background: rgba(20, 24, 31, 0.02);
+}
+
+.rowSelected {
+  background: rgba(29, 78, 216, 0.06) !important;
+}
+
+.table td {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.mono {
+  font-family: var(--font-figures);
+}
+
+.numeric {
+  text-align: right;
+}
+
+.newBadge {
+  margin-left: 6px;
+  padding: 2px 6px;
+  background: var(--color-amber);
+  color: var(--color-white);
+  font-family: var(--font-figures);
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: var(--radius);
+}
+
+.footerHint {
+  display: none;
+  font-family: var(--font-figures);
+  font-size: 10px;
+  color: var(--color-locked);
+  padding-top: 4px;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cardMeta {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.cardBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@keyframes rowNew {
+  0% {
+    background-color: #dbeafe;
+  }
+  60% {
+    background-color: #eff6ff;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.rowNew {
+  animation: rowNew 5s ease-out;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: 24px;
+  }
+
+  .table {
+    display: table;
+  }
+
+  .cards {
+    display: none;
+  }
+
+  .footerHint {
+    display: block;
+  }
+}

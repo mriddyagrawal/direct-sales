@@ -1,0 +1,124 @@
+.rail {
+  display: none;
+}
+
+.mobileTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.mobileBottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  height: 60px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--color-white);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brandName {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-ink);
+}
+
+.account {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  color: var(--color-locked);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.mobileTab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--color-inactive);
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  border-top: 2px solid transparent;
+}
+
+.mobileTab.active {
+  color: var(--color-ink);
+  border-top-color: var(--color-accent);
+}
+
+@media (min-width: 768px) {
+  .rail {
+    display: flex;
+    flex-direction: column;
+    width: 200px;
+    flex-shrink: 0;
+    height: 100dvh;
+    position: sticky;
+    top: 0;
+    padding: 20px 16px;
+    background: var(--color-white);
+    border-right: 1px solid var(--color-hairline);
+    gap: 24px;
+  }
+
+  .mobileTop,
+  .mobileBottom {
+    display: none;
+  }
+
+  .railLinks {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .railLink {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    font-family: var(--font-structure);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-locked);
+    border-left: 2px solid transparent;
+  }
+
+  .railLink.active {
+    color: var(--color-accent);
+    background: rgba(29, 78, 216, 0.06);
+    border-left-color: var(--color-accent);
+  }
+
+  .railAccount {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-hairline);
+    font-family: var(--font-structure);
+    font-size: 12px;
+    color: var(--color-locked);
+  }
+}

@@ -1,6 +1,6 @@
 const IST_TIME_ZONE = "Asia/Kolkata";
 
-function istDateKey(date: Date): string {
+export function istDateKey(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: IST_TIME_ZONE,
     year: "numeric",
