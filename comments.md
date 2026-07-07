@@ -2022,3 +2022,37 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Commit 2 (wire the range predicate into `OrdersList` with `DEFAULT_RANGE`, default Last 30 days, IST `istDateKey` inclusive compare, `{n} orders · {rangeLabel}` header, tabs-left/filters-right row) — where I'll first get to verify the *filter behavior* by execution against the live ledger rather than just the component shell.
 
 ---
+
+## Review of c76c120 — feat(dashboard): wire DateRangeFilter into the ledger, default last 30 days (S8 revamp commit 2)
+
+**Verdict:** ✅ accept — the range predicate is correct (inclusive both ends, chronologically-sound string compare), the old date `<select>` is cleanly excised with no dangling refs, and the filter-row layout is set up for commit 3's folder tabs. Build/tsc/eslint clean.
+
+**Phase / commit goal (as I understood it):** Commit 2 of the S8 revamp — replace the old all/today/yesterday date `<select>` with the promoted `DateRangeFilter`, defaulting to **Last 30 days**; filter orders by IST day inclusive of `[from, to]`; show `{n} orders · {rangeLabel}` in the header; and regroup the row as tabs-left / (salesman + date + search)-right, flush on the table's top rule so commit 3's folder-tab can connect. Still frontend-only (2 files: `OrdersList.tsx` + its CSS).
+
+**What works (verified by execution):**
+- **The IST range predicate is correct** ([OrdersList.tsx:104-111](src/app/dashboard/OrdersList.tsx#L104)). `range?.from` falsy ⇒ "All" (no date exclusion); else `key = istDateKey(new Date(o.submitted_at))` is excluded when `key < fromKey || key > toKey`, with `toKey = istDateKey(range.to ?? range.from)` handling the single-day (to-still-undefined) case. I node-tested the string compare across 6 boundary cases — **inclusive on both `from` and `to`, single-day range matches its one day, day-before/day-after excluded, all PASS.**
+- **`istDateKey` makes the compare sound** — it's `Intl.DateTimeFormat("en-CA", { timeZone: IST_TIME_ZONE, month:"2-digit", day:"2-digit" })` → zero-padded `YYYY-MM-DD`, so lexicographic `<`/`>` **is** chronological order. The `submitted_at` side is converted to the IST calendar day regardless of browser TZ (it passes an explicit `timeZone`), so the DB's UTC timestamps bucket into the right IST day. Reuses the exact format already trusted elsewhere in `format.ts`.
+- **"assumes an IST browser" caveat is accurate and is *not* a regression** — the only TZ-sensitivity is that `range.from`/`range.to` come from react-day-picker at *local-browser* midnight, so a non-IST browser could shift the picked boundary by a day. But the prior today/yesterday logic had the identical exposure (`istDateKey(new Date(tick))` off a local instant), and the deployment target is IST. In an IST browser the boundary is exactly the picked day. Same assumption as before, honestly documented.
+- **Old date filter fully excised** — `type DateFilter`, the `dateFilter` state, `todayKey`/`yesterdayKey`, and the `<select>` are all gone; `grep` across `src/` finds **no dangling reference** (the two `todayKey` hits are an unrelated local inside `format.ts`). `tsc --noEmit` exit 0 confirms no broken symbol.
+- **Header label** ([OrdersList.tsx:152](src/app/dashboard/OrdersList.tsx#L152)) — now `{n} order(s) · {rangeLabel(range)}`, singular/plural preserved, e.g. default → `N orders · 8 Jun 2026 — 7 Jul 2026`.
+- **Default = Last 30 days** via `useState<DateRange|undefined>(DEFAULT_RANGE)` (lazy initializer — `DEFAULT_RANGE` is the function from commit 1, so "now" is captured on mount). The four real test orders (order_no 1001–1004, submitted during owner testing on/around 2026-07-07) fall inside 30 days, so they still show by default; **All** preset restores full history.
+- **Filter-row layout** — `.filters` gains `justify-content: space-between`; salesman + date + search now wrapped in `.filterGroup` (right cluster), tabs stay left. The `-12px` bottom margin that pulls the row flush onto the table's top rule is correctly **scoped to the `≥768px` media query** (desktop table view) — the mobile card list has no top rule, so it keeps the normal gap. Sound reasoning; sets up commit 3's folder tab.
+- **Bounded-fetch seam documented, not built** ([OrdersList.tsx:97-100](src/app/dashboard/OrdersList.tsx#L97)) — a one-line comment marks where a server-side range query would swap in when volume outgrows the client-side fetch, exactly as the guardrail asked ("mark the seam, don't build it").
+- **`npm run build` clean** (full route table, no errors), **`tsc --noEmit` exit 0**, **`eslint OrdersList.tsx` clean**.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **`rangeLabel` format vs the mock** — the header/mock example was `8 Jun – 7 Jul 2026` (shared year, en-dash), but `rangeLabel` renders `8 Jun 2026 — 7 Jul 2026` (year on both sides, em-dash). Purely cosmetic and the prompt said "e.g.", so no change required — just flagging that the shipped label is more verbose than the mock if the owner wants the compact shared-year form later.
+- **Default-30-days hides older orders** — a deliberate behavior change from the old "All" default; anything >30 days old is now hidden until the user picks **All** or a wider range. Intended per the prompt; noting it so it's a known, not a surprise, when the owner opens S8.
+- **Two independent "today" clocks now** — `DateRangeFilter` has its own `useState(nowMs)` and `OrdersList` has another; a session open across local midnight could drift the picker's `defaultMonth`/preset boundaries vs the list's. Negligible for a field tool (nobody holds S8 open across midnight), and both are day-granular. No action.
+
+**Domain / correctness checks:** Money math / RLS / state-machine / snapshots — **N/A** (no data-layer change; `ORDERS_SELECT` untouched, still carries `order_items(count)` which commit 4 removes). The one correctness surface here — the date bucketing — is verified above (IST day key + inclusive string compare). Realtime insert/update path is unchanged by this commit; I'll re-exercise live tab counts under commit 3 where the count refactor lands.
+
+**What I tried:** `git show c76c120` (full diff, 2 files, frontend-only); read `istDateKey` in `src/lib/format.ts` (en-CA IST `YYYY-MM-DD`); `grep -rn dateFilter\|DateFilter\|todayKey\|yesterdayKey src/` (no dangling OrdersList refs); node harness on the `key<from||key>to` predicate across 6 boundary cases + single-day (all PASS, inclusive); `npx tsc --noEmit` (0); `npx eslint OrdersList.tsx` (clean); `npm run build` (clean). Row layout/`-12px` flush verified by CSS reading (no browser this session).
+
+**Open flags (cumulative):** none new. No 🔴 blocking. Carried 🟡 ㉝ (pre-M6 migration reconciliation), ㉛ (order_no_seq grant hardening — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Commit 3 (two-stage filtering — `scoped` = salesman+range+search, `finalFiltered` = + status tab; per-tab counts from `scoped` with `submitted+processed+cancelled===all`; folder-tab active state) — where I'll verify the counts stay consistent across tab switches and under a live Realtime insert.
+
+---
