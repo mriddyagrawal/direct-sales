@@ -18,7 +18,16 @@ Supabase Auth email+password, admin-created accounts, no self-signup (D3). Postg
 
 ### Current reality: admin and accountant are functionally identical in-app
 
-Every RPC role check in the codebase (`submit_order`, `update_order_items`, `cancel_order`, `process_order`) branches on `v_role in ('accountant', 'admin')` — no admin-only RPC branch exists, and the dashboard nav/UI does not differentiate the two roles at all. There is exactly one admin-only permission at the RLS layer: `products_admin_insert` restricts inserting a **new** product row to `admin` (accountant can only UPDATE existing rows, per `products_staff_update`) — there's no in-app screen for it yet, so it's dormant today. Otherwise, the only things admin can do that accountant can't are outside the app entirely: creating users and setting `profiles.role`/`username`, done by hand in Supabase Studio per the provisioning runbook below.
+Every RPC role check in the codebase (`submit_order`, `update_order_items`, `cancel_order`, `process_order`) branches on `v_role in ('accountant', 'admin')` — no admin-only RPC branch exists, and the dashboard nav/UI does not differentiate the two roles at all. There are, however, **four** admin-only policies at the RLS layer (confirmed by querying `pg_policies` directly, not just reading migration comments):
+
+| Policy | Table | What it lets admin do that accountant can't |
+|---|---|---|
+| `profiles_update_admin` | `profiles` | UPDATE **any** profile row (role, active, username, ...). Accountant has no UPDATE policy on `profiles` at all — not even their own row (`profiles_update_self` is salesman-only). |
+| `brands_admin_insert` | `brands` | INSERT a new brand. Accountant only has SELECT (`brands_select_staff`). |
+| `brands_admin_update` | `brands` | UPDATE a brand. Same — accountant is SELECT-only. |
+| `products_admin_insert` | `products` | INSERT a new product row. Accountant can only UPDATE existing ones (`products_staff_update`). |
+
+All four are **dormant in practice**: no in-app screen calls any of them today — profile role changes and brand/product-catalog additions all happen by hand in Supabase Studio (as `postgres`/service role, not through these policies), per the provisioning runbook below. So they're real, latent admin-exclusive capability at the database level, just not yet exercised through the app.
 
 So today, "admin only oversees/escalates" is an **organizational convention the owner has chosen to follow, not a permission the system enforces** — nothing stops an admin account from doing full-time accountant-style order processing, and nothing in the UI signals "you're the escalation path." **Decision: leave this as is (owner-confirmed 2026-07-07)** — see [decisions.md](../decisions.md) D11 for the full reasoning and what would need to change if a real enforced split is ever wanted.
 
