@@ -10,13 +10,14 @@ import { formatOrderTimestamp, formatRupees, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { DEFAULT_RANGE, rangeLabel } from "@/lib/date-range";
 import { DateRangeFilter } from "./DateRangeFilter";
+import { SalesmanFilter } from "./SalesmanFilter";
 import type { DashboardOrderRow, SalesmanOption } from "./page";
 import styles from "./OrdersList.module.css";
 
 type StatusFilter = "all" | "submitted" | "processed" | "cancelled";
 
 const ORDERS_SELECT =
-  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), order_items(count)";
+  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name)";
 
 interface OrdersListProps {
   initialOrders: DashboardOrderRow[];
@@ -63,9 +64,9 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
     }
 
     // Refetch (not patch-in-place) on UPDATE too — the raw payload lacks
-    // joined fields like order_items(count), so a line-count change (an
-    // edit adding/removing items) would otherwise go stale until a manual
-    // refresh (review flag ㉚.3).
+    // joined fields like retailers(name, verified), so e.g. a retailer
+    // verification wouldn't be reflected in the row until a manual refresh
+    // (review flag ㉚.3).
     async function handleUpdate(orderId: string) {
       const { data } = await supabase.from("orders").select(ORDERS_SELECT).eq("id", orderId).maybeSingle();
       if (!data) return;
@@ -181,14 +182,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
           ))}
         </div>
         <div className={styles.filterGroup}>
-          <select className={styles.select} value={salesmanId} onChange={(e) => setSalesmanId(e.target.value)}>
-            <option value="all">All salesmen</option>
-            {salesmen.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name}
-              </option>
-            ))}
-          </select>
+          <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />
           <DateRangeFilter value={range} onChange={setRange} />
           <input
             ref={searchRef}
@@ -211,7 +205,6 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
                 <th>SUBMITTED</th>
                 <th>SALESMAN</th>
                 <th>RETAILER</th>
-                <th className={styles.numeric}>LINES</th>
                 <th className={styles.numeric}>TOTAL</th>
                 <th>STATUS</th>
               </tr>
@@ -239,7 +232,6 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
                       {order.retailers?.name ?? "—"}
                       {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
                     </td>
-                    <td className={`${styles.mono} ${styles.numeric}`}>{order.order_items?.[0]?.count ?? 0}</td>
                     <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(order.total_paise)}</td>
                     <td>
                       <StatusTag tone={tag.tone} label={tag.label} />
@@ -267,7 +259,7 @@ export function OrdersList({ initialOrders, salesmen }: OrdersListProps) {
                   <div className={styles.cardMeta}>
                     {order.retailers?.name ?? "—"}
                     {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>} ·{" "}
-                    {order.profiles?.full_name ?? "—"} · {order.order_items?.[0]?.count ?? 0} lines
+                    {order.profiles?.full_name ?? "—"}
                   </div>
                   <div className={styles.cardBottom}>
                     <span className={styles.mono}>{formatOrderTimestamp(order.submitted_at, now)}</span>

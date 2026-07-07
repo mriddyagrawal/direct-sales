@@ -1,0 +1,36 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  background: var(--color-white);
+  overflow: hidden;
+  font-family: var(--font-structure);
+}
+
+.option {
+  text-align: left;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-hairline);
+  font-family: var(--font-structure);
+  font-size: 13px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.option:last-child {
+  border-bottom: none;
+}
+
+.option:hover {
+  background: rgba(20, 24, 31, 0.03);
+}
+
+.optionActive {
+  color: var(--color-accent);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
