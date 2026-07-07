@@ -2538,3 +2538,38 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Phase-3a Commit 2 (Quick Order brand UI) — already landed as 029ffa4; reviewing next. Will verify the brand dropdown + Brand▸Category two-tier sticky grouping + lazy auto-lock, and — critically — the shared-DB **test-brand hygiene** (no stray brand/products left in the live catalog).
 
 ---
+
+## Review of 029ffa4 — feat(new-order): phase3a c2 — Quick Order brand dropdown, Brand▸Category grouping, lazy auto-lock
+
+**Verdict:** ✅ accept — correct and, crucially, **the single-brand path (the owner's live Zebronics flow) is provably unchanged**: all brand UI is gated behind `multiBrand = brandOptions.length >= 2`, false with one brand. Lazy auto-lock is derived from the cart (no imperative state); two-tier nested sticky is implemented. tsc/eslint/build clean. **Test-brand hygiene respected** — no 2nd brand provisioned, live catalog still Zebronics-only (verified). The multi-brand *runtime* visuals can't be exercised without a 2nd brand + a browser — the one residual.
+
+**Phase / commit goal (as I understood it):** Phase 3a Commit 2 — in-Quick-Order brand selection: a plain `<select>` beside the search (≥2 brands only), "All brands" nesting Brand▸Category with two-tier sticky headers, pick-to-filter, add-first-item lazy auto-lock (disable select + narrow list + cue), empty-cart unlock; submit unchanged.
+
+**What works (verified):**
+- **Single-brand path unchanged (safety-critical):** `multiBrand` false at 1 brand ⇒ no `<select>`, `showBrandTier=false` ⇒ flat `allCategories` (old rendering via the extracted `renderCategory`), no `lockNote`, `.listTwoTier` off ⇒ `--brand-offset:0` ⇒ category bar pins at `--search-bar-height` exactly as before; `visible` = all products either way. The owner's live flow is byte-identical behaviour; only cosmetic copy changed (de-SKU'd placeholder/empty-state).
+- **Lazy auto-lock is derived, not stateful** — `cartBrandId = first cart line's brand`; `locked = cartBrandId !== null`; select `value`/`disabled` + the list filter all read from it; empty cart ⇒ unlocked. No imperative lock effect to desync. `effectiveBrand = locked ? cartBrandId : (brandFilter==="all"?null:brandFilter)`.
+- **Grouping correct** — `brandGroups` nests Brand▸Category from `visible` (brands alphabetical, categories encounter-order); `showBrandTier = effectiveBrand===null && multiBrand`; picked/locked ⇒ flat categories. Same-named categories across brands don't collide (each under its brand `<section>`); React keys unique among siblings. The memo deps `[products, items, brandFilter, query]` cover every input to `visible`/`effectiveBrand`.
+- **Two-tier nested sticky implemented** — `.brandHeader` sticky `top: var(--search-bar-height)` z9; category bar `top: calc(var(--search-bar-height) + var(--brand-offset))` z8; `.listTwoTier` sets `--brand-offset: var(--brand-header-height)`. (All referenced classes present at HEAD — checked.)
+- **page.tsx** — selects `brand_id, brands(name)`, flattens `brand_name` (`r.brands?.name ?? ""`, standard to-one embed). Ordering unchanged.
+- **Submit unchanged** — server derives + guards brand (c1, verified live). UI lock is belt-to-suspenders.
+- **Compiles** — `tsc --noEmit` clean, `eslint` clean, `npm run build` exit 0.
+- **Test-brand hygiene ✓ (my c1/c2 watch-item)** — live catalog still **Zebronics-only** (`brand_count=1`, `non_zeb_products=0`); the builder deliberately did NOT provision a 2nd brand (would leak into the owner's live Quick Order). Responsible.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **`--brand-header-height: 34px` is a hardcoded estimate**, unlike the search bar's live ResizeObserver measurement. If the brand header's real rendered height differs (long/wrapping brand name on a narrow phone, font metrics), the two sticky tiers can slightly overlap/gap — and the design called two-tier sticky "the fiddly part." Consider live-measuring the brand header too, or confirm 34px holds across brand-name lengths on a real phone.
+- **Multi-brand runtime unverified** — the dropdown, nested-sticky, lazy lock/unlock, and the narrowed cue only exist with ≥2 brands, which don't exist live (deliberately). I verified compile + single-brand-unchanged + logic-by-reading; the visual/interaction pass needs a browser + a temporary 2nd brand (dev branch, not prod). Real-device residual.
+
+**Domain / correctness checks:**
+- **One-brand-per-order** ✓ — UI lock prevents adding a foreign brand (list filters to the locked brand); server is the real wall (c1). Belt-and-suspenders.
+- **Money / snapshots / ㉕** ✓ — `renderCategory` preserves the exact product row, pricing (`pricesById`), stepper/keypad, and the ㉕ unavailable-line handling; cart/price path unchanged.
+- **RLS** ✓ — catalog still RLS-scoped (active+priced); brand list derived from the visible catalog.
+
+**What I tried:** `git show 029ffa4` (QuickOrder.tsx + page.tsx + CSS); traced the single-brand path (multiBrand gate) + lazy-lock derivation; confirmed every referenced CSS class exists at HEAD (`.brandHeader`/`.listTwoTier`/`.brandSelect`/`.lockNote`/`.searchRow` + `--brand-offset`) and working-tree == 029ffa4; live catalog hygiene (1 brand, 0 non-Zeb products); `tsc --noEmit` + `eslint` clean; `npm run build` exit 0.
+
+**Open flags (cumulative):** No 🔴 blocking. No new ledger flag. Carried 🟡 ㉝ (migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Residual (not a flag): multi-brand runtime + `--brand-header-height` need a real-device / 2nd-brand pass.
+
+**Next-commit suggestion:** Phase-3a Commit 3 (dashboard BRAND column + BrandFilter + pick-slip + detail). I'll verify the BrandFilter composes with the date/salesman filters + tab counts (single-brand-today: the column shows, the filter has one option). Then c4 (Products mobile grouping). Also queued: bf0ad3b (future-plans docs) — reviewing next, oldest-first.
+
+---
