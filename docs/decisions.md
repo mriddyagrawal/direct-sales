@@ -85,6 +85,16 @@ Supabase Auth has no native "log in by arbitrary field" — it authenticates by 
 
 ---
 
+## D10 — Order history shows real staff names to the salesman
+
+**Context.** The S7 order-detail HISTORY (and the dashboard S9 timeline) humanize `order_events` with the actor's `full_name` ("Edited after lock 14:20 by Vikram — TT27 qty 5→10, reason: shop called"), falling back to "the office" only when no name resolves. `profiles_select_active` (M1) already lets any active staff read the profiles directory, so a salesman *can* see who touched their order. REVIEWER flag ㉗(b) asked whether surfacing real staff names to salesmen is intended, or should be a generic "the office".
+
+**Decision.** Show **real staff names** (owner-confirmed 2026-07-07). At a 3–4 person family-run operation everyone already knows everyone; a name is more useful and more honest than "the office" ("Vikram edited this" tells the salesman exactly who to call). No code change — this is the current behavior; ㉗(b) closes as intended.
+
+**Consequences.** None new; `profiles_select_active` stays as is. If the team ever grows to where staff anonymity matters, revisit (tighten the profiles read policy + fall back to role labels).
+
+---
+
 # Graveyard — rejected ideas (do not re-litigate)
 
 - **"Gapless" numbering via SEQUENCE** — not a real thing (see D1); and not needed once refs are internal.
