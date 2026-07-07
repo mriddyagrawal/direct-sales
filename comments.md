@@ -1648,3 +1648,25 @@ Every implementation trap I pinned at 99d60ab (flags 1–7) is now demonstrably 
 **Next-commit suggestion:** already in flight — S9 workbench + S10 pick slip (0c19fae). I'll drive `process_order` + edit-with-reason live there.
 
 ---
+
+## Review of 0c19fae — feat(m5): order workbench (S9) + print pick slip (S10)
+
+**Verdict:** ✅ accept — a faithful S9 workbench + S10 pick slip; all writes go through the RPCs I proved live, the FK embeds resolve, snapshot semantics hold, and the print view matches the spec. `eslint` + `tsc` clean on the tree. One low UX nit (no flag).
+
+**S9 workbench — verified:**
+- **Actions map to the right RPCs:** Mark processed (submitted only, confirm sheet) → `processOrder` → `process_order`; Edit → `updateOrderItems(id, notes, items, reason?)`; Cancel (reason **required**) → `cancelOrder(id, reason)`. New `processOrder` wrapper calls `rpc("process_order", { p_order_id })` through the offline-aware `callRpc`, matching the live signature. I proved all three RPCs live earlier (process_order rejects salesmen + does submitted→processed; update_order_items reason mandatory past lock; cancel needs reason). ✓
+- **Edit-with-reason is correct:** `requiresReason = mode==='edit' && !editable` (`editable = submitted && editableUntil>now`), `handleSave` blocks on an empty reason and passes `reason` only when required — so an in-window edit logs `items_changed` (no reason) and a post-lock edit logs `edited_after_lock` with the reason. Mirrors the RPC's own guard (defense in depth). ✓
+- **FK embeds resolve:** the multi-join (`salesman:profiles!orders_salesman_id_fkey`, `processed_by_profile:!orders_processed_by_fkey`, `cancelled_by_profile:!orders_cancelled_by_fkey`) — all three constraint names exist live, so the page won't 500. ✓
+- **Snapshot + D2:** existing lines render/submit at their `order_items` snapshot price (survivors keep it); add-item search is filtered to `active && price_paise !== null` (D2). Money integer paise → `formatRupees`; "Total (incl. GST)", no tax row (D5). HISTORY via the shared `describeEvent`. ✓
+- **The lint error I flagged is fixed** — [OrderWorkbench.tsx:376](src/app/dashboard/orders/[id]/OrderWorkbench.tsx#L376) now uses `&apos;`; `eslint` exit 0.
+
+**S10 pick slip — verified:**
+- Print-CSS only (no PDF lib): `@media print` + `@page { size: A4 }`; **QTY column first** at `font-size: 30px` (godown-readable ≥16pt); item `product_name` verbatim, no truncate/ellipsis rule (wraps, never clipped). Prices **off by default**; the toggle flips the badge **PICK SLIP → ORDER COPY** (so paper can't be misfiled) and reveals RATE/AMOUNT + "Total (incl. GST)" (no tax line). Notes boxed, dropped if empty; Packed-by/Checked-by rules; footer uses the new `formatFullTimestamp` (always-full IST date+time — right call, paper has no relative "now"). RLS-scoped data page under the role-gated `/dashboard`. ✓
+
+**Low nit (no flag):** the workbench freezes `now` at mount (no interval), so if the 2h window lapses while it's open, the client still thinks `editable` and hides the reason field — but a save then hits the server's `edited_after_lock` guard and is **rejected with "reason is required"** (no silent bypass; the accountant refreshes and the reason field appears). Self-correcting, rare, safe — noting only.
+
+**Open flags:** No 🔴 blocking; only 🟡 ㉗(b) (owner-confirm). ㉚ closed.
+
+**Next-commit suggestion:** already landed — S11 retailers (711ef1d) + Products pricing (983554a); I'll verify the verify-flow + the TBD-price→salesman-visible criterion (#6) live there.
+
+---
