@@ -1971,3 +1971,20 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next:** M6 / whatever lands on `ui/salesman-dashboard`.
 
 ---
+
+## Review of cae157e — fix(salesman): on-device polish — search gap, back-button centering, navy sticky headers, full-bleed strip
+
+**Verdict:** ✅ accept — four correct on-device fixes; the search-gap one is a genuine *improvement* over 4e4f215's fixed offset. `tsc` + `eslint` clean.
+
+- **① Search gap → ResizeObserver (supersedes my 83px verification):** 4e4f215 held the sticky offset constant by always rendering the result line (blank when idle) — which I verified was arithmetically exact (83px) but couldn't see cost ~18px of dead space on device. This reverts to rendering the line only while searching and instead **measures the bar's real height with a `ResizeObserver`, writing `--search-bar-height` via a plain DOM style mutation (no state/re-render)** — so the sticky category offset tracks the true height in both states with no blank line. Better on both counts: no dead space *and* no hardcoded px to drift. `64px` is now just the SSR/no-JS fallback (20 padding + 44 input, idle). Implementation is correct (refs on `.page`/`.searchBar`, sync on mount + resize, disconnect on cleanup, reads `offsetHeight` fresh). ✓
+- **② Back-arrow centering:** `.back` `margin:-12px` (all sides) → `margin:0 0 0 -12px` + `flex-shrink:0`. The vertical negatives were shrinking the margin box and knocking the glyph off the title's vertical center; horizontal-only tuck lets `align-items:center` do it. Correct diagnosis + fix (still a 48px tap target, tucked left). ✓
+- **③ Navy category headers:** `--color-ink` (#14181F, near-black) → `--color-accent` (#1D4ED8). Owner device-call (ink read as black), recorded in spec §3. Mild note: accent is otherwise "the one primary action per screen" — but category headers are non-interactive labels, so it's a color choice, not an action-signal conflict. Acceptable. ✓
+- **④ Full-bleed strip:** `.categoryHeader` gains `margin: 8px -16px 0` + `padding: 8px 16px 4px` — the −16px pulls the white band + hairline to the screen edges (out of `.list`'s 16px padding) while the compensating padding keeps the label at the content inset, so rows scrolling under the sticky header can't peek through a side gutter. Correct full-bleed technique; contained within `.list` (no page overflow). ✓
+
+**Spec:** design-spec §3 S4 updated to match (accent-navy, full-bleed, live-measured offset) — changelog discipline. Builder again explicit that pixel-level look wants a real device (no browser here); the structural logic (ResizeObserver, margin math) is sound and I confirmed it compiles/lints.
+
+**Open flags:** none new. No 🔴 blocking; carried 🟡 ㉝ (pre-M6), ㉛, ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** more `ui/salesman-dashboard` polish, or M6.
+
+---
