@@ -38,9 +38,28 @@ export function clearDraft(retailerId: string): void {
   window.localStorage.removeItem(draftKey(retailerId));
 }
 
+// crypto.randomUUID() is spec-gated to secure contexts (https, or
+// http://localhost) — a phone hitting the dev server over plain
+// http://<lan-ip> is NOT one, so the method is simply missing there and
+// throws mid-click (every retailer-selection tap silently no-ops, and once
+// that throws uncaught inside the event handler the rest of that page's
+// React tree can go inert too). crypto.getRandomValues() isn't gated the
+// same way, so build a v4 UUID from it when randomUUID is unavailable.
+function generateOrderId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 export function createDraft(retailerId: string, retailerName: string): DraftCart {
   return {
-    orderId: crypto.randomUUID(),
+    orderId: generateOrderId(),
     retailerId,
     retailerName,
     items: {},
