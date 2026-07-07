@@ -18,6 +18,7 @@
 | ~~**M3**~~ | **Auth + roles** — login flow, provisioning runbook executed for the real team | Each role logs in and sees only what the matrix allows | ✅ **Done** — S1 login (username→email via secret-key lookup, D9), middleware route-protection + role routing, deactivated-user lockout — all reviewer-verified live. Real-team account creation = a Dashboard runbook step at go-live |
 | ~~**M4**~~ | **Salesman app** per [salesman-app.md](docs/specs/salesman-app.md) | All 6 acceptance criteria, incl. the 90-second stopwatch test and airplane-mode drills | ✅ **Done** — S3–S7 built (`feature/salesman-app`), all commits reviewer-accepted; idempotent submit, double-tap→one row, and the post-expiry server-side reject **proven live** by the REVIEWER against the real DB. Owner ran the 90s stopwatch test live — passed. Airplane-mode drill deferred (owner, later); not blocking. Two device bugs found in real phone testing fixed along the way: the sticky bottom-bar visibility, and `crypto.randomUUID()` throwing in the insecure (LAN-http) context |
 | ~~**M5**~~ | **Accountant dashboard** per [accountant-dashboard.md](docs/specs/accountant-dashboard.md) | All 6 acceptance criteria, incl. live-appearance ≤5s and A4 pick-slip print | ✅ **Done** — Orders (S8 list + S9 workbench + S10 pick-slip) · Retailers (S11 verify queue) · Products (in-app pricing) as a 3-tab dashboard, desktop + phone; Realtime live-updates, post-lock edit-reason RPC (`p_reason`), TBD→salesman-visible — all reviewer-verified live. Owner deviations: phone version + in-app Products tab; users stay in Supabase ([add-user-runbook](docs/add-user-runbook.md)) |
+| **M5.5** | **Catalog admin** — admin adds products two ways: a manual **+ Add product** form and a brand-scoped **Excel import** (SheetJS) | Admin adds/updates products in-app (single + bulk); import shows a **New/Updated/Errors dry-run preview** then applies; **upsert on `(brand_id, tally_name)`**, never duplicates; **drops the invented `sku`** | ⬜ **Designed, not built** — [catalog-admin-design.md](docs/catalog-admin-design.md) + Claude Design brief [products-admin-design-prompt](Prompts/products-admin-design-prompt.md) |
 | **M6** | **Deploy + pilot** — Vercel prod, Supabase prod, real accounts, onboard 1 salesman + accountant | Rollout gate below | ⬜ Not started |
 
 > **Verified-complete detail** lives in the Open Items Ledger atop [comments.md](comments.md). No 🔴 blocking items open — see the ledger for the full non-blocking/deferred list.
@@ -29,8 +30,8 @@ No 🔴 blocking items. Everything below is non-blocking / deferred / owner-conf
 | Flag | Item | Type | Home / next step |
 |---|---|---|---|
 | ㉗(b) | HISTORY renders real staff names, not a generic "the office" | owner-confirm | ✅ **Resolved 2026-07-07 (D10)** — owner confirms **real names**; current behavior stays, no change |
-| ㉒ | `SUPABASE_SECRET_KEY` set in `.env.local` + Vercel env (D9 username→email lookup needs it, or login fails) | config / owner | ✅ **Resolved 2026-07-07** — owner set it. Still add it to **Vercel env** before deploy |
-| ⑯ | Enable Supabase Auth leaked-password protection (HaveIBeenPwned check) | config / owner | Owner — **Pro-plan only**; enable at go-live (ties to Q#5/Q#7) |
+| ㉒ | `SUPABASE_SECRET_KEY` in `.env.local` + Vercel env | config / owner | ✅ **Resolved 2026-07-07** — set in both `.env.local` **and Vercel env** (owner) |
+| ⑯ | Leaked-password protection (HaveIBeenPwned) | config / owner | ❌ **Declined 2026-07-07** — owner not doing it (also Pro-only, and owner is staying on free tier) |
 | ㉛ | Least-privilege on `order_no_seq` — `anon`/`authenticated` hold default Supabase sequence grants (`USAGE`/`UPDATE`) they don't need. **Not exploitable** (no API path exposes `setval`/`nextval` — they're in `pg_catalog`, not the exposed schema; and `submit_order` is `security definer`, running the sequence as its owner). `revoke select, usage, update on sequence public.order_no_seq from anon, authenticated;` then confirm `submit_order` still assigns `order_no`. | hardening / deferred | **Owner: not required now** — do at go-live hardening (reviewer finding 2026-07-07) |
 | ⑬ | Drift-protected `scripts/seed.ts` loader (warn/skip on price-drift re-run, `--force-prices` override) | minor / deferred | Buildable now (Node exists); do when a re-seed is first needed |
 | ⑭ | RLS/index performance pass — 4 `get_advisors(performance)` categories (6 unindexed FKs incl. `orders.cancelled_by`, unwrapped `auth.uid()` in policies, multiple permissive policies, 1 unused index). Verified accurate + harmless at current scale | minor / deferred | Parked in [docs/future-plans.md](docs/future-plans.md); revisit with the Pro-billing decision |
@@ -45,7 +46,7 @@ Closed flags (audit trail retained in [comments.md](comments.md)): ⑩ RLS fail-
 1. Pilot: one salesman, one route, **one week running app + notebook in parallel**.
 2. Compare: capture time, error/dispute count, accountant effort.
 3. The salesman chooses the app voluntarily → cut over; keep paper as fallback for one more week.
-4. Before the pilot ends: upgrade Supabase prod to Pro (~$25/mo — the free tier pauses after ~1 week idle) and decide Vercel Pro ($20/mo; Hobby is non-commercial).
+4. **Billing (owner 2026-07-07): staying on free tier for now — no Supabase/Vercel Pro.** Supabase free pauses after ~1 week *idle*, so an actively-used pilot is fine; revisit only if it actually pauses. (Vercel Hobby is technically non-commercial — a licensing note, not a pilot blocker.)
 
 ### In-phase choices (either is fine — builder decides at the milestone)
 
@@ -104,13 +105,13 @@ Owner-approved ideas parked outside the committed phases (currently: **order-pun
 
 | # | Question | Owner |
 |---|---|---|
-| 1 | Edit window: confirm the 2-hour default | Owner |
+| 1 | Edit window — **2 hours** | ✅ **Confirmed 2026-07-07 (owner)** |
 | 2 | Retailer master: seed from a Tally ledger export? (Best option — names then pre-match for Phase 2) | Owner + accountant |
 | 3 | CSV provenance: do product names mirror Tally stock-item names? Decides when display-name typos get cleaned | Accountant |
 | 4 | Pick slip: A4 laser or thermal printer? | Owner |
-| 5 | Go-live billing: approve Supabase Pro ($25/mo) + Vercel Pro ($20/mo) | Owner |
+| 5 | Go-live billing | **Owner 2026-07-07: free tier for now (no Pro).** Caveat: Supabase free pauses after ~1 week *idle* — fine for an active pilot; revisit only if it pauses |
 | 6 | Godown phone view (read-only pick list) as Phase 1.5 if printing annoys | Later |
-| 7 | Enable Supabase Auth's leaked-password protection (HaveIBeenPwned check) — Dashboard-only setting (Authentication → Providers → Email), no MCP tool exposes it; same class of limitation as creating auth users (ledger flag ⑯) | Owner |
+| 7 | Leaked-password protection (⑯) | ❌ **Owner declined 2026-07-07** — not doing (also Pro-only) |
 
 ## Changelog discipline
 
