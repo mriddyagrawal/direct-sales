@@ -1868,3 +1868,24 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next:** M6 (deploy + pilot) — ㉝ belongs on its checklist.
 
 ---
+
+## Review of 20400cd — docs(phase3): add per-brand pricing mode (LG manual) + admin approval gate
+
+**Verdict:** ✅ accept — an accurate, internally-consistent, honest Phase-3 capture (not built). Its load-bearing factual claim checks out live, and it's careful about the two things that matter: relaxing the price-trust boundary and extending the state machine.
+
+**Verified:**
+- **The key claim is correct:** live `orders_status_check` = `status IN ('submitted','processed','cancelled')` (queried). So the doc is right that `pending_approval` is **a real CHECK-extending migration, not the "status headroom" PLAN Phase 5 implied** — good that it corrects that rather than inheriting the wrong assumption. ✓
+- **`fixed` mode = today's behavior** (RPC snapshots from catalog, client price ignored) — matches what I verified in `submit_order`. ✓
+
+**Design is sound + honest:**
+- **`manual` mode deliberately relaxes the "client never sends a price" invariant — but only for manual brands**, with `>0` sanity ceiling, snapshot into `order_items.unit_price_paise`, and actor audit in `order_events`; Zebronics keeps its untamperable guarantee. Explicitly a scoped trust-boundary change (`brands.pricing_mode fixed|manual`), not blanket — the right framing for the money path. ✓
+- Correctly **amends the earlier "what does NOT change"** — the brand/ref change is additive, but manual mode *does* touch the RPC price source + adds a state. No leftover over-broad claim. ✓
+- **Admin-only approval is consistent with D11:** D11 recorded admin ≡ accountant *today* and flagged "if a real enforced split is ever wanted, that's a future product decision" — this LG approval gate is precisely that first split (owner specified admin, not accountant). Forward-consistent, not contradictory. ✓
+- Correctly distinguishes LG-manual (free entry + approval, no floor/tiers) from Phase-5 tiered-discounts (list price + tiers, no free-typing) — different mechanisms that can coexist. ✓
+- Leaves the right things **open** (reject → back-to-salesman vs cancelled; whether the 2h window applies pre-approval; exact event names) instead of over-specifying an unbuilt feature. ✓
+
+**Open flags:** none new — not-built design note; the manual-pricing relaxation + `pending_approval` state + admin approval are Phase-3-time work (owner: worry-later). No 🔴 blocking; carried 🟡 ㉝ (pre-M6), ㉛, ⑯ ⑬ ⑭ ⑦⑧⑨.
+
+**Next:** M6 (deploy + pilot).
+
+---
