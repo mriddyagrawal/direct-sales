@@ -2142,3 +2142,30 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** As before — M6 (deploy + pilot) is the meaningful open work, gated by 🟡 ㉝; the small S8 dead-CSS/`{" "}` cleanups can ride along a future dashboard-CSS touch.
 
 ---
+
+## Review of 73111df — fix(dashboard): simplify Orders header to just the title
+
+**Verdict:** ✅ accept — removes redundant header chrome (count/range duplicated the tab + DATE box) plus the LIVE tag per owner ask, and proactively clears the `.select` dead CSS I flagged on 30ac3cb. No orphan refs, build/tsc/eslint clean.
+
+**Phase / commit goal (as I understood it):** Trim the Orders title row to just "Orders": drop the `LIVE` tag (owner ask — no functional loss) and the `{n} orders · {rangeLabel}` line (the count duplicates commit 3's "All N" tab; the range duplicates the DATE box's own label). Also delete the now-unused CSS (`.liveTag`, `.count`, and the `.select` I flagged last review).
+
+**What works (verified):**
+- **Header trimmed cleanly, no dangling refs** — the `LIVE` span and the count/range span are gone from `.titleRow` (now just `<h1>Orders</h1>`), and the `rangeLabel` import is removed from `OrdersList.tsx`. Grep confirms **no** `styles.liveTag` / `styles.count` / `styles.select` / `rangeLabel` reference survives *in OrdersList* — the remaining `rangeLabel` hits are DateRangeFilter's own DATE label/readout (legit), and the remaining `styles.count` is `ProductsPricing`'s separate module (unrelated). `tsc --noEmit` exit 0 confirms no broken symbol.
+- **State that's still needed is retained** — removing the display didn't over-prune: `range`/`setRange` still drive `<DateRangeFilter value={range}>` and the IST filter predicate, and `finalFiltered` still feeds the table + keyboard-nav (`safeIndex`, Arrow/Enter, the `.map`). Only the *presentational* `rangeLabel(range)` call and its import went. No unused-var, no dead state.
+- **Dead CSS removed** — `.liveTag`, `.count`, `.select` deleted from `OrdersList.module.css`. This **closes my 30ac3cb non-blocking note** (`.select` unused since commit 4 replaced the native `<select>`), and the builder correctly swept `.liveTag`/`.count` in the same touch now that they're unreferenced.
+- **`npm run build`** → `✓ Compiled successfully`; **`tsc --noEmit`** exit 0; **`eslint OrdersList.tsx`** clean.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- The order **count** is now only visible as the "All N" tab, and the active **range** only on the DATE box — both are still on-screen, just de-duplicated, so no information is actually lost. Fine. (The `{" "}`+flex-gap cosmetic double-space in the tab labels from commit 3 is still open — trivial, whenever.)
+
+**Domain / correctness checks:** N/A — presentational only (removed display chrome + dead CSS); no data/state-machine/money/RLS surface, and the filter/keyboard-nav logic is untouched.
+
+**What I tried:** `git show 73111df` (2 files, all deletions/removals); `grep -rn styles.liveTag\|styles.count\|styles.select\|rangeLabel src/app/dashboard/` (no OrdersList orphan — remaining hits are DateRangeFilter + ProductsPricing, both legit); `grep value={range}\|finalFiltered` (both still used, 10 sites); `npx tsc --noEmit` (0); `npx eslint OrdersList.tsx` (clean); `npm run build` (compiled successfully).
+
+**Open flags (cumulative):** none new. `.select` dead-CSS note (raised 30ac3cb) **✅ addressed here**. No 🔴 blocking. Carried 🟡 ㉝ (pre-M6 migration reconciliation), ㉛ (order_no_seq grant hardening — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** M6 (deploy + pilot) remains the meaningful open work, gated by 🟡 ㉝; the last tiny S8 cosmetic (`{" "}` double-space) can ride any future dashboard touch.
+
+---
