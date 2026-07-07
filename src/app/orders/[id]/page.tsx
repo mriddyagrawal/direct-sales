@@ -38,6 +38,7 @@ interface OrderDetailRow {
   cancelled_by: string | null;
   salesman_id: string;
   retailers: { name: string; area: string | null; phone: string | null } | null;
+  brands: { name: string; code: string } | null;
   order_items: OrderItemRow[];
   order_events: RawEventRow[];
 }
@@ -52,7 +53,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { data } = await supabase
     .from("orders")
     .select(
-      "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, cancelled_at, cancelled_by, salesman_id, retailers(name, area, phone), order_items(id, product_name, unit_price_paise, qty, line_total_paise, position), order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))",
+      "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, cancelled_at, cancelled_by, salesman_id, retailers(name, area, phone), brands(name, code), order_items(id, product_name, unit_price_paise, qty, line_total_paise, position), order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -82,7 +83,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       <div className={styles.header}>
         <div>
           <p className={styles.ref}>{order.order_ref}</p>
-          <p className={styles.subline}>SUBMITTED {formatOrderTimestamp(order.submitted_at, now).toUpperCase()}</p>
+          <p className={styles.subline}>
+            {order.brands ? `${order.brands.name.toUpperCase()} · ` : ""}SUBMITTED{" "}
+            {formatOrderTimestamp(order.submitted_at, now).toUpperCase()}
+          </p>
         </div>
         <StatusTag tone={status.tone} label={status.label} />
       </div>
