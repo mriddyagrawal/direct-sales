@@ -2573,3 +2573,30 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Phase-3a Commit 3 (dashboard BRAND column + BrandFilter + pick-slip + detail). I'll verify the BrandFilter composes with the date/salesman filters + tab counts (single-brand-today: the column shows, the filter has one option). Then c4 (Products mobile grouping). Also queued: bf0ad3b (future-plans docs) — reviewing next, oldest-first.
 
 ---
+
+## Review of bf0ad3b — docs(future-plans): fulfillment & serial/QR capture at dispatch (Phase 4+)
+
+**Verdict:** ✅ accept — a well-formed parking-lot entry (owner-approved, explicitly TBD / Phase-4+); cross-refs resolve, placement is right, and it introduces no contradiction with current state or decisions. Docs only.
+
+**Phase / commit goal (as I understood it):** Record the owner's fulfillment/serial-capture idea in future-plans.md — a new godown/warehouse role scans each unit's serial at dispatch, the accountant keys them into Tally where the bill is then created (so the Tally invoice is generated at *dispatch* off captured serials, not at order time); mandatory for LG, optional elsewhere. Structure TBD, gated on Phase 2 (Tally) + Phase 3b (LG).
+
+**What works (verified):**
+- **Correct home + framing** — appended to future-plans.md's "approved in principle but deliberately not scheduled" parking lot, alongside geotag / RLS-pass / cancelled-orders-view / Payments-tab. Every claim is hedged TBD and dependency-gated — matches the doc's "decided shape + context, not a build spec" contract.
+- **Cross-references resolve** — `phase2-tally-sync-design.md` exists (the "refines the app→Tally trigger" ref); the geotag entry it points to ("carry the parked order-submit geotag as proof-of-delivery") exists at future-plans.md:5, and that entry's idempotency pin (`submit_order` retries don't update the geotag) stays consistent — a dispatch/fulfilled state is a *separate later event*, nothing conflicts.
+- **No stale contradiction** — the note "(Corrects the earlier 'salesman scans' sketch.)" leaves nothing dangling: grep finds **no** surviving "salesman scans" text in docs/. The GODOWN-not-salesman correction is clean.
+- **Internally consistent + technically sound** — the new `warehouse`/`godown` role is additive (doesn't touch the current salesman/accountant/admin model); `order_item_serials` (per-unit, additive) fits the immutable-snapshot posture; the `BarcodeDetector` feasibility note (Android Chrome yes / iOS Safari no) is accurate; the "Tally bill at dispatch, off serials" refinement is flagged as *refining* (not overriding) the Phase-2 trigger and left undecided.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- When this graduates from the parking lot, fold the "Tally bill created at *dispatch*, not order-time" refinement INTO phase2-tally-sync-design.md itself (the voucher-trigger timing currently lives only in this forward note) so the Phase-2 design and this entry don't drift on when the voucher fires. Not needed now — at scheduling time.
+
+**Domain / correctness checks:** N/A — planning doc; no code/data/RLS/money/state surface. The described `order_item_serials` + `warehouse` role are additive and consistent with the state-machine/snapshot model when eventually built.
+
+**What I tried:** `git show bf0ad3b` (1 doc, +21); confirmed `docs/phase2-tally-sync-design.md` exists, the geotag entry + its idempotency pin exist in future-plans.md (ref resolves), no surviving "salesman scans" sketch (grep), and the entry sits in the parking-lot section.
+
+**Open flags (cumulative):** No 🔴 blocking, no new flags. Carried 🟡 ㉝ (migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Phase-3a Commit 3 (dashboard BRAND column + BrandFilter + pick-slip + detail) and c4 (Products mobile grouping) — the remaining Phase-3a UI. For c3 I'll verify the BrandFilter composes with the date/salesman filters + tab counts.
+
+---
