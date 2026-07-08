@@ -2971,3 +2971,30 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** The pick-slip Share **implementation** (per e56b272) is the likely next code commit — verified on a device. Pre-handover: the `supabase db push --dry-run`, a real-device pass of the salesman flow + LG approve + share, and a catalog/orders cleanup to a real starting state.
 
 ---
+
+## Review of 8e6b4c8 — feat(new-order): Quick Order search matches brand + category, not just name
+
+**Verdict:** ✅ accept — a minimal, correct search-scope widening: the salesman search now matches product name OR category OR brand (all via the existing `normalize`); the brand lock/picked-brand filter still ANDs on top unchanged; null-safe. tsc/eslint clean. *(Branch `ui/salesman-search-brand-category`, off main@416be41.)*
+
+**Phase / commit goal (as I understood it):** Broaden the Quick Order search so a category term ("adaptor", "refriger") or a brand term ("ze") surfaces the matching items, not just product-name matches.
+
+**What works (verified):**
+- **Predicate widened correctly** — `matchesSearch(p) = q==="" || normalize(p.name).includes(q) || normalize(p.category).includes(q) || normalize(p.brand_name).includes(q)`; `visible = products.filter(p => matchesSearch(p) && (effectiveBrand === null || p.brand_id === effectiveBrand))`. So text match is name/category/brand OR, and the brand filter (lock or picked) is still ANDed on top — brand scope unchanged, only the text match broadened.
+- **Null-safe + consistent** — `p.category` is a required `string`; `p.brand_name` is `string` (`brands?.name ?? ""` from page.tsx), so `normalize` never sees null; same space-insensitive `normalize` as the name search ("ze"→"zebronics", "adaptor" matches "Adaptors").
+- **Grouping/lock intact** — `brandGroups` still derives from `visible`, so Brand▸Category grouping + counts reflect the widened search; lazy brand-lock, `effectiveBrand`, and the collapse rows are untouched. Placeholder → "Search name, brand or category".
+- **Compiles** — `tsc --noEmit` + `eslint` clean.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- OR semantics mean a brand term also surfaces *other-brand* products containing the term in name/category (e.g. "ze" matches any product with "ze" anywhere, not only Zebronics). Intended broad search — fine; the strict "only that brand" path is the brand *filter*/lock, not the text box. No change needed.
+
+**Domain / correctness checks:** N/A — client-side display filter; no data/RLS/money/state surface (the RLS-scoped catalog is unchanged; this only narrows what's shown).
+
+**What I tried:** `git show 8e6b4c8` (QuickOrder.tsx, +10/−4); traced `matchesSearch` + that `effectiveBrand` still ANDs on top; confirmed `category`/`brand_name` are non-null strings; `tsc --noEmit` + `eslint` clean.
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Nothing outstanding. A real-device pass would confirm the widened search feels right on a phone (pure filter change, low risk).
+
+---
