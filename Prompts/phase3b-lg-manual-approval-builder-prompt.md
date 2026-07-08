@@ -59,14 +59,15 @@ Rework the product rows in `src/app/new-order/QuickOrder.tsx` (+ its module CSS)
 **Manual-price entry (in the revealed area):**
 - For a `manual` brand the revealed area holds the **price input** (`₹`, ≤2 decimals → paise, `> 0`); the salesman types the unit price (no catalog price exists). Fixed brands: catalog price, no input.
 - **Review (S5):** show the entered unit prices + line amounts + total; submit sends them (the optional price key from commit 1).
-- **Salesman order detail (S7):** render `pending_approval` ("Waiting for office approval") + `approved`; a `pending_approval` order stays salesman-editable within the 2h window (approval beats it).
+- **Status chips — update the shared `getOrderStatusTag` (`src/lib/order-status.ts`):** add **`pending_approval`** (amber, "Waiting for office approval") + **`approved`** (neutral/ink — distinct from green `Processed`). It's the *shared* chip, so this one change surfaces the new states on the **salesman Home list (S2)**, the **order detail (S7)**, **and** the **dashboard (S8)** — do it here so the salesman sees "pending approval" on their own LG order the moment they submit.
+- **Salesman order detail (S7):** a `pending_approval` order stays salesman-editable within the 2h window (approval beats it); show the awaiting-approval / approved messaging.
 
 **Tap targets:** collapsed head ≥48px; the revealed stepper/keypad keep their ≥48px. Cart bar, search, sticky Brand▸Category headers, keypad sheet all unchanged.
 
 **Acceptance:** rows show name+price until tapped; tapping reveals the stepper (+ manual price input for LG), tapping again collapses, **multiple rows open at once**; in-cart rows start expanded and show "· N in cart" when collapsed; a manual (LG) line can be priced (expand→input) with its price shown on the collapsed row; ₹x.5 stores paise, `>2` decimals rejected; a Zebronics/Luminous order is still catalog-priced with no input; chevron rotates + is comfortably sized on phone; **all tap targets ≥48px**; brand grouping + sticky headers + cart bar intact; `npm run build` clean; verified on a phone-width viewport.
 
 ## Commit 3 — Dashboard: Pending approval tab + admin Approve
-- **S8 ledger:** add a **Pending approval** filter tab (folds into the two-stage scoped counts); chip vocabulary gains **`Pending approval`** (amber) + **`Approved`** (neutral/ink — distinct from green `Processed`).
+- **S8 ledger:** add a **Pending approval** filter tab (folds into the two-stage scoped counts). The `pending_approval` / `approved` **chips already exist from commit 2** (shared `getOrderStatusTag`) — reuse them, don't redefine.
 - **S9 workbench:** an **Approve** action (admin-only button, **hidden for the accountant**) on a `pending_approval` order → `approve_order`; **Mark processed** stays blocked until the order is `approved`; show `approved_by`/`at` in the history register.
 
 **Acceptance:** admin sees LG orders under Pending approval and approves them; **accountant cannot** (no button, and the RPC/guard deny it); approved orders become processable, pending ones can't be processed; chips render (amber pending · ink approved · green processed); build clean.
