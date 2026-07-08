@@ -11,7 +11,7 @@ import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatRupees } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
-import { updateOrderItems, cancelOrder, processOrder } from "@/lib/order-rpcs";
+import { updateOrderItems, cancelOrder, processOrder, approveOrder } from "@/lib/order-rpcs";
 import type { CatalogProduct } from "./page";
 import styles from "./OrderWorkbench.module.css";
 
@@ -54,6 +54,8 @@ interface WorkbenchOrderData {
   retailerPhone: string | null;
   retailerVerified: boolean;
   brandName: string | null;
+  approvedAt: string | null;
+  approvedByName: string | null;
 }
 
 interface OrderWorkbenchProps {
@@ -62,13 +64,14 @@ interface OrderWorkbenchProps {
   events: RawEventRow[];
   catalog: CatalogProduct[];
   currentUserId: string;
+  isAdmin: boolean;
 }
 
 // S9 — the accountant/admin workbench. One filled-accent action (Mark
 // processed); Edit and Cancel are outline/destructive; Print opens the
 // dedicated pick-slip route. All writes go through the same RPCs the
 // salesman app uses — this UI is a different lens on the same guards.
-export function OrderWorkbench({ order, items: initialItems, events, catalog, currentUserId }: OrderWorkbenchProps) {
+export function OrderWorkbench({ order, items: initialItems, events, catalog, currentUserId, isAdmin }: OrderWorkbenchProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [items, setItems] = useState<Record<string, number>>(() => {
@@ -88,7 +91,10 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
   const [tick] = useState(nowMs);
 
   const now = useMemo(() => new Date(tick), [tick]);
-  const editable = order.status === "submitted" && new Date(order.editableUntil) > now;
+  // Matches the RPC's editable window: a pending_approval order is still
+  // editable in-window (approval beats the timer), so no reason is demanded.
+  const editable =
+    (order.status === "submitted" || order.status === "pending_approval") && new Date(order.editableUntil) > now;
   const requiresReason = mode === "edit" && !editable;
   const statusTag = getOrderStatusTag({ status: order.status, editable_until: order.editableUntil }, now);
 
@@ -175,6 +181,21 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
     }
   }
 
+  async function handleApprove() {
+    setSaving(true);
+    setError(null);
+    try {
+      await approveOrder(order.id);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not approve the order.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleProcess() {
     setSaving(true);
     setError(null);
@@ -230,13 +251,25 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             {order.status === "cancelled" &&
               order.cancelledAt &&
               ` · cancelled ${formatOrderTimestamp(order.cancelledAt, now)}${order.cancelledByName ? ` by ${order.cancelledByName}` : ""}`}
+            {order.status === "approved" &&
+              order.approvedAt &&
+              ` · approved ${formatOrderTimestamp(order.approvedAt, now)}${order.approvedByName ? ` by ${order.approvedByName}` : ""}`}
           </p>
         </div>
         <StatusTag tone={statusTag.tone} label={statusTag.label} />
       </div>
 
       <div className={styles.actions}>
-        {order.status === "submitted" && (
+        {/* Approval is admin-only (approve_order + guard enforce it too). The
+            accountant sees a pending order but no Approve button. */}
+        {order.status === "pending_approval" && isAdmin && (
+          <Button variant="primary" onClick={handleApprove} loading={saving || isPending}>
+            Approve
+          </Button>
+        )}
+        {/* Processable = submitted (fixed) or approved (manual). A pending
+            order can't be processed until approved (RPC enforces it too). */}
+        {(order.status === "submitted" || order.status === "approved") && (
           <Button variant="primary" onClick={() => setConfirmProcess(true)}>
             Mark processed
           </Button>

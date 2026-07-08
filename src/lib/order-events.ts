@@ -65,6 +65,8 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
       const reason = typeof details.reason === "string" ? ` · reason: ${details.reason}` : "";
       return `${time} Cancelled by ${actorLabel}${reason}`;
     }
+    case "approved":
+      return `${time} Approved by ${actorLabel}`;
     case "processed":
       return `${time} Processed by ${actorLabel}`;
     default:
