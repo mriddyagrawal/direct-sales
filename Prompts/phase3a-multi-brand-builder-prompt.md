@@ -13,7 +13,7 @@ Make **fixed-price brands** (Zebronics + any other constant-price brand) properl
 - `orders` has **no** `brand_id`; `brands` has **no** `code`. `products.brand_id` exists (all rows Zebronics). Verify exact shapes with `list_tables` before the migration.
 - Salesman **Quick Order (S4)** shows all active priced products, **brand-agnostic**, grouped by category with **sticky navy category bars (live-measured offset)** — `src/app/new-order/QuickOrder.tsx`.
 - The dashboard has a reusable **`FilterDropdown`** shell + a **`SalesmanFilter`** built on it (`src/app/dashboard/`) — **reuse that pattern** for the brand filter.
-- `submit_order` / `update_order_items` live bodies: `update_order_items` is the **4-arg `p_reason`** version in `20260707T120000_update_order_items_reason.sql` (do not regress ㉘); the audit payload already emits `tally_name` (M5.5, ㉞).
+- `submit_order` / `update_order_items` live bodies: `update_order_items` is the **4-arg `p_reason`** version in `20260707071615_update_order_items_reason.sql` (do not regress ㉘); the audit payload already emits `tally_name` (M5.5, ㉞).
 
 ---
 
