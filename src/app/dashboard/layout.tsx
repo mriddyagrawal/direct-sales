@@ -9,13 +9,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("full_name, role")
     .eq("id", user!.id)
     .maybeSingle();
 
   return (
     <div className={styles.shell}>
-      <DashboardNav accountLabel={profile?.full_name ?? user?.email ?? ""} />
+      <DashboardNav accountLabel={profile?.full_name ?? user?.email ?? ""} isAdmin={profile?.role === "admin"} />
       <main className={styles.main}>{children}</main>
     </div>
   );

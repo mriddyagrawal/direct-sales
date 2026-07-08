@@ -1,0 +1,218 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(20, 24, 31, 0.35);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.panel {
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--color-white);
+  border-top: 2px solid var(--color-ink);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heading {
+  font-family: var(--font-structure);
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
+  color: var(--color-ink);
+}
+
+.closeX {
+  background: none;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-locked);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.errorStrip {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-white);
+  background: var(--color-error);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.selectField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+}
+
+.select {
+  min-height: var(--touch-target-min);
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.hint {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+/* Edit-mode Account section — Active toggle + reset-password affordance. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.sectionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toggleOn {
+  background: var(--color-white);
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+}
+
+.toggleOff {
+  background: none;
+  border: 1px dashed var(--color-locked);
+  color: var(--color-locked);
+}
+
+.linkButton {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.resetBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resetActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* One-time credentials reveal after Add. */
+.oneTimeNote {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.creds {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.creds > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.credLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+}
+
+.credValue {
+  font-family: var(--font-figures);
+  font-size: 15px;
+  color: var(--color-ink);
+  word-break: break-all;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (min-width: 768px) {
+  .scrim {
+    align-items: center;
+  }
+
+  .panel {
+    max-width: 460px;
+    border: 1px solid var(--color-hairline);
+    border-top: 2px solid var(--color-ink);
+    border-radius: var(--radius);
+  }
+}

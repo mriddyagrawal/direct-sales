@@ -8,19 +8,28 @@ import styles from "./DashboardNav.module.css";
 
 interface DashboardNavProps {
   accountLabel: string;
+  isAdmin?: boolean;
 }
 
-const TABS = [
+const BASE_TABS = [
   { href: "/dashboard", label: "Orders", match: (p: string) => p === "/dashboard" || p.startsWith("/dashboard/orders") },
   { href: "/dashboard/retailers", label: "Retailers", match: (p: string) => p.startsWith("/dashboard/retailers") },
   { href: "/dashboard/products", label: "Products", match: (p: string) => p.startsWith("/dashboard/products") },
 ];
 
-// M5 nav shell — 3 tabs only (Orders/Retailers/Products), left rail on
+// Users is admin-only — an accountant never sees the tab (and the page + every
+// action gate it independently, so hiding the tab is convenience, not the
+// security boundary).
+const ADMIN_TABS = [
+  { href: "/dashboard/users", label: "Users", match: (p: string) => p.startsWith("/dashboard/users") },
+];
+
+// M5 nav shell — Orders/Retailers/Products (+ admin-only Users), left rail on
 // desktop, a bottom tab bar + top account strip on phone (owner deviation:
 // a responsive layout is required, not just >=1280px desktop).
-export function DashboardNav({ accountLabel }: DashboardNavProps) {
+export function DashboardNav({ accountLabel, isAdmin = false }: DashboardNavProps) {
   const pathname = usePathname();
+  const TABS = isAdmin ? [...BASE_TABS, ...ADMIN_TABS] : BASE_TABS;
 
   return (
     <>
