@@ -223,16 +223,19 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 0 4px 10px 0;
+  gap: 10px;
+  padding: 0 4px 8px 0;
 }
 
+/* Compact price input: narrower + tighter padding than before. Height sits at
+   the 48px touch-target floor (aligned to the stepper cells beside it) — never
+   below it. */
 .priceField {
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 44px;
-  padding: 0 10px;
+  min-height: 48px;
+  padding: 0 8px;
   background: var(--color-paper);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius);
@@ -249,7 +252,7 @@
 }
 
 .priceInput {
-  width: 92px;
+  width: 68px;
   border: none;
   background: none;
   outline: none;
@@ -258,10 +261,12 @@
   color: var(--color-ink);
 }
 
-/* "Tap to price" prompt on an unpriced manual line's collapsed head. */
-.productPricePrompt {
-  color: var(--color-accent);
-  font-weight: 600;
+/* Model (Tally name) shown to the left of the display name for show_model
+   brands (LG): muted/lighter ink so the human-readable name stays primary.
+   e.g. "LG 43UA73806LA"・UHD TV 43". */
+.modelPrefix {
+  color: var(--color-locked);
+  font-weight: 400;
 }
 
 .priceError {

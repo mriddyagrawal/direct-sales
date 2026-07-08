@@ -195,8 +195,21 @@ export function QuickOrder({
           aria-expanded={expanded}
         >
           <span className={styles.productHeadInfo}>
-            <span className={`${styles.productName} ${inCart ? styles.productNameActive : ""}`}>{p.name}</span>
-            <span className={`${styles.productPrice} ${isManual && entered == null ? styles.productPricePrompt : ""}`}>
+            <span className={`${styles.productName} ${inCart ? styles.productNameActive : ""}`}>
+              {p.show_model && p.tally_name && p.tally_name !== p.name ? (
+                <>
+                  <span className={styles.modelPrefix}>{p.tally_name}</span>
+                  {"・"}
+                  {p.name}
+                </>
+              ) : (
+                p.name
+              )}
+            </span>
+            {/* "Tap to price" renders with the exact same class as a real ₹ price
+                (no distinct accent/weight) so a priced Luminous row and an
+                unpriced LG row read identically on the price line. */}
+            <span className={styles.productPrice}>
               {priceLabel}
               {inCart ? ` · ${qty} in cart` : ""}
             </span>
