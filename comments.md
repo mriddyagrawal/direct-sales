@@ -2735,3 +2735,29 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Commit 1 (backend). I'll verify by execution: LG order → `pending_approval`, client price snapshotted + enterer logged; `approve_order` admin-only (accountant denied at RPC + guard); `process_order` accepts `approved`, rejects `pending_approval`; **Zebronics/Luminous submit unchanged + client price ignored (untamperable)**; unpriced LG visible, unpriced fixed hidden; ㉘/㉞ preserved in `update_order_items`; build clean.
 
 ---
+
+## Review of c895706 — prompt(phase3b): fold Quick Order collapse revamp into the salesman commit
+
+**Verdict:** ✅ accept — a clean, accurate prompt amendment: folds the collapse-to-reveal row revamp into Commit 2 (both rewrite the same Quick Order rows — sound rationale), the salvage refs resolve, and it correctly preserves the existing stepper/keypad/brand-grouping. Docs/prompt only.
+
+**Phase / commit goal (as I understood it):** Bundle the salesman "collapse-to-reveal" row revamp (rows collapse to name+price; tap reveals the same stepper + the LG price input inside the drop) into Phase-3b Commit 2, since both rewrite the same QuickOrder product rows — one row-rewrite rather than two.
+
+**What works (verified):**
+- **Salvage refs resolve** — `874f090` ("collapse Quick Order rows to name+price; tap to reveal stepper") + `fecc555` ("swap the two-glyph hint for one CSS chevron that rotates") exist on branch `test/salesman-ui-collapse`; the prompt's descriptions match, and it correctly flags them "pre-3a stale — re-implement fresh" (Phase-3a rewrote QuickOrder's grouping/lock, so the old spike wouldn't merge).
+- **Preserves the right pieces** — the current row (`renderCategory` → `productRow` + `<Stepper onChange onTapQuantity>` + keypad + `brandGroups`/`categoryHeader` sticky) is exactly what the revamp rewrites; "the stepper is NOT replaced — it lives inside the drop," "in-cart rows pre-expanded (seed the Set once)," "per-row Set, not accordion," "≥48px tap targets / sticky headers + cart bar unchanged" all reference real current structure (QuickOrder.tsx L157–177). Consistent with the Phase-3a QuickOrder I reviewed (c2).
+- **Money rule intact** — the manual-price input keeps ≤2-dec→paise, `>0`; fixed brands: catalog price, no input.
+
+**Blocking issues (must fix in next commit):** None (docs/prompt).
+
+**Non-blocking suggestions:**
+- **Scope note for Commit 2:** the collapse revamp rewrites **all** salesman rows (fixed + manual), so it changes the deployed **Zebronics/Luminous** salesman UX too (rows now collapse; in-cart pre-expanded; catalog price on the collapsed head). Intended (general UX revamp, not LG-only), but it makes Commit 2 a substantial change to the daily-driver S4 screen — I'll verify the **fixed-brand path stays fully intact** (collapse/expand, stepper-in-drop, keypad, cart total, brand lock) on a phone-width viewport alongside the LG manual-price additions.
+
+**Domain / correctness checks:** N/A — prompt/doc text; the money/RLS/state surface is unchanged from dc04359. The revamp is presentational (row shape); the manual-price input is already covered by the dc04359 checks.
+
+**What I tried:** `git show c895706` (1 prompt file); `git rev-parse` confirmed `874f090`/`fecc555` + branch `test/salesman-ui-collapse` exist with matching subjects; grepped QuickOrder.tsx for the Stepper/keypad/brand-grouping the revamp must preserve (all present, `renderCategory`/`productRow`/`<Stepper>` at L157–177).
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉝ (migration reconciliation — Phase-3b `_lg_manual_approval.sql` will join), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Commit-2 watch-items: fixed-brand collapse path intact + the dc04359 items (pending_approval editability, manual-price ≤2-dec, untamperability).
+
+**Next-commit suggestion:** Phase-3b Commit 1 (backend) — verification plan in the dc04359 block. Commit 2 then carries the collapse revamp + manual price.
+
+---
