@@ -48,6 +48,8 @@ export function ProductModal({
 
   const [catOpen, setCatOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ category?: string; displayName?: string; price?: string }>({});
   const catBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,6 +123,23 @@ export function ProductModal({
     if (dbError) {
       setSaving(false);
       setError(dbError.message);
+      return;
+    }
+    onSaved();
+  }
+
+  // Admin-only hard delete, guarded server-side (delete_product): a product
+  // that's ever been ordered is refused with a message pointing to deactivate.
+  async function handleDelete() {
+    if (!initial) return;
+    setDeleting(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: rpcError } = await supabase.rpc("delete_product", { p_id: initial.id });
+    if (rpcError) {
+      setDeleting(false);
+      setConfirmDelete(false);
+      setError(rpcError.message);
       return;
     }
     onSaved();
@@ -243,6 +262,21 @@ export function ProductModal({
         </div>
 
         <div className={styles.actions}>
+          {/* Hard delete — admin-only, edit mode only. Two-step (Delete →
+              Confirm delete) so a bright-red button next to Cancel can't be a
+              one-tap accident. Server-guarded: an ordered product is refused. */}
+          {mode === "edit" &&
+            isAdmin &&
+            initial &&
+            (confirmDelete ? (
+              <Button variant="destructive-filled" onClick={handleDelete} loading={deleting}>
+                Confirm delete
+              </Button>
+            ) : (
+              <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
+                Delete
+              </Button>
+            ))}
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>

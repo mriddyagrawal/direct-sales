@@ -416,6 +416,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delete_product: { Args: { p_id: string }; Returns: undefined }
       email_for_username: { Args: { p_username: string }; Returns: string }
       import_products: {
         Args: { p_brand_id: string; p_rows: Json }
