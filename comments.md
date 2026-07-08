@@ -2998,3 +2998,35 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Nothing outstanding. A real-device pass would confirm the widened search feels right on a phone (pure filter change, low risk).
 
 ---
+
+## Review of 54517c7 — fix(products): Active toggle flips instantly + supports concurrent rows (useOptimistic)
+
+**Verdict:** ✅ accept — a clean fix for two real bugs in the M5.5 toggle: the single `busyId` behaved like a radio (a second row's tap cleared the first's busy), and the row didn't visually flip until `router.refresh()` landed (looked like nothing happened though the write succeeded). Now `useOptimistic` flips instantly + **auto-reverts on failure**, and a `busy` Set lets rows toggle concurrently. Render-from-prop (㉜🅐) preserved. tsc/eslint clean. *(Branch `feature/products-delete-and-toggle-fix`.)*
+
+**Phase / commit goal (as I understood it):** Make the Products ledger ACTIVE toggle flip immediately on tap (optimistic) and support several rows in flight at once, instead of a single-select-radio busy id + a flip that only appeared after a refresh.
+
+**What works (verified):**
+- **useOptimistic overlay, correct** — `[displayProducts, applyOptimisticActive] = useOptimistic(products, (state, {id, active}) => state.map(patch))`; the table + mobile cards render from `displayProducts`; the optimistic patch is dispatched **inside** the transition, **before** the `await` (correct placement). Row flips instantly.
+- **Auto-reverts on failure (elegant)** — on `updateError` it sets the error and does **NOT** call `router.refresh()`; when the transition ends, `useOptimistic` discards the patch and falls back to the unchanged `products` prop → the flip reverts. On success, `router.refresh()` brings the updated prop and the overlay reconciles to the (now-matching) server value. A stale optimistic flip can't mask real data — the ㉜🅐 render-from-prop guarantee holds (comment says so, and the mechanics back it).
+- **Concurrent rows** — `busyId` (single) → `busy: Set`; several toggles in flight, each row `disabled={busy.has(p.id)}` independently; a same-row double-tap is blocked while its write is in flight. Fixes the radio-like behavior.
+- **Derivations correct** — `priced` (L55) + `categoriesByBrand` (L61) stay on the **raw `products`** prop (both active-independent → no needless recompute on an optimistic flip); only `mobileGroups` (L74) + the table/cards render from `displayProducts`. Matches the commit's claim.
+- **Compiles** — `tsc --noEmit` + `eslint` clean.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **Device-check the success-path visual:** the failure path clearly reverts; on success the overlay resets when the transition ends and reconciles as `router.refresh()`'s data lands. If Next keeps the transition pending through the refresh (its documented behavior), the flip is clean; if the reset races ahead of the refetch there could be a brief revert-flicker (new→old→new). Worth an eyeball on a real browser — the whole point is the instant flip. (Not a correctness issue; the final state is always right.)
+
+**Domain / correctness checks:**
+- **render-from-prop (㉜🅐/🅑)** ✓ — `displayProducts` derives from the `products` prop via useOptimistic; a post-write refresh (or a modal edit changing active) flows through and the overlay reconciles; no stale masking.
+- **RLS/write** ✓ — still `update({active}).eq(id)` via the browser session (`products_staff_update`, accountant+admin); unchanged.
+- **Money / state machine** — N/A (active toggle).
+- **Row-click edit** ✓ — the toggle still `stopPropagation`s so it doesn't open the edit modal.
+
+**What I tried:** `git show 54517c7` (ProductsPricing.tsx, +33/−23); traced the useOptimistic dispatch (inside transition, pre-await), the failure-revert (no refresh → overlay discarded), the `busy` Set concurrency, and that `priced`/`categoriesByBrand` stay on raw `products` while renders use `displayProducts`; `tsc --noEmit` + `eslint` clean.
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** The branch name (`feature/products-delete-and-toggle-fix`) hints a product **delete** is coming — I'll watch for FK safety (`order_items` reference products; a delete must be blocked or soft where an order references the product) + admin-only. Plus a device-check of the toggle flip.
+
+---
