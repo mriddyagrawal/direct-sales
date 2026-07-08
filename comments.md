@@ -2796,3 +2796,28 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Commit 2 (Quick Order collapse revamp + manual-price entry). I'll verify the fixed-brand collapse path stays intact + the LG manual-price input (≤2-dec→paise, in-drop) on a phone-width viewport, plus the pending_approval/approved salesman detail states.
 
 ---
+
+## Review of f997e7b — prompt(phase3b): move the new status chips to commit 2 (shared getOrderStatusTag)
+
+**Verdict:** ✅ accept — accurate prompt reorganization: `getOrderStatusTag` is a real shared helper, and moving the `pending_approval`/`approved` chip definitions into commit 2 correctly surfaces the new states on the salesman's own views (S2 Home, S7 detail) at submit — not just the accountant's dashboard in commit 3. Docs/prompt only.
+
+**Phase / commit goal (as I understood it):** Move the `pending_approval` (amber) + `approved` (ink) chip definitions from c3 to c2, updating the shared `getOrderStatusTag` (`src/lib/order-status.ts`) so the salesman sees "pending approval" on their own LG order the moment they submit; c3 reuses the chips + adds the Pending-approval filter tab.
+
+**What works (verified):**
+- **`getOrderStatusTag` is the shared chip helper** — `src/lib/order-status.ts` exports it (committed at HEAD via 32c1c96) and it's imported by **S2 salesman Home** (`src/app/page.tsx`), the **S8 dashboard** (`OrdersList.tsx`), and **S7 order detail** (`orders/[id]/page.tsx` + workbench). A single update propagates to all three surfaces — the prompt's rationale holds.
+- **Rationale UX-correct** — the salesman must see their LG order's `pending_approval` at submit, which only happens if the shared chip is updated in the salesman commit (c2), not deferred to c3. Sound.
+- **c3 stays consistent** — the amendment correctly changes c3 to "reuse the chips from c2, don't redefine."
+
+**Blocking issues (must fix in next commit):** None (docs/prompt).
+
+**Non-blocking suggestions:** None. I'll verify the actual chip tones (amber pending / ink approved / green processed) when Commit 2 lands — the builder is already mid-drafting it in the working tree (uncommitted `order-status.ts` chips + `NewOrderFlow`/`cart`/`order-rpcs`).
+
+**Domain / correctness checks:** N/A — prompt text; state/money/RLS surface unchanged.
+
+**What I tried:** `git show f997e7b` (1 prompt file); confirmed `src/lib/order-status.ts` exports `getOrderStatusTag`, imported by S2 `page.tsx` / S8 `OrdersList.tsx` / S7 `orders/[id]/page.tsx` + workbench (the three surfaces the shared chip must reach); noted the chip additions are currently uncommitted (c2 in progress).
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉝ (migration reconciliation), ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (Builder mid-drafting Commit 2 in the working tree.)
+
+**Next-commit suggestion:** Phase-3b Commit 2 (Quick Order collapse revamp + manual-price entry + shared chips) — verify chip tones, fixed-brand collapse path intact, LG manual-price input, and the salesman seeing `pending_approval` on their own order, on a phone-width viewport.
+
+---
