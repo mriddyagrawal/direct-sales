@@ -2915,3 +2915,59 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** e56b272 (pick-slip Share prompt) + af20a5a (phase3b→main merge) — reviewing next.
 
 ---
+
+## Review of e56b272 — prompt: pick-slip mobile Share button (Web Share API)
+
+**Verdict:** ✅ accept — accurate, well-scoped frontend-only prompt; the file/props/classes/helpers it targets all verify, and the Web Share API guidance is technically correct (SSR-safe feature-detect, swallow AbortError, text-not-link because auth-gated, secure-context caveat, respect the Prices toggle). Docs/prompt only.
+
+**Phase / commit goal (as I understood it):** Add a Share button to the pick slip (S10) beside Print that opens the phone's native share sheet via `navigator.share`, sharing the order as formatted WhatsApp-friendly text (respecting the Prices on/off toggle).
+
+**What works (verified):**
+- **Target + structure accurate** — `PickSlip.tsx` exists, is `"use client"`, has the **Print** button in `.chromeControls` (screen-only `.chrome`, excluded from print) — so "add Share beside Print in `.chromeControls`" lands correctly; the `pricesOn` toggle (with the "ORDER COPY"/"PICK SLIP" badge) is real, so "respect the toggle" maps to existing state.
+- **Helpers + props present** — `formatRupees` (format.ts:99) + `formatFullTimestamp` (format.ts:41) exist; the props the text-format references (orderRef, retailerName, salesmanName, items w/ unit_price_paise + line_total_paise, totalPaise, brandName, submittedAt, notes) are all on PickSlip. (Retailer area/phone are fetched at the page level; the prompt's bare `area`/`phone` pseudo-code maps to the actual `retailerArea`/`retailerPhone` props — trivial wiring.)
+- **Web Share API guidance correct** — feature-detect **after mount** in `useEffect` (avoids the SSR `navigator`-undefined hydration mismatch); `navigator.share({ title, text })` with **no `url`** (right — the page is auth-gated, a link is useless to a non-user); **swallow `AbortError`** (user cancelled, not an error); the **secure-context** caveat (HTTPS/localhost only, not plain-HTTP LAN) is accurate + consistent with the prior `crypto.randomUUID` gotcha.
+
+**Blocking issues (must fix in next commit):** None (docs/prompt).
+
+**Non-blocking suggestions:**
+- The Copy-to-clipboard fallback is left "optional" — fine (the target is the phone); desktop parity is the follow-up if wanted.
+- Text-format pseudo-code uses bare `area`/`phone`; map to the real `retailerArea`/`retailerPhone`. Trivial.
+
+**Domain / correctness checks:** N/A — prompt text; no data/RLS/state surface. Money: the shared text reuses `formatRupees` on the same paise fields the slip renders — consistent, display-only.
+
+**What I tried:** `git show e56b272` (1 prompt file, +41); grepped `PickSlip.tsx` (`"use client"`, Print in `.chromeControls`, `.chrome` screen-only, `pricesOn`, referenced props) + `format.ts` (`formatRupees`/`formatFullTimestamp` present).
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (㉝ closed at 670ad93.) Residual: this is a **mobile** feature — `navigator.share` needs a real phone / deployed HTTPS URL to verify (can't test headlessly).
+
+**Next-commit suggestion:** The pick-slip Share implementation — I'll verify the feature-detect gates the button (no SSR hydration issue), AbortError swallowed, shared text respects `pricesOn` + reuses `formatRupees`, Print/print-output unchanged, build clean; the actual share-sheet interaction needs a device.
+
+---
+
+## Review of af20a5a — merge: Phase 3b LG manual pricing + admin approval into main (c1–c3)
+
+**Verdict:** ✅ accept (clean integration) — a conflict-free merge of the fully-reviewed Phase-3b branch into `main`: `git diff 670ad93 af20a5a -- src/ supabase/` is **empty** (main's code + migrations exactly match the reviewed phase3b tip), the only thing `main` (e56b272) contributed beyond the tip is the **reviewed** pick-slip Share prompt, no conflict markers, tsc clean, all my Phase-3b review blocks came across in comments.md. **No unreviewed code entered main.**
+
+**Phase / commit goal (as I understood it):** Integrate `feature/phase3b-lg-manual-approval` (c1 backend + c2 salesman UI + c3 dashboard + prompt commits + the 670ad93 migration reconcile) into `main`.
+
+**What works (verified):**
+- **Clean union** — `git diff 670ad93 (phase3b tip) af20a5a -- src/ supabase/` = **empty** ⇒ main's application code + all 22 migrations are byte-identical to the reviewed tip; no merge-resolution drift. The merge's only delta over the tip is `Prompts/pickslip-share-button-builder-prompt.md` (e56b272, reviewed above).
+- **No conflicts** — no `<<<<<<<`/`>>>>>>>` markers in src/supabase/comments.md.
+- **Review log carried** — comments.md brought all Phase-3b review blocks (c1/c2/c3 + the prompt reviews); the branch's comments.md was a superset of main's, so it merged cleanly.
+- **Compiles on main** — `tsc --noEmit` clean post-merge (c1–c3 already build-verified individually).
+- **Backend already live** — the phase3b migrations were applied to the shared DB during the branch work (c1 proven by execution); the merge is code/log integration, no new DB action.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** None. Unlike the phase3a merge (34d6231), no open blocker rode along — ㊳ was already closed (owner), ㉝ resolved at 670ad93.
+
+**Domain / correctness checks:**
+- **Merge integrity** ✓ — clean union, no unreviewed code, all 22 migrations present + reconciled (㉝).
+- Money / RLS / state machine — unchanged (verified per phase3b commit; untamperability + admin-only approval proven live at c1).
+
+**What I tried:** `git show af20a5a` (parents e56b272 + 670ad93); `git diff 670ad93 af20a5a -- src/ supabase/` (empty — clean union); `--stat` (only the pick-slip prompt beyond the tip); conflict-marker grep (none); confirmed the phase3b review blocks present in comments.md; `tsc --noEmit` clean.
+
+**Open flags (cumulative):** No 🔴 blocking. **No open 🟡 needing action** — ㉝ ✅ (670ad93), ㊳ ✅ (owner), ㊱/㊲ ✅. Only 🟡 ㉛ (order_no_seq — owner-deferred to go-live) + older doc flags ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ remain. **Phase-3b complete + merged to main.**
+
+**Next-commit suggestion:** The pick-slip Share **implementation** (per e56b272) is the likely next code commit — verified on a device. Pre-handover: the `supabase db push --dry-run`, a real-device pass of the salesman flow + LG approve + share, and a catalog/orders cleanup to a real starting state.
+
+---
