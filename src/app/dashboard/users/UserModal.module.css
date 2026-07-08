@@ -88,6 +88,11 @@
   border-color: var(--color-accent);
 }
 
+.select:disabled {
+  color: var(--color-locked);
+  background: rgba(20, 24, 31, 0.03);
+}
+
 .hint {
   font-family: var(--font-structure);
   font-size: 11px;

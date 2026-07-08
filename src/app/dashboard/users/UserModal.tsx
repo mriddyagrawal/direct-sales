@@ -167,7 +167,16 @@ export function UserModal({ mode, callerId, initial, onClose, onSaved }: UserMod
             <label className={styles.label} htmlFor="um-role">
               Role
             </label>
-            <select id="um-role" className={styles.select} value={role} onChange={(e) => setRole(e.target.value)}>
+            {/* Disabled when editing yourself: the action rejects self-demotion
+                server-side (㊶), and disabling here stops you picking a role
+                that would only error on save. */}
+            <select
+              id="um-role"
+              className={styles.select}
+              value={role}
+              disabled={isSelf}
+              onChange={(e) => setRole(e.target.value)}
+            >
               {ROLES.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
