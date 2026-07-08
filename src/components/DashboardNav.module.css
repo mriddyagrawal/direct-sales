@@ -103,6 +103,13 @@
     font-weight: 600;
     color: var(--color-locked);
     border-left: 2px solid transparent;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  .railLink:hover {
+    color: var(--color-ink);
+    background: rgba(20, 24, 31, 0.05);
   }
 
   .railLink.active {
