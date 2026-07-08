@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
@@ -34,9 +34,19 @@ export function ProductsPricing({
   isAdmin: boolean;
 }) {
   const router = useRouter();
-  // review flag ㉜🅑: which row is mid-write, so the toggle it lives on stays
-  // busy through the refresh rather than dimming the whole table.
-  const [busyId, setBusyId] = useState<string | null>(null);
+  // Optimistic active overlay so a row's toggle flips instantly instead of
+  // waiting on router.refresh(). useOptimistic auto-reconciles to the server
+  // prop once it updates (post-refresh, or after a modal edit changes active),
+  // so a stale flip can never mask real data — preserving render-from-prop
+  // (㉜🅐). Render from `displayProducts` where active matters.
+  const [displayProducts, applyOptimisticActive] = useOptimistic(
+    products,
+    (state: ProductRow[], patch: { id: string; active: boolean }) =>
+      state.map((p) => (p.id === patch.id ? { ...p, active: patch.active } : p)),
+  );
+  // review flag ㉜🅑: which rows are mid-write (a Set — several toggles can be
+  // in flight at once, unlike a single id which behaved like a radio button).
+  const [busy, setBusy] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
@@ -61,7 +71,7 @@ export function ProductsPricing({
   // ordered by category, then name).
   const mobileGroups = useMemo(() => {
     const byBrand = new Map<string, { brandName: string; cats: Map<string, ProductRow[]> }>();
-    for (const p of products) {
+    for (const p of displayProducts) {
       let bg = byBrand.get(p.brand_id);
       if (!bg) {
         bg = { brandName: p.brands?.name ?? "—", cats: new Map() };
@@ -78,7 +88,7 @@ export function ProductsPricing({
         categories: [...bg.cats.entries()].map(([category, ps]) => ({ category, products: ps })),
       }))
       .sort((a, b) => a.brandName.localeCompare(b.brandName));
-  }, [products]);
+  }, [displayProducts]);
   const multiBrandProducts = mobileGroups.length >= 2;
 
   function closeAndRefresh() {
@@ -118,7 +128,7 @@ export function ProductsPricing({
             e.stopPropagation();
             toggleActive(p);
           }}
-          disabled={busyId === p.id}
+          disabled={busy.has(p.id)}
         >
           {p.active ? "Active" : "Inactive"}
         </button>
@@ -126,21 +136,21 @@ export function ProductsPricing({
     );
   }
 
-  async function toggleActive(p: ProductRow) {
-    setBusyId(p.id);
+  function toggleActive(p: ProductRow) {
+    const next = !p.active; // p is from displayProducts, so this is the shown state
+    setBusy((prev) => new Set(prev).add(p.id));
     setError(null);
-    const supabase = createClient();
-    const { error: updateError } = await supabase.from("products").update({ active: !p.active }).eq("id", p.id);
-    if (updateError) {
-      setBusyId(null);
-      setError(updateError.message);
-      return;
-    }
-    // Stay busy through the refresh (㉜🅑) — clear busy only after the fresh
-    // data is queued to repaint, matching RetailersQueue.setActive.
-    startTransition(() => {
-      router.refresh();
-      setBusyId(null);
+    startTransition(async () => {
+      applyOptimisticActive({ id: p.id, active: next }); // instant flip; auto-reverts if the write fails
+      const supabase = createClient();
+      const { error: updateError } = await supabase.from("products").update({ active: next }).eq("id", p.id);
+      if (updateError) setError(updateError.message);
+      else router.refresh(); // reconciles the overlay to fresh server data
+      setBusy((prev) => {
+        const s = new Set(prev);
+        s.delete(p.id);
+        return s;
+      });
     });
   }
 
@@ -182,7 +192,7 @@ export function ProductsPricing({
               </tr>
             </thead>
             <tbody>
-              {products.map((p, index) => (
+              {displayProducts.map((p, index) => (
                 <tr
                   key={p.id}
                   className={`${styles.clickable} ${!p.active ? styles.rowInactive : ""}`}
@@ -204,7 +214,7 @@ export function ProductsPricing({
                         e.stopPropagation();
                         toggleActive(p);
                       }}
-                      disabled={busyId === p.id}
+                      disabled={busy.has(p.id)}
                     >
                       {p.active ? "Active" : "Inactive"}
                     </button>
