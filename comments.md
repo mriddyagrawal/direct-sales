@@ -3085,3 +3085,122 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Nothing outstanding.
 
 ---
+
+## Review of e49fd07 — feat(new-order): Quick Order polish — unified price line, tighter price input, per-brand model prefix
+
+**Verdict:** ✅ accept — three Quick Order refinements, all **verified live**: the new `brands.show_model` flag is correctly decoupled from `pricing_mode` (proven necessary against real data), the model-prefix render is guarded against `X・X`, and the price-prompt/input CSS changes are sound. Migration applied + on disk + in the ㉝-reconciled ledger. tsc/eslint/build clean.
+
+**Phase / commit goal (as I understood it):** Polish the salesman collapse rows — (1) render "Tap to price" with the same class as a real ₹ price (drop the accent prompt), (2) tighten the expanded price input to the 48px touch floor, (3) add a per-brand `show_model` flag that renders `{tally_name}・{name}` for LG.
+
+**What works (verified by execution):**
+- **`show_model` decoupling is correct — and proven so.** Live: LG `show_model=true` / LUM,ZEB `false`. The commit claims a naive "tally≠name" rule would wrongly light up Luminous — **confirmed against the real catalog**: LG 526/526 rows have `tally_name≠name`, **Luminous has 36** such rows, Zebronics 0. So a `tally≠name` heuristic *would* have shown the model on 36 Luminous rows; the explicit per-brand flag is the right call, not over-engineering.
+- **Render guard prevents `X・X`** — `p.show_model && p.tally_name && p.tally_name !== p.name` (QuickOrder.tsx:199); a defaulted `tally_name===name` row falls through to plain `{p.name}`. The muted `.modelPrefix` (`--color-locked`, weight 400) keeps the human name primary.
+- **Price-label logic intact** (QuickOrder.tsx:179–183) — manual+entered → `formatRupees`, manual+unpriced → "Tap to price", fixed → `formatRupees`. The CSS change only drops the accent/semibold `.productPricePrompt`, so an unpriced LG line and a priced Luminous line read identically on the price line, exactly as claimed.
+- **CSS floor respected** — `.priceField min-height 44→48px` (raised to the touch floor, not below), input width `92→68px`, tighter gaps. Stepper untouched.
+- **Query/types wired** — page.tsx selects `tally_name` + `brands(... show_model)`, maps with null-safe `?? false`/`?? ""`; `database.types.ts` gains `show_model` on brands Row/Insert/Update. Build compiles the `/new-order` route.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:**
+- **Migration ledger (㉝)** ✓ — `20260708172917_brand_show_model` is applied in `schema_migrations`, present on disk with matching version+name; `not null default false` then `update ... where code='LG'`. Slots cleanly into the reconciled ledger.
+- **Money** — N/A (display-only; price-label formatting unchanged).
+- **RLS** — read path only; unchanged product select.
+
+**What I tried:** `git show e49fd07`; live SQL (rolled-back/read-only) — per-brand `show_model` + `tally_name≠name` counts (LG 526/526, LUM 36/99, ZEB 0/44); `schema_migrations` vs `ls supabase/migrations`; read QuickOrder.tsx render guard + `priceLabel`; `npm run build` exit 0 (`/new-order` compiled).
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** User-management docs landed next (68ac748) → reviewed below.
+
+---
+
+## Review of 68ac748 — docs(users): SQL-based add-user runbook + admin user-mgmt builder prompt
+
+**Verdict:** ✅ accept — docs-only; the runbook rewrite matches the *actual* Supabase dashboard flow (create-then-SQL, no-email pgcrypto reset) and the builder prompt is a faithful, security-forward spec for the screen that lands in 7a46fa4/28a59e3.
+
+**Phase / commit goal (as I understood it):** Correct `docs/add-user-runbook.md` to the real dashboard (drop the flaky "User Metadata"/email-reset steps, add create→SQL for username/full_name/role and a pgcrypto direct password reset), and add `Prompts/admin-user-management-builder-prompt.md` specifying the in-app admin Users screen.
+
+**What works:**
+- **Runbook is now accurate** — the app reads `profiles.full_name`/`username`, not Supabase Auth "Display name"/metadata; the doc says exactly that and sets the app fields via SQL joined through `auth.users.email`. The `email_for_username()` verify step is the right smoke test (NULL ⇒ won't log in).
+- **No-email password reset** via `extensions.crypt(pw, gen_salt('bf'))` writing `encrypted_password` — the correct `$2a$` bcrypt shape GoTrue accepts; sensible for placeholder gmails with no real inbox.
+- **Builder prompt is security-first** — mandates the double gate (page + every action), service-client-only, self-lockout + last-admin guards, type-password-twice, no schema change. The implementation commits honor it (verified below).
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** The pgcrypto reset is a *fallback* SQL path; once the in-app screen shipped (28a59e3 adds the "primary path" note), it's belt-and-suspenders. No action.
+
+**Domain / correctness checks:** N/A — documentation. Claims cross-checked against the schema (`profiles` columns, `create_profile_for_new_user` trigger behavior) and the shipped feature.
+
+**What I tried:** `git show 68ac748` (runbook diff + new prompt); cross-read against the actual `profiles` schema and the implemented actions/page.
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** The gated Server Actions (7a46fa4) → reviewed below, with the full accountant-as-attacker security pass.
+
+---
+
+## Review of 7a46fa4 — feat(users): gated admin Server Actions for user management (no UI yet)
+
+**Verdict:** ✅ accept — the security-critical layer, **proven fail-closed by execution**. Every action calls `requireAdmin()` (server-side, from the session cookie, via `getUser()`) *before* any service client is constructed; a non-admin caller is rejected with zero mutations, and the RLS backstop independently blocks a non-admin who bypasses the app entirely. Self-lockout + last-admin guards verified against real data. Two minor non-blocking flags (TOCTOU race; partial-create), neither a security hole.
+
+**Phase / commit goal (as I understood it):** Establish the app's first real gated Server Actions — `createUser`, `updateUserProfile`, `resetUserPassword`, `setUserActive` — each running on the privileged `server-only` service client but guarded by an admin re-check derived from the session, plus validation, self-lockout, and last-admin guards.
+
+**What works (verified by execution — live rolled-back RLS impersonation):**
+- **The gate reads the caller's TRUE role and fails closed.** `requireAdmin()` uses the RLS server client's `getUser()` (revalidated against the Auth server, not `getSession()`), reads `role,active` for `auth.uid()`, and throws `Forbidden` unless `active && role==='admin'`. Simulated as the RLS `authenticated` role under each user's real JWT: **admin gate_passes=true (positive control); accountant=false; salesman=false.** Because it `throw`s (never returns) and runs before `createServiceClient()`, a rejected caller triggers zero privileged work.
+- **RLS backstop (defense-in-depth) holds if the app is bypassed.** The actions use the service client (bypasses RLS), so `requireAdmin()` is the app-layer gate — but I confirmed that a non-admin hitting PostgREST *directly* with their own JWT still can't escalate: accountant self-`update role='admin'` → **0 rows** (`profiles_update_admin` qual requires admin; accountant has no self-update path), salesman self-escalate → hard **`42501` RLS rejection** (`profiles_update_self` with_check pins `role`/`active` to current values). So neither the app gate nor the DB can be individually defeated.
+- **Self-lockout + last-admin guards** — `updateUserProfile`/`setUserActive` reject self-demote/self-deactivate (`targetId===callerId`), and `wouldOrphanAdmins()` counts active admins (incl. target) and blocks any demote/deactivate leaving ≤1. Verified against live data: exactly **1 active admin** (vikram) ⇒ demoting/deactivating him is blocked (`≤1 → true`).
+- **Validation** — email/username(`^[a-zA-Z0-9_.]{3,20}$`)/role/full_name/password≥8 all checked server-side; friendly dup-username pre-check *and* the citext-unique violation both mapped to "already taken"; GoTrue duplicate-email mapped to a friendly message. Passwords never logged/echoed.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **㊴ `wouldOrphanAdmins` is a non-atomic count-then-update (TOCTOU).** Two concurrent demotions of two *different* admins could each read count=2 and both proceed → 0 active admins. Real but very low severity at this scale (1–2 staff); a single-statement guarded UPDATE (or a `SELECT ... FOR UPDATE`/advisory lock) would close it. Not blocking.
+- **createUser partial failure** — if `admin.createUser` succeeds but the follow-up `profiles.update` fails (e.g. a username race), the auth user exists as an inert salesman with `username=NULL` (can't username-login), fixable via Edit. The code comments acknowledge this and the guardrail (never delete) is honored; acceptable.
+
+**Domain / correctness checks:**
+- **Auth/authorization** ✓ — `getUser()` (not `getSession()`); gate before service client; throws not returns; server-derived caller id (never client-passed).
+- **Privilege isolation** ✓ — service client constructed only past the gate; `server-only` (verified in 28a59e3).
+- **Money / state machine** — N/A.
+
+**What I tried:** Read `actions.ts` end-to-end; live rolled-back RLS impersonation (`set local role authenticated` + `request.jwt.claims`) of admin/accountant/salesman running the exact gate select + direct self-escalation attempts; live `wouldOrphanAdmins` reality check (1 active admin); traced all four actions' guard order.
+
+**Open flags (cumulative):** No 🔴 blocking. New 🟡 ㊴ (last-admin TOCTOU race — low severity). Carried 🟡 ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** The UI wiring (28a59e3) → reviewed below.
+
+---
+
+## Review of 28a59e3 — feat(users): admin Users screen — nav tab, gated page, list + Active toggle, Add/Edit/reset modal
+
+**Verdict:** ✅ accept — the UI wires cleanly onto the gated actions with a correct second gate (page redirect) and the **service key proven absent from the client bundle**. Build/tsc/eslint clean. Two minor non-blocking UX/robustness flags, neither a security issue (both fail closed).
+
+**Phase / commit goal (as I understood it):** Wire the gated actions into an admin-only `/dashboard/users` screen — admin-only nav tab, page gate + service-client-merged user list, `UsersAdmin` table/cards with a `setUserActive`-backed Active toggle, and a shared Add/Edit/reset-password `UserModal` — all writes through the Server Actions, never a client supabase call.
+
+**What works (verified by execution):**
+- **Page gate is real and fails closed** — `page.tsx` reads the caller's `role,active` (RLS client) and `redirect("/dashboard")` unless active admin; the accountant `gate_passes=false` result from 7a46fa4 applies identically here (same predicate), so an accountant reaching the route at the middleware layer is bounced before the service client runs. Emails (from `auth.users` via the service client) are only fetched *past* the gate.
+- **Service key never ships to the browser** — after `npm run build`, grepped all **27** client JS chunks in `.next/static` for the real `SUPABASE_SECRET_KEY` value (42 chars, non-empty — grep was real), the `SUPABASE_SECRET_KEY` name, `sb_secret_`, `auth/v1/admin`, `admin.createUser`, `createServiceClient` → **zero hits**. The `server-only` import on `service.ts` makes a client import a build error; the clean build confirms no client component pulls it.
+- **Nav gate** — `DashboardNav` appends the Users tab only when `isAdmin`; `layout.tsx` now selects `role` and passes `isAdmin={profile?.role==='admin'}` (desktop rail + mobile bar). Accountant sees the original 3 tabs. (Tab hiding is convenience; the page/action gates are the boundary.)
+- **Active toggle** — `UsersAdmin` reuses the `useOptimistic` + busy-`Set` + `router.refresh()` pattern (matching the reviewed ProductsPricing toggle), calling `setUserActive` (gated) not a client write; renders from the `users` prop (㉜🅐); `stopPropagation` so the toggle doesn't open the edit modal.
+- **UserModal** — Add takes email + password ×2 (must match, ≥8 client-side) then reveals credentials once ("won't be shown again"); Edit updates username/full_name/role, has a gated Active toggle and a reset-password sub-form (new ×2, must match); no email edit, no delete. Only the confirmed password is sent.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **㊵ `page.tsx:31` uses `user!.id` (non-null assertion) with no explicit `!user` check**, unlike `actions.ts`/`requireAdmin` which throws on `!user`. Relies on middleware to guarantee auth on `/dashboard/*`; if that ever regressed, the page throws a TypeError (500) rather than redirecting — still **fail-closed** (no data render/leak), just inconsistent. Cheap to align with a `!user` guard. (Same pattern pre-exists in `layout.tsx`.)
+- **㊶ Edit-mode role `<select>` is not `disabled` for a self-admin** — it only shows the hint "You can't change your own admin role." A self-admin can pick another role and hit Save, but `updateUserProfile` rejects it server-side ("You can't remove your own admin role"). Fails closed; UX-only — disabling the control (or the last-admin option) would avoid the round-trip.
+
+**Domain / correctness checks:**
+- **Authorization** ✓ — page gate verified (predicate identical to the executed accountant probe); nav gate admin-only; all mutations via gated actions.
+- **Secret isolation** ✓ — service key/admin API absent from 27 client chunks; `server-only` + clean build.
+- **render-from-prop (㉜🅐)** ✓ — `displayUsers` derives from `users` via useOptimistic; each mutation `router.refresh()`.
+- **Money / state machine** — N/A.
+
+**What I tried:** Read page.tsx/UsersAdmin.tsx/UserModal.tsx/DashboardNav.tsx + layout diff; `npm run build` exit 0 (`/dashboard/users` = dynamic ƒ); grepped 27 `.next/static` chunks for the secret value/name/admin-API/service-client (zero hits) after confirming the key is 42 chars; reused the executed accountant gate result for the redirect predicate.
+
+**Open flags (cumulative):** No 🔴 blocking. New 🟡 ㊵ (page `user!` non-null assertion — fail-closed, cosmetic), 🟡 ㊶ (self-role select not disabled — server rejects, UX-only). Carried 🟡 ㊴, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Feature is complete and secure. Real-browser follow-ups only: eyeball the create→one-time-credential reveal, an accountant hitting `/dashboard/users` (should bounce), and the Active-toggle flip. When merging `feature/admin-user-management` to main, confirm the three new migrations already reconcile (they do: all 14-digit).
+
+---
