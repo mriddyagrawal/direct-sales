@@ -122,3 +122,8 @@ export async function processOrder(orderId: string): Promise<OrderRow> {
   const supabase = createClient();
   return callRpc(() => supabase.rpc("process_order", { p_order_id: orderId }));
 }
+
+export async function approveOrder(orderId: string): Promise<OrderRow> {
+  const supabase = createClient();
+  return callRpc(() => supabase.rpc("approve_order", { p_order_id: orderId }));
+}
