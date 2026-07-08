@@ -18,7 +18,7 @@ interface SalesmanFilterProps {
 export function SalesmanFilter({ salesmen, value, onChange }: SalesmanFilterProps) {
   const [open, setOpen] = useState(false);
   const selected = salesmen.find((s) => s.id === value);
-  const valueLabel = selected ? selected.full_name : "All salesmen";
+  const valueLabel = selected ? selected.full_name : "All";
 
   function select(id: string) {
     onChange(id);
@@ -33,7 +33,7 @@ export function SalesmanFilter({ salesmen, value, onChange }: SalesmanFilterProp
           className={`${styles.option} ${value === "all" ? styles.optionActive : ""}`}
           onClick={() => select("all")}
         >
-          All salesmen
+          All
         </button>
         {salesmen.map((s) => (
           <button
