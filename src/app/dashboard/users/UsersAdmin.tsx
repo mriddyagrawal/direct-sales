@@ -10,10 +10,13 @@ import styles from "./UsersAdmin.module.css";
 
 type ModalState = { mode: "add" } | { mode: "edit"; user: UserRow } | null;
 
+// Display labels only — the stored identifiers stay admin/accountant/salesman
+// (wired into the CHECK constraint, RLS, and every RPC). Owner terminology:
+// "Sales" / "Accounts".
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
-  accountant: "Accountant",
-  salesman: "Salesman",
+  accountant: "Accounts",
+  salesman: "Sales",
 };
 
 // Mirrors ProductsPricing: desktop table + mobile cards, row-click opens the
