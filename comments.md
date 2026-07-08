@@ -3204,3 +3204,71 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Feature is complete and secure. Real-browser follow-ups only: eyeball the create→one-time-credential reveal, an accountant hitting `/dashboard/users` (should bounce), and the Active-toggle flip. When merging `feature/admin-user-management` to main, confirm the three new migrations already reconcile (they do: all 14-digit).
 
 ---
+
+## Review of b523d5e — feat(users): show roles as "Sales"/"Accounts"/"Admin" (display labels only)
+
+**Verdict:** ✅ accept — a pure display-label rename, verified to touch **no** stored value, validation, or authorization path. Owner terminology only.
+
+**Phase / commit goal (as I understood it):** Render `salesman→"Sales"`, `accountant→"Accounts"`, `admin→"Admin"` in the Users list and the role dropdown, while leaving the stored identifiers (and everything keyed on them) untouched.
+
+**What works (verified):**
+- **Stored identifiers unchanged** — `UserModal` `ROLES[].value` is still `salesman`/`accountant`/`admin`; only `label` changed. So the Add/Edit form still submits the real identifier, which `actions.ts` validates against `["admin","accountant","salesman"]` (unchanged). No desync between UI and the CHECK constraint / RLS / RPCs.
+- **No logic depends on the label** — grepped `src` for any `=== / !==` comparison to `"Salesman"|"Accountant"|"Sales"|"Accounts"` → **none**. Labels are render-only; `ROLE_LABEL` (UsersAdmin) and `ROLE_ORDER` (page.tsx sort) are both keyed by the identifiers, so sorting/rendering still resolve.
+- **Scope honored** — person-labeling uses of "Salesman" (orders SalesmanFilter caption, pick slip) intentionally left; those name a *person*, not the role enum. Consistent.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Authorization/RLS/RPC — untouched (identifiers are the contract; only display strings changed). Money/state machine — N/A.
+
+**What I tried:** `git show b523d5e`; grep for label-as-logic (none); confirmed `ROLES[].value`, `ROLE_LABEL`/`ROLE_ORDER` keys, and `actions.ts` `ROLES` are all still the 3 identifiers; `npm run build` exit 0.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊴ (last-admin TOCTOU — see 02ffeec: owner won't-fix), ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** The ㊵/㊶ fixes (02ffeec) → below.
+
+---
+
+## Review of 02ffeec — fix(users): disable self-role select (㊶) + drop user! non-null assertion (㊵)
+
+**Verdict:** ✅ accept — both non-blocking reviewer flags correctly closed; ㊴ accepted as owner won't-fix. Corroborated by the live e2e run (AD-09 saw the self-role select disabled).
+
+**Phase / commit goal (as I understood it):** Address ㊶ (disable the Edit-modal role select when editing yourself, matching the server-side self-demote guard) and ㊵ (replace `user!` non-null assertions in page.tsx with an explicit `!user` redirect).
+
+**What works (verified):**
+- **㊶ CLOSED** — `<select ... disabled={isSelf}>` with `isSelf = mode==="edit" && initial?.id===callerId`. Verified the truth table: **Add** mode → `isSelf=false` → enabled (correct, you set a new user's role); **Edit self** → disabled; **Edit other** → enabled. A self-admin can still save name/username edits because `value={role}` stays their own `admin`, so `updateUserProfile`'s `role!=='admin'` self-demote guard is not tripped — no legitimate self-edit is locked out. Muted `.select:disabled` style added. This is exactly what the live **AD-09** observed ("role dropdown is disabled"). The server guard is unchanged — UI now agrees with it.
+- **㊵ CLOSED** — `page.tsx` now `if (!user) redirect("/login")` before using `user.id` (no `!`). `redirect()` throws `NEXT_REDIRECT`, so the subsequent `user.id` is unreachable when unauthenticated — fail-closed *and* assertion-free, consistent with `requireAdmin()` in actions.ts. Middleware still guarantees a user upstream; this is belt-and-suspenders.
+- **㊴ won't-fix (accepted)** — the commit documents the owner decision: single owner-admin, microsecond window, a real fix needs DB-level locking/constraint disproportionate to the risk. Reasonable; I'm closing ㊴ as **accepted risk**, not outstanding.
+
+**Blocking issues:** None. **Non-blocking:** None new.
+
+**Domain / correctness checks:** Authorization — the *security* guard (server-side self-demote + last-admin) is unchanged; ㊶ is a UI-alignment, not a new gate. Auth null-handling now fail-closed without assertions. Money/state — N/A.
+
+**What I tried:** `git show 02ffeec`; traced `isSelf` across Add/Edit-self/Edit-other; confirmed `redirect` short-circuits before `user.id`; confirmed the server self-demote guard is untouched; `npm run build` exit 0; cross-checked against live AD-09 pass.
+
+**Open flags (cumulative):** No 🔴, no new flag. **㊵ CLOSED, ㊶ CLOSED, ㊴ CLOSED (won't-fix/accepted).** Carried 🟡 ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** The salesman-filter label (33b9056) → below.
+
+---
+
+## Review of 33b9056 — fix(dashboard): salesman filter reads "All" instead of "All salesmen"
+
+**Verdict:** ✅ accept — trivial display-only copy change; filter logic untouched.
+
+**Phase / commit goal (as I understood it):** The SalesmanFilter's default/reset option (collapsed value + dropdown option) reads "All" instead of the redundant "All salesmen" (the "SALESMAN" caption already names the filter).
+
+**What works (verified):**
+- **Display-only** — both edits change the string `"All salesmen"→"All"` (the `valueLabel` fallback and the reset `<button>` text). The selection sentinel (`value === "all"`, `onChange(id)`, `selected = salesmen.find(s => s.id === value)`) is unchanged, so filtering behavior is identical — corroborated by the live **AC-03** pass (salesman filter stacks/ANDs correctly).
+- No type/data/RLS surface.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** N/A — presentational copy; no data/auth/money/state surface.
+
+**What I tried:** `git show 33b9056` (1 file, 2 lines); confirmed only the label strings changed and the `"all"` sentinel logic is intact; `npm run build` exit 0.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (㊴/㊵/㊶ all closed above.)
+
+**Next-commit suggestion:** Nothing outstanding — `main` is fully reviewed through 33b9056. The user-management feature + Quick Order polish are merged, reviewed, and independently confirmed by the live e2e run (31 real passes; the 3 reported "failures" were verified to be browser-agent artifacts, not code defects).
+
+---
