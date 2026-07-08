@@ -110,10 +110,16 @@ export function QuickOrder({
   const effectiveBrand = locked ? cartBrandId : brandFilter === "all" ? null : brandFilter;
   const lockedBrandName = locked ? (brandOptions.find((b) => b.id === cartBrandId)?.name ?? "") : "";
 
+  // Search matches product name, category, OR brand — so "ze" surfaces all
+  // Zebronics items and a category term (e.g. "adaptor", "refriger") surfaces
+  // that whole category. Brand filtering (lock / picked) still applies on top.
   const q = normalize(query.trim());
-  const visible = products.filter(
-    (p) => (q === "" || normalize(p.name).includes(q)) && (effectiveBrand === null || p.brand_id === effectiveBrand),
-  );
+  const matchesSearch = (p: ProductOption) =>
+    q === "" ||
+    normalize(p.name).includes(q) ||
+    normalize(p.category).includes(q) ||
+    normalize(p.brand_name).includes(q);
+  const visible = products.filter((p) => matchesSearch(p) && (effectiveBrand === null || p.brand_id === effectiveBrand));
 
   const brandGroups: BrandGroup[] = useMemo(() => {
     const byBrand = new Map<string, { brandName: string; cats: Map<string, ProductOption[]> }>();
@@ -262,7 +268,7 @@ export function QuickOrder({
             className={styles.searchInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name"
+            placeholder="Search name, brand or category"
           />
         </div>
         {q !== "" && (
