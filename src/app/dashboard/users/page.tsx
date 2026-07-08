@@ -25,10 +25,11 @@ export default async function UsersPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/login"); // middleware guarantees this, but no non-null assertion (㊵)
   const { data: me } = await supabase
     .from("profiles")
     .select("role, active")
-    .eq("id", user!.id)
+    .eq("id", user.id)
     .maybeSingle();
   if (!me || !me.active || me.role !== "admin") redirect("/dashboard");
 
@@ -59,5 +60,5 @@ export default async function UsersPage() {
         a.full_name.localeCompare(b.full_name),
     );
 
-  return <UsersAdmin users={users} callerId={user!.id} />;
+  return <UsersAdmin users={users} callerId={user.id} />;
 }
