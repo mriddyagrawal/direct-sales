@@ -28,7 +28,7 @@ export function PendingOrdersStrip() {
   async function sync(order: PendingOrder) {
     setSyncingId(order.orderId);
     try {
-      await submitOrder(order.orderId, order.retailerId, order.notes, order.items);
+      await submitOrder(order.orderId, order.retailerId, order.notes, order.items, order.prices);
       removePending(order.orderId);
       clearDraft(order.retailerId);
       clearLastActiveRetailerId();

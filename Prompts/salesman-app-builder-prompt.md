@@ -13,7 +13,7 @@ Work in small atomic commits on branch **`feature/salesman-app`**. A separate RE
 - **App:** Next.js 16 (App Router, TypeScript, Turbopack), CSS Modules, `src/` layout. Routes already live: `/login`, `/` (salesman Home / S2), `/dashboard` (accountant S8), `/new-order` (placeholder — **this milestone fills the order flow behind it**).
 - **Reuse the design system** in `src/components/ui/` (`Button`, `Field`, `StatusTag`) and `src/components/` (`BottomTabBar`, `OrderCard`, `SignOutButton`), the tokens/fonts in `src/app/globals.css` + `layout.tsx`, and the helpers in `src/lib/` (`format.ts` for ₹ en-IN / IST / refs, `order-status.ts` for the derived lock/countdown). Extend these; don't fork parallel styles. New primitives (e.g. a stepper, a bottom sheet) join `src/components/ui/`.
 - **Supabase clients** are in `src/lib/supabase/` (`client.ts` browser, `server.ts` server, `middleware.ts`, `service.ts` secret-key). Generated DB types are in `src/lib/types/database.types.ts` — use them; regenerate via MCP `generate_typescript_types` if you change the schema.
-- **The RPCs are already built and verified.** Read their exact signatures + the `p_items` **jsonb shape** in `supabase/migrations/20260706T150400_rpcs.sql` before wiring — do not guess the payload keys.
+- **The RPCs are already built and verified.** Read their exact signatures + the `p_items` **jsonb shape** in `supabase/migrations/20260706174220_rpcs.sql` before wiring — do not guess the payload keys.
 
 ## 1. Hard constraints (the invariants this flow lives or dies on)
 

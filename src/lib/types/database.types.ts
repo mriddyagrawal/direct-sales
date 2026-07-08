@@ -20,18 +20,24 @@ export type Database = {
           code: string
           id: string
           name: string
+          pricing_mode: string
+          requires_approval: boolean
         }
         Insert: {
           active?: boolean
           code: string
           id?: string
           name: string
+          pricing_mode?: string
+          requires_approval?: boolean
         }
         Update: {
           active?: boolean
           code?: string
           id?: string
           name?: string
+          pricing_mode?: string
+          requires_approval?: boolean
         }
         Relationships: []
       }
@@ -127,6 +133,8 @@ export type Database = {
       }
       orders: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
@@ -145,6 +153,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           brand_id: string
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -163,6 +173,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           brand_id?: string
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -181,6 +193,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_brand_id_fkey"
             columns: ["brand_id"]
@@ -338,10 +357,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_order: {
+        Args: { p_order_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          brand_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          editable_until: string
+          id: string
+          notes: string
+          order_no: number
+          order_ref: string
+          processed_at: string | null
+          processed_by: string | null
+          retailer_id: string
+          salesman_id: string
+          status: string
+          submitted_at: string
+          total_paise: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       auth_profile_role: { Args: never; Returns: string }
       cancel_order: {
         Args: { p_order_id: string; p_reason?: string }
         Returns: {
+          approved_at: string | null
+          approved_by: string | null
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
@@ -374,6 +424,8 @@ export type Database = {
       process_order: {
         Args: { p_order_id: string }
         Returns: {
+          approved_at: string | null
+          approved_by: string | null
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
@@ -406,6 +458,8 @@ export type Database = {
           p_retailer_id: string
         }
         Returns: {
+          approved_at: string | null
+          approved_by: string | null
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
@@ -438,6 +492,8 @@ export type Database = {
           p_reason?: string
         }
         Returns: {
+          approved_at: string | null
+          approved_by: string | null
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
