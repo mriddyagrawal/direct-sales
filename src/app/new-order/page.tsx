@@ -6,9 +6,10 @@ export interface ProductOption {
   id: string;
   category: string;
   name: string;
-  price_paise: number;
+  price_paise: number | null; // null for manual-pricing (LG) products — no catalog price
   brand_id: string;
   brand_name: string;
+  pricing_mode: string; // 'fixed' | 'manual'
 }
 
 export interface RetailerOption {
@@ -71,7 +72,7 @@ export default async function NewOrderPage({
   const [{ data: productRows }, { data: retailerRows }, { data: recentRows }] = await Promise.all([
     supabase
       .from("products")
-      .select("id, category, name, price_paise, brand_id, brands(name)")
+      .select("id, category, name, price_paise, brand_id, brands(name, pricing_mode)")
       .order("category")
       .order("created_at"),
     supabase.from("retailers").select("id, name, area, verified").order("name"),
@@ -87,9 +88,9 @@ export default async function NewOrderPage({
       id: string;
       category: string;
       name: string;
-      price_paise: number;
+      price_paise: number | null;
       brand_id: string;
-      brands: { name: string } | null;
+      brands: { name: string; pricing_mode: string } | null;
     }>
   ).map((r) => ({
     id: r.id,
@@ -98,6 +99,7 @@ export default async function NewOrderPage({
     price_paise: r.price_paise,
     brand_id: r.brand_id,
     brand_name: r.brands?.name ?? "",
+    pricing_mode: r.brands?.pricing_mode ?? "fixed",
   })) as ProductOption[];
   const retailers = (retailerRows ?? []) as RetailerOption[];
 

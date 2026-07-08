@@ -165,6 +165,112 @@
   margin-right: -2px;
 }
 
+/* Phase 3b collapse-to-reveal row: a column of [tap head] + [revealed drop]. */
+.collapseRow {
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.collapseRowActive {
+  background: #dbeafe;
+  border-left: 2px solid var(--color-accent);
+  margin-left: -8px;
+  margin-right: -2px;
+  padding-left: 6px;
+}
+
+.productHead {
+  width: 100%;
+  min-height: 48px; /* comfortable phone tap target */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.productHeadInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Thin CSS-border chevron — stays crisp when enlarged for a phone. Points
+   down (▾) at rest, rotates up on expand. */
+.chevron {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  margin-top: -4px;
+  border-right: 2px solid var(--color-locked);
+  border-bottom: 2px solid var(--color-locked);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.chevronOpen {
+  transform: rotate(225deg);
+  margin-top: 2px;
+}
+
+.productDrop {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 4px 10px 0;
+}
+
+.priceField {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 10px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.priceField:focus-within {
+  border-color: var(--color-accent);
+}
+
+.pricePrefix {
+  font-family: var(--font-figures);
+  font-size: 14px;
+  color: var(--color-locked);
+}
+
+.priceInput {
+  width: 92px;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: var(--font-figures);
+  font-size: 15px;
+  color: var(--color-ink);
+}
+
+/* "Tap to price" prompt on an unpriced manual line's collapsed head. */
+.productPricePrompt {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.priceError {
+  flex-basis: 100%;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  color: var(--color-error);
+}
+
 .productInfo {
   min-width: 0;
   flex: 1;
