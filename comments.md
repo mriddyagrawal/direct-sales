@@ -3060,3 +3060,28 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Nothing outstanding on `feature/products-delete-and-toggle-fix` (useOptimistic toggle + this delete — both verified). Ready to merge to main when you are; a device-check of the toggle flip + delete confirm is the only real-browser follow-up.
 
 ---
+
+## Review of 2f9809d — fix(nav): add hover state to desktop sidebar links
+
+**Verdict:** ✅ accept — trivial, correct cosmetic CSS: a `:hover` (ink text + subtle wash) + `cursor: pointer` + 0.12s transition on `.railLink`, placed before `.railLink.active` so the current page keeps its accent while hovered. Presentational-only; no logic/data surface. *(On `main`; history is linear — the search/toggle/delete branches fast-forwarded in, all reviews present.)*
+
+**Phase / commit goal (as I understood it):** Give the desktop sidebar rail links hover feedback (they had an active style but no `:hover`).
+
+**What works (verified):**
+- **Correct + minimal** — adds `cursor: pointer` + `transition: background 0.12s, color 0.12s` to `.railLink` and `.railLink:hover { color: var(--color-ink); background: rgba(20,24,31,0.05) }`. Standard hover pattern.
+- **Cascade correct** — `.railLink:hover` and `.railLink.active` are equal specificity (0,2,0), so source order decides; `:hover` is placed **before** `.active`, so an active link being hovered keeps its accent color/border (active wins) while still getting the hover wash. Matches the commit's stated intent.
+- **Scope** — one file (`DashboardNav.module.css`, +7), CSS-only; no JS/type/data change (no build/tsc concern).
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** None. Visual is browser-verifiable, but the CSS is manifestly correct.
+
+**Domain / correctness checks:** N/A — presentational CSS; no data/RLS/money/state surface.
+
+**What I tried:** `git show 2f9809d` (1 CSS file, +7); confirmed CSS-only, standard hover, and the specificity/source-order reasoning (`:hover` before `.active` → active accent preserved on hover).
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Nothing outstanding.
+
+---
