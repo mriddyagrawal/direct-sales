@@ -1,0 +1,193 @@
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.title {
+  font-family: var(--font-structure);
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
+  color: var(--color-ink);
+}
+
+.count {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.titleActions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.table tbody tr.clickable:hover {
+  background: rgba(29, 78, 216, 0.05);
+}
+
+.error {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}
+
+/* Desktop ledger — same S8 grammar as ProductsPricing (hairlines, mono
+   figures, muted metadata, bold primary column). Hidden on mobile. */
+.table {
+  display: none;
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 2px solid var(--color-ink);
+}
+
+.table thead th {
+  text-align: left;
+  font-family: var(--font-figures);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--color-locked);
+  height: 32px;
+  border-bottom: 2px solid var(--color-ink);
+}
+
+.table tbody tr {
+  height: 40px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.table tbody tr:nth-child(even) {
+  background: rgba(20, 24, 31, 0.02);
+}
+
+.table td {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  padding-right: 12px;
+}
+
+.mono {
+  font-family: var(--font-figures);
+}
+
+/* Username is the primary scan target; everything else recedes. Scoped as
+   `.table td.cellX` so it beats `.table td`'s own colour on specificity. */
+.table td.cellMeta {
+  color: var(--color-locked);
+  font-weight: 400;
+}
+
+.table td.cellName {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.rowInactive td {
+  opacity: 0.55;
+}
+
+/* ACTIVE toggle — same outline/weight-carries-state pill as ProductsPricing. */
+.toggle {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toggleOn {
+  background: var(--color-white);
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+}
+
+.toggleOff {
+  background: none;
+  border: 1px dashed var(--color-locked);
+  color: var(--color-locked);
+}
+
+/* Mobile cards — desktop table has no room on a phone. */
+.cards {
+  display: block;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.cardInactive {
+  opacity: 0.6;
+}
+
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardName {
+  font-family: var(--font-figures);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.cardRole {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.cardMeta {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.card .toggle {
+  align-self: flex-start;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: 24px;
+  }
+
+  .table {
+    display: table;
+  }
+
+  .cards {
+    display: none;
+  }
+}

@@ -1,6 +1,8 @@
 # Runbook — Add a login account (in Supabase)
 
-Accounts are **admin-created in Supabase** (D3), and login is by a **username**, not email (D9). There is no in-app user-management screen by design — this is the whole process. Project: `direct-sales` (`ugjwcbxyyuowiyhczcrh`).
+> **The in-app admin _Users_ screen (`/dashboard/users`) is now the primary path** — create/rename/deactivate a user and reset a password there, no dashboard or SQL needed. These Supabase + SQL steps remain the fallback (e.g. if you ever need to change a login email, which the screen deliberately doesn't do).
+
+Accounts are **admin-created** (D3), and login is by a **username**, not email (D9). Project: `direct-sales` (`ugjwcbxyyuowiyhczcrh`).
 
 **Two things the Supabase dashboard makes confusing — read once:**
 - The **"Display name"** column and **User Metadata** in the Users list are Supabase Auth's *own* fields. **Our app ignores them entirely** — it reads `public.profiles.full_name` (the display name) and `public.profiles.username`. So "Display name: –" in that list is normal and irrelevant.
