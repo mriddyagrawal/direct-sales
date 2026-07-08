@@ -6,6 +6,7 @@ import { Stepper } from "@/components/ui/Stepper";
 import { KeypadSheet } from "@/components/ui/KeypadSheet";
 import { formatRupees } from "@/lib/format";
 import { cartLineCount, cartTotalPaise } from "@/lib/cart";
+import { parsePricePaise } from "@/lib/price";
 import type { ProductOption } from "./page";
 import styles from "./QuickOrder.module.css";
 
@@ -30,45 +31,50 @@ interface QuickOrderProps {
   retailerName: string;
   retailerArea: string | null;
   items: Record<string, number>;
+  prices?: Record<string, number>; // entered unit prices (paise) for manual/LG lines
   snapshotPrices?: Record<string, number>;
   snapshotNames?: Record<string, string>;
   onChangeQty: (productId: string, qty: number) => void;
+  onChangePrice?: (productId: string, pricePaise: number) => void;
   onReview: () => void;
   onBack: () => void;
 }
 
-// S4 — the hero screen. Category-grouped dense list, sticky client-side
-// search (no network round-trip), stepper + keypad, sticky split cart bar.
+// S4 — the hero screen. Brand▸Category grouped dense list, sticky client-side
+// search, sticky split cart bar.
 //
-// Phase 3a: brand is a first-class order attribute. When ≥2 brands are
-// orderable, a plain <select> beside the search filters by brand, and "All
-// brands" nests Brand ▸ Category with two-tier sticky headers. Adding the
-// first item lazily auto-locks the brand (one order = one brand — the server
-// guard is the real wall, this is just the pleasant front-end). With a single
-// brand (today's Zebronics), none of this shows — the screen is unchanged.
+// Phase 3a: brand dropdown + two-tier grouping + lazy brand-lock.
+// Phase 3b: rows collapse to name + price; tapping a row reveals its qty
+// stepper (and, for manual-pricing brands like LG, a unit-price input) inside
+// the drop. Multiple rows open independently; in-cart rows start expanded.
 export function QuickOrder({
   products,
   retailerName,
   retailerArea,
   items,
+  prices,
   snapshotPrices,
   snapshotNames,
   onChangeQty,
+  onChangePrice,
   onReview,
   onBack,
 }: QuickOrderProps) {
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("all"); // "all" | brand_id
   const [keypadProductId, setKeypadProductId] = useState<string | null>(null);
+  // Per-row collapse state (a Set, NOT an accordion — several rows open at
+  // once). Seeded ONCE from in-cart lines so drafts/in-cart lines show their
+  // controls without a tap.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+    () => new Set(Object.keys(items).filter((id) => (items[id] ?? 0) > 0)),
+  );
+  // Local text buffer for manual price inputs (keeps "45." mid-type); the
+  // committed paise value lives in the parent cart via onChangePrice.
+  const [priceText, setPriceText] = useState<Record<string, string>>({});
   const pageRef = useRef<HTMLDivElement>(null);
   const searchBarRef = useRef<HTMLDivElement>(null);
 
-  // Keep --search-bar-height equal to the search bar's real rendered
-  // height so the sticky headers pin flush beneath it. The bar grows/shrinks
-  // (the "N of M products" line only shows while searching, the brand-lock
-  // cue only while locked); a ResizeObserver writes the live height to the
-  // page's CSS var (a plain DOM mutation — no React state), so the offset is
-  // always exact without reserving a blank line.
   useEffect(() => {
     const bar = searchBarRef.current;
     const page = pageRef.current;
@@ -80,16 +86,14 @@ export function QuickOrder({
     return () => observer.disconnect();
   }, []);
 
-  // Snapshot prices (existing lines, if editing) win over the live catalog
-  // price — a catalog re-price never rewrites what a survivor line shows.
+  // Effective unit price: catalog for fixed brands (snapshot wins if editing),
+  // entered price for manual (LG) lines. Manual products have no catalog price.
   const pricesById = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const p of products) map[p.id] = p.price_paise;
-    return { ...map, ...snapshotPrices };
-  }, [products, snapshotPrices]);
+    for (const p of products) if (p.price_paise != null) map[p.id] = p.price_paise;
+    return { ...map, ...snapshotPrices, ...prices };
+  }, [products, snapshotPrices, prices]);
 
-  // Orderable brands = the distinct brands present in the (already active +
-  // priced, RLS-scoped) catalog. One brand ⇒ no brand UI at all.
   const brandOptions = useMemo(() => {
     const byId = new Map<string, string>();
     for (const p of products) if (!byId.has(p.brand_id)) byId.set(p.brand_id, p.brand_name);
@@ -97,16 +101,12 @@ export function QuickOrder({
   }, [products]);
   const multiBrand = brandOptions.length >= 2;
 
-  // Lazy auto-lock: the cart's brand (all cart lines share one brand while
-  // locked). Non-empty cart ⇒ locked to that brand; empty ⇒ unlocked.
   const cartBrandId = useMemo(() => {
     const first = products.find((p) => (items[p.id] ?? 0) > 0);
     return first?.brand_id ?? null;
   }, [products, items]);
   const locked = cartBrandId !== null;
 
-  // The brand actually in effect: locked ⇒ the cart's brand; else the picked
-  // filter (null = "All brands"). null + multiBrand ⇒ the two-tier view.
   const effectiveBrand = locked ? cartBrandId : brandFilter === "all" ? null : brandFilter;
   const lockedBrandName = locked ? (brandOptions.find((b) => b.id === cartBrandId)?.name ?? "") : "";
 
@@ -115,8 +115,6 @@ export function QuickOrder({
     (p) => (q === "" || normalize(p.name).includes(q)) && (effectiveBrand === null || p.brand_id === effectiveBrand),
   );
 
-  // Nested Brand ▸ Category, preserving encounter order for categories and
-  // alphabetical order for brands.
   const brandGroups: BrandGroup[] = useMemo(() => {
     const byBrand = new Map<string, { brandName: string; cats: Map<string, ProductOption[]> }>();
     for (const p of visible) {
@@ -146,13 +144,86 @@ export function QuickOrder({
   const totalPaise = cartTotalPaise(items, pricesById);
   const keypadProduct = products.find((p) => p.id === keypadProductId) ?? null;
 
-  // ㉕ — a line whose product has left the active+priced catalog mid-window
-  // (edit mode only) must still be visible so it can be removed, rather than
-  // silently vanishing while still counted in the total and sent.
   const catalogIds = useMemo(() => new Set(products.map((p) => p.id)), [products]);
   const unavailable = Object.keys(items)
     .filter((id) => !catalogIds.has(id) && snapshotNames?.[id])
     .map((id) => ({ id, name: snapshotNames![id], qty: items[id], price: pricesById[id] ?? 0 }));
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handlePriceInput(id: string, text: string) {
+    setPriceText((prev) => ({ ...prev, [id]: text }));
+    const parsed = parsePricePaise(text);
+    onChangePrice?.(id, parsed.ok && parsed.paise != null ? parsed.paise : 0);
+  }
+
+  function renderProduct(p: ProductOption) {
+    const qty = items[p.id] ?? 0;
+    const inCart = qty > 0;
+    const isManual = p.pricing_mode === "manual";
+    const expanded = expandedIds.has(p.id);
+    const entered = prices?.[p.id] ?? snapshotPrices?.[p.id];
+    const priceLabel = isManual
+      ? entered != null
+        ? formatRupees(entered)
+        : "Tap to price"
+      : formatRupees(pricesById[p.id] ?? p.price_paise ?? 0);
+    const buffered = priceText[p.id];
+    const inputVal = buffered ?? (entered != null ? String(entered / 100) : "");
+    const parsed = isManual && buffered != null && buffered !== "" ? parsePricePaise(buffered) : null;
+    const priceError = parsed && !parsed.ok ? parsed.error : null;
+
+    return (
+      <div key={p.id} className={`${styles.collapseRow} ${inCart ? styles.collapseRowActive : ""}`}>
+        <button
+          type="button"
+          className={styles.productHead}
+          onClick={() => toggleExpanded(p.id)}
+          aria-expanded={expanded}
+        >
+          <span className={styles.productHeadInfo}>
+            <span className={`${styles.productName} ${inCart ? styles.productNameActive : ""}`}>{p.name}</span>
+            <span className={`${styles.productPrice} ${isManual && entered == null ? styles.productPricePrompt : ""}`}>
+              {priceLabel}
+              {inCart ? ` · ${qty} in cart` : ""}
+            </span>
+          </span>
+          <span className={`${styles.chevron} ${expanded ? styles.chevronOpen : ""}`} aria-hidden />
+        </button>
+
+        {expanded && (
+          <div className={styles.productDrop}>
+            {isManual && (
+              <label className={styles.priceField}>
+                <span className={styles.pricePrefix}>₹</span>
+                <input
+                  className={styles.priceInput}
+                  inputMode="decimal"
+                  value={inputVal}
+                  placeholder="Unit price"
+                  onChange={(e) => handlePriceInput(p.id, e.target.value)}
+                />
+              </label>
+            )}
+            <Stepper
+              qty={qty}
+              max={UI_QTY_CAP}
+              onChange={(next) => onChangeQty(p.id, next)}
+              onTapQuantity={() => setKeypadProductId(p.id)}
+            />
+            {priceError && <span className={styles.priceError}>{priceError}</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   function renderCategory(group: CategoryGroup) {
     return (
@@ -161,24 +232,7 @@ export function QuickOrder({
           <span>{group.category}</span>
           <span>{group.products.length}</span>
         </div>
-        {group.products.map((p) => {
-          const qty = items[p.id] ?? 0;
-          const inCart = qty > 0;
-          return (
-            <div key={p.id} className={`${styles.productRow} ${inCart ? styles.productRowActive : ""}`}>
-              <div className={styles.productInfo}>
-                <p className={`${styles.productName} ${inCart ? styles.productNameActive : ""}`}>{p.name}</p>
-                <p className={styles.productPrice}>{formatRupees(pricesById[p.id] ?? p.price_paise)}</p>
-              </div>
-              <Stepper
-                qty={qty}
-                max={UI_QTY_CAP}
-                onChange={(next) => onChangeQty(p.id, next)}
-                onTapQuantity={() => setKeypadProductId(p.id)}
-              />
-            </div>
-          );
-        })}
+        {group.products.map(renderProduct)}
       </section>
     );
   }

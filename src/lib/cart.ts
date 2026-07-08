@@ -7,6 +7,10 @@ export interface DraftCart {
   retailerId: string;
   retailerName: string;
   items: Record<string, number>; // product_id -> qty
+  // product_id -> entered unit price in paise. Populated ONLY for manual-brand
+  // (LG) lines — the salesman types the price (Phase 3b). Fixed brands never
+  // use this; their price is snapshotted server-side from the catalog.
+  prices?: Record<string, number>;
   notes: string;
   updatedAt: number; // epoch ms, for the resume-draft sheet's "saved 11:31"
 }
@@ -63,6 +67,7 @@ export function createDraft(retailerId: string, retailerName: string): DraftCart
     retailerId,
     retailerName,
     items: {},
+    prices: {},
     notes: "",
     updatedAt: Date.now(),
   };

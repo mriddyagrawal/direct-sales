@@ -51,6 +51,7 @@ type FlowAction =
   | { type: "START_FRESH_FROM_RESUME"; cart: DraftCart }
   | { type: "DISMISS_RESUME" }
   | { type: "CHANGE_QTY"; productId: string; qty: number }
+  | { type: "CHANGE_PRICE"; productId: string; pricePaise: number }
   | { type: "SET_NOTES"; notes: string }
   | { type: "GOTO_STEP"; step: Step }
   | { type: "SUBMIT_START" }
@@ -87,6 +88,13 @@ function flowReducer(state: FlowState, action: FlowAction): FlowState {
       else items[action.productId] = action.qty;
       return { ...state, cart: { ...state.cart, items, updatedAt: nowMs() } };
     }
+    case "CHANGE_PRICE": {
+      if (!state.cart) return state;
+      const prices = { ...(state.cart.prices ?? {}) };
+      if (action.pricePaise > 0) prices[action.productId] = action.pricePaise;
+      else delete prices[action.productId];
+      return { ...state, cart: { ...state.cart, prices, updatedAt: nowMs() } };
+    }
     case "SET_NOTES":
       return state.cart ? { ...state, cart: { ...state.cart, notes: action.notes, updatedAt: nowMs() } } : state;
     case "GOTO_STEP":
@@ -117,7 +125,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
   const isEdit = editOrder !== null;
 
   const pricesById: Record<string, number> = {};
-  for (const p of products) pricesById[p.id] = p.price_paise;
+  for (const p of products) if (p.price_paise != null) pricesById[p.id] = p.price_paise;
   const catalogIds = new Set(products.map((p) => p.id));
 
   // ㉕ (create mode only) — a resumed draft can name a product that's since
@@ -141,6 +149,9 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
           retailerId: editOrder!.retailerId,
           retailerName: editOrder!.retailerName,
           items: editOrder!.items,
+          // Seed entered prices from the order's current unit prices so a
+          // manual (LG) line shows its price to edit; fixed brands ignore it.
+          prices: editOrder!.snapshotPrices,
           notes: editOrder!.notes,
           updatedAt: 0,
         }
@@ -194,6 +205,10 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
     dispatch({ type: "CHANGE_QTY", productId, qty });
   }
 
+  function handleChangePrice(productId: string, pricePaise: number) {
+    dispatch({ type: "CHANGE_PRICE", productId, pricePaise });
+  }
+
   function handleNotesChange(notes: string) {
     dispatch({ type: "SET_NOTES", notes });
   }
@@ -203,8 +218,8 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
     dispatch({ type: "SUBMIT_START" });
     try {
       const order = isEdit
-        ? await updateOrderItems(cart.orderId, cart.notes, cart.items)
-        : await submitOrder(cart.orderId, cart.retailerId, cart.notes, cart.items);
+        ? await updateOrderItems(cart.orderId, cart.notes, cart.items, undefined, cart.prices)
+        : await submitOrder(cart.orderId, cart.retailerId, cart.notes, cart.items, cart.prices);
 
       removePending(cart.orderId);
       if (!isEdit) {
@@ -226,8 +241,9 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
             retailerName: cart.retailerName,
             notes: cart.notes,
             items: cart.items,
+            prices: cart.prices,
             itemCount: Object.keys(cart.items).length,
-            totalPaise: cartTotalPaise(cart.items, pricesById),
+            totalPaise: cartTotalPaise(cart.items, { ...pricesById, ...(cart.prices ?? {}) }),
             savedAt: nowMs(),
           });
         }
@@ -263,7 +279,8 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
           <BottomSheet onClose={() => dispatch({ type: "DISMISS_RESUME" })}>
             <p>
               Continue order for {resumeCandidate.retailerName}? · {Object.keys(resumeCandidate.items).length} items ·{" "}
-              {formatRupees(cartTotalPaise(resumeCandidate.items, pricesById))} · saved{" "}
+              {formatRupees(cartTotalPaise(resumeCandidate.items, { ...pricesById, ...(resumeCandidate.prices ?? {}) }))} ·
+              saved{" "}
               {new Date(resumeCandidate.updatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}{" "}
               on this phone
             </p>
@@ -301,9 +318,11 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         retailerName={cart.retailerName}
         retailerArea={retailerArea}
         items={cart.items}
+        prices={cart.prices ?? {}}
         snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}
         snapshotNames={isEdit ? editOrder!.snapshotNames : undefined}
         onChangeQty={handleChangeQty}
+        onChangePrice={handleChangePrice}
         onReview={() => goto("review")}
         onBack={() => (isEdit ? router.push(`/orders/${cart.orderId}`) : goto("retailer"))}
       />
@@ -314,6 +333,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
     return (
       <Review
         products={products}
+        prices={cart.prices ?? {}}
         snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}
         snapshotNames={isEdit ? editOrder!.snapshotNames : undefined}
         items={cart.items}

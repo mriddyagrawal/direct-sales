@@ -14,6 +14,7 @@ const UI_QTY_CAP = 999;
 
 interface ReviewProps {
   products: ProductOption[];
+  prices?: Record<string, number>; // entered unit prices (manual/LG lines)
   snapshotPrices?: Record<string, number>;
   snapshotNames?: Record<string, string>;
   items: Record<string, number>;
@@ -35,6 +36,7 @@ interface ReviewProps {
 // lib/order-rpcs.ts's OfflineError split from a real server rejection).
 export function Review({
   products,
+  prices,
   snapshotPrices,
   snapshotNames,
   items,
@@ -51,11 +53,14 @@ export function Review({
   submitError,
 }: ReviewProps) {
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  // Effective unit price: catalog for fixed brands, the salesman's entered
+  // price for manual (LG) lines. Manual products have no catalog price, so
+  // they only appear here once priced.
   const pricesById = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const p of products) map[p.id] = p.price_paise;
-    return { ...map, ...snapshotPrices };
-  }, [products, snapshotPrices]);
+    for (const p of products) if (p.price_paise != null) map[p.id] = p.price_paise;
+    return { ...map, ...snapshotPrices, ...prices };
+  }, [products, snapshotPrices, prices]);
 
   // ㉕ — a line whose product left the catalog mid-window (edit mode only)
   // still has to appear here: it's still in `items`, still counted in

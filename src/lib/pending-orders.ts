@@ -10,6 +10,7 @@ export interface PendingOrder {
   retailerName: string;
   notes: string;
   items: Record<string, number>; // product_id -> qty
+  prices?: Record<string, number>; // entered unit prices (manual/LG lines) — needed to resubmit
   itemCount: number;
   totalPaise: number; // display-only estimate from catalog prices at submit time
   savedAt: number;

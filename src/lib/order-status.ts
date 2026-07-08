@@ -15,8 +15,17 @@ export function getOrderStatusTag(
 ): { tone: StatusTone; label: string } {
   if (order.status === "cancelled") return { tone: "error", label: "Cancelled" };
   if (order.status === "processed") return { tone: "processed", label: "Processed" };
+  // Approved (Phase 3b): admin-signed-off manual-brand order, salesman
+  // read-only — neutral/ink, deliberately NOT the green of Processed.
+  if (order.status === "approved") return { tone: "locked", label: "Approved" };
 
   const countdown = formatCountdown(order.editable_until, now);
+  // Pending approval (Phase 3b): awaiting the admin (amber = "needs an eye").
+  // The salesman can still edit within the window (approval beats the timer),
+  // but the chip is status, never edit-permission.
+  if (order.status === "pending_approval") {
+    return { tone: "amber", label: countdown ? `Pending approval · ${countdown.label}` : "Pending approval" };
+  }
   if (countdown) {
     return {
       tone: countdown.urgent ? "amber" : "accent",

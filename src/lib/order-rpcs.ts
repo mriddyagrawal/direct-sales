@@ -3,16 +3,22 @@ import type { Database } from "@/lib/types/database.types";
 
 type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
 
-// Thin wrappers around the four write RPCs (supabase/migrations/
-// 20260706T150400_rpcs.sql). The client only ever sends product_id + qty —
-// prices are snapshotted server-side from the catalog inside the RPC; never
-// collect or send a price here. A zero/removed line must never reach the
-// payload — the DB's `qty between 1 and 9999` check would reject the whole
-// order (review flag ㉔); filter defensively here, not just at the caller.
-function toItemsPayload(items: Record<string, number>) {
+// Thin wrappers around the write RPCs. For FIXED brands the client sends only
+// product_id + qty — the price is snapshotted server-side from the catalog and
+// any client price is ignored (untamperable). For MANUAL brands (LG, Phase 3b)
+// the salesman's entered unit price is sent as `unit_price_paise`; the RPC
+// trusts it only for manual-brand lines (validate > 0, ceiling, no floor).
+// A zero/removed line must never reach the payload — the DB's
+// `qty between 1 and 9999` check would reject the whole order (review flag ㉔);
+// filter defensively here, not just at the caller.
+function toItemsPayload(items: Record<string, number>, prices?: Record<string, number>) {
   return Object.entries(items)
     .filter(([, qty]) => qty > 0)
-    .map(([product_id, qty]) => ({ product_id, qty }));
+    .map(([product_id, qty]) =>
+      prices && prices[product_id] != null
+        ? { product_id, qty, unit_price_paise: prices[product_id] }
+        : { product_id, qty },
+    );
 }
 
 // A network failure (offline, DNS, timeout) throws before the server ever
@@ -71,6 +77,7 @@ export async function submitOrder(
   retailerId: string,
   notes: string,
   items: Record<string, number>,
+  prices?: Record<string, number>,
 ): Promise<OrderRow> {
   const supabase = createClient();
   return callRpc(() =>
@@ -78,7 +85,7 @@ export async function submitOrder(
       p_id: orderId,
       p_retailer_id: retailerId,
       p_notes: notes,
-      p_items: toItemsPayload(items),
+      p_items: toItemsPayload(items, prices),
     }),
   );
 }
@@ -88,13 +95,14 @@ export async function updateOrderItems(
   notes: string,
   items: Record<string, number>,
   reason?: string,
+  prices?: Record<string, number>,
 ): Promise<OrderRow> {
   const supabase = createClient();
   return callRpc(() =>
     supabase.rpc("update_order_items", {
       p_order_id: orderId,
       p_notes: notes,
-      p_items: toItemsPayload(items),
+      p_items: toItemsPayload(items, prices),
       p_reason: reason,
     }),
   );
