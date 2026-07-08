@@ -15,9 +15,11 @@ interface UserModalProps {
   onSaved: () => void;
 }
 
+// value = stored identifier (unchanged — CHECK/RLS/RPCs depend on it);
+// label = owner-facing terminology ("Sales" / "Accounts").
 const ROLES: { value: string; label: string }[] = [
-  { value: "salesman", label: "Salesman" },
-  { value: "accountant", label: "Accountant" },
+  { value: "salesman", label: "Sales" },
+  { value: "accountant", label: "Accounts" },
   { value: "admin", label: "Admin" },
 ];
 
