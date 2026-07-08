@@ -1,10 +1,10 @@
-# Builder prompt — Phase 3b: LG manual pricing + admin approval
+# Builder prompt — Phase 3b: LG manual pricing + admin approval + Quick Order collapse revamp
 
 ## What this is
-Enable **manual-pricing brands** (LG) — the salesman types the unit price per line (no catalog price, no floor) — and gate those orders behind **admin approval** before they can be processed. Design: [docs/phase3-multi-brand-design.md](../docs/phase3-multi-brand-design.md) ("Pricing mode per brand", "Approval gate"), [docs/specs/order-lifecycle.md](../docs/specs/order-lifecycle.md) (the `pending_approval` / `approved` states), [docs/specs/roles-and-permissions.md](../docs/specs/roles-and-permissions.md) (approve = admin-only, the first genuinely admin-exclusive RPC).
+Enable **manual-pricing brands** (LG) — the salesman types the unit price per line (no catalog price, no floor) — and gate those orders behind **admin approval** before they can be processed. **Bundled in:** the salesman **Quick Order collapse revamp** — rows collapse to name + price, and tapping a row reveals its **stepper** (the same `[−] qty [+]`, just hidden until tapped) — and, for LG, the price input — **inside** the "drop". It ships in the same salesman commit because it rewrites the same product rows. Design: [docs/phase3-multi-brand-design.md](../docs/phase3-multi-brand-design.md) ("Pricing mode per brand", "Approval gate"), [docs/specs/order-lifecycle.md](../docs/specs/order-lifecycle.md) (the `pending_approval` / `approved` states), [docs/specs/roles-and-permissions.md](../docs/specs/roles-and-permissions.md) (approve = admin-only, the first genuinely admin-exclusive RPC).
 
-## Commit order (decided): Backend → Salesman manual-price → Dashboard approval
-Create before approve — the approval commit then acts on real, app-created LG orders.
+## Commit order (decided): Backend → Salesman Quick Order (collapse revamp + manual price) → Dashboard approval
+Create before approve — the approval commit then acts on real, app-created LG orders. The **collapse revamp folds into the salesman commit** because it rewrites the same product rows; do them as one row-rewrite rather than twice.
 
 ## Scope guardrails (read first)
 - **Fixed brands (Zebronics, Luminous) must be COMPLETELY unaffected** — untamperable catalog-snapshot pricing, land in `submitted`, unpriced products stay hidden (D2). The manual/approval paths activate **only** for brands flagged `pricing_mode='manual'` / `requires_approval=true`.
@@ -47,13 +47,23 @@ New migration `supabase/migrations/<ts>_lg_manual_approval.sql` (MCP-applied, re
 
 **Acceptance:** an LG order submitted with per-line prices → lands `pending_approval`, `unit_price_paise` = entered value, event records the enterer; `approve_order` as admin → `approved` (as accountant → **denied**; guard rejects non-admin `→approved`); `process_order` on `approved` → `processed`, on `pending_approval` → **rejected**; **Zebronics/Luminous submit → still `submitted`, catalog-priced, client price ignored, fully unchanged**; unpriced LG products are salesman-visible while unpriced fixed-brand products stay hidden; `npm run build` clean.
 
-## Commit 2 — Salesman Quick Order: manual-price entry
-In `src/app/new-order/QuickOrder.tsx` (composes with the Phase-3a brand lock) + review + detail:
-- When the selected/locked brand is **`manual`**, each product line shows a **price input** (`₹`, ≤2 decimals → paise, `> 0`) instead of a fixed catalog price (there is none). Stepper still sets qty; the salesman types the unit price. Fixed brands: unchanged (catalog price, no input).
-- **Review (S5):** show the entered unit prices + line amounts + total; submit sends them (optional price key from commit 1).
-- **Salesman order detail (S7):** render the `pending_approval` state ("Waiting for office approval") and `approved` state; a `pending_approval` order stays salesman-editable within the 2h window (approval beats it).
+## Commit 2 — Salesman Quick Order: collapse-to-reveal revamp + manual-price entry
+Rework the product rows in `src/app/new-order/QuickOrder.tsx` (+ its module CSS) to a **collapse-to-reveal ("dropdown") shape** AND add the manual-price input — **one row rewrite covering both**, composing with the Phase-3a Brand▸Category grouping + brand lock. (Salvaged from `test/salesman-ui-collapse` `874f090`/`fecc555` — re-implement fresh; that branch is pre-3a stale.)
 
-**Acceptance:** a salesman builds an LG order, enters per-line prices, submits → `pending_approval`; sees the awaiting-approval messaging; a ₹x.5 price stores paise, `>2` decimals rejected; a Zebronics/Luminous order is still catalog-priced with no input; works on a phone.
+**Collapse / reveal ("dropdown" rows):**
+- **Collapsed** = `name + price (+ "· N in cart" if in cart) + a chevron`, the whole head a **real ≥48px tap `<button>`**. Fixed brand: price = catalog price. Manual brand: price = the salesman's **entered** price, or a **"Tap to price"** prompt if unset.
+- **Tapping reveals**, below the head: the **qty stepper** (the current `[−] qty [+]`, unchanged — just hidden until tapped) **and**, for manual brands, the **price input**. The stepper is **not** replaced — it lives *inside* the drop.
+- **Per-row independent** (a `Set<string>` of expanded ids, **not** an accordion — several rows stay open at once). **In-cart rows pre-expanded**: seed the Set **once** from lines with qty>0 so drafts/in-cart lines show their controls without a tap.
+- **Chevron:** the **`▾` glyph**, sized comfortably for a phone (~**14–16px** — bigger than the dashboard's), rotate **180° on expand** with a transition. **If a filled `▾` reads chunky at that size, use the thin CSS-border chevron** (`border-right`+`border-bottom`, `rotate(45deg)`→`rotate(225deg)`) — it stays crisp when enlarged. Tune by eye on a real phone; either is fine. *(Ignore the admin `FilterDropdown` chevron — owner says leave it.)*
+
+**Manual-price entry (in the revealed area):**
+- For a `manual` brand the revealed area holds the **price input** (`₹`, ≤2 decimals → paise, `> 0`); the salesman types the unit price (no catalog price exists). Fixed brands: catalog price, no input.
+- **Review (S5):** show the entered unit prices + line amounts + total; submit sends them (the optional price key from commit 1).
+- **Salesman order detail (S7):** render `pending_approval` ("Waiting for office approval") + `approved`; a `pending_approval` order stays salesman-editable within the 2h window (approval beats it).
+
+**Tap targets:** collapsed head ≥48px; the revealed stepper/keypad keep their ≥48px. Cart bar, search, sticky Brand▸Category headers, keypad sheet all unchanged.
+
+**Acceptance:** rows show name+price until tapped; tapping reveals the stepper (+ manual price input for LG), tapping again collapses, **multiple rows open at once**; in-cart rows start expanded and show "· N in cart" when collapsed; a manual (LG) line can be priced (expand→input) with its price shown on the collapsed row; ₹x.5 stores paise, `>2` decimals rejected; a Zebronics/Luminous order is still catalog-priced with no input; chevron rotates + is comfortably sized on phone; **all tap targets ≥48px**; brand grouping + sticky headers + cart bar intact; `npm run build` clean; verified on a phone-width viewport.
 
 ## Commit 3 — Dashboard: Pending approval tab + admin Approve
 - **S8 ledger:** add a **Pending approval** filter tab (folds into the two-stage scoped counts); chip vocabulary gains **`Pending approval`** (amber) + **`Approved`** (neutral/ink — distinct from green `Processed`).
