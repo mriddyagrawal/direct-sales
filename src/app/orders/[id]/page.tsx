@@ -64,7 +64,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const now = new Date();
   const status = getOrderStatusTag(order, now);
   const isOwner = order.salesman_id === user!.id;
-  const editable = order.status === "submitted" && new Date(order.editable_until) > now;
+  // A pending_approval order (manual/LG brand) stays salesman-editable within
+  // the window — approval beats the timer (Phase 3b).
+  const editable =
+    (order.status === "submitted" || order.status === "pending_approval") && new Date(order.editable_until) > now;
 
   const items = [...order.order_items].sort((a, b) => a.position - b.position);
   const events: OrderEventRow[] = order.order_events
@@ -125,9 +128,18 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </div>
         )}
 
+        {order.status === "pending_approval" && (
+          <p className={styles.noteLocked}>
+            Waiting for office approval{editable ? " — you can still edit until the window closes." : "."}
+          </p>
+        )}
+        {order.status === "approved" && (
+          <p className={styles.noteProcessed}>Approved by the office — waiting to be processed.</p>
+        )}
+
         {isOwner && editable && <OrderActions orderId={order.id} />}
 
-        {isOwner && !editable ? (
+        {isOwner && !editable && (order.status === "submitted" || order.status === "processed" || order.status === "cancelled") ? (
           <p className={order.status === "cancelled" ? styles.noteCancelled : order.status === "processed" ? styles.noteProcessed : styles.noteLocked}>
             {order.status === "processed"
               ? "Booked into Tally by the office. For any change, call the accountant."

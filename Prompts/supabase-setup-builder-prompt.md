@@ -26,7 +26,7 @@ These specs are authoritative. Copy the `CREATE TABLE`/sequence/index DDL from t
 
 ## 2. Migration plan (ordered — one atomic commit per numbered file unless noted)
 
-Name files `supabase/migrations/<UTC-timestamp>_<slug>.sql` (e.g. `20260706T120000_profiles_and_helpers.sql`). Apply each via MCP `apply_migration` immediately after writing it, verify, then commit.
+Name files `supabase/migrations/<UTC-timestamp>_<slug>.sql` (e.g. `20260706120000_profiles_and_helpers.sql`). Apply each via MCP `apply_migration` immediately after writing it, verify, then commit.
 
 1. **`profiles` + shared helpers.**
    - `create table public.profiles (...)` per data-model.md.
