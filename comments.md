@@ -3030,3 +3030,33 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** The branch name (`feature/products-delete-and-toggle-fix`) hints a product **delete** is coming — I'll watch for FK safety (`order_items` reference products; a delete must be blocked or soft where an order references the product) + admin-only. Plus a device-check of the toggle flip.
 
 ---
+
+## Review of 81b7547 — feat(products): admin hard-delete in Edit modal, guarded against ordered products
+
+**Verdict:** ✅ accept — a safe, well-guarded destructive feature, **proven by execution**: `delete_product` is admin-only (accountant denied, live), refuses any product referenced by an order line (order history protected, live), and deletes a never-ordered product cleanly (live) — all backstopped by the `order_items` FK being **NO ACTION** (never cascades) and no DELETE RLS policy (the RPC is the only delete path). Two-step Delete→Confirm, admin+edit-only, error surfaced. tsc/eslint/build clean.
+
+**Phase / commit goal (as I understood it):** Let an admin hard-delete a mistaken/test product from the Edit modal (freeing its `(brand_id, tally_name)` for re-add), guarded so it can never orphan order history.
+
+**What works (verified by execution — rolled-back probes):**
+- **Admin-only (server-enforced)** — `delete_product` raises `only admin may delete products` for non-admins; proven live: an **accountant** call was **denied**. And there's **no DELETE RLS policy** on products, so a direct client `delete` is default-denied — the security-definer RPC is the sole path (no bypass).
+- **Order-history protected** — the RPC refuses if any `order_items.product_id = p_id` ("deactivate it instead"); proven live: I created a temp order referencing a product, then an **admin** `delete_product` on it → **refused**. Backstop: `order_items_product_id_fkey` is **NO ACTION** (not CASCADE) — even if the check were bypassed the delete is FK-blocked, and a delete can **never** cascade-destroy order_items (immutable snapshots safe); the FK also serializes the check-then-delete race vs a concurrent order insert.
+- **Clean delete of a never-ordered product** — proven live: an admin `delete_product` on an unreferenced product removed the row (`gone=true`), then rolled back (products count unchanged, no probe junk, orders still 0).
+- **UI correct** — the Delete button is `mode==="edit" && isAdmin && initial` (admin + edit-only), **two-step** (`destructive` "Delete" → `destructive-filled` "Confirm delete") so a red button beside Cancel can't be a one-tap accident; the RPC refusal message surfaces in the modal error strip; both Button variants exist. Types regenerated (tsc clean).
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** None. (A hard delete frees `(brand_id, tally_name)` so the same item can be re-added — a real benefit over deactivate for typos/test rows; deactivate remains the path for ever-ordered products, which the refusal message points to.)
+
+**Domain / correctness checks:**
+- **Immutable snapshots** ✓ — FK NO ACTION + the order-reference refusal mean a product with order history can never be deleted, and order_items are never cascade-removed. Order history inviolable.
+- **RLS/auth** ✓ — admin-only at the RPC (proven, accountant denied); no DELETE policy → RPC-only.
+- **Money / state machine** — N/A.
+- **Data safety** ✓ — destructive but bounded to never-ordered products; two-step UI; no cascade.
+
+**What I tried:** `git show 81b7547` (delete_product migration + ProductModal diff + types); live checks — `order_items→products` FK is NO ACTION, no products DELETE policy, `delete_product` exists; **rolled-back execution probe** — accountant delete **denied**, admin delete of an ordered product (temp order created) **refused**, admin delete of a never-ordered product **succeeded** then rolled back (post-check: orders 0, no probe junk); `tsc --noEmit` + `eslint` clean; `destructive`/`destructive-filled` Button variants confirmed present.
+
+**Open flags (cumulative):** No 🔴 blocking, no new flag. Carried 🟡 ㉛ (order_no_seq — owner-deferred), ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (New migration `20260708144837_delete_product.sql` is already 14-digit — slots cleanly into the ㉝-reconciled ledger.)
+
+**Next-commit suggestion:** Nothing outstanding on `feature/products-delete-and-toggle-fix` (useOptimistic toggle + this delete — both verified). Ready to merge to main when you are; a device-check of the toggle flip + delete confirm is the only real-browser follow-up.
+
+---
