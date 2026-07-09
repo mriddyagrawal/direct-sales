@@ -25,6 +25,7 @@ interface OrderItemRow {
   qty: number;
   line_total_paise: number;
   position: number;
+  order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
 
 interface RawEventRow {
@@ -56,6 +57,8 @@ interface WorkbenchOrderData {
   brandName: string | null;
   approvedAt: string | null;
   approvedByName: string | null;
+  pickedAt: string | null;
+  pickedByName: string | null;
 }
 
 interface OrderWorkbenchProps {
@@ -86,6 +89,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [tick] = useState(nowMs);
@@ -125,6 +129,36 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
           .filter((p) => p.active && p.price_paise !== null && !items[p.id])
           .filter((p) => p.name.toLowerCase().includes(addQ))
           .slice(0, 8);
+
+  // Godown-scanned serials per line (scan order), for the accountant to read
+  // into Tally. Empty for fixed brands and for approved→processed overrides.
+  const serialGroups = useMemo(
+    () =>
+      [...initialItems]
+        .sort((a, b) => a.position - b.position)
+        .filter((it) => (it.order_item_scans ?? []).length > 0)
+        .map((it) => ({
+          id: it.id,
+          name: it.product_name,
+          serials: [...it.order_item_scans]
+            .sort((a, b) => a.scanned_at.localeCompare(b.scanned_at))
+            .map((s) => s.serial),
+        })),
+    [initialItems],
+  );
+  const showSerials =
+    (order.status === "ready_to_bill" || order.status === "processed") && serialGroups.length > 0;
+
+  async function handleCopySerials() {
+    const text = serialGroups.map((g) => `${g.name}\n${g.serials.join("\n")}`).join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Couldn't copy — select the serials by hand.");
+    }
+  }
 
   const events2: OrderEventRow[] = events.map((e) => ({
     id: e.id,
@@ -254,6 +288,8 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             {order.status === "approved" &&
               order.approvedAt &&
               ` · approved ${formatOrderTimestamp(order.approvedAt, now)}${order.approvedByName ? ` by ${order.approvedByName}` : ""}`}
+            {order.pickedAt &&
+              ` · picked ${formatOrderTimestamp(order.pickedAt, now)}${order.pickedByName ? ` by ${order.pickedByName}` : ""}`}
           </p>
         </div>
         <StatusTag tone={statusTag.tone} label={statusTag.label} />
@@ -267,9 +303,11 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             Approve
           </Button>
         )}
-        {/* Processable = submitted (fixed) or approved (manual). A pending
-            order can't be processed until approved (RPC enforces it too). */}
-        {(order.status === "submitted" || order.status === "approved") && (
+        {/* Processable = submitted (fixed), approved (manual — the override
+            path), or ready_to_bill (picked, serials in hand — the normal LG
+            path). A pending order can't be processed until approved (RPC
+            enforces it too). */}
+        {(order.status === "submitted" || order.status === "approved" || order.status === "ready_to_bill") && (
           <Button variant="primary" onClick={() => setConfirmProcess(true)}>
             Mark processed
           </Button>
@@ -359,6 +397,31 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             <span>{lines.length} LINES</span>
             <span className={styles.mono}>Total (incl. GST) {formatRupees(total)}</span>
           </div>
+
+          {/* Godown hand-off: the scanned serials the accountant types into
+              Tally (batch/lot field). Copy-all because they're re-keying. */}
+          {showSerials && (
+            <div className={styles.serialsBox}>
+              <div className={styles.serialsHead}>
+                <p className={styles.sectionLabel}>SERIALS / TRACKING</p>
+                <button type="button" className={styles.copySerials} onClick={handleCopySerials}>
+                  {copied ? "Copied ✓" : "Copy all"}
+                </button>
+              </div>
+              {serialGroups.map((group) => (
+                <div key={group.id} className={styles.serialGroup}>
+                  <p className={styles.serialGroupName}>
+                    {group.name} <span className={styles.serialCount}>×{group.serials.length}</span>
+                  </p>
+                  {group.serials.map((serial) => (
+                    <p key={serial} className={styles.serialItem}>
+                      {serial}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
 
           {mode === "edit" && requiresReason && (
             <div className={styles.reasonField}>

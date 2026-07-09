@@ -18,6 +18,9 @@ interface OrderItemRow {
   qty: number;
   line_total_paise: number;
   position: number;
+  // Godown fulfilment: one row per scanned physical unit (LG orders that went
+  // through the pick step; empty for fixed brands / override-processed).
+  order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
 
 interface EventRow {
@@ -44,10 +47,12 @@ interface WorkbenchOrderRow {
   retailers: { name: string; area: string | null; phone: string | null; verified: boolean } | null;
   approved_at: string | null;
   approved_by: string | null;
+  picked_at: string | null;
   salesman: { full_name: string } | null;
   processed_by_profile: { full_name: string } | null;
   cancelled_by_profile: { full_name: string } | null;
   approved_by_profile: { full_name: string } | null;
+  picked_by_profile: { full_name: string } | null;
   brands: { name: string; code: string } | null;
   order_items: OrderItemRow[];
   order_events: EventRow[];
@@ -64,14 +69,15 @@ export default async function WorkbenchPage({ params }: { params: Promise<{ id: 
     supabase
       .from("orders")
       .select(
-        "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, cancelled_at, cancelled_by, approved_at, approved_by, salesman_id, " +
+        "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, salesman_id, " +
           "retailers(name, area, phone, verified), " +
           "salesman:profiles!orders_salesman_id_fkey(full_name), " +
           "processed_by_profile:profiles!orders_processed_by_fkey(full_name), " +
           "cancelled_by_profile:profiles!orders_cancelled_by_fkey(full_name), " +
           "approved_by_profile:profiles!orders_approved_by_fkey(full_name), " +
+          "picked_by_profile:profiles!orders_picked_by_fkey(full_name), " +
           "brands(name, code), " +
-          "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, position), " +
+          "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, position, order_item_scans(id, serial, scanned_at)), " +
           "order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))",
       )
       .eq("id", id)
@@ -111,6 +117,8 @@ export default async function WorkbenchPage({ params }: { params: Promise<{ id: 
         brandName: order.brands?.name ?? null,
         approvedAt: order.approved_at,
         approvedByName: order.approved_by_profile?.full_name ?? null,
+        pickedAt: order.picked_at,
+        pickedByName: order.picked_by_profile?.full_name ?? null,
       }}
       items={items}
       events={events}
