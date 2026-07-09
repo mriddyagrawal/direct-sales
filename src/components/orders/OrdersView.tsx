@@ -12,8 +12,32 @@ import { DEFAULT_RANGE } from "@/lib/date-range";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { SalesmanFilter } from "./SalesmanFilter";
 import { BrandFilter } from "./BrandFilter";
-import type { BrandOption, DashboardOrderRow, SalesmanOption } from "./page";
-import styles from "./OrdersList.module.css";
+import styles from "./OrdersView.module.css";
+
+export interface OrderListRow {
+  id: string;
+  order_ref: string;
+  submitted_at: string;
+  total_paise: number;
+  status: string;
+  editable_until: string;
+  cancelled_by: string | null;
+  salesman_id: string;
+  brand_id: string;
+  retailers: { name: string; verified: boolean } | null;
+  profiles: { full_name: string } | null;
+  brands: { name: string; code: string } | null;
+}
+
+export interface SalesmanOption {
+  id: string;
+  full_name: string;
+}
+
+export interface BrandOption {
+  id: string;
+  name: string;
+}
 
 type StatusFilter = "all" | "submitted" | "pending_approval" | "ready_to_bill" | "processed" | "cancelled";
 
@@ -29,17 +53,24 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
 const ORDERS_SELECT =
   "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
 
-interface OrdersListProps {
-  initialOrders: DashboardOrderRow[];
+interface OrdersViewProps {
+  initialOrders: OrderListRow[];
   salesmen: SalesmanOption[];
   brands: BrandOption[];
+  role: "salesman" | "staff";
+  currentUserId: string;
 }
 
-// S8 — live orders ledger. New rows arrive via Supabase Realtime (postgres_
-// changes on `orders`, RLS-scoped) within acceptance criterion #1's 5s
-// budget; updates (Mark processed / Cancel / Edit, from this dashboard or
-// any other open one) patch the row in place, no manual refresh needed.
-export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps) {
+// THE orders list — one component, every role (unification, owner decision
+// 2026-07-10). Same tabs/search/date-range/Realtime for everyone; RLS decides
+// which rows exist (staff see all salesmen, a salesman only himself), and the
+// role prop decides the extras: staff get the SALESMAN + BRAND filters and
+// the salesman column; the salesman gets neither (they're all him) and D8
+// self-cancel hiding. New rows arrive via Supabase Realtime (postgres_changes
+// on `orders`, RLS-scoped) within the 5s budget; updates patch in place.
+export function OrdersView({ initialOrders, salesmen, brands, role, currentUserId }: OrdersViewProps) {
+  const isStaff = role === "staff";
+  const detailBase = isStaff ? "/dashboard/orders" : "/orders";
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
@@ -60,10 +91,17 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
   useEffect(() => {
     const supabase = createClient();
 
+    // D8: a salesman's own self-cancelled order reads as "never happened" —
+    // the page query excludes it, and this keeps Realtime from re-adding it.
+    function hiddenByD8(row: OrderListRow) {
+      return !isStaff && row.status === "cancelled" && row.cancelled_by === currentUserId;
+    }
+
     async function handleInsert(orderId: string) {
       const { data } = await supabase.from("orders").select(ORDERS_SELECT).eq("id", orderId).maybeSingle();
       if (!data) return;
-      const row = data as unknown as DashboardOrderRow;
+      const row = data as unknown as OrderListRow;
+      if (hiddenByD8(row)) return;
       setOrders((prev) => (prev.some((o) => o.id === row.id) ? prev : [row, ...prev]));
       setNewIds((prev) => new Set(prev).add(row.id));
       setTimeout(() => {
@@ -82,7 +120,12 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
     async function handleUpdate(orderId: string) {
       const { data } = await supabase.from("orders").select(ORDERS_SELECT).eq("id", orderId).maybeSingle();
       if (!data) return;
-      const row = data as unknown as DashboardOrderRow;
+      const row = data as unknown as OrderListRow;
+      if (hiddenByD8(row)) {
+        // Just self-cancelled from another tab/device — drop it from the list.
+        setOrders((prev) => prev.filter((o) => o.id !== row.id));
+        return;
+      }
       setOrders((prev) => prev.map((o) => (o.id === row.id ? row : o)));
     }
 
@@ -103,7 +146,9 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+    // isStaff/currentUserId are stable props — this resubscribes only if the
+    // role somehow changed under us (it can't; belt and suspenders for lint).
+  }, [isStaff, currentUserId]);
 
   const now = useMemo(() => new Date(tick), [tick]);
 
@@ -168,7 +213,7 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
         e.preventDefault();
         setSelectedIndex((i) => Math.max(0, i - 1));
       } else if (e.key === "Enter" && finalFiltered[safeIndex]) {
-        router.push(`/dashboard/orders/${finalFiltered[safeIndex].id}`);
+        router.push(`${detailBase}/${finalFiltered[safeIndex].id}`);
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -196,8 +241,10 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
           ))}
         </div>
         <div className={styles.filterGroup}>
-          <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />
-          {multiBrand && <BrandFilter brands={brands} value={brandId} onChange={setBrandId} />}
+          {/* SALESMAN/BRAND filters are staff-only — a salesman's rows are all
+              his own (RLS), so those filters would be dead weight on a phone. */}
+          {isStaff && <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />}
+          {isStaff && multiBrand && <BrandFilter brands={brands} value={brandId} onChange={setBrandId} />}
           <DateRangeFilter value={range} onChange={setRange} />
           <input
             ref={searchRef}
@@ -210,7 +257,11 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
       </div>
 
       {finalFiltered.length === 0 ? (
-        <p className={styles.empty}>No orders match these filters.</p>
+        <p className={styles.empty}>
+          {!isStaff && orders.length === 0
+            ? "No orders yet — take your first order — tap New Order below"
+            : "No orders match these filters."}
+        </p>
       ) : (
         <>
           <table className={styles.table}>
@@ -218,7 +269,7 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
               <tr>
                 <th>REF</th>
                 <th>SUBMITTED</th>
-                <th>SALESMAN</th>
+                {isStaff && <th>SALESMAN</th>}
                 {multiBrand && <th>BRAND</th>}
                 <th>RETAILER</th>
                 <th className={styles.numeric}>TOTAL</th>
@@ -238,12 +289,12 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
                   <tr
                     key={order.id}
                     className={rowClasses}
-                    onClick={() => router.push(`/dashboard/orders/${order.id}`)}
+                    onClick={() => router.push(`${detailBase}/${order.id}`)}
                     onMouseEnter={() => setSelectedIndex(index)}
                   >
                     <td className={styles.mono}>{order.order_ref}</td>
                     <td className={`${styles.mono} ${styles.cellMeta}`}>{formatOrderTimestamp(order.submitted_at, now)}</td>
-                    <td className={styles.cellMeta}>{order.profiles?.full_name ?? "—"}</td>
+                    {isStaff && <td className={styles.cellMeta}>{order.profiles?.full_name ?? "—"}</td>}
                     {multiBrand && <td className={styles.cellMeta}>{order.brands?.name ?? "—"}</td>}
                     <td className={styles.cellRetailer}>
                       {order.retailers?.name ?? "—"}
@@ -267,7 +318,7 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
                   key={order.id}
                   type="button"
                   className={`${styles.card} ${newIds.has(order.id) ? styles.rowNew : ""}`}
-                  onClick={() => router.push(`/dashboard/orders/${order.id}`)}
+                  onClick={() => router.push(`${detailBase}/${order.id}`)}
                 >
                   <div className={styles.cardTop}>
                     <span className={styles.mono}>{order.order_ref}</span>
@@ -275,8 +326,8 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
                   </div>
                   <div className={styles.cardMeta}>
                     {order.retailers?.name ?? "—"}
-                    {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>} ·{" "}
-                    {order.profiles?.full_name ?? "—"}
+                    {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
+                    {isStaff && <> · {order.profiles?.full_name ?? "—"}</>}
                     {multiBrand && ` · ${order.brands?.name ?? "—"}`}
                   </div>
                   <div className={styles.cardBottom}>

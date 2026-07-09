@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FilterDropdown } from "./FilterDropdown";
-import type { BrandOption } from "./page";
+import type { BrandOption } from "./OrdersView";
 import styles from "./SalesmanFilter.module.css";
 
 interface BrandFilterProps {
