@@ -49,6 +49,7 @@ export default async function PickSlipPage({ params }: { params: Promise<{ id: s
 
   return (
     <PickSlip
+      orderId={id}
       orderRef={order.order_ref}
       submittedAt={order.submitted_at}
       notes={order.notes}

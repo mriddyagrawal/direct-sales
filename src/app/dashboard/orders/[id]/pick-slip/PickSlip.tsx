@@ -16,6 +16,7 @@ interface PickSlipItem {
 }
 
 interface PickSlipProps {
+  orderId: string;
   orderRef: string;
   submittedAt: string;
   notes: string;
@@ -31,8 +32,11 @@ interface PickSlipProps {
 
 // S10 — the order-copy sheet (accountant/admin). Always shows prices
 // (owner decision — the godown reads qty in the /godown pick flow, not this
-// sheet). "Print" opens the browser print dialog for now.
+// sheet). The on-screen sheet is the visual preview; "Download PDF" links to
+// the sibling pdf route, which streams a real generated A5 PDF (the phone's
+// native viewer opens it → share to WhatsApp).
 export function PickSlip({
+  orderId,
   orderRef,
   submittedAt,
   notes,
@@ -69,9 +73,14 @@ export function PickSlip({
           {orderRef} · ORDER COPY
         </span>
         <div className={styles.chromeControls}>
-          <button type="button" className={styles.printButton} onClick={() => window.print()}>
-            Print
-          </button>
+          <a
+            href={`/dashboard/orders/${orderId}/pick-slip/pdf`}
+            target="_blank"
+            rel="noopener"
+            className={styles.printButton}
+          >
+            Download PDF
+          </a>
           <ShareOrderButton title={orderRef} text={shareText} className={styles.printButton} />
         </div>
       </div>
