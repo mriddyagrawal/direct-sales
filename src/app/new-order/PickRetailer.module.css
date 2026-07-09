@@ -52,6 +52,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Owner feedback: the names are the scan target — full ink, semibold. */
+  color: var(--color-ink);
+  font-weight: 600;
 }
 
 .retailerMeta {

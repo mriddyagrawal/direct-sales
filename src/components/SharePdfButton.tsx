@@ -55,9 +55,18 @@ export function SharePdfButton({ orderId, orderRef, variant = "secondary" }: Sha
   }
 
   return (
-    <Button type="button" variant={variant} onClick={handleClick} loading={busy}>
+    // While the PDF is being fetched the button INVERTS to ink (owner
+    // feedback) and keeps its label — no white spinner square, no width
+    // collapse. Disabled guards double-taps during the ~2s fetch.
+    <Button
+      type="button"
+      variant={busy ? "ink" : variant}
+      onClick={handleClick}
+      disabled={busy}
+      aria-busy={busy || undefined}
+    >
       <Glyph icon={Share2} />
-      {failed ? "Share failed — retry" : "Share PDF"}
+      {busy ? "Preparing…" : failed ? "Share failed — retry" : "Share PDF"}
     </Button>
   );
 }
