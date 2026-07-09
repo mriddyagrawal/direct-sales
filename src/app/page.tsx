@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/BottomTabBar";
-import { SignOutButton } from "@/components/SignOutButton";
+import { TopStrip } from "@/components/TopStrip";
 import { OrdersView, type OrderListRow, type BrandOption } from "@/components/orders/OrdersView";
 import styles from "./page.module.css";
 
@@ -43,6 +43,7 @@ export default async function Home() {
 
   return (
     <div className={styles.page}>
+      <TopStrip accountLabel={profile?.full_name ?? user?.email ?? ""} />
       <div className={styles.content}>
         <OrdersView
           initialOrders={(orderRows ?? []) as unknown as OrderListRow[]}
@@ -51,10 +52,6 @@ export default async function Home() {
           role="salesman"
           currentUserId={user!.id}
         />
-      </div>
-
-      <div className={styles.account}>
-        Signed in as {profile?.full_name ?? user?.email} · <SignOutButton />
       </div>
 
       <BottomTabBar />
