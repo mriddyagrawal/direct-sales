@@ -116,8 +116,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const isOwner = order.salesmanId === currentUserId;
   // Matches the RPC's editable window: a pending_approval order is still
   // editable in-window (approval beats the timer), so no reason is demanded.
-  const editable =
-    (order.status === "submitted" || order.status === "pending_approval") && new Date(order.editableUntil) > now;
+  const editable = order.status === "pending_approval" && new Date(order.editableUntil) > now;
   // The salesman may edit/cancel only his own order, only in-window (the
   // cancel_order/update_order_items RPCs enforce exactly this server-side).
   const salesmanActionable = !isStaff && isOwner && editable;
@@ -171,7 +170,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   // Serials are the godown→accountant hand-off — staff-only (owner decision;
   // the salesman's RLS returns no scan rows anyway, this just skips the shell).
   const showSerials =
-    isStaff && (order.status === "ready_to_bill" || order.status === "processed") && serialGroups.length > 0;
+    isStaff && (order.status === "ready_to_bill" || order.status === "billed") && serialGroups.length > 0;
 
   async function handleCopySerials() {
     const text = serialGroups.map((g) => `${g.name}\n${g.serials.join("\n")}`).join("\n\n");
@@ -305,7 +304,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             by {order.salesmanName}
             {order.brandName && ` · ${order.brandName}`} · submitted {formatOrderTimestamp(order.submittedAt, now)}
             {editable && ` · editable until ${formatOrderTimestamp(order.editableUntil, now)}`}
-            {order.status === "processed" &&
+            {order.status === "billed" &&
               order.processedAt &&
               ` · billed ${formatOrderTimestamp(order.processedAt, now)}${order.processedByName ? ` by ${order.processedByName}` : ""}`}
             {order.status === "cancelled" &&
@@ -333,7 +332,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             path), or ready_to_bill (picked, serials in hand — the normal LG
             path). A pending order can't be processed until approved (RPC
             enforces it too). */}
-        {isStaff && (order.status === "submitted" || order.status === "approved" || order.status === "ready_to_bill") && (
+        {isStaff && (order.status === "approved" || order.status === "ready_to_bill") && (
           <Button variant="primary" onClick={() => setConfirmProcess(true)}>
             Mark billed
           </Button>
@@ -382,9 +381,9 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             <p className={styles.noteProcessed}>Approved by the office — waiting to be processed.</p>
           )}
           {order.status === "ready_to_bill" && (
-            <p className={styles.noteProcessed}>Picked and ready — the office will bill it shortly.</p>
+            <p className={styles.noteProcessed}>Approved — the office will bill it shortly.</p>
           )}
-          {order.status === "processed" && (
+          {order.status === "billed" && (
             <p className={styles.noteProcessed}>Booked into Tally by the office. For any change, call the accountant.</p>
           )}
           {order.status === "cancelled" && (
@@ -392,9 +391,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
               Cancelled {formatOrderTimestamp(order.cancelledAt ?? order.submittedAt, now)}
               {order.cancelledById === currentUserId ? " — by you." : " — by the office."}
             </p>
-          )}
-          {order.status === "submitted" && !salesmanActionable && (
-            <p className={styles.noteLocked}>The edit window has ended. Call the accountant to change this order.</p>
           )}
         </>
       )}

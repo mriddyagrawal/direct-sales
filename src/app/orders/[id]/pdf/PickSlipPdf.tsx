@@ -74,20 +74,18 @@ const NAVY = "#1e3a8a"; // model line on show_model (LG) items
 // Status under the ORDER COPY badge — the app's status language ("Billed",
 // not the DB's 'processed') with the app's tone colours.
 const STATUS_LABEL: Record<string, string> = {
-  submitted: "SUBMITTED",
   pending_approval: "PENDING APPROVAL",
   approved: "APPROVED",
   ready_to_bill: "READY TO BILL",
-  processed: "BILLED",
+  billed: "BILLED",
   cancelled: "CANCELLED",
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  submitted: "#1d4ed8", // accent
   pending_approval: "#b45309", // amber
   approved: LOCKED,
   ready_to_bill: "#1d4ed8", // accent
-  processed: "#15803d", // green
+  billed: "#15803d", // green
   cancelled: "#b91c1c", // red
 };
 

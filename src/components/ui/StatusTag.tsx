@@ -1,6 +1,6 @@
 import styles from "./StatusTag.module.css";
 
-export type StatusTone = "accent" | "amber" | "locked" | "processed" | "error";
+export type StatusTone = "accent" | "amber" | "locked" | "billed" | "error";
 
 interface StatusTagProps {
   tone: StatusTone;

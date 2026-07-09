@@ -9,7 +9,7 @@
 4. On submit, the order → **`ready_to_bill`**; the **accountant** reads the serials off the app and enters the bill into **Tally by hand** (auto-Tally sync is a later phase).
 
 ## Scope (v1)
-- **LG only.** Only LG uses approval + serial capture. Zebronics/Luminous keep going straight `submitted → processed` (no godown step, no serials).
+- **LG only** for the scan step. Since the lifecycle overhaul (2026-07-10) **every** brand goes through admin approval; `brands.requires_scan` (renamed from `requires_approval`) decides what approval routes to — LG → `approved` (godown scans next), fixed brands → straight `ready_to_bill` (no godown step, no serials).
 - **Accountant still bills manually in Tally** — the app just hands them structured serials instead of WhatsApp photos.
 - **Prices are hidden from the godown in the UI only** (owner decision — no server-side price-stripping; prices may ride along in payloads, they're just not rendered). Low-risk internal role, not worth extra security.
 
@@ -20,19 +20,19 @@
 
 ## State machine (additions to the existing lifecycle)
 ```
-submitted → pending_approval → approved → ready_to_bill → processed
-                                  │  └────────────────────→ processed   (accountant OVERRIDE, kept)
+pending_approval (EVERY brand) → approved (requires_scan) → ready_to_bill → billed
+                │  └→ ready_to_bill (fixed, no scan)   │ └──→ billed  (accountant OVERRIDE, kept)
                                   └→ cancelled          ready_to_bill → cancelled
 ```
 `guard_order_transition` gains:
 | From | To | Who | Notes |
 |---|---|---|---|
 | `approved` | `ready_to_bill` | **godown** | via `submit_pick`; stamps `picked_at/by`; every line must be fully scanned |
-| `approved` | `processed` | accountant/admin | **override kept** — accountant can bill without the godown step for exceptions |
-| `ready_to_bill` | `processed` | accountant/admin | the normal bill path, now with serials in hand |
+| `approved` | `billed` | accountant/admin | **override kept** — accountant can bill without the godown step for exceptions |
+| `ready_to_bill` | `billed` | accountant/admin | the normal bill path, now with serials in hand |
 | `ready_to_bill` | `cancelled` | accountant/admin | reason required |
 
-`process_order` accepts **both** `approved → processed` (override) and `ready_to_bill → processed`.
+`process_order` accepts **both** `approved → billed` (override) and `ready_to_bill → billed`. (Status value/event say `billed` since 2026-07-10; the RPC name and `processed_at/by` columns are internal plumbing.)
 
 ## Data model
 ```sql
@@ -89,7 +89,7 @@ Serial format is strikingly consistent: **`\d{3}[A-Z]{4}\d{6}`** (3 digits = mfg
 
 ## Accountant hand-off
 - Orders dashboard gains a **`Ready to bill`** status tab.
-- Opening a `ready_to_bill` order shows each line marked **picked ✓** with its **serial list**; the accountant types the Tally bill (reading serials on screen), then **Mark processed** (`ready_to_bill → processed`).
+- Opening a `ready_to_bill` order shows each line marked **picked ✓** with its **serial list**; the accountant types the Tally bill (reading serials on screen), then **Mark billed** (`ready_to_bill → billed`).
 
 ## Migrations (6)
 | # | Change |
@@ -98,7 +98,7 @@ Serial format is strikingly consistent: **`\d{3}[A-Z]{4}\d{6}`** (3 digits = mfg
 | 2 | `orders.status` check + `guard_order_transition` → add `ready_to_bill` and its transitions (godown submit, accountant override kept) |
 | 3 | `orders.picked_at`, `orders.picked_by` |
 | 4 | `order_item_scans` table + RLS (serials within-bill unique only — no serial index) |
-| 5 | `submit_pick` RPC; `process_order` also accepts `ready_to_bill → processed` |
+| 5 | `submit_pick` RPC; `process_order` also accepts `ready_to_bill → billed` |
 | 6 | RLS for `godown` (select approved/ready_to_bill LG orders + items + scans) |
 
 ## Middleware / routing
