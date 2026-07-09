@@ -1,0 +1,31 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 24px;
+}
+
+.soon {
+  font-family: var(--font-structure);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.hint {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+  max-width: 280px;
+}

@@ -2,27 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ReceiptText, Wallet } from "lucide-react";
+import { Glyph } from "@/components/ui/Glyph";
 import styles from "./BottomTabBar.module.css";
 
-// Two destinations only — Home / New Order (owner decision 2026-07-06, design
-// spec §2 "Mobile bottom tab bar"). Sync/Profile tabs were cut; sign-out
-// lives at the bottom of Home instead. The slot grammar keeps room for the
-// future Payments tab (docs/future-plans.md) but only renders these two now.
+// Salesman bottom bar (orders-ui spec §6): Orders (/) · Deposits (/deposits).
+// New Order left the bar — it's the floating FAB now (§2). Deposits is a live,
+// tappable tab routing to a "Coming soon!" placeholder (owner decision #3);
+// the real feature later replaces the page without touching this nav.
 export function BottomTabBar() {
   const pathname = usePathname();
-  const isHome = pathname === "/";
-  const isNewOrder = pathname === "/new-order";
 
   return (
     <nav className={styles.bar}>
-      <Link href="/" className={[styles.tab, isHome ? styles.active : ""].join(" ")}>
-        <span className={styles.icon} aria-hidden>
-          ■
-        </span>
-        Home
+      <Link href="/" className={[styles.tab, pathname === "/" ? styles.active : ""].join(" ")}>
+        <Glyph icon={ReceiptText} />
+        Orders
       </Link>
-      <Link href="/new-order" className={[styles.newOrder, isNewOrder ? styles.active : ""].join(" ")}>
-        + New Order
+      <Link
+        href="/deposits"
+        className={[styles.tab, pathname === "/deposits" ? styles.active : ""].join(" ")}
+      >
+        <Glyph icon={Wallet} />
+        Deposits
       </Link>
     </nav>
   );
