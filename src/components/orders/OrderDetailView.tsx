@@ -342,21 +342,9 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           const meta = metaParts.filter(Boolean).join(" · ");
           return meta ? <p className={styles.heroMeta}>{meta}</p> : null;
         })()}
-        <p className={styles.byline}>
-          submitted {formatOrderTimestamp(order.submittedAt, now)}
-          {editable && ` · editable until ${formatOrderTimestamp(order.editableUntil, now)}`}
-          {order.status === "billed" &&
-            order.processedAt &&
-            ` · billed ${formatOrderTimestamp(order.processedAt, now)}${order.processedByName ? ` by ${order.processedByName}` : ""}`}
-          {order.status === "cancelled" &&
-            order.cancelledAt &&
-            ` · cancelled ${formatOrderTimestamp(order.cancelledAt, now)}${order.cancelledByName ? ` by ${order.cancelledByName}` : ""}`}
-          {order.status === "approved" &&
-            order.approvedAt &&
-            ` · approved ${formatOrderTimestamp(order.approvedAt, now)}${order.approvedByName ? ` by ${order.approvedByName}` : ""}`}
-          {order.pickedAt &&
-            ` · picked ${formatOrderTimestamp(order.pickedAt, now)}${order.pickedByName ? ` by ${order.pickedByName}` : ""}`}
-        </p>
+        {editable && (
+          <p className={styles.byline}>editable until {formatOrderTimestamp(order.editableUntil, now)}</p>
+        )}
       </div>
 
       {/* PRIMARY action = the status (spec §5): pending → Approve (admin only);
@@ -453,7 +441,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       <div className={styles.body}>
         <div className={styles.main}>
           <div className={styles.itemsHead}>
-            <p className={styles.sectionLabel}>ITEM · SNAPSHOT AT SUBMIT</p>
+            <p className={styles.sectionLabel}>ITEMS</p>
             {isStaff && showSerialRows && hasAnySerials && (
               <button type="button" className={styles.copySerials} onClick={handleCopySerials}>
                 <Glyph icon={Copy} size={14} />
@@ -544,12 +532,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                 </div>
               )}
             </div>
-          )}
-
-          {!order.showModel && (
-            <p className={styles.namesOnlyNote}>
-              No model / serial tracking — {order.brandName ?? "these"} products carry names only.
-            </p>
           )}
 
           <div className={styles.totalRow}>

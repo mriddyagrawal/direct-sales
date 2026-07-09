@@ -324,8 +324,9 @@
 
 .backRef {
   font-family: var(--font-figures);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-ink);
 }
 
 .hero {
@@ -423,11 +424,3 @@
   color: var(--color-locked);
 }
 
-/* Fixed brands: the names-only footnote — the table SHAPE signals the brand
-   type, no badge. */
-.namesOnlyNote {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-locked);
-  padding: 8px 0 0;
-}
