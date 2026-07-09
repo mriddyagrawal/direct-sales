@@ -3414,3 +3414,27 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** **24ec59b — feat(users): "Godown" role in user management** is still **unreviewed** (it landed on main between the godown work and this PWA fix). Review it next to close the gap.
 
 ---
+
+## Review of 24ec59b — feat(users): "Godown" role in user management (all four spots)
+
+**Verdict:** ✅ accept — the godown role is now creatable/editable through the admin Users screen, with all four app-layer spots updated consistently and the DB CHECK confirmed to accept it. No security-guard impact. *(Reviewed after c3d7653 per request — commit actually predates it on main.)*
+
+**Phase / commit goal (as I understood it):** Let an admin create/edit a `godown` user in-app (not just via the SQL runbook): add `godown` to the server-action role whitelist, the modal dropdown, the list label map, and the sort order.
+
+**What works (verified):**
+- **Server validation accepts godown** — `actions.ts` `ROLES` is now `["admin","accountant","salesman","godown"]`, so `createUser`/`updateUserProfile`'s `ROLES.includes(role)` passes for godown (without this the action would reject a godown create even with a valid form). The `Role` union type widens accordingly (tsc clean).
+- **DB accepts godown** — rolled-back probe: `update profiles set role='godown'` succeeds against `profiles_role_check` (the constraint gained `'godown'` in e91939c, applied live). So the full create path (auth create → trigger → `profiles.update role='godown'`) has no CHECK violation.
+- **All role maps consistent** — grepped every role map in `src`: `UserModal.ROLES` (dropdown), `UsersAdmin.ROLE_LABEL` (→ "Godown"), `page.tsx ROLE_ORDER` (godown: 3, sorts after salesman instead of the `?? 9` bucket), and `middleware.ROLE_HOME` (godown→/godown, from 837abac) — **all five include godown**; none missed. Owner-facing labels stay display-only over the stored identifiers ([[b523d5e]] pattern).
+- **Guards unaffected** — self-lockout + last-admin key on `'admin'` only, so introducing godown doesn't touch them (a godown user is just another non-admin; the page/action admin gate treats it like salesman/accountant → no access to `/dashboard/users`).
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Authorization ✓ (godown is a non-admin everywhere the gate matters; verified earlier that only `role==='admin'` passes the Users gate); role identifier vs label separation intact; DB CHECK ✓; no money/state-machine surface.
+
+**What I tried:** `git show 24ec59b`; grep of all `ROLE_*`/`ROLES` maps to confirm none omitted godown; live rolled-back `profiles` update to `role='godown'` (accepted by the CHECK); `npm run build` exit 0; tsc/eslint clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷ (godown client dup — cosmetic), ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** `main` is now fully reviewed through c3d7653. (A `godown-scanner-improvements` prompt is staged in the tree — torch/format-hints/scan-region crop for the pick screen — so a follow-up scanner branch is expected next.)
+
+---
