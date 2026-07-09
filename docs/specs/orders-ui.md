@@ -167,11 +167,12 @@ cancelled order shows Share only.
   are entered GST-inclusive by convention) but do not imply a tax breakup; a real
   GST split is a Tally-export follow-up, not this work.
 
-**Serials are staff-only** (owner decision; the salesman's RLS returns zero scan
-rows anyway). So on the **salesman's** own LG order he sees the **model eyebrow but
-not the serial rows**. (7e's bottom card shows a salesman seeing serials — that is
-a mockup liberty; keeping serials staff-only avoids an RLS change. If we later want
-the salesman to see his own serials, that's a separate `order_item_scans` policy.)
+**Serials show for both roles** (owner flip, 2026-07-11 — 7e's salesman card was
+the intent after all): the salesman sees the serials on **his own** orders via the
+`order_item_scans_select_salesman` RLS policy (migration `20260709232132`,
+SELECT-only, own orders only — probe-verified he sees exactly his rows and no one
+else's). The italic "captured at picking" placeholder and `Copy serials` remain
+**staff-only**.
 
 **Salesman status notes** (green info banner, his lens on the status — keep the
 existing copy): pending → "Waiting for office approval…"; approved/ready_to_bill →
