@@ -110,15 +110,19 @@ export function QuickOrder({
   const effectiveBrand = locked ? cartBrandId : brandFilter === "all" ? null : brandFilter;
   const lockedBrandName = locked ? (brandOptions.find((b) => b.id === cartBrandId)?.name ?? "") : "";
 
-  // Search matches product name, category, OR brand — so "ze" surfaces all
-  // Zebronics items and a category term (e.g. "adaptor", "refriger") surfaces
-  // that whole category. Brand filtering (lock / picked) still applies on top.
+  // Search matches product name, category, brand, OR the Tally/model name
+  // (e.g. an LG model like "43UA73806LA") — so "ze" surfaces all Zebronics
+  // items, a category term ("adaptor", "refriger") surfaces that whole
+  // category, and a model code finds the exact unit. Fixed brands whose
+  // tally_name == name gain nothing; LG (distinct model codes) gains model
+  // search. Brand filtering (lock / picked) still applies on top.
   const q = normalize(query.trim());
   const matchesSearch = (p: ProductOption) =>
     q === "" ||
     normalize(p.name).includes(q) ||
     normalize(p.category).includes(q) ||
-    normalize(p.brand_name).includes(q);
+    normalize(p.brand_name).includes(q) ||
+    normalize(p.tally_name).includes(q);
   const visible = products.filter((p) => matchesSearch(p) && (effectiveBrand === null || p.brand_id === effectiveBrand));
 
   const brandGroups: BrandGroup[] = useMemo(() => {
