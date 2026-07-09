@@ -31,7 +31,15 @@
 
 .filterTabs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+.filterTabs::-webkit-scrollbar {
+  display: none;
 }
 
 .filterGroup {
@@ -51,16 +59,16 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
   min-height: 32px;
-  padding: 0 10px;
-  background: none;
-  border: none;
+  padding: 0 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: 16px;
   font-family: var(--font-structure);
   font-size: 12px;
   font-weight: 500;
-  color: var(--color-ink);
-  cursor: pointer;
-}
+  white-space: nowrap;
 
 .tabCount {
   font-family: var(--font-figures);
@@ -69,16 +77,10 @@
 }
 
 .filterTabActive {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-white);
   font-weight: 600;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-bottom: none;
-  border-radius: var(--radius) var(--radius) 0 0;
-  padding-bottom: 5px;
-  margin-bottom: -1px;
-  position: relative;
-  z-index: 1;
-}
 
 .search {
   flex: 1;
@@ -207,11 +209,48 @@
   cursor: pointer;
 }
 
-.cardTop {
+/* Spec §2 card anatomy: eyebrow (ref + chip) / bold main (retailer + amount)
+   / one grey meta line. */
+.cardEyebrow {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-size: 14px;
-  font-weight: 600;
+  gap: 8px;
+}
+
+.cardRef {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.cardMain {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardRetailer {
+  font-family: var(--font-structure);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+  min-width: 0;
+}
+
+.cardAmount {
+  flex-shrink: 0;
+  font-family: var(--font-figures);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.cardAmountStruck {
+  text-decoration: line-through;
+  color: var(--color-locked);
+  font-weight: 500;
 }
 
 .cardMeta {
@@ -220,10 +259,10 @@
   color: var(--color-locked);
 }
 
-.cardBottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* Amber left edge = "needs a human" — pending_approval only (spec §2). */
+.cardPending {
+  border-left: 4px solid var(--color-amber);
+  padding-left: 9px;
 }
 
 @keyframes rowNew {
