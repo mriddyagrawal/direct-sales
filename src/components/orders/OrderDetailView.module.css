@@ -349,3 +349,67 @@
   border-left: 2px solid var(--color-error);
   padding-left: 8px;
 }
+
+/* Orders-UI revamp (spec §3): back-eyebrow + retailer hero + action rows. */
+.backRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.backRow .breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.backRef {
+  font-family: var(--font-figures);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.heroRetailer {
+  font-family: var(--font-structure);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.heroMeta {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  color: var(--color-locked);
+}
+
+/* The approved / waiting-for-scan quiet line (spec §4) — deliberately not a
+   button: the godown owns the next move. */
+.waitLine {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  color: var(--color-locked);
+  border-left: 2px solid var(--color-hairline);
+  padding-left: 10px;
+}
+
+.secondaries {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Cancel sits red at the FAR END of the secondaries row (spec §3). */
+.cancelAction {
+  margin-left: auto;
+}

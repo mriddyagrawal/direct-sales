@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Glyph } from "@/components/ui/Glyph";
 
 interface SharePdfButtonProps {
   orderId: string;
   orderRef: string;
-  variant?: "secondary" | "ink";
+  variant?: "primary" | "secondary" | "ink";
 }
 
 // The one pick-slip action (owner decision: share-only, no preview page).
@@ -54,6 +56,7 @@ export function SharePdfButton({ orderId, orderRef, variant = "secondary" }: Sha
 
   return (
     <Button type="button" variant={variant} onClick={handleClick} loading={busy}>
+      <Glyph icon={Share2} />
       {failed ? "Share failed — retry" : "Share PDF"}
     </Button>
   );
