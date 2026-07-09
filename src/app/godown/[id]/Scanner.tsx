@@ -7,9 +7,9 @@ interface ScannerProps {
   onDecode: (raw: string) => void;
 }
 
-// Torch isn't in the DOM lib's MediaTrack* types yet — extend locally.
-type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
-type TorchConstraintSet = MediaTrackConstraintSet & { torch?: boolean };
+// Torch + focusMode aren't in the DOM lib's MediaTrack* types yet — extend locally.
+type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[] };
+type TorchConstraintSet = MediaTrackConstraintSet & { torch?: boolean; focusMode?: string };
 
 // LG boxes carry 3 barcodes (serial CODE_128, an EAN-13, sometimes a QR) and
 // ZXing's whole-frame decodeFromVideoDevice kept locking onto the easy EAN/QR.
@@ -100,6 +100,18 @@ export function Scanner({ onDecode }: ScannerProps) {
           setTorchOn(true);
         } catch {
           // Constraint refused — stay torchless, keep scanning.
+        }
+      }
+
+      // Continuous autofocus where the hardware supports it — cuts the
+      // focus-lock lag once the barcode is at a readable angle/distance.
+      // Capability-gated exactly like torch; unsupported devices skip
+      // silently and keep their default (single-shot) focus — no crash.
+      if (caps?.focusMode?.includes("continuous")) {
+        try {
+          await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as TorchConstraintSet] });
+        } catch {
+          // Refused — keep the device's default focus mode.
         }
       }
 
