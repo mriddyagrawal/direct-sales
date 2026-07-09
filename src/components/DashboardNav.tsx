@@ -3,7 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ReceiptText, Store, Package, Users } from "lucide-react";
 import { SignOutButton } from "@/components/SignOutButton";
+import { Glyph } from "@/components/ui/Glyph";
 import styles from "./DashboardNav.module.css";
 
 interface DashboardNavProps {
@@ -12,16 +14,21 @@ interface DashboardNavProps {
 }
 
 const BASE_TABS = [
-  { href: "/dashboard", label: "Orders", match: (p: string) => p === "/dashboard" || p.startsWith("/dashboard/orders") },
-  { href: "/dashboard/retailers", label: "Retailers", match: (p: string) => p.startsWith("/dashboard/retailers") },
-  { href: "/dashboard/products", label: "Products", match: (p: string) => p.startsWith("/dashboard/products") },
+  {
+    href: "/dashboard",
+    label: "Orders",
+    icon: ReceiptText,
+    match: (p: string) => p === "/dashboard" || p.startsWith("/dashboard/orders"),
+  },
+  { href: "/dashboard/retailers", label: "Retailers", icon: Store, match: (p: string) => p.startsWith("/dashboard/retailers") },
+  { href: "/dashboard/products", label: "Products", icon: Package, match: (p: string) => p.startsWith("/dashboard/products") },
 ];
 
 // Users is admin-only — an accountant never sees the tab (and the page + every
 // action gate it independently, so hiding the tab is convenience, not the
 // security boundary).
 const ADMIN_TABS = [
-  { href: "/dashboard/users", label: "Users", match: (p: string) => p.startsWith("/dashboard/users") },
+  { href: "/dashboard/users", label: "Users", icon: Users, match: (p: string) => p.startsWith("/dashboard/users") },
 ];
 
 // M5 nav shell — Orders/Retailers/Products (+ admin-only Users), left rail on
@@ -45,6 +52,7 @@ export function DashboardNav({ accountLabel, isAdmin = false }: DashboardNavProp
               href={tab.href}
               className={`${styles.railLink} ${tab.match(pathname) ? styles.active : ""}`}
             >
+              <Glyph icon={tab.icon} />
               {tab.label}
             </Link>
           ))}
@@ -72,6 +80,7 @@ export function DashboardNav({ accountLabel, isAdmin = false }: DashboardNavProp
             href={tab.href}
             className={`${styles.mobileTab} ${tab.match(pathname) ? styles.active : ""}`}
           >
+            <Glyph icon={tab.icon} />
             {tab.label}
           </Link>
         ))}

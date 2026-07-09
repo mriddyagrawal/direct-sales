@@ -96,6 +96,9 @@
   }
 
   .railLink {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 10px 12px;
     border-radius: var(--radius);
     font-family: var(--font-structure);
