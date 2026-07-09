@@ -13,7 +13,7 @@ export interface UserRow {
   created_at: string;
 }
 
-const ROLE_ORDER: Record<string, number> = { admin: 0, accountant: 1, salesman: 2 };
+const ROLE_ORDER: Record<string, number> = { admin: 0, accountant: 1, salesman: 2, godown: 3 };
 
 // Admin-only user management. TWO independent gates protect this: the page gate
 // here (redirect any non-admin — the list exposes emails + roles) and, more

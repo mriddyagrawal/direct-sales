@@ -17,6 +17,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
   accountant: "Accounts",
   salesman: "Sales",
+  godown: "Godown",
 };
 
 // Mirrors ProductsPricing: desktop table + mobile cards, row-click opens the

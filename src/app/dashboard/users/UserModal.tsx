@@ -19,6 +19,7 @@ interface UserModalProps {
 // label = owner-facing terminology ("Sales" / "Accounts").
 const ROLES: { value: string; label: string }[] = [
   { value: "salesman", label: "Sales" },
+  { value: "godown", label: "Godown" },
   { value: "accountant", label: "Accounts" },
   { value: "admin", label: "Admin" },
 ];
