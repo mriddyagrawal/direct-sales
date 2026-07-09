@@ -127,3 +127,24 @@ export async function approveOrder(orderId: string): Promise<OrderRow> {
   const supabase = createClient();
   return callRpc(() => supabase.rpc("approve_order", { p_order_id: orderId }));
 }
+
+// Godown pick submission (godown role only, LG/approval orders only). One
+// batch per order: `scans` is one entry per physical unit, each carrying the
+// RAW scanner output — the serial is derived server-side (authoritative);
+// anything the client extracted is display-only. The RPC validates full
+// per-line coverage and global serial uniqueness, then flips the order
+// approved -> ready_to_bill.
+export interface PickScan {
+  order_item_id: string;
+  raw_scan: string;
+}
+
+export async function submitPick(orderId: string, scans: PickScan[]): Promise<OrderRow> {
+  const supabase = createClient();
+  return callRpc(() =>
+    supabase.rpc("submit_pick", {
+      p_order_id: orderId,
+      p_scans: scans as unknown as Database["public"]["Functions"]["submit_pick"]["Args"]["p_scans"],
+    }),
+  );
+}
