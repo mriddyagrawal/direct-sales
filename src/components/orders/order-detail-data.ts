@@ -13,8 +13,8 @@ export const ORDER_DETAIL_SELECT =
   "cancelled_by_profile:profiles!orders_cancelled_by_fkey(full_name), " +
   "approved_by_profile:profiles!orders_approved_by_fkey(full_name), " +
   "picked_by_profile:profiles!orders_picked_by_fkey(full_name), " +
-  "brands(name, code), " +
-  "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, position, order_item_scans(id, serial, scanned_at)), " +
+  "brands(name, code, show_model), " +
+  "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, position, products(tally_name), order_item_scans(id, serial, scanned_at)), " +
   "order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))";
 
 export interface OrderDetailItemRow {
@@ -25,6 +25,9 @@ export interface OrderDetailItemRow {
   qty: number;
   line_total_paise: number;
   position: number;
+  // The CURRENT product's model (display-only, like the pick slip) — the
+  // snapshot product_name stays the display name of record.
+  products: { tally_name: string } | null;
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
 
@@ -58,7 +61,7 @@ export interface OrderDetailQueryRow {
   cancelled_by_profile: { full_name: string } | null;
   approved_by_profile: { full_name: string } | null;
   picked_by_profile: { full_name: string } | null;
-  brands: { name: string; code: string } | null;
+  brands: { name: string; code: string; show_model: boolean } | null;
   order_items: OrderDetailItemRow[];
   order_events: OrderDetailEventRow[];
 }
@@ -89,6 +92,7 @@ export function toOrderDetailProps(row: OrderDetailQueryRow): {
       retailerPhone: row.retailers?.phone ?? null,
       retailerVerified: row.retailers?.verified ?? true,
       brandName: row.brands?.name ?? null,
+      showModel: row.brands?.show_model ?? false,
       approvedAt: row.approved_at,
       approvedByName: row.approved_by_profile?.full_name ?? null,
       pickedAt: row.picked_at,
