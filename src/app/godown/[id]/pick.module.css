@@ -1,0 +1,269 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 96px; /* room for the sticky submit bar */
+  background: var(--color-paper);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px 8px 4px;
+  margin: 0 -16px;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.back {
+  flex-shrink: 0;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.headInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ref {
+  font-family: var(--font-figures);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.retailer {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Camera viewport — fixed-height strip with a centre guide line (the LG
+   serial barcode is a 1D linear code; a horizontal guide helps aim). */
+.cameraWrap {
+  position: relative;
+  margin: 12px 0 0;
+  height: 220px;
+  background: var(--color-ink);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.camera {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cameraGuide {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 50%;
+  height: 2px;
+  background: var(--color-accent);
+  opacity: 0.7;
+}
+
+.cameraError {
+  margin-top: 12px;
+  padding: 10px 12px;
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-ink);
+  background: var(--color-white);
+  border: 1px dashed var(--color-locked);
+  border-radius: var(--radius);
+}
+
+.flash {
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-white);
+  background: var(--color-error);
+  border-radius: var(--radius);
+}
+
+/* Unparsed-scan confirm panel. */
+.pending {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-top: 2px solid var(--color-ink);
+  border-radius: var(--radius);
+}
+
+.pendingTitle {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.pendingHint {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.pendingActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.lines {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.line {
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  padding: 0 12px 0;
+}
+
+.lineActive {
+  border-color: var(--color-accent);
+  border-left-width: 3px;
+}
+
+.lineHead {
+  width: 100%;
+  min-height: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lineName {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.lineProgress {
+  flex-shrink: 0;
+  font-family: var(--font-figures);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-locked);
+}
+
+.lineDone {
+  color: var(--color-processed);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 0 10px;
+}
+
+/* One scanned unit — the extracted serial, mono, with a ✕ to undo. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px 4px 8px;
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.chipRemove {
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-locked);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.manualRow {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 12px;
+}
+
+.manualInput {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-figures);
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.manualInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* Sticky submit bar — progress + the one filled button. */
+.submitBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--color-white);
+  border-top: 2px solid var(--color-ink);
+}
+
+.submitProgress {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-locked);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
