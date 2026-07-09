@@ -112,7 +112,6 @@
      .form out-specify them, so the shared component stays untouched. */
   .form label {
     font-size: 13px;
-    color: var(--color-accent);
   }
 
   .form input:not([type="checkbox"]) {
