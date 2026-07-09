@@ -5,6 +5,8 @@ import { OrderActions } from "./OrderActions";
 import { formatOrderTimestamp, formatRupees } from "@/lib/format";
 import { getOrderStatusTag } from "@/lib/order-status";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
+import { ShareOrderButton } from "@/components/ShareOrderButton";
+import { buildOrderShareText } from "@/lib/order-share";
 import styles from "./order-detail.module.css";
 
 interface OrderItemRow {
@@ -38,6 +40,7 @@ interface OrderDetailRow {
   cancelled_by: string | null;
   salesman_id: string;
   retailers: { name: string; area: string | null; phone: string | null } | null;
+  salesman: { full_name: string } | null;
   brands: { name: string; code: string } | null;
   order_items: OrderItemRow[];
   order_events: RawEventRow[];
@@ -53,7 +56,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { data } = await supabase
     .from("orders")
     .select(
-      "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, cancelled_at, cancelled_by, salesman_id, retailers(name, area, phone), brands(name, code), order_items(id, product_name, unit_price_paise, qty, line_total_paise, position), order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))",
+      "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, cancelled_at, cancelled_by, salesman_id, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code), order_items(id, product_name, unit_price_paise, qty, line_total_paise, position), order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -81,6 +84,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     }))
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+  const shareText = buildOrderShareText({
+    orderRef: order.order_ref,
+    brandName: order.brands?.name ?? null,
+    submittedAt: order.submitted_at,
+    retailerName: order.retailers?.name ?? "Unknown retailer",
+    retailerArea: order.retailers?.area ?? null,
+    retailerPhone: order.retailers?.phone ?? null,
+    salesmanName: order.salesman?.full_name ?? null,
+    items,
+    totalPaise: order.total_paise,
+    notes: order.notes,
+    withPrices: true,
+  });
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -102,6 +119,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             {order.retailers.phone && <p className={styles.retailerMetaMono}>{order.retailers.phone}</p>}
           </div>
         )}
+
+        <ShareOrderButton title={order.order_ref} text={shareText} />
 
         <div>
           {items.map((item) => (
