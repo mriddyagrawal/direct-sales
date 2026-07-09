@@ -20,6 +20,7 @@ interface PdfItemRow {
 
 interface PdfOrderRow {
   order_ref: string;
+  status: string;
   submitted_at: string;
   notes: string;
   total_paise: number;
@@ -37,7 +38,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data } = await supabase
     .from("orders")
     .select(
-      "order_ref, submitted_at, notes, total_paise, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code, show_model), order_items(product_name, qty, unit_price_paise, line_total_paise, position, products(tally_name))",
+      "order_ref, status, submitted_at, notes, total_paise, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code, show_model), order_items(product_name, qty, unit_price_paise, line_total_paise, position, products(tally_name))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -59,6 +60,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const buffer = await renderPickSlipPdfBuffer({
     orderRef: order.order_ref,
+    status: order.status,
     submittedAt: order.submitted_at,
     notes: order.notes,
     totalPaise: order.total_paise,
