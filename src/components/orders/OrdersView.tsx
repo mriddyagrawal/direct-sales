@@ -227,7 +227,8 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
   return (
     <div className={styles.page}>
       <div className={styles.titleRow}>
-        <h1 className={styles.title}>Orders</h1>
+        {/* "My orders" for the salesman (every row is his); "Orders" for staff. */}
+        <h1 className={styles.title}>{isStaff ? "Orders" : "My orders"}</h1>
       </div>
 
       <div className={styles.filters}>
@@ -254,7 +255,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
             className={styles.search}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search ref or retailer (/)"
+            placeholder="Search ref or retailer"
           />
         </div>
       </div>
@@ -317,25 +318,36 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
             {finalFiltered.map((order) => {
               const tag = getOrderStatusTag(order, now);
               return (
+                /* Spec §2: ref = mono grey eyebrow + chip; retailer + amount
+                   are the two BOLD scan targets; ONE grey meta line
+                   (salesman·time for staff, time only for the salesman — and
+                   no brand: the ref eyebrow already carries the brand code).
+                   pending_approval = amber left edge ("needs a human");
+                   cancelled = struck amount. */
                 <button
                   key={order.id}
                   type="button"
-                  className={`${styles.card} ${newIds.has(order.id) ? styles.rowNew : ""}`}
+                  className={`${styles.card} ${order.status === "pending_approval" ? styles.cardPending : ""} ${newIds.has(order.id) ? styles.rowNew : ""}`}
                   onClick={() => router.push(`${detailBase}/${order.id}`)}
                 >
-                  <div className={styles.cardTop}>
-                    <span className={styles.mono}>{order.order_ref}</span>
-                    <span className={styles.mono}>{formatRupees(order.total_paise)}</span>
+                  <div className={styles.cardEyebrow}>
+                    <span className={styles.cardRef}>{order.order_ref}</span>
+                    <StatusTag tone={tag.tone} label={tag.label} />
+                  </div>
+                  <div className={styles.cardMain}>
+                    <span className={styles.cardRetailer}>
+                      {order.retailers?.name ?? "—"}
+                      {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
+                    </span>
+                    <span
+                      className={`${styles.cardAmount} ${order.status === "cancelled" ? styles.cardAmountStruck : ""}`}
+                    >
+                      {formatRupees(order.total_paise)}
+                    </span>
                   </div>
                   <div className={styles.cardMeta}>
-                    {order.retailers?.name ?? "—"}
-                    {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
-                    {isStaff && <> · {order.profiles?.full_name ?? "—"}</>}
-                    {multiBrand && ` · ${order.brands?.name ?? "—"}`}
-                  </div>
-                  <div className={styles.cardBottom}>
-                    <span className={styles.mono}>{formatOrderTimestamp(order.submitted_at, now)}</span>
-                    <StatusTag tone={tag.tone} label={tag.label} />
+                    {isStaff && <>{order.profiles?.full_name ?? "—"} · </>}
+                    {formatOrderTimestamp(order.submitted_at, now)}
                   </div>
                 </button>
               );
