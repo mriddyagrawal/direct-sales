@@ -5,8 +5,7 @@ import { OrderActions } from "./OrderActions";
 import { formatOrderTimestamp, formatRupees } from "@/lib/format";
 import { getOrderStatusTag } from "@/lib/order-status";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
-import { ShareOrderButton } from "@/components/ShareOrderButton";
-import { buildOrderShareText } from "@/lib/order-share";
+import { SharePdfButton } from "@/components/SharePdfButton";
 import styles from "./order-detail.module.css";
 
 interface OrderItemRow {
@@ -84,20 +83,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     }))
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-  const shareText = buildOrderShareText({
-    orderRef: order.order_ref,
-    brandName: order.brands?.name ?? null,
-    submittedAt: order.submitted_at,
-    retailerName: order.retailers?.name ?? "Unknown retailer",
-    retailerArea: order.retailers?.area ?? null,
-    retailerPhone: order.retailers?.phone ?? null,
-    salesmanName: order.salesman?.full_name ?? null,
-    items,
-    totalPaise: order.total_paise,
-    notes: order.notes,
-    withPrices: true,
-  });
-
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -120,7 +105,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </div>
         )}
 
-        <ShareOrderButton title={order.order_ref} text={shareText} />
+        <SharePdfButton orderId={order.id} orderRef={order.order_ref} />
 
         <div>
           {items.map((item) => (
