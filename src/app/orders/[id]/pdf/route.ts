@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { renderPickSlipPdfBuffer } from "./PickSlipPdf";
 
-// Streams the ORDER COPY as a real application/pdf — the phone opens it in
-// its native viewer (→ share to WhatsApp), instead of window.print()'s clunky
-// browser-print. @react-pdf/renderer needs Node, not edge.
+// Streams the ORDER COPY as a real application/pdf. Lives at the NEUTRAL
+// /orders/[id]/pdf path on purpose: middleware fences salesmen out of
+// /dashboard/*, and this PDF serves salesman, accountant, and admin alike —
+// RLS scopes each caller to the orders they may see (no row → 404), so the
+// route needs no role check of its own. @react-pdf/renderer needs Node, not
+// edge.
 export const runtime = "nodejs";
 
 interface PdfItemRow {

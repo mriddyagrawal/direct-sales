@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
+import { SharePdfButton } from "@/components/SharePdfButton";
 import { Stepper } from "@/components/ui/Stepper";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { getOrderStatusTag } from "@/lib/order-status";
@@ -71,9 +72,10 @@ interface OrderWorkbenchProps {
 }
 
 // S9 — the accountant/admin workbench. One filled-accent action (Mark
-// processed); Edit and Cancel are outline/destructive; Print opens the
-// dedicated pick-slip route. All writes go through the same RPCs the
-// salesman app uses — this UI is a different lens on the same guards.
+// processed); Edit and Cancel are outline/destructive; Share PDF hands the
+// generated A5 order copy to the share sheet (phone) or the browser's viewer
+// (desktop). All writes go through the same RPCs the salesman app uses —
+// this UI is a different lens on the same guards.
 export function OrderWorkbench({ order, items: initialItems, events, catalog, currentUserId, isAdmin }: OrderWorkbenchProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -322,9 +324,10 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             Cancel
           </Button>
         )}
-        <Link href={`/dashboard/orders/${order.id}/pick-slip`} target="_blank">
-          <Button variant="ink">Print pick slip</Button>
-        </Link>
+        {/* Share-only pick slip (owner decision): the generated A5 PDF goes
+            straight to the native share sheet on a phone; desktop opens the
+            PDF route in the browser's own viewer. The preview page is gone. */}
+        <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="ink" />
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
