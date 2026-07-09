@@ -3272,3 +3272,118 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Nothing outstanding — `main` is fully reviewed through 33b9056. The user-management feature + Quick Order polish are merged, reviewed, and independently confirmed by the live e2e run (31 real passes; the 3 reported "failures" were verified to be browser-agent artifacts, not code defects).
 
 ---
+
+## Review of e91939c — feat(godown): backend — godown role, ready_to_bill, order_item_scans, submit_pick (no UI)
+
+**Verdict:** ✅ accept — the security-critical backend of the godown fulfilment feature, **proven end-to-end by execution** (two rolled-back DO-block probes impersonating real godown/accountant users). Every state-machine edge, the server-authoritative serial capture, global serial uniqueness with cancel-frees, and the fail-closed godown RLS scope all behave exactly as specified. Migration reconciled to the ledger (㉝). No blocking issues.
+
+**Phase / commit goal (as I understood it):** Add the `godown` role + `ready_to_bill` status + `order_item_scans` table, the `submit_pick` RPC (godown-only, approved+LG-only, full-coverage, server-derived serials), guard/`process_order`/`cancel_order` updates, and RLS so godown sees only its queue — no UI.
+
+**What works (verified by live rolled-back execution):**
+- **State machine (guard_order_transition), every existing edge intact:**
+  - `approved → ready_to_bill` **godown-only** — probe: accountant raw UPDATE → *"only godown may mark an order ready to bill"* (rejected); godown path via `submit_pick` → succeeds. Mirrors admin-only `→ approved`.
+  - `ready_to_bill → processed` via `process_order` → **processed** ✓; `ready_to_bill → cancelled` allowed ✓.
+  - **`approved → processed` accountant OVERRIDE retained** — probe: accountant `process_order` on an `approved` order → **processed** ✓. (This was my explicit worry; it's preserved.)
+- **`submit_pick` (godown's only write path):**
+  - **godown-only** — accountant call → *"only godown may submit a pick"* ✓.
+  - **approved + approval-brand only** — `FOR UPDATE` lock on the order; status/brand asserted (verified guard against double-submit: a re-pick fails the status assert).
+  - **Full coverage** — incomplete (2 of 3) → *'line "LG TV B" needs 1 serial(s), got 0'* ✓; over-scan (n≠qty) is caught by the same `qty <> n` check; unknown line id → rejected.
+  - **Server-authoritative serial** — raw `W5LN606NWFG207155IN` stored with `serial=606NWFG207155` (regex `[0-9]{3}[A-Z]{4}[0-9]{6}`); a non-matching manual raw `'manual-xyz  '` stored trimmed → `manual-xyz`. Client-sent serials are ignored — derivation is server-side. ✓
+  - **Global serial uniqueness** — within-batch dup → *"serial 606NWFG207155 already recorded on another order"* (row-at-a-time insert names the offender) ✓; cross-order dup (same serial, second order) → rejected ✓.
+  - **Stamps + event** — `picked_at`/`picked_by=godown` set, `order_events` `'picked'` logged ✓.
+- **`cancel_order` frees serials** — probe: pick o1 (serial recorded) → cancel o1 → **o1 scans deleted (0 left)** → the same serial re-picks cleanly on another order ✓. (Owner's chosen approach over a partial index; delete precedes the status write.)
+- **RLS fail-closed + correctly scoped** — `authenticated` has only SELECT on orders/order_items/order_item_scans (no direct writes). As a **real authenticated godown**: sees the `ready_to_bill` LG order, and **not** a `processed` LG order nor a `submitted` Zebronics order (`all_visible_in_scope=true`, total_visible=1). The load-bearing `brands_select_godown`/`retailers_select_godown` policies are present (RLS applies inside the `exists()` subqueries — without them the queue would be empty). Staff selects are unfiltered so `ready_to_bill` is already visible to accountant/admin; `order_item_scans_select_staff` lets them read serials.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None material. (Design choice noted: once an order is `processed`, godown loses scan visibility via `order_item_scans_select_godown` — correct, godown only needs the pick window; staff retain full visibility.)
+
+**Domain / correctness checks:**
+- **State machine** ✓ — additive edges, every prior transition preserved (verified override + submitted/pending/processed paths untouched).
+- **Immutable snapshots** ✓ — scans are additive rows; `order_items`/`order_ref` never mutated; `on delete cascade` from order_items only removes scans, never the reverse.
+- **Serial integrity** ✓ — server-derived, globally unique, freed on cancel.
+- **RLS** ✓ — default-deny, godown scoped to approved/ready_to_bill approval-brand, writes RPC-only, `auth_profile_role()` used consistently.
+- **Money** — N/A on the godown surface (no price columns touched).
+- **Migration ledger (㉝)** ✓ — `20260709124648_godown_fulfilment` applied + on disk + version/name match; 14-digit, no `T`.
+
+**What I tried:** `git show e91939c` + read the 380-line migration; `list_migrations`/`schema_migrations` vs disk; grants introspection (SELECT-only for authenticated); **DO-block probe #1** (godown-only deny, coverage reject, within-batch dup reject, happy→ready_to_bill + server serial extraction + stamps, ready_to_bill→processed, guard accountant→ready_to_bill deny, approved→processed override) and **#2** (cross-order dup reject, cancel-frees-serial + reuse, RLS visibility as authenticated godown) — both rolled back via terminal RAISE; `tsc`/`eslint`/`build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (㊴/㊵/㊶ closed earlier.)
+
+**Next-commit suggestion:** Routing + status surfacing (837abac) → below.
+
+---
+
+## Review of 837abac — feat(godown): routing + ready_to_bill surfacing (no godown app yet)
+
+**Verdict:** ✅ accept — middleware fencing + status surfacing, all correct and low-risk. The three-way territory logic confines godown to `/godown` and fences everyone else out, without regressing the existing salesman/staff fencing.
+
+**Phase / commit goal (as I understood it):** `ROLE_HOME` godown→`/godown`; confine godown to `/godown/*` and fence salesman/staff out of it; surface `ready_to_bill` in the status tag, the dashboard tab, and the salesman order note.
+
+**What works (verified):**
+- **Middleware territory logic** — `wrongTerritory` now: `(salesman && (dashboard||godown)) || (godown && !godown) || (staff && (home||godown))`. Traced each role: godown on any non-`/godown` path → redirect to `/godown`; salesman/accountant/admin on `/godown/*` → redirected to their own home; prior salesman↔dashboard / staff↔home fencing unchanged. `ROLE_HOME[godown]="/godown"` so the redirect target resolves.
+- **order-status.ts** — `ready_to_bill → { tone: "accent", label: "Ready to bill" }`, deliberately not the green `processed`; reads as in-flight/read-only, consistent with how `approved` is treated for the salesman.
+- **OrdersList** — `ready_to_bill` added to `StatusFilter` type, `STATUS_LABEL`, the tab array, and `tabCounts` (all four sites) — no partial wiring. Realtime refetches on UPDATE, so a `→ ready_to_bill` transition lands in the tab with no extra code.
+- **Salesman order detail** — a `ready_to_bill` note ("Picked and ready — the office will bill it shortly."); read-only falls out for free since `editable` only covers submitted/pending_approval and `orders_select_own` has no status filter (so the salesman still *sees* it, but gets no actions).
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Routing/authorization ✓ (godown confined, others fenced out — page gates in commit 3 backstop this); state surfacing ✓; no data/money/RLS change in this commit.
+
+**What I tried:** `git show 837abac`; traced the `wrongTerritory` boolean for all four roles against `/`, `/dashboard/*`, `/godown/*`; confirmed all four `ready_to_bill` insertion points in OrdersList; `tsc`/`eslint`/`build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried as above.
+
+**Next-commit suggestion:** The godown app + scanner (f1ad002) → below.
+
+---
+
+## Review of f1ad002 — feat(godown): the godown app — pick queue, scan screen, @zxing serial scanner
+
+**Verdict:** ✅ accept — a clean, mobile-first godown app: godown-gated, **no price columns anywhere on the surface**, a correctly-managed camera lifecycle, and a pick flow whose client-side guards are all backstopped by the server. `@zxing/browser` added. One trivially-minor non-blocking note (client dedup is best-effort; server is authoritative).
+
+**Phase / commit goal (as I understood it):** Build `/godown` (queue) + `/godown/[id]` (scan/pick screen) with a ZXing 1D scanner, a shared `extractSerial`, batch submit via `submitPick`, and manual-entry fallbacks.
+
+**What works (verified):**
+- **Gating + price guardrail** — both pages `getUser()` → fetch `role` → `redirect("/")` if not godown (middleware backstops). Queries select **only** `product_name`/`qty` (+ ref/retailer/time) — no `unit_price_paise`/`line_total_paise` on the godown surface, honoring the owner guardrail literally. Queue scoped to `status='approved'`; pick page redirects if the order isn't `approved` (already-picked can't be re-picked).
+- **`extractSerial`** (`src/lib/serial.ts`) — `/\d{3}[A-Z]{4}\d{6}/`, **character-for-character the server regex**; miss → `{ serial: raw.trim(), parsed: false }`. Client uses it for display; server re-derives authoritatively (verified in e91939c).
+- **Camera lifecycle (Scanner.tsx)** — tracks start on mount, `controls.stop()` on unmount, **and** the warm-up race handled (`cancelled` flag stops controls that resolve after unmount) — no hot-camera leak on route-away. Insecure-context (no `mediaDevices`) and `NotAllowedError` both fall through to a clear message + the manual-entry path. `onDecode` kept in a ref so the camera effect runs once.
+- **Pick flow (PickScreen.tsx)** — tap-to-activate a line; per-line qty cap (`countFor >= qty` blocks), within-order serial de-dup, `✓ count/qty` progress, unparsed scans routed to a confirm/hand-type step, rapid identical-read suppression (2.5s), submit **disabled until every line is complete**, one batched `submitPick`, and `OfflineError` handled so warehouse dead-spots don't lose scans. Remove-chip supported.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **㊷ Client within-order duplicate check is best-effort** — `allSerials` is a `useMemo` over `scans`, so two adds in the same render tick could momentarily see a stale set. Practically shielded by the 2.5s identical-read suppressor and one-at-a-time human scanning, and **fully backstopped server-side** (within-batch dup rejected on submit, proven). Worst case: a duplicate chip that the server rejects with a named-serial message. Cosmetic; no data-integrity risk. Won't-fix is defensible.
+
+**Domain / correctness checks:** Authorization ✓ (godown page gate + no price leak); serial parsing ✓ (mirrors server); resource safety ✓ (camera stopped on unmount/complete); offline resilience ✓; money — N/A (absent by design).
+
+**What I tried:** Read `godown/page.tsx`, `godown/[id]/page.tsx`, `PickScreen.tsx`, `Scanner.tsx`, `serial.ts`; confirmed no price columns in either query; traced camera start/stop + the cancelled-during-warmup path; traced qty-cap/dup/complete gating and the batch payload shape (`{order_item_id, raw_scan}`); `tsc`/`eslint`/`build` clean (`/godown`, `/godown/[id]` compiled).
+
+**Open flags (cumulative):** No 🔴. New 🟡 ㊷ (client dup check best-effort — server-authoritative, cosmetic). Carried 🟡 ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** The accountant hand-off (3e7d41e) → below.
+
+---
+
+## Review of 3e7d41e — feat(godown): workbench serial hand-off + Mark processed for ready_to_bill
+
+**Verdict:** ✅ accept — the accountant side of the hand-off: the scanned serials surface for Tally entry and `ready_to_bill` becomes processable. Correct gating on when the section shows; build/tsc/eslint clean.
+
+**Phase / commit goal (as I understood it):** Fetch `picked_at`/`picked_by` + nested `order_item_scans` in the workbench; render a SERIALS / TRACKING section (copyable) for `ready_to_bill`/`processed` orders; add "Mark processed" for `ready_to_bill`; add a "picked" byline.
+
+**What works (verified):**
+- **Serials section** — `showSerials = (status==='ready_to_bill' || 'processed') && serialGroups.length>0`. So it's **hidden for fixed brands and approved→processed overrides** (no scans), and shown for picked orders even after processing (scans persist through `process_order`). Serials grouped per line, ordered by `scanned_at` (scan order), with `×count`. **Copy-all** writes `name\nserials…` blocks to the clipboard with "Copied ✓" feedback and a graceful failure message — sensible since the accountant re-keys into Tally.
+- **Mark processed** — the button predicate gains `ready_to_bill` alongside `submitted`/`approved`; `process_order` accepts `ready_to_bill` (verified live in e91939c). The `approved→processed` override button is unchanged.
+- **Data path** — the workbench query nests `order_item_scans(id, serial, scanned_at)` under `order_items` and adds `picked_at` + `picked_by_profile`; staff can read scans via `order_item_scans_select_staff` (verified). Byline appends "· picked {time} by {name}" when `picked_at` is set.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Authorization ✓ (staff RLS covers the scan embed); state machine ✓ (Mark processed only for processable statuses; RPC enforces); serials read-only display ✓; money — the workbench still shows prices to staff (correct — this is the accountant view, not the godown).
+
+**What I tried:** `git show 3e7d41e` (page.tsx embed + OrderWorkbench diff); confirmed the `showSerials` gate, scan-order sort, copy-all payload, and the processable-status predicate; verified staff scan-select RLS exists; `tsc=0`/`eslint=0`/`build` exit 0.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Godown fulfilment (commits 1–4) is complete and backend-verified. Remaining confidence step is a **real-device pass** (HTTPS): scan a physical LG barcode on a phone (secure-context camera), confirm a full pick → `ready_to_bill` → accountant serials + Mark processed. When merging `feature/godown-fulfilment` to main, the single migration is already 14-digit/reconciled.
+
+---
