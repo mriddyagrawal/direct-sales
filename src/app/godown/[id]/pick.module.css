@@ -167,6 +167,13 @@
   color: var(--color-ink);
 }
 
+/* Model / Tally name before the display name for show_model brands (LG) —
+   muted, like the salesman Quick Order. */
+.lineModel {
+  color: var(--color-locked);
+  font-weight: 400;
+}
+
 .lineProgress {
   flex-shrink: 0;
   font-family: var(--font-figures);

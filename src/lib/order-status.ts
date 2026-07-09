@@ -14,7 +14,7 @@ export function getOrderStatusTag(
   now: Date = new Date(),
 ): { tone: StatusTone; label: string } {
   if (order.status === "cancelled") return { tone: "error", label: "Cancelled" };
-  if (order.status === "processed") return { tone: "processed", label: "Processed" };
+  if (order.status === "processed") return { tone: "processed", label: "Billed" };
   // Approved (Phase 3b): admin-signed-off manual-brand order, salesman
   // read-only — neutral/ink, deliberately NOT the green of Processed.
   if (order.status === "approved") return { tone: "locked", label: "Approved" };

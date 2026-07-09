@@ -51,8 +51,21 @@ export function ProductsPricing({
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [importing, setImporting] = useState(false);
+  const [query, setQuery] = useState("");
 
   const priced = products.filter((p) => p.price_paise !== null).length;
+
+  const q = query.trim().toLowerCase();
+  const filteredProducts =
+    q === ""
+      ? displayProducts
+      : displayProducts.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.tally_name.toLowerCase().includes(q) ||
+            p.category.toLowerCase().includes(q) ||
+            (p.brands?.name ?? "").toLowerCase().includes(q),
+        );
 
   // Brand-scoped existing categories drive the modal's typeahead + the
   // "speakers"→"Speakers" normalization (derived from the full catalog).
@@ -71,7 +84,7 @@ export function ProductsPricing({
   // ordered by category, then name).
   const mobileGroups = useMemo(() => {
     const byBrand = new Map<string, { brandName: string; cats: Map<string, ProductRow[]> }>();
-    for (const p of displayProducts) {
+    for (const p of filteredProducts) {
       let bg = byBrand.get(p.brand_id);
       if (!bg) {
         bg = { brandName: p.brands?.name ?? "—", cats: new Map() };
@@ -88,7 +101,7 @@ export function ProductsPricing({
         categories: [...bg.cats.entries()].map(([category, ps]) => ({ category, products: ps })),
       }))
       .sort((a, b) => a.brandName.localeCompare(b.brandName));
-  }, [displayProducts]);
+  }, [filteredProducts]);
   const multiBrandProducts = mobileGroups.length >= 2;
 
   function closeAndRefresh() {
@@ -173,10 +186,19 @@ export function ProductsPricing({
         )}
       </div>
 
+      <input
+        className={styles.search}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search products — name, model, category or brand"
+      />
+
       {error && <p className={styles.error}>{error}</p>}
 
       {products.length === 0 ? (
         <p className={styles.empty}>No products in the catalog.</p>
+      ) : filteredProducts.length === 0 ? (
+        <p className={styles.empty}>No products match &quot;{query}&quot;.</p>
       ) : (
         <>
           <table className={styles.table}>
@@ -192,7 +214,7 @@ export function ProductsPricing({
               </tr>
             </thead>
             <tbody>
-              {displayProducts.map((p, index) => (
+              {filteredProducts.map((p, index) => (
                 <tr
                   key={p.id}
                   className={`${styles.clickable} ${!p.active ? styles.rowInactive : ""}`}
