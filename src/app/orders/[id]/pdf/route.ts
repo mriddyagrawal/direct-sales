@@ -68,7 +68,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     retailerArea: order.retailers?.area ?? null,
     retailerPhone: order.retailers?.phone ?? null,
     salesmanName: order.salesman?.full_name ?? "Unknown",
-    brandName: order.brands?.name ?? null,
     showModel: order.brands?.show_model ?? false,
     items,
     printedAtIso: new Date().toISOString(),
