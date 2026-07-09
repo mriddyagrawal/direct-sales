@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
 import { formatOrderTimestamp } from "@/lib/format";
+import { PreloadScanner } from "./PreloadScanner";
 import styles from "./godown.module.css";
 
 interface QueueRow {
@@ -45,6 +46,7 @@ export default async function GodownQueuePage() {
 
   return (
     <div className={styles.page}>
+      <PreloadScanner />
       <header className={styles.header}>
         <span className={styles.brand}>GANPATI · GODOWN</span>
         <span className={styles.account}>

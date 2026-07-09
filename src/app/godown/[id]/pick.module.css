@@ -69,14 +69,41 @@
   object-fit: cover;
 }
 
-.cameraGuide {
+/* The reticle — a wide/short landscape window (barcodes are wide, not tall).
+   MUST stay in sync with Scanner.tsx's RETICLE_W/RETICLE_H (0.9 × 0.28,
+   centered): the decode loop crops exactly this region, so the box is a
+   truthful "only this part is read" indicator, not decoration. The huge
+   box-shadow dims everything outside it. */
+.reticle {
   position: absolute;
-  left: 10%;
-  right: 10%;
-  top: 50%;
-  height: 2px;
+  left: 5%;
+  right: 5%;
+  top: 36%;
+  bottom: 36%;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 999px rgba(20, 24, 31, 0.45);
+}
+
+.torchToggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: var(--touch-target-min);
+  padding: 0 12px;
+  background: rgba(20, 24, 31, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-white);
+  cursor: pointer;
+}
+
+.torchOnState {
   background: var(--color-accent);
-  opacity: 0.7;
+  border-color: var(--color-accent);
 }
 
 .cameraError {
@@ -98,38 +125,6 @@
   color: var(--color-white);
   background: var(--color-error);
   border-radius: var(--radius);
-}
-
-/* Unparsed-scan confirm panel. */
-.pending {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-top: 2px solid var(--color-ink);
-  border-radius: var(--radius);
-}
-
-.pendingTitle {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.pendingHint {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-locked);
-}
-
-.pendingActions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
 }
 
 .lines {

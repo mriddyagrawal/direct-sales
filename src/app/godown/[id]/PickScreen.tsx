@@ -34,8 +34,6 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, line
   // shown in the chips is the client-side extraction (display only).
   const [scans, setScans] = useState<Record<string, string[]>>({});
   const [activeId, setActiveId] = useState<string>(lines[0]?.id ?? "");
-  // An unparseable scan waits here for confirm/correction before it counts.
-  const [pending, setPending] = useState<string | null>(null);
   const [manualText, setManualText] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -80,7 +78,15 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, line
   }
 
   function handleDecode(raw: string) {
-    if (submitting || pending !== null) return;
+    if (submitting) return;
+    // The content-filter (the targeting fix): LG boxes carry an EAN-13, a
+    // model code, sometimes a QR. Only a decode matching the serial pattern
+    // counts — anything else is SILENTLY ignored and the loop keeps scanning.
+    // No fix-it card on the scan path; the deliberate override is the
+    // per-line "Or type a serial…" field.
+    const { parsed } = extractSerial(raw);
+    if (!parsed) return;
+
     // The camera fires the same barcode repeatedly while it's in frame —
     // silently ignore an identical read within 2.5s instead of flashing a
     // duplicate error at someone still holding the box up.
@@ -93,12 +99,6 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, line
     if (!active) return;
     if (countFor(activeId) >= active.qty) {
       showFlash("Line complete — tap the next line first.");
-      return;
-    }
-    const { parsed } = extractSerial(raw);
-    if (!parsed) {
-      // Not an LG serial pattern — let them confirm or correct it by hand.
-      setPending(raw);
       return;
     }
     addScan(activeId, raw);
@@ -148,18 +148,9 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, line
         </div>
       </header>
 
-      {/* Unmounting the scanner once every line is full also stops the camera. */}
-      {!allComplete && pending === null && <Scanner onDecode={handleDecode} />}
-
-      {pending !== null && (
-        <PendingConfirm
-          raw={pending}
-          onConfirm={(text) => {
-            if (addScan(activeId, text)) setPending(null);
-          }}
-          onDiscard={() => setPending(null)}
-        />
-      )}
+      {/* Unmounting the scanner once every line is full also stops the
+          camera + torch + decode loop. */}
+      {!allComplete && <Scanner onDecode={handleDecode} />}
 
       {flash && <p className={styles.flash}>{flash}</p>}
 
@@ -230,42 +221,6 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, line
         </span>
         <Button variant="primary" onClick={handleSubmit} disabled={!allComplete} loading={submitting}>
           Submit pick
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// Inline confirm for a scan that didn't match the LG serial pattern — the
-// godown can correct it (or type the serial off the label) before it counts.
-function PendingConfirm({
-  raw,
-  onConfirm,
-  onDiscard,
-}: {
-  raw: string;
-  onConfirm: (text: string) => void;
-  onDiscard: () => void;
-}) {
-  const [text, setText] = useState(raw);
-  return (
-    <div className={styles.pending}>
-      <p className={styles.pendingTitle}>That doesn&apos;t look like an LG serial</p>
-      <p className={styles.pendingHint}>Check it against the label — fix it here or add it as-is.</p>
-      <input
-        className={styles.manualInput}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        autoCapitalize="characters"
-        autoCorrect="off"
-        spellCheck={false}
-      />
-      <div className={styles.pendingActions}>
-        <Button variant="secondary" onClick={onDiscard}>
-          Discard
-        </Button>
-        <Button variant="primary" onClick={() => onConfirm(text)} disabled={text.trim() === ""}>
-          Add serial
         </Button>
       </div>
     </div>
