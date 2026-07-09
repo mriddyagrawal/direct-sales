@@ -30,6 +30,23 @@
   gap: 8px;
 }
 
+.search {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
 .clickable {
   cursor: pointer;
 }

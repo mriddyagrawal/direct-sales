@@ -153,7 +153,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </p>
         )}
         {order.status === "approved" && (
-          <p className={styles.noteProcessed}>Approved by the office — waiting to be processed.</p>
+          <p className={styles.noteProcessed}>Approved by the office — waiting to be billed.</p>
         )}
         {order.status === "ready_to_bill" && (
           <p className={styles.noteProcessed}>Picked and ready — the office will bill it shortly.</p>

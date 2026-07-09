@@ -13,6 +13,7 @@ interface PickLine {
   id: string;
   name: string;
   qty: number;
+  tally_name: string | null;
 }
 
 interface PickScreenProps {
@@ -20,6 +21,7 @@ interface PickScreenProps {
   orderRef: string;
   retailerName: string;
   retailerArea: string | null;
+  showModel: boolean;
   lines: PickLine[];
 }
 
@@ -28,7 +30,7 @@ interface PickScreenProps {
 // submit the whole pick in ONE batch — scans accumulate client-side so a
 // warehouse dead-spot never blocks picking; the authoritative uniqueness/
 // coverage checks run server-side in submit_pick. No prices on this screen.
-export function PickScreen({ orderId, orderRef, retailerName, retailerArea, lines }: PickScreenProps) {
+export function PickScreen({ orderId, orderRef, retailerName, retailerArea, showModel, lines }: PickScreenProps) {
   const router = useRouter();
   // Raw scans per line — raw strings go to the server verbatim; the serial
   // shown in the chips is the client-side extraction (display only).
@@ -162,7 +164,17 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, line
           return (
             <div key={line.id} className={`${styles.line} ${active ? styles.lineActive : ""}`}>
               <button type="button" className={styles.lineHead} onClick={() => setActiveId(line.id)}>
-                <span className={styles.lineName}>{line.name}</span>
+                <span className={styles.lineName}>
+                  {showModel && line.tally_name && line.tally_name !== line.name ? (
+                    <>
+                      <span className={styles.lineModel}>{line.tally_name}</span>
+                      {"・"}
+                      {line.name}
+                    </>
+                  ) : (
+                    line.name
+                  )}
+                </span>
                 <span className={`${styles.lineProgress} ${full ? styles.lineDone : ""}`}>
                   {full ? "✓ " : ""}
                   {count} / {line.qty}

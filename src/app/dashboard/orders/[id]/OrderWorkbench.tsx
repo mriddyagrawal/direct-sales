@@ -281,7 +281,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             {editable && ` · editable until ${formatOrderTimestamp(order.editableUntil, now)}`}
             {order.status === "processed" &&
               order.processedAt &&
-              ` · processed ${formatOrderTimestamp(order.processedAt, now)}${order.processedByName ? ` by ${order.processedByName}` : ""}`}
+              ` · billed ${formatOrderTimestamp(order.processedAt, now)}${order.processedByName ? ` by ${order.processedByName}` : ""}`}
             {order.status === "cancelled" &&
               order.cancelledAt &&
               ` · cancelled ${formatOrderTimestamp(order.cancelledAt, now)}${order.cancelledByName ? ` by ${order.cancelledByName}` : ""}`}
@@ -479,7 +479,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
 
       {confirmProcess && (
         <BottomSheet onClose={() => setConfirmProcess(false)}>
-          <p className={styles.confirmTitle}>Mark {order.orderRef} processed?</p>
+          <p className={styles.confirmTitle}>Mark {order.orderRef} billed?</p>
           <p className={styles.confirmBody}>The salesman&apos;s app goes read-only for this order immediately.</p>
           {error && <p className={styles.error}>{error}</p>}
           <div className={styles.editActions}>
@@ -487,7 +487,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
               Cancel
             </Button>
             <Button variant="primary" onClick={handleProcess} loading={saving || isPending}>
-              Mark processed
+              Mark billed
             </Button>
           </div>
         </BottomSheet>

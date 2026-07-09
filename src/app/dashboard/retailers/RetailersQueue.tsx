@@ -32,6 +32,7 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const counts = {
     all: retailers.length,
@@ -40,10 +41,18 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
     deactivated: retailers.filter((r) => !r.active).length,
   };
 
+  const q = query.trim().toLowerCase();
   const filtered = retailers.filter((r) => {
-    if (tab === "pending") return r.active && !r.verified;
-    if (tab === "verified") return r.active && r.verified;
-    if (tab === "deactivated") return !r.active;
+    const tabOk =
+      tab === "all"
+        ? true
+        : tab === "pending"
+          ? r.active && !r.verified
+          : tab === "verified"
+            ? r.active && r.verified
+            : !r.active; // deactivated
+    if (!tabOk) return false;
+    if (q && !`${r.name} ${r.area ?? ""} ${r.phone ?? ""}`.toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -138,10 +147,19 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
         </button>
       </div>
 
+      <input
+        className={styles.search}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search retailers — name, area or phone"
+      />
+
       {error && <p className={styles.error}>{error}</p>}
 
       {filtered.length === 0 ? (
-        <div className={styles.empty}>{tab === "pending" ? "All shops verified." : "No shops in this view."}</div>
+        <div className={styles.empty}>
+          {q ? `No shops match "${query}".` : tab === "pending" ? "All shops verified." : "No shops in this view."}
+        </div>
       ) : (
         <div className={styles.list}>
           {filtered.map((r) => {

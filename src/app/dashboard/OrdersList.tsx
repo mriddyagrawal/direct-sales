@@ -22,7 +22,7 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
   submitted: "Submitted",
   pending_approval: "Pending approval",
   ready_to_bill: "Ready to bill",
-  processed: "Processed",
+  processed: "Billed",
   cancelled: "Cancelled",
 };
 
