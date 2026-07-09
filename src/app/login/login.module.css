@@ -95,7 +95,6 @@
     background: var(--color-white);
     border: 1px solid #c7d2fe;
     border-radius: 20px;
-    box-shadow: 0 10px 26px rgba(29, 78, 216, 0.14);
     margin-bottom: 18px;
   }
 
@@ -113,16 +112,13 @@
      .form out-specify them, so the shared component stays untouched. */
   .form label {
     font-size: 13px;
+    color: var(--color-accent);
   }
 
   .form input:not([type="checkbox"]) {
     min-height: 58px;
     font-size: 17px;
     border-radius: 10px;
-  }
-
-  .form input:not([type="checkbox"]):focus {
-    box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.16);
   }
 
   .remember {
@@ -141,7 +137,6 @@
     font-size: 18px;
     border-radius: 10px;
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #1e3a8a 100%);
-    box-shadow: 0 10px 22px rgba(29, 78, 216, 0.28);
   }
 
   .errorStrip {
