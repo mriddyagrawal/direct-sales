@@ -327,3 +327,25 @@
   color: var(--color-ink);
   padding: 2px 0 2px 12px;
 }
+
+/* Salesman guidance notes — what the status means for him (ported from the
+   old /orders/[id] page when the detail views were unified). */
+.noteLocked {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.noteProcessed {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-processed);
+}
+
+.noteCancelled {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+  border-left: 2px solid var(--color-error);
+  padding-left: 8px;
+}
