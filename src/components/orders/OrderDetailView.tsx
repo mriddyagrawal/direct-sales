@@ -3,8 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronLeft, CheckCircle2, Stamp, Pencil, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
+import { Glyph } from "@/components/ui/Glyph";
 import { SharePdfButton } from "@/components/SharePdfButton";
 import { Stepper } from "@/components/ui/Stepper";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -293,77 +295,105 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
   return (
     <div className={styles.page}>
-      <Link href={isStaff ? "/dashboard" : "/"} className={styles.breadcrumb}>
-        {isStaff ? "← ORDERS" : "← MY ORDERS"}
-      </Link>
-
-      <div className={styles.header}>
-        <div>
-          <p className={styles.ref}>{order.orderRef}</p>
-          <p className={styles.byline}>
-            by {order.salesmanName}
-            {order.brandName && ` · ${order.brandName}`} · submitted {formatOrderTimestamp(order.submittedAt, now)}
-            {editable && ` · editable until ${formatOrderTimestamp(order.editableUntil, now)}`}
-            {order.status === "billed" &&
-              order.processedAt &&
-              ` · billed ${formatOrderTimestamp(order.processedAt, now)}${order.processedByName ? ` by ${order.processedByName}` : ""}`}
-            {order.status === "cancelled" &&
-              order.cancelledAt &&
-              ` · cancelled ${formatOrderTimestamp(order.cancelledAt, now)}${order.cancelledByName ? ` by ${order.cancelledByName}` : ""}`}
-            {order.status === "approved" &&
-              order.approvedAt &&
-              ` · approved ${formatOrderTimestamp(order.approvedAt, now)}${order.approvedByName ? ` by ${order.approvedByName}` : ""}`}
-            {order.pickedAt &&
-              ` · picked ${formatOrderTimestamp(order.pickedAt, now)}${order.pickedByName ? ` by ${order.pickedByName}` : ""}`}
-          </p>
-        </div>
+      {/* Back-eyebrow (spec §3): ‹ REF on the left, status chip on the right. */}
+      <div className={styles.backRow}>
+        <Link href={isStaff ? "/dashboard" : "/"} className={styles.breadcrumb}>
+          <Glyph icon={ChevronLeft} />
+          <span className={styles.backRef}>{order.orderRef}</span>
+        </Link>
         <StatusTag tone={statusTag.tone} label={statusTag.label} />
       </div>
 
-      <div className={styles.actions}>
-        {/* Approval is admin-only (approve_order + guard enforce it too). The
-            accountant sees a pending order but no Approve button. */}
-        {isStaff && order.status === "pending_approval" && isAdmin && (
-          <Button variant="primary" onClick={handleApprove} loading={saving || isPending}>
-            Approve
-          </Button>
-        )}
-        {/* Processable = submitted (fixed), approved (manual — the override
-            path), or ready_to_bill (picked, serials in hand — the normal LG
-            path). A pending order can't be processed until approved (RPC
-            enforces it too). */}
-        {isStaff && (order.status === "approved" || order.status === "ready_to_bill") && (
-          <Button variant="primary" onClick={() => setConfirmProcess(true)}>
-            Mark billed
-          </Button>
-        )}
+      {/* Hero (spec §3): the RETAILER is the headline — name bold + large,
+          then `area · phone · salesman` (phone is staff-only), then the
+          timeline byline. */}
+      <div className={styles.hero}>
+        <p className={styles.heroRetailer}>
+          {order.retailerName}
+          {!order.retailerVerified && <span className={styles.newBadge}>NEW</span>}
+        </p>
+        <p className={styles.heroMeta}>
+          {[order.retailerArea, isStaff ? order.retailerPhone : null, order.salesmanName]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        <p className={styles.byline}>
+          submitted {formatOrderTimestamp(order.submittedAt, now)}
+          {editable && ` · editable until ${formatOrderTimestamp(order.editableUntil, now)}`}
+          {order.status === "billed" &&
+            order.processedAt &&
+            ` · billed ${formatOrderTimestamp(order.processedAt, now)}${order.processedByName ? ` by ${order.processedByName}` : ""}`}
+          {order.status === "cancelled" &&
+            order.cancelledAt &&
+            ` · cancelled ${formatOrderTimestamp(order.cancelledAt, now)}${order.cancelledByName ? ` by ${order.cancelledByName}` : ""}`}
+          {order.status === "approved" &&
+            order.approvedAt &&
+            ` · approved ${formatOrderTimestamp(order.approvedAt, now)}${order.approvedByName ? ` by ${order.approvedByName}` : ""}`}
+          {order.pickedAt &&
+            ` · picked ${formatOrderTimestamp(order.pickedAt, now)}${order.pickedByName ? ` by ${order.pickedByName}` : ""}`}
+        </p>
+      </div>
+
+      {/* PRIMARY action = the status (spec §5): pending → Approve (admin only);
+          ready_to_bill → Mark billed; billed/cancelled → Share PDF. `approved`
+          deliberately has NO loud primary (§4) — the godown owns the next move;
+          the admin override rides in the secondaries. */}
+      {isStaff && isAdmin && order.status === "pending_approval" && (
+        <Button variant="primary" onClick={handleApprove} loading={saving || isPending}>
+          <Glyph icon={CheckCircle2} />
+          Approve order
+        </Button>
+      )}
+      {isStaff && order.status === "ready_to_bill" && (
+        <Button variant="primary" onClick={() => setConfirmProcess(true)}>
+          <Glyph icon={Stamp} />
+          Mark billed
+        </Button>
+      )}
+      {(order.status === "billed" || order.status === "cancelled") && (
+        <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="primary" />
+      )}
+      {isStaff && order.status === "approved" && (
+        <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
+      )}
+
+      {/* SECONDARIES (glyph + label; Cancel red at the far end — spec §3/§5).
+          Every write still goes through the role-guarded RPCs; hiding a
+          button is cosmetic. Billed-cancel is ADMIN-only (owner decision #1);
+          salesman self-cancel = own + pending + in-window (decision #2). */}
+      <div className={styles.secondaries}>
         {isStaff && order.status !== "cancelled" && mode === "view" && (
           <Button variant="secondary" onClick={() => setMode("edit")}>
+            <Glyph icon={Pencil} />
             Edit
           </Button>
         )}
-        {isStaff && order.status !== "cancelled" && (
-          <Button variant="destructive" onClick={() => setConfirmCancel(true)}>
+        {salesmanActionable && (
+          <Button variant="secondary" onClick={() => router.push(`/new-order?edit=${order.id}`)}>
+            <Glyph icon={Pencil} />
+            Edit order
+          </Button>
+        )}
+        {order.status !== "billed" && order.status !== "cancelled" && (
+          <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="secondary" />
+        )}
+        {isStaff && order.status === "approved" && (
+          <Button variant="secondary" onClick={() => setConfirmProcess(true)}>
+            <Glyph icon={Stamp} />
+            Mark billed
+          </Button>
+        )}
+        {((isStaff && (order.status === "billed" ? isAdmin : order.status !== "cancelled")) ||
+          salesmanActionable) && (
+          <Button
+            variant="destructive"
+            className={styles.cancelAction}
+            onClick={() => setConfirmCancel(true)}
+          >
+            <Glyph icon={X} />
             Cancel
           </Button>
         )}
-        {/* Salesman actions exist only while the RPC window does: edit rides
-            the Quick Order flow, cancel is the reason-free self-cancel. Past
-            the window the buttons are removed, not disabled. */}
-        {salesmanActionable && (
-          <>
-            <Button variant="secondary" onClick={() => router.push(`/new-order?edit=${order.id}`)}>
-              Edit order
-            </Button>
-            <Button variant="destructive" onClick={() => setConfirmCancel(true)}>
-              Cancel order
-            </Button>
-          </>
-        )}
-        {/* Share-only pick slip (owner decision): the generated A5 PDF goes
-            straight to the native share sheet on a phone; desktop opens the
-            PDF route in the browser's own viewer. The preview page is gone. */}
-        <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="ink" />
       </div>
 
       {error && !confirmCancel && !confirmProcess && <p className={styles.error}>{error}</p>}
@@ -521,15 +551,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             ) : (
               <p className={styles.notesText}>{notes || "—"}</p>
             )}
-          </div>
-
-          <div className={styles.card}>
-            <p className={styles.retailerName}>
-              {order.retailerName}
-              {!order.retailerVerified && <span className={styles.newBadge}>NEW</span>}
-            </p>
-            {order.retailerArea && <p className={styles.meta}>{order.retailerArea}</p>}
-            {order.retailerPhone && <p className={styles.metaMono}>{order.retailerPhone}</p>}
           </div>
 
           <div>
