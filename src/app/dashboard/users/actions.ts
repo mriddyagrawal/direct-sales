@@ -15,7 +15,7 @@ export interface ActionResult {
 
 const USERNAME_RE = /^[a-zA-Z0-9_.]{3,20}$/;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const ROLES = ["admin", "accountant", "salesman"] as const;
+const ROLES = ["admin", "accountant", "salesman", "godown"] as const;
 type Role = (typeof ROLES)[number];
 
 // The action gate. Throws (never returns) for a non-admin so a caller can
