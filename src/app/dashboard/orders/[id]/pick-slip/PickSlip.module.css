@@ -31,30 +31,6 @@
   gap: 12px;
 }
 
-.toggle {
-  display: flex;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.toggleButton {
-  min-height: 36px;
-  padding: 0 12px;
-  background: var(--color-white);
-  border: none;
-  font-family: var(--font-structure);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-locked);
-  cursor: pointer;
-}
-
-.toggleButtonActive {
-  background: var(--color-accent);
-  color: var(--color-white);
-}
-
 .printButton {
   min-height: 36px;
   padding: 0 16px;
@@ -229,27 +205,4 @@
   text-align: center;
   border-top: 1px solid #000;
   padding-top: 8px;
-}
-
-@media print {
-  .chrome {
-    display: none;
-  }
-
-  .page {
-    padding: 0;
-    background: var(--color-white);
-  }
-
-  .sheet {
-    border: none;
-    min-height: 0;
-    max-width: none;
-    padding: 0;
-  }
-
-  @page {
-    size: A4;
-    margin: 16mm;
-  }
 }
