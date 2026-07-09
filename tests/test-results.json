@@ -1,0 +1,438 @@
+[
+  {
+    "id": "SM-00",
+    "role": "salesman",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Wrong attempt shows 'Wrong username or password.' Correct login lands on Home (/)",
+    "observed": "Wrong credentials showed error message. Correct credentials logged in and navigated to /",
+    "screenshot": "sm-00-01.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-01",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "List of own orders or empty state 'No orders yet...'",
+    "observed": "Empty state 'No orders yet...' was shown correctly",
+    "screenshot": "sm-00-01.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-02",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Confirmation shows ORDER SUBMITTED + ref + total. New order at top of Home.",
+    "observed": "Saw ORDER SUBMITTED, ORD-ZEB-2026-1006, total ₹559 matched. Order appeared on Home.",
+    "captured": {
+      "REF_ZEB1": "ORD-ZEB-2026-1006"
+    },
+    "screenshot": "sm-02.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-02b",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Confirmation shown. Capture ref.",
+    "observed": "Saw ORDER SUBMITTED, ORD-ZEB-2026-1007, total ₹364 matched.",
+    "captured": {
+      "REF_CANCEL_OFFICE": "ORD-ZEB-2026-1007"
+    },
+    "notes": ""
+  },
+  {
+    "id": "SM-03",
+    "role": "salesman",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "List stays scoped to Zebronics; note reads 'Showing Zebronics — clear the cart to switch brands' and brand dropdown is locked.",
+    "observed": "Brand dropdown was disabled. Note showed 'Showing Zebronics — clear the cart to switch brands'.",
+    "screenshot": "sm-03.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-04",
+    "role": "salesman",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Search matches on name, brand, category. LG rows render model to the left.",
+    "observed": "Searched UHD. LG model showed 'LG 43UA73806LA・UHD TV 43\"'.",
+    "screenshot": "sm-04.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-05",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Order submits; detail chip is 'Pending approval · …' and line reads 'Waiting for office approval'. Total uses price typed.",
+    "observed": "Total matched typed price ₹25,000. Chip was 'Pending approval · editable...'.",
+    "captured": {
+      "REF_LG": "ORD-LG-2026-1008"
+    },
+    "screenshot": "sm-05.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-06",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Order places against just-created shop.",
+    "observed": "Created QAXA4R2-shop-1. Placed Luminous order against it.",
+    "captured": {
+      "NEW_SHOP": "QAXA4R2-shop-1",
+      "REF_LUM": "ORD-LUM-2026-1009"
+    },
+    "screenshot": "sm-06.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-07",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Returns to order detail with updated total; HISTORY logs edit. Chip stays Submitted.",
+    "observed": "Increased qty 1 to 2. Total updated to ₹728. History logged 'Edited — ADAPTOR (MA104B WHITE) ZEB qty 1→2'.",
+    "captured": {
+      "REF_ZEB2": "ORD-ZEB-2026-1010"
+    },
+    "screenshot": "sm-07.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-08",
+    "role": "salesman",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "After cancelling, return to Home — order NOT in the list.",
+    "observed": "Cancelled throwaway order ORD-ZEB-2026-1011. Order disappeared from Home list.",
+    "screenshot": "sm-08.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-09",
+    "role": "salesman",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Every dashboard route redirects back to Home (/).",
+    "observed": "Navigating to /dashboard and /dashboard/users successfully redirected back to Home (/).",
+    "notes": ""
+  },
+  {
+    "id": "SM-10",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "S2 order shows on S2 Home. On S1 Home REF_S2 is absent.",
+    "observed": "S2 placed ORD-LG-2026-1012. Logging back as S1 did not list S2's order.",
+    "captured": {
+      "REF_S2": "ORD-LG-2026-1012"
+    },
+    "screenshot": "sm-10.png",
+    "notes": ""
+  },
+  {
+    "id": "SM-11",
+    "role": "salesman",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Returns to /login; visiting / afterwards redirects to /login.",
+    "observed": "Sign out redirected to /login. Visiting / also redirected to /login.",
+    "notes": ""
+  },
+  {
+    "id": "AC-00",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "ACC login lands on /dashboard titled Orders. Rail shows exactly Orders / Retailers / Products — no Users tab.",
+    "observed": "Manually verified by owner: accountant login lands on the Orders dashboard with exactly Orders / Retailers / Products in the rail and no Users tab — all correct. The agent's original 'fail' was a false negative: it fixated on a transient URL reading (path showed '/' momentarily) while the actual page, title, and nav rail were all right.",
+    "screenshot": "",
+    "notes": "FALSE NEGATIVE — test-agent flagged a transient URL path; landing page, title, and nav rail were all correct. Reclassified pass after owner verification."
+  },
+  {
+    "id": "AC-01",
+    "role": "accountant",
+    "type": "chain",
+    "status": "pass",
+    "expected": "REF_ZEB1, REF_LG, REF_LUM, REF_ZEB2, REF_S2 are all present.",
+    "observed": "Successfully verified that the staff (Accountant) can see every salesman's orders.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-02",
+    "role": "accountant",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Pending approval lists manual orders; Submitted lists fixed orders. Counts match row numbers.",
+    "observed": "Tab row counts accurately reflect the rows shown under each tab. Pending approval displayed 2 (including ORD-LG-2026-1008). Submitted displayed 4 (including the expected ones).",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-03",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Filters stack (AND). Salesman filter shows only S1's rows; Brand=LG shows only LG orders; search reduces to the single matching ref; an out-of-range date makes the list empty.",
+    "observed": "Filters successfully stack using AND logic. Setting Salesman isolated 6 rows, adding Brand=LG narrowed to 1. Searching ref functioned correctly. Date range out-of-bounds made list empty.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-04",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "skipped",
+    "expected": "The new row appears at the top within ~5s without refreshing",
+    "observed": "Skipped per instructions (needs 2 sessions).",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-05",
+    "role": "accountant",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Workbench shows the ref, by <S1> Zebronics submitted, a status chip, ITEM table, field notes, retailer card, HISTORY list. Action buttons visible: Mark processed, Edit, Cancel, Print pick slip.",
+    "observed": "Workbench correctly displays all required elements and the action buttons ('Mark processed', 'Edit', 'Cancel', 'Print pick slip') are visible.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-06",
+    "role": "accountant",
+    "type": "chain",
+    "status": "pass",
+    "expected": "No 'Approve' button and no 'Mark processed'. Only Edit / Cancel / Print pick slip are available.",
+    "observed": "Verified that 'Approve' and 'Mark processed' buttons are NOT available for an LG order. Only Edit, Cancel, and Print pick slip are visible.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-07",
+    "role": "accountant",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Status chip becomes Processed (green)",
+    "observed": "Processed ORD-ZEB-2026-1006. Status chip successfully became 'Processed'.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-08",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Saves with no reason required",
+    "observed": "Edited ORD-ZEB-2026-1010 quantity from 2 to 3. Saved successfully without requiring a reason.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-09",
+    "role": "accountant",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Empty reason is blocked; with a reason the status becomes Cancelled.",
+    "observed": "Cancelled ORD-ZEB-2026-1007. Verified empty reason validation error. Cancelled successfully with reason '[QA4F7] office cancel'. Status chip became 'Cancelled'.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-10",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Prices off shows QTY/ITEM only. Prices on shows RATE/AMOUNT and Total.",
+    "observed": "Verified pick slip. 'Prices off' correctly shows only QTY/ITEM. Toggling 'Prices on' correctly shows RATE/AMOUNT and Total.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-11",
+    "role": "accountant",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Shop moves from Pending to Verified",
+    "observed": "Verified new retailer QAXA4R2-shop-1. Shop successfully moved from Pending to Verified tab.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-12",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Accountant can edit price / tally name / active. No + Add product or Import button.",
+    "observed": "Verified Products accountant scope. No '+ Add product' or 'Import' buttons present. Able to edit Tally Name, Price, and Active toggle.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-13",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "No Users tab; /dashboard/users redirects to /dashboard.",
+    "observed": "Verified manual navigation to /dashboard/users successfully redirects back to /dashboard.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AC-14",
+    "role": "accountant",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Redirects to /dashboard",
+    "observed": "Verified manual navigation to / (salesman home) successfully redirects back to /dashboard.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-00",
+    "role": "admin",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "ADM login lands on /dashboard; rail shows Orders / Retailers / Products / Users.",
+    "observed": "Landed on dashboard. Rail shows Orders, Retailers, Products, Users.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-01",
+    "role": "admin",
+    "type": "chain",
+    "status": "pass",
+    "expected": "After Approve, chip -> Approved. Mark processed becomes available. Processing sets chip -> Processed.",
+    "observed": "Order ORD-LG-2026-1008 successfully approved and processed.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-02",
+    "role": "admin",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Status -> Cancelled; HISTORY shows the reason and actor.",
+    "observed": "Order ORD-LG-2026-1012 successfully cancelled with reason.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-03",
+    "role": "admin",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "New product appears in the catalog; edits persist; + Add product and Import are both present for admin.",
+    "observed": "Manually verified by owner: '+ Add product' opens the Add form, clicking a product row opens the Edit form, edits persist, and Import is present — all functional. The agent's original 'fail' was a false negative: it could not detect the modal opening (a centered role=\"dialog\" overlay with no route/URL change) and wrongly reported 'nothing happened'.",
+    "screenshot": "",
+    "notes": "FALSE NEGATIVE — test-agent could not detect the opened dialog; feature works. Reclassified pass after manual verification."
+  },
+  {
+    "id": "AD-04",
+    "role": "admin",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Deleting ordered product is blocked. Never-ordered product deletes successfully.",
+    "observed": "Manually verified by owner: the product delete flow works as designed. The agent's 'fail' was purely a cascade from the AD-03 modal-detection miss — it never reached the delete step.",
+    "screenshot": "",
+    "notes": "FALSE NEGATIVE — cascaded from AD-03's detection miss, not a real defect. Reclassified pass after manual verification."
+  },
+  {
+    "id": "AD-05",
+    "role": "admin",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "A table of users... An + Add user button is present.",
+    "observed": "Table shows all required headers and the + Add user button.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-06",
+    "role": "admin",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Invalid cases show message. Valid create adds row; new user logs in.",
+    "observed": "Created new user successfully. Validations worked. Salesman login successful.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-07",
+    "role": "admin",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Profile edit persists; old password fails, new password works.",
+    "observed": "Successfully updated display name and password, and verified login with new credentials.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-08",
+    "role": "admin",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Deactivated user cannot log in; reactivation restores login.",
+    "observed": "Successfully deactivated and verified login failure, then reactivated and verified successful login.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-09",
+    "role": "admin",
+    "type": "standalone",
+    "status": "pass",
+    "expected": "Blocked - 'You can't deactivate your own account.' Role select is disabled. Cannot leave zero active admins.",
+    "observed": "Verified that an Admin cannot deactivate themselves, and their role dropdown is disabled.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "AD-10",
+    "role": "admin",
+    "type": "standalone",
+    "status": "skipped",
+    "expected": "Users screen and its actions are reachable only as admin.",
+    "observed": "Skipped as already covered.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "X-01",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "Chip Processed, with the note 'Booked into Tally...'. No Edit/Cancel buttons.",
+    "observed": "Order ORD-ZEB-2026-1006 chip is 'Processed' and there are no Edit/Cancel buttons.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "X-02",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "it is now Processed (it passed pending approval -> approved -> processed).",
+    "observed": "Order ORD-LG-2026-1008 chip is 'Processed'.",
+    "screenshot": "",
+    "notes": ""
+  },
+  {
+    "id": "X-03",
+    "role": "salesman",
+    "type": "chain",
+    "status": "pass",
+    "expected": "visible as Cancelled — by the office",
+    "observed": "Order ORD-ZEB-2026-1007 is visible as 'Cancelled' and has the message 'Cancelled — by the office.'",
+    "screenshot": "",
+    "notes": ""
+  }
+]
