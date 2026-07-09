@@ -69,6 +69,7 @@
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
+}
 
 .tabCount {
   font-family: var(--font-figures);
@@ -81,6 +82,11 @@
   border-color: var(--color-ink);
   color: var(--color-white);
   font-weight: 600;
+}
+
+.filterTabActive .tabCount {
+  color: rgba(255, 255, 255, 0.75);
+}
 
 .search {
   flex: 1;

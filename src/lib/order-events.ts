@@ -67,6 +67,8 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
     }
     case "approved":
       return `${time} Approved by ${actorLabel}`;
+    case "picked":
+      return `${time} Picked by ${actorLabel}`;
     case "billed":
       return `${time} Billed by ${actorLabel}`;
     default:

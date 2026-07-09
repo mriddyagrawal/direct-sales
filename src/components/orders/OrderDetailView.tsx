@@ -188,12 +188,13 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         })),
     [initialItems],
   );
-  // Serials are the godown→accountant hand-off — STAFF-only (owner decision;
-  // the salesman's RLS returns no scan rows anyway). On a show_model brand the
-  // serial rows nest under each line (spec §3); before the pick they read the
-  // teaching placeholder instead ("models at order time; serials after").
-  const showSerialRows = isStaff && order.showModel && mode === "view";
-  const serialsPending = order.status === "pending_approval" || order.status === "approved";
+  // Serial sub-rows nest under each line on show_model brands (spec §3) —
+  // BOTH roles (owner flip 2026-07-11: the salesman sees his own serials; an
+  // RLS policy scopes him to his own orders). The italic "captured at
+  // picking" teaching placeholder stays STAFF-only — the salesman just sees
+  // serials once they exist.
+  const showSerialRows = order.showModel && mode === "view";
+  const serialsPending = isStaff && (order.status === "pending_approval" || order.status === "approved");
   const hasAnySerials = serialGroups.length > 0;
 
   async function handleCopySerials() {
@@ -334,11 +335,13 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           {order.retailerName}
           {!order.retailerVerified && <span className={styles.newBadge}>NEW</span>}
         </p>
-        <p className={styles.heroMeta}>
-          {[order.retailerArea, isStaff ? order.retailerPhone : null, order.salesmanName]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+        {(() => {
+          const metaParts = isStaff
+            ? [order.retailerArea, order.retailerPhone, order.salesmanName]
+            : [order.retailerArea];
+          const meta = metaParts.filter(Boolean).join(" · ");
+          return meta ? <p className={styles.heroMeta}>{meta}</p> : null;
+        })()}
         <p className={styles.byline}>
           submitted {formatOrderTimestamp(order.submittedAt, now)}
           {editable && ` · editable until ${formatOrderTimestamp(order.editableUntil, now)}`}
@@ -451,7 +454,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         <div className={styles.main}>
           <div className={styles.itemsHead}>
             <p className={styles.sectionLabel}>ITEM · SNAPSHOT AT SUBMIT</p>
-            {showSerialRows && hasAnySerials && (
+            {isStaff && showSerialRows && hasAnySerials && (
               <button type="button" className={styles.copySerials} onClick={handleCopySerials}>
                 <Glyph icon={Copy} size={14} />
                 {copied ? "Copied ✓" : "Copy serials"}
@@ -550,7 +553,9 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           )}
 
           <div className={styles.totalRow}>
-            <span>{lines.length} LINES</span>
+            <span>
+              {lines.reduce((sum, l) => sum + l.qty, 0)} {lines.reduce((sum, l) => sum + l.qty, 0) === 1 ? "unit" : "units"}
+            </span>
             <span className={styles.mono}>Total (incl. GST) {formatRupees(total)}</span>
           </div>
 
@@ -585,7 +590,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             {mode === "edit" ? (
               <textarea className={styles.notesInput} value={notes} onChange={(e) => setNotes(e.target.value)} />
             ) : (
-              <p className={styles.notesText}>{notes || "—"}</p>
+              <p className={styles.notesText}>{notes || "— no notes —"}</p>
             )}
           </div>
 
