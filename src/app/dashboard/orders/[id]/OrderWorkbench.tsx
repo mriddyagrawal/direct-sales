@@ -309,7 +309,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             enforces it too). */}
         {(order.status === "submitted" || order.status === "approved" || order.status === "ready_to_bill") && (
           <Button variant="primary" onClick={() => setConfirmProcess(true)}>
-            Mark processed
+            Mark billed
           </Button>
         )}
         {order.status !== "cancelled" && mode === "view" && (
