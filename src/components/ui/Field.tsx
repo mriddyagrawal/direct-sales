@@ -9,8 +9,39 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 // White, 1px hairline, 2px radius; focus = 1px accent, sharp; error = 1px
-// red + plain-words helper below (design spec §2 "Fields"). Password
-// fields get the mono SHOW/HIDE toggle the S1 login screen specs.
+// red + plain-words helper below (design spec §2 "Fields"). Password fields
+// get an eye toggle (owner swap from the mono SHOW/HIDE text): eye = tap to
+// reveal, struck-through eye = tap to hide.
+function EyeIcon({ off }: { off: boolean }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {off ? (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+          <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </>
+      ) : (
+        <>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export function Field({ label, error, id, type, className, ...rest }: FieldProps) {
   const generatedId = useId();
   const fieldId = id ?? generatedId;
@@ -37,8 +68,9 @@ export function Field({ label, error, id, type, className, ...rest }: FieldProps
             className={styles.showToggle}
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
+            aria-label={visible ? "Hide password" : "Show password"}
           >
-            {visible ? "HIDE" : "SHOW"}
+            <EyeIcon off={visible} />
           </button>
         )}
       </div>

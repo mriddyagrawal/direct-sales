@@ -42,16 +42,19 @@
 
 .showToggle {
   position: absolute;
-  right: 12px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
-  font-family: var(--font-figures);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  color: var(--color-locked);
+  padding: 10px;
+}
+
+.showToggle:active {
   color: var(--color-accent);
-  padding: 8px;
 }
 
 .errorText {

@@ -26,14 +26,7 @@
   font-size: var(--text-name-size);
   font-weight: var(--text-name-weight);
   color: var(--color-ink);
-}
-
-.tagline {
-  font-family: var(--font-figures);
-  font-size: var(--text-section-label-size);
-  letter-spacing: var(--text-section-label-tracking);
-  text-transform: uppercase;
-  color: var(--color-locked);
+  /* The tagline is gone (owner decision) — carry its breathing room here. */
   margin-bottom: 24px;
 }
 
@@ -76,4 +69,88 @@
   font-family: var(--font-structure);
   font-size: 12px;
   color: var(--color-inactive);
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile-only glow-up (owner: the PC login is great as-is — every rule below
+   is scoped to phones). Bigger everything, plus a little colour: a soft blue
+   wash at the top, the receipt mark on a white chip with an indigo halo, and
+   a gradient Sign in.
+--------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .page {
+    background:
+      radial-gradient(130% 55% at 50% 0%, #dbe4ff 0%, rgba(219, 228, 255, 0) 65%),
+      var(--color-paper);
+  }
+
+  .card {
+    max-width: 440px;
+  }
+
+  .mark {
+    width: 76px;
+    height: 76px;
+    padding: 14px;
+    background: var(--color-white);
+    border: 1px solid #c7d2fe;
+    border-radius: 20px;
+    box-shadow: 0 10px 26px rgba(29, 78, 216, 0.14);
+    margin-bottom: 18px;
+  }
+
+  .name {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 26px;
+  }
+
+  .form {
+    gap: 20px;
+  }
+
+  /* Field's own classes are component-scoped; these element selectors under
+     .form out-specify them, so the shared component stays untouched. */
+  .form label {
+    font-size: 13px;
+  }
+
+  .form input:not([type="checkbox"]) {
+    min-height: 58px;
+    font-size: 17px;
+    border-radius: 10px;
+  }
+
+  .form input:not([type="checkbox"]):focus {
+    box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.16);
+  }
+
+  .remember {
+    font-size: 13px;
+    gap: 10px;
+  }
+
+  .remember input {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--color-accent);
+  }
+
+  .form .submit {
+    min-height: 58px;
+    font-size: 18px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 55%, #1e3a8a 100%);
+    box-shadow: 0 10px 22px rgba(29, 78, 216, 0.28);
+  }
+
+  .errorStrip {
+    font-size: 15px;
+    padding: 12px 14px;
+  }
+
+  .footer {
+    font-size: 14px;
+    margin-top: 30px;
+  }
 }
