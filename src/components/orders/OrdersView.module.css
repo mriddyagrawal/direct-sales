@@ -1,5 +1,8 @@
 .page {
   padding: 16px;
+  /* Clearance for the floating New Order FAB — the last card must never sit
+     under it. */
+  padding-bottom: 96px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -272,5 +275,35 @@
 
   .footerHint {
     display: block;
+  }
+}
+
+/* Floating + New Order (spec §2) — filled accent, bottom-right, both roles.
+   Mobile offset clears the salesman bottom bar / the staff mobile tab bar;
+   desktop floats nearer the corner. */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  background: var(--color-accent);
+  color: var(--color-white);
+  border-radius: 24px;
+  font-family: var(--font-structure);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
+}
+
+@media (min-width: 768px) {
+  .fab {
+    right: 32px;
+    bottom: 32px;
   }
 }

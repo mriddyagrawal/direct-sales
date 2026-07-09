@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { Glyph } from "@/components/ui/Glyph";
 import type { DateRange } from "react-day-picker";
 import { createClient } from "@/lib/supabase/client";
 import { StatusTag } from "@/components/ui/StatusTag";
@@ -342,6 +345,14 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       )}
 
       <p className={styles.footerHint}>/ search · ↑↓ move · ↵ open</p>
+
+      {/* New Order is a floating FAB for BOTH roles (spec §2) — it left the
+          salesman bottom bar. The .page bottom padding keeps it off the last
+          card. */}
+      <Link href="/new-order" className={styles.fab}>
+        <Glyph icon={Plus} />
+        New Order
+      </Link>
     </div>
   );
 }
