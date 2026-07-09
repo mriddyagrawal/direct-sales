@@ -3555,3 +3555,124 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** `main` is fully reviewed through 36cd303. Remaining confidence step is the owner's **device retest on the deployed HTTPS URL** (torch on, EAN/QR ignored, out-of-reticle codes not read) — the camera path is the one thing not verifiable from here.
 
 ---
+
+## Review of ab3d8c7 — feat(orders): shareable order — mobile Share / desktop Copy
+
+**Verdict:** ✅ accept — a clean shared Share/Copy affordance: WhatsApp-friendly plain text (no link, since the pages are auth-gated), feature-detected after mount to avoid a hydration mismatch, money via `formatRupees`. Two placements, one shared builder.
+
+**Phase / commit goal (as I understood it):** Add a Share button (Web Share on mobile, clipboard Copy on desktop) that shares an order as plain text — on the salesman order detail (full copy incl. prices) and the pick slip (respecting its Prices toggle).
+
+**What works (verified):**
+- **No-URL plain text** — `buildOrderShareText` emits header + ref/brand + `ORDER COPY`/`PICK SLIP` + meta + `{n} LINES` + per-line `qty × name [@ rate = amount]` + total + notes. A link would be useless to a non-user (auth-gated), so sharing the content is the right call. Money is `formatRupees` throughout — no raw paise.
+- **No hydration mismatch** — `ShareOrderButton` starts with `canShare=false` (label "Copy order") and flips to `navigator.share` support in a post-mount `useEffect`, so SSR and first client render agree. A dismissed share sheet (`AbortError`) and a blocked clipboard are both swallowed quietly.
+- **`withPrices` mirrors the sheet** — off → "PICK SLIP" + qty/item only; on → "ORDER COPY" + priced lines + total.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Money ✓ (`formatRupees`, en-IN, no raw paise); no data/RLS/state surface (read-only text from already-fetched props); auth ✓ (no link shared, content only).
+
+**What I tried:** Read `order-share.ts` + `ShareOrderButton.tsx`; confirmed the post-mount feature-detect, AbortError/clipboard swallow, and `formatRupees` money; `build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Quick Order model-name search (692fe7d) → below.
+
+---
+
+## Review of 692fe7d — feat(new-order): Quick Order search also matches Tally/model name
+
+**Verdict:** ✅ accept — one-line search widening (OR in `tally_name`), null-safe (the column is NOT NULL), no downside for fixed brands.
+
+**Phase / commit goal (as I understood it):** Let the salesman search find an LG unit by its model code (e.g. "43UA73806LA") by matching `tally_name` in addition to name/category/brand.
+
+**What works (verified):**
+- **`normalize(p.tally_name).includes(q)` OR'd into `matchesSearch`** — `normalize` lowercases + strips whitespace, so "43UA73806LA" matches `tally_name` "LG 43UA73806LA". Brand lock/filter still ANDs on top (unchanged).
+- **Null-safe** — I confirmed live that `products.tally_name` is **NOT NULL**, so `normalize(p.tally_name)` can't throw; and the `ProductOption.tally_name` field is populated in the page mapping (from e49fd07). Fixed brands whose `tally_name == name` gain nothing; only LG (distinct model codes) benefits.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Read-only client filter; no data/RLS/money/state surface.
+
+**What I tried:** `git show 692fe7d`; read `normalize`; live check that `products.tally_name is_nullable = NO`; `build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried as above.
+
+**Next-commit suggestion:** Pick-slip model + always-on prices (6a5e25a) → below.
+
+---
+
+## Review of 6a5e25a — feat(pick-slip): show LG model (tally name) + always-on prices
+
+**Verdict:** ✅ accept — the pick slip becomes a true ORDER COPY (prices always on) with the LG model line under the display name; join is null-safe and the model render is guarded against `X == X`.
+
+**Phase / commit goal (as I understood it):** Always show prices (drop the off/on toggle) and add a `tally_name` model line under the product name for `show_model` brands, joined via `order_items.product_id → products`.
+
+**What works (verified):**
+- **Model line guarded + null-safe** — `showModel && item.tally_name && item.tally_name !== item.product_name` (same pattern as Quick Order — no "X·X"); the page maps `tally_name: it.products?.tally_name ?? null`, so a missing join is `null` (line simply omitted). `products(tally_name)` resolves because ordered products can't be hard-deleted (verified in 81b7547's FK/guard review).
+- **Always-on prices** — the toggle + all `pricesOn &&` conditionals are gone; RATE/AMOUNT columns, the per-line money, and the Total row are unconditional; the badge is a constant "ORDER COPY"; `buildOrderShareText` is called with `withPrices: true`. Money via `formatRupees`.
+- **Query extended** — `brands(... show_model)` + `order_items(... products(tally_name))`; `showModel` threaded to the component.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Money ✓ (`formatRupees`, no raw paise); RLS unchanged (same page query, just more columns — all readable by staff); no state surface. The godown reads qty in `/godown`, so an always-priced accountant sheet is the owner's intent, not a leak.
+
+**What I tried:** `git show 6a5e25a` (page.tsx + PickSlip.tsx); confirmed the guarded/null-safe model render, the toggle removal, and `formatRupees`; `build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried as above.
+
+**Next-commit suggestion:** Admin/godown polish + "Billed" rename (dc856a2) → below.
+
+---
+
+## Review of dc856a2 — feat(admin+godown): search bars, godown model name, white price input, "Billed" label
+
+**Verdict:** ✅ accept — search boxes on Products/Retailers, the LG model on the godown pick screen, and a user-facing "Processed"→"Billed" rename **verified to be label-only** (the stored `processed` value and every guard/RLS untouched). No price leak on the godown surface.
+
+**Phase / commit goal (as I understood it):** Client-side search on Products/Retailers; show the LG model on the godown pick screen; white price input; rename the user-facing "Processed" to "Billed" everywhere it shows.
+
+**What works (verified):**
+- **"Processed"→"Billed" is display-only** — grepped `src`: **no** code compares status to the string `"Billed"`/`"Processed"`; every branch still keys on the stored value `order.status === "processed"` (`order-status.ts` label, `order-events.ts` "Billed by", OrdersList tab, OrderWorkbench byline + confirm/"Mark billed" button, salesman note). `handleProcess` still calls `process_order` (writes DB `processed`). No migration — the state machine/guards/RLS are untouched. The status *tone* stays `processed` (green).
+- **Products search** — filters `displayProducts` by name/`tally_name`/category/brand with a no-match empty state; feeds both the table and mobile groups. Null-safe (`tally_name` NOT NULL; brand via `?? ""`). Renders from the optimistic prop, so the Active toggle still reconciles.
+- **Godown model** — the pick screen now shows `tally_name` before the product name (muted), joined via `order_items→products`, gated by `show_model`. Crucially the godown query **still selects no price columns** (only `product_name, qty, position, tally_name` + `brands(show_model)`) — the price guardrail holds.
+- **White price input** — CSS only.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** State machine ✓ (rename is cosmetic; DB `processed` + guards intact); godown price guardrail ✓ (no price columns); search null-safety ✓; no money/RLS regression.
+
+**What I tried:** `git show dc856a2`; grep for any logic keyed on the display strings (none) + confirmed all `=== "processed"` comparisons remain; verified the godown query selects no price column; `tsc`/`eslint`/`build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried as above.
+
+**Next-commit suggestion:** The generated PDF pick slip (9f686be, on `feature/pickslip-pdf`) → below.
+
+---
+
+## Review of 9f686be — feat(pick-slip): real generated A5 PDF replaces window.print
+
+**Verdict:** ✅ accept — a proper server-streamed A5 PDF, **RLS-gated** (no service client), with the PDF library kept out of every client bundle and a sensible WinAnsi glyph strategy. Render path **verified by execution** (valid 1-page A5). On `feature/pickslip-pdf`.
+
+**Phase / commit goal (as I understood it):** Replace `window.print()` with a "Download PDF" link to a server route that streams a generated A5 ORDER COPY (`@react-pdf/renderer`), reusing the RLS-scoped pick-slip query; keep the on-screen sheet + Share.
+
+**What works (verified):**
+- **RLS is the access gate** — `route.ts` uses the RLS-scoped **server** client (`@/lib/supabase/server`), the *same* select as the pick-slip page; `maybeSingle()` → `!order` → **404**. No service client, no new RLS/columns — a caller who can't see the order gets nothing. `runtime = "nodejs"` (react-pdf needs Node). Response is `application/pdf`, `Content-Disposition: inline; filename="<order_ref>.pdf"`, `Cache-Control: no-store`.
+- **Render path executes to a valid PDF** — I rendered a probe through `@react-pdf/renderer`'s `renderToBuffer` with the component's exact fonts (Helvetica/Courier) and `pdfMoney`/`pdfText` logic → **`%PDF-`, 1 page, A5**. The layout mirrors the sheet: header + ORDER COPY badge, meta, `{n} LINES`, QTY·ITEM·RATE·AMOUNT with the guarded LG model line (`showModel && tally_name && tally_name !== product_name`), Total (incl. GST), notes box, Packed/Checked signatures, generated-at footer.
+- **Money never raw paise** — `pdfMoney` = `formatRupees` with the ₹ stripped to `"Rs "` (the built-in fonts are WinAnsi and have no ₹/⋆). `pdfText` maps known symbols (⋆→*, ・→·, smart quotes) and squashes any other non-Latin-1 char to `"?"` so the encoder never prints a wrong glyph — a fix the commit notes was **caught by executing the render**, which I credit.
+- **PDF lib absent from client bundles** — after build, grepped `.next/static` for `react-pdf`/`renderToBuffer` → **empty**; it appears only in server chunks. `renderPickSlipPdfBuffer` keeps JSX out of `route.ts`. Route present as `ƒ /dashboard/orders/[id]/pick-slip/pdf`.
+- **Button swap** — Print → "Download PDF" link (`target="_blank" rel="noopener"`, `orderId` threaded from the page); on-screen sheet kept as preview; Share untouched; dead `@media print` + `.toggle*` CSS removed.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **"Rs" vs ₹ is a deliberate v1** — the built-in fonts can't render ₹; registering Space Grotesk / JetBrains Mono (or any ₹-capable font) via `Font.register` is the planned follow-up and would restore the rupee glyph + the app's real type. Fine to ship as-is.
+- **`pdfText` collapses newlines** in `notes` to single spaces (`\s+ → " "`). Acceptable for a one-line notes field; if multi-line notes matter later, preserve `\n`.
+
+**Domain / correctness checks:** Authorization ✓ (RLS server client, 404 on no-row, no service client); money ✓ (`formatRupees`, no raw paise); no schema/RLS/RPC change (guardrail honored); bundle isolation ✓ (server-only). Secure — the route can't leak an order the caller couldn't already see on the page.
+
+**What I tried:** Read `route.ts` + `PickSlipPdf.tsx`; confirmed the RLS server client + 404 + headers + `nodejs` runtime; **executed a `renderToBuffer` probe** (valid 1-page A5, %PDF, "Rs 15,000", glyph map); grepped `.next/static` for react-pdf (absent) and confirmed server-only; `tsc`/`eslint`/`build` clean, route present.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Feature branch is complete + verified. Owner phone test on the deployed HTTPS URL (tap Download PDF → native viewer → share to WhatsApp; confirm the LG model line + prices + 404 for a non-visible order). Font registration (₹ glyph) is the natural follow-up. `feature/pickslip-pdf` is merge-ready.
+
+---
