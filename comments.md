@@ -3387,3 +3387,30 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Godown fulfilment (commits 1–4) is complete and backend-verified. Remaining confidence step is a **real-device pass** (HTTPS): scan a physical LG barcode on a phone (secure-context camera), confirm a full pick → `ready_to_bill` → accountant serials + Mark processed. When merging `feature/godown-fulfilment` to main, the single migration is already 14-digit/reconciled.
 
 ---
+
+## Review of c3d7653 — fix(pwa): installable WebAPK — minimal service worker + standard static icons
+
+**Verdict:** ✅ accept — a correct, low-risk PWA installability fix: a no-op passthrough service worker + standard-sized static icons that satisfy Chrome's WebAPK minter. No behavior change to the app itself; build/tsc/eslint clean. *(Reviewed out of order per request — see note: 24ec59b sits unreviewed just below.)*
+
+**Phase / commit goal (as I understood it):** Make Android "Add to Home screen" install a real WebAPK (receipt icon, no Chrome badge, standalone) instead of a badged shortcut — which needs (a) a registered service worker with a real fetch handler and (b) manifest icons the minter reliably fetches.
+
+**What works (verified):**
+- **Icons match the manifest exactly** — `sips` confirms `icon-192.png`=**192×192**, `icon-512.png`=**512×512**, `icon-maskable-512.png`=**512×512**, matching the three `manifest.ts` entries (`192x192 any`, `512x512 any`, `512x512 maskable`). A size mismatch is a common cause of the install falling back to a shortcut; these are exact. No lingering `1000x1000`/`1250x1250`/`/icon.png` refs remain in the manifest.
+- **Service worker is genuinely minimal + installability-only** — `public/sw.js` (served at `/sw.js`, scope `/`): `install→skipWaiting`, `activate→clients.claim`, `fetch→respondWith(fetch(event.request))`. A straight network passthrough — **no caching, so no staleness/offline-regression class of bugs** — but a non-trivial handler, which is exactly what Chrome requires to promote to a WebAPK (a no-op handler is skipped). The comment documents this rationale accurately.
+- **Registration is safe** — `SwRegister` (client, renders `null`) registers in a `useEffect` guarded by `"serviceWorker" in navigator`, with a `.catch` no-op (old browsers / private mode → no prompt, app unaffected). Imported once, rendered in `<body>` in the root layout.
+- **Build** — `npm run build` exit 0; `/manifest.webmanifest` emitted as a static route.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **First-load control handoff** — `skipWaiting` + `clients.claim` means the SW takes control of already-open clients immediately on first activation; with a pure passthrough this is benign (no cache to serve stale). If caching is ever added to `sw.js` later, revisit the update strategy so a new deploy can't be masked by a stale SW. (Forward-looking only; nothing to change now.)
+
+**Domain / correctness checks:** No data/RLS/money/state-machine surface — this is static assets + a passthrough SW + a client registration. Offline behavior is explicitly unchanged (passthrough, no cache).
+
+**What I tried:** `git show c3d7653`; `sips` pixel dimensions on all three icons vs the manifest sizes; confirmed `public/sw.js` scope + handlers; grep for stale icon refs (none); confirmed single `SwRegister` import/render; `npm run build` exit 0 with `/manifest.webmanifest`. (Actual install promotion is a real-device/HTTPS check — Chrome DevTools → Application → Manifest/Service Workers on the deployed URL — noted as the one thing not verifiable from here.)
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷ (godown client dup — cosmetic), ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** **24ec59b — feat(users): "Godown" role in user management** is still **unreviewed** (it landed on main between the godown work and this PWA fix). Review it next to close the gap.
+
+---
