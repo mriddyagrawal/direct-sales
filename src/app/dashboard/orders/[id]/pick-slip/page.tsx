@@ -8,6 +8,7 @@ interface PickSlipItemRow {
   unit_price_paise: number;
   line_total_paise: number;
   position: number;
+  products: { tally_name: string } | null;
 }
 
 interface PickSlipOrderRow {
@@ -17,7 +18,7 @@ interface PickSlipOrderRow {
   total_paise: number;
   retailers: { name: string; area: string | null; phone: string | null } | null;
   salesman: { full_name: string } | null;
-  brands: { name: string; code: string } | null;
+  brands: { name: string; code: string; show_model: boolean } | null;
   order_items: PickSlipItemRow[];
 }
 
@@ -28,7 +29,7 @@ export default async function PickSlipPage({ params }: { params: Promise<{ id: s
   const { data } = await supabase
     .from("orders")
     .select(
-      "order_ref, submitted_at, notes, total_paise, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code), order_items(product_name, qty, unit_price_paise, line_total_paise, position)",
+      "order_ref, submitted_at, notes, total_paise, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code, show_model), order_items(product_name, qty, unit_price_paise, line_total_paise, position, products(tally_name))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -36,7 +37,15 @@ export default async function PickSlipPage({ params }: { params: Promise<{ id: s
   const order = data as unknown as PickSlipOrderRow | null;
   if (!order) notFound();
 
-  const items = [...order.order_items].sort((a, b) => a.position - b.position);
+  const items = [...order.order_items]
+    .sort((a, b) => a.position - b.position)
+    .map((it) => ({
+      product_name: it.product_name,
+      qty: it.qty,
+      unit_price_paise: it.unit_price_paise,
+      line_total_paise: it.line_total_paise,
+      tally_name: it.products?.tally_name ?? null,
+    }));
 
   return (
     <PickSlip
@@ -49,6 +58,7 @@ export default async function PickSlipPage({ params }: { params: Promise<{ id: s
       retailerPhone={order.retailers?.phone ?? null}
       salesmanName={order.salesman?.full_name ?? "Unknown"}
       brandName={order.brands?.name ?? null}
+      showModel={order.brands?.show_model ?? false}
       items={items}
     />
   );

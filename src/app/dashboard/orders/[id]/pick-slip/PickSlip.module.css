@@ -177,6 +177,17 @@
   overflow-wrap: anywhere;
 }
 
+/* Model / Tally name under the display name for show_model brands (LG) —
+   mono + dark so the godown can pick by the exact model code on print. */
+.slipModel {
+  display: block;
+  font-family: var(--font-figures);
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  margin-top: 2px;
+}
+
 .numeric {
   text-align: right;
   font-family: var(--font-figures);
