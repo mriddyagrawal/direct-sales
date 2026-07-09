@@ -86,6 +86,48 @@ export type Database = {
           },
         ]
       }
+      order_item_scans: {
+        Row: {
+          id: string
+          order_item_id: string
+          raw_scan: string
+          scanned_at: string
+          scanned_by: string
+          serial: string
+        }
+        Insert: {
+          id?: string
+          order_item_id: string
+          raw_scan: string
+          scanned_at?: string
+          scanned_by: string
+          serial: string
+        }
+        Update: {
+          id?: string
+          order_item_id?: string
+          raw_scan?: string
+          scanned_at?: string
+          scanned_by?: string
+          serial?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_scans_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_scans_scanned_by_fkey"
+            columns: ["scanned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           id: string
@@ -146,6 +188,8 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          picked_at: string | null
+          picked_by: string | null
           processed_at: string | null
           processed_by: string | null
           retailer_id: string
@@ -166,6 +210,8 @@ export type Database = {
           notes?: string
           order_no: number
           order_ref: string
+          picked_at?: string | null
+          picked_by?: string | null
           processed_at?: string | null
           processed_by?: string | null
           retailer_id: string
@@ -186,6 +232,8 @@ export type Database = {
           notes?: string
           order_no?: number
           order_ref?: string
+          picked_at?: string | null
+          picked_by?: string | null
           processed_at?: string | null
           processed_by?: string | null
           retailer_id?: string
@@ -213,6 +261,13 @@ export type Database = {
           {
             foreignKeyName: "orders_cancelled_by_fkey"
             columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_picked_by_fkey"
+            columns: ["picked_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -373,6 +428,8 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          picked_at: string | null
+          picked_by: string | null
           processed_at: string | null
           processed_by: string | null
           retailer_id: string
@@ -403,6 +460,8 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          picked_at: string | null
+          picked_by: string | null
           processed_at: string | null
           processed_by: string | null
           retailer_id: string
@@ -438,6 +497,8 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          picked_at: string | null
+          picked_by: string | null
           processed_at: string | null
           processed_by: string | null
           retailer_id: string
@@ -472,6 +533,39 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          picked_at: string | null
+          picked_by: string | null
+          processed_at: string | null
+          processed_by: string | null
+          retailer_id: string
+          salesman_id: string
+          status: string
+          submitted_at: string
+          total_paise: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      submit_pick: {
+        Args: { p_order_id: string; p_scans: Json }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          brand_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          editable_until: string
+          id: string
+          notes: string
+          order_no: number
+          order_ref: string
+          picked_at: string | null
+          picked_by: string | null
           processed_at: string | null
           processed_by: string | null
           retailer_id: string
@@ -506,6 +600,8 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          picked_at: string | null
+          picked_by: string | null
           processed_at: string | null
           processed_by: string | null
           retailer_id: string
