@@ -21,7 +21,7 @@ export type Database = {
           id: string
           name: string
           pricing_mode: string
-          requires_approval: boolean
+          requires_scan: boolean
           show_model: boolean
         }
         Insert: {
@@ -30,7 +30,7 @@ export type Database = {
           id?: string
           name: string
           pricing_mode?: string
-          requires_approval?: boolean
+          requires_scan?: boolean
           show_model?: boolean
         }
         Update: {
@@ -39,7 +39,7 @@ export type Database = {
           id?: string
           name?: string
           pricing_mode?: string
-          requires_approval?: boolean
+          requires_scan?: boolean
           show_model?: boolean
         }
         Relationships: []
