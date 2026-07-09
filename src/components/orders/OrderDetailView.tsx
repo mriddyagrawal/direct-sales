@@ -13,10 +13,19 @@ import { formatOrderTimestamp, formatRupees } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
 import { updateOrderItems, cancelOrder, processOrder, approveOrder } from "@/lib/order-rpcs";
-import type { CatalogProduct } from "./page";
-import styles from "./OrderWorkbench.module.css";
+import styles from "./OrderDetailView.module.css";
 
 const UI_QTY_CAP = 999;
+
+// Catalog rows for the staff inline "+ Add item" editor. The salesman page
+// passes [] — his edits go through the Quick Order flow instead.
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  category: string;
+  price_paise: number | null;
+  active: boolean;
+}
 
 interface OrderItemRow {
   id: string;
@@ -38,7 +47,7 @@ interface RawEventRow {
   profiles: { full_name: string } | null;
 }
 
-interface WorkbenchOrderData {
+export interface OrderDetailData {
   id: string;
   orderRef: string;
   status: string;
@@ -48,7 +57,9 @@ interface WorkbenchOrderData {
   editableUntil: string;
   processedAt: string | null;
   cancelledAt: string | null;
+  cancelledById: string | null;
   cancelledByName: string | null;
+  salesmanId: string;
   salesmanName: string;
   processedByName: string | null;
   retailerName: string;
@@ -62,21 +73,25 @@ interface WorkbenchOrderData {
   pickedByName: string | null;
 }
 
-interface OrderWorkbenchProps {
-  order: WorkbenchOrderData;
+interface OrderDetailViewProps {
+  order: OrderDetailData;
   items: OrderItemRow[];
   events: RawEventRow[];
   catalog: CatalogProduct[];
   currentUserId: string;
+  role: "salesman" | "staff";
   isAdmin: boolean;
 }
 
-// S9 — the accountant/admin workbench. One filled-accent action (Mark
-// processed); Edit and Cancel are outline/destructive; Share PDF hands the
-// generated A5 order copy to the share sheet (phone) or the browser's viewer
-// (desktop). All writes go through the same RPCs the salesman app uses —
-// this UI is a different lens on the same guards.
-export function OrderWorkbench({ order, items: initialItems, events, catalog, currentUserId, isAdmin }: OrderWorkbenchProps) {
+// THE order detail — one component, every role (unification, owner decision
+// 2026-07-10). The role decides which ACTIONS render; the boilerplate
+// (header, lines, total, serials, notes, retailer, history, Share PDF) is
+// identical. Staff: Approve (admin) · Mark billed · inline Edit (+reason
+// after lock) · Cancel with reason · serials panel. Salesman: Edit order
+// (via the Quick Order flow) + Cancel while in-window, read-only after,
+// plus the status guidance notes; no serials. Hiding a button is cosmetic —
+// every write goes through the same role-guarded RPCs either way.
+export function OrderDetailView({ order, items: initialItems, events, catalog, currentUserId, role, isAdmin }: OrderDetailViewProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [items, setItems] = useState<Record<string, number>>(() => {
@@ -97,10 +112,15 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
   const [tick] = useState(nowMs);
 
   const now = useMemo(() => new Date(tick), [tick]);
+  const isStaff = role === "staff";
+  const isOwner = order.salesmanId === currentUserId;
   // Matches the RPC's editable window: a pending_approval order is still
   // editable in-window (approval beats the timer), so no reason is demanded.
   const editable =
     (order.status === "submitted" || order.status === "pending_approval") && new Date(order.editableUntil) > now;
+  // The salesman may edit/cancel only his own order, only in-window (the
+  // cancel_order/update_order_items RPCs enforce exactly this server-side).
+  const salesmanActionable = !isStaff && isOwner && editable;
   const requiresReason = mode === "edit" && !editable;
   const statusTag = getOrderStatusTag({ status: order.status, editable_until: order.editableUntil }, now);
 
@@ -148,8 +168,10 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
         })),
     [initialItems],
   );
+  // Serials are the godown→accountant hand-off — staff-only (owner decision;
+  // the salesman's RLS returns no scan rows anyway, this just skips the shell).
   const showSerials =
-    (order.status === "ready_to_bill" || order.status === "processed") && serialGroups.length > 0;
+    isStaff && (order.status === "ready_to_bill" || order.status === "processed") && serialGroups.length > 0;
 
   async function handleCopySerials() {
     const text = serialGroups.map((g) => `${g.name}\n${g.serials.join("\n")}`).join("\n\n");
@@ -249,14 +271,16 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
   }
 
   async function handleCancel() {
-    if (!cancelReason.trim()) {
+    // Staff must give a reason (RPC demands it); the salesman's in-window
+    // self-cancel is reason-free — same rule the RPC applies.
+    if (isStaff && !cancelReason.trim()) {
       setError("Reason is required.");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await cancelOrder(order.id, cancelReason.trim());
+      await cancelOrder(order.id, isStaff ? cancelReason.trim() : undefined);
       setConfirmCancel(false);
       startTransition(() => {
         router.refresh();
@@ -270,8 +294,8 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
 
   return (
     <div className={styles.page}>
-      <Link href="/dashboard" className={styles.breadcrumb}>
-        ← ORDERS
+      <Link href={isStaff ? "/dashboard" : "/"} className={styles.breadcrumb}>
+        {isStaff ? "← ORDERS" : "← MY ORDERS"}
       </Link>
 
       <div className={styles.header}>
@@ -300,7 +324,7 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
       <div className={styles.actions}>
         {/* Approval is admin-only (approve_order + guard enforce it too). The
             accountant sees a pending order but no Approve button. */}
-        {order.status === "pending_approval" && isAdmin && (
+        {isStaff && order.status === "pending_approval" && isAdmin && (
           <Button variant="primary" onClick={handleApprove} loading={saving || isPending}>
             Approve
           </Button>
@@ -309,20 +333,33 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
             path), or ready_to_bill (picked, serials in hand — the normal LG
             path). A pending order can't be processed until approved (RPC
             enforces it too). */}
-        {(order.status === "submitted" || order.status === "approved" || order.status === "ready_to_bill") && (
+        {isStaff && (order.status === "submitted" || order.status === "approved" || order.status === "ready_to_bill") && (
           <Button variant="primary" onClick={() => setConfirmProcess(true)}>
             Mark billed
           </Button>
         )}
-        {order.status !== "cancelled" && mode === "view" && (
+        {isStaff && order.status !== "cancelled" && mode === "view" && (
           <Button variant="secondary" onClick={() => setMode("edit")}>
             Edit
           </Button>
         )}
-        {order.status !== "cancelled" && (
+        {isStaff && order.status !== "cancelled" && (
           <Button variant="destructive" onClick={() => setConfirmCancel(true)}>
             Cancel
           </Button>
+        )}
+        {/* Salesman actions exist only while the RPC window does: edit rides
+            the Quick Order flow, cancel is the reason-free self-cancel. Past
+            the window the buttons are removed, not disabled. */}
+        {salesmanActionable && (
+          <>
+            <Button variant="secondary" onClick={() => router.push(`/new-order?edit=${order.id}`)}>
+              Edit order
+            </Button>
+            <Button variant="destructive" onClick={() => setConfirmCancel(true)}>
+              Cancel order
+            </Button>
+          </>
         )}
         {/* Share-only pick slip (owner decision): the generated A5 PDF goes
             straight to the native share sheet on a phone; desktop opens the
@@ -330,7 +367,37 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
         <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="ink" />
       </div>
 
-      {error && <p className={styles.error}>{error}</p>}
+      {error && !confirmCancel && !confirmProcess && <p className={styles.error}>{error}</p>}
+
+      {/* Salesman guidance notes — what the status means for HIM and what
+          happens next (ported verbatim from the old /orders/[id] page). */}
+      {!isStaff && (
+        <>
+          {order.status === "pending_approval" && (
+            <p className={styles.noteLocked}>
+              Waiting for office approval{salesmanActionable ? " — you can still edit until the window closes." : "."}
+            </p>
+          )}
+          {order.status === "approved" && (
+            <p className={styles.noteProcessed}>Approved by the office — waiting to be processed.</p>
+          )}
+          {order.status === "ready_to_bill" && (
+            <p className={styles.noteProcessed}>Picked and ready — the office will bill it shortly.</p>
+          )}
+          {order.status === "processed" && (
+            <p className={styles.noteProcessed}>Booked into Tally by the office. For any change, call the accountant.</p>
+          )}
+          {order.status === "cancelled" && (
+            <p className={styles.noteCancelled}>
+              Cancelled {formatOrderTimestamp(order.cancelledAt ?? order.submittedAt, now)}
+              {order.cancelledById === currentUserId ? " — by you." : " — by the office."}
+            </p>
+          )}
+          {order.status === "submitted" && !salesmanActionable && (
+            <p className={styles.noteLocked}>The edit window has ended. Call the accountant to change this order.</p>
+          )}
+        </>
+      )}
 
       <div className={styles.body}>
         <div className={styles.main}>
@@ -499,13 +566,19 @@ export function OrderWorkbench({ order, items: initialItems, events, catalog, cu
       {confirmCancel && (
         <BottomSheet onClose={() => setConfirmCancel(false)}>
           <p className={styles.confirmTitle}>Cancel {order.orderRef}?</p>
-          <label className={styles.notesLabel}>REASON (required)</label>
-          <textarea
-            className={styles.notesInput}
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-            placeholder="e.g. shop backed out"
-          />
+          {isStaff ? (
+            <>
+              <label className={styles.notesLabel}>REASON (required)</label>
+              <textarea
+                className={styles.notesInput}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g. shop backed out"
+              />
+            </>
+          ) : (
+            <p className={styles.confirmBody}>This can&apos;t be undone.</p>
+          )}
           {error && <p className={styles.error}>{error}</p>}
           <div className={styles.editActions}>
             <Button variant="secondary" onClick={() => setConfirmCancel(false)}>
