@@ -61,7 +61,6 @@ export interface PickSlipPdfProps {
   retailerArea: string | null;
   retailerPhone: string | null;
   salesmanName: string;
-  brandName: string | null;
   showModel: boolean;
   items: PickSlipPdfItem[];
   printedAtIso: string;
@@ -115,11 +114,6 @@ const s = StyleSheet.create({
     fontFamily: "Courier-Bold",
     fontSize: 16,
     marginTop: 4,
-  },
-  slipBrand: {
-    fontSize: 8,
-    color: LOCKED,
-    marginTop: 2,
   },
   badgeCol: {
     alignItems: "flex-end",
@@ -179,7 +173,7 @@ const s = StyleSheet.create({
     borderBottomColor: HAIRLINE,
     alignItems: "flex-start",
   },
-  colQty: { width: 30 },
+  colQty: { width: 30, textAlign: "right" },
   colItem: { flex: 1, paddingRight: 6 },
   colRate: { width: 64, textAlign: "right" },
   colAmount: { width: 70, textAlign: "right" },
@@ -264,7 +258,6 @@ export function PickSlipPdf({
   retailerArea,
   retailerPhone,
   salesmanName,
-  brandName,
   showModel,
   items,
   printedAtIso,
@@ -275,8 +268,8 @@ export function PickSlipPdf({
         <View style={s.headerRow}>
           <View>
             <Text style={s.brand}>GANPATI ENTERPRISES</Text>
+            {/* No separate brand line — the ref already carries it (ORD-LG-…). */}
             <Text style={s.ref}>{orderRef}</Text>
-            {brandName ? <Text style={s.slipBrand}>{pdfText(brandName)}</Text> : null}
           </View>
           <View style={s.badgeCol}>
             <Text style={s.badge}>ORDER COPY</Text>
@@ -301,16 +294,17 @@ export function PickSlipPdf({
 
         <Text style={s.linesRule}>{items.length} {items.length === 1 ? "LINE" : "LINES"}</Text>
 
+        {/* ITEM leads (owner decision) — the item is what the reader scans
+            for first; qty/rate/amount follow as figures columns. */}
         <View style={s.tableHeader}>
-          <Text style={[s.th, s.colQty]}>QTY</Text>
           <Text style={[s.th, s.colItem]}>ITEM</Text>
+          <Text style={[s.th, s.colQty]}>QTY</Text>
           <Text style={[s.th, s.colRate]}>RATE</Text>
           <Text style={[s.th, s.colAmount]}>AMOUNT</Text>
         </View>
 
         {items.map((item, i) => (
           <View key={i} style={s.row} wrap={false}>
-            <Text style={[s.qty, s.colQty]}>{item.qty}</Text>
             <View style={s.colItem}>
               {showModel && item.tally_name && item.tally_name !== item.product_name ? (
                 <>
@@ -321,13 +315,13 @@ export function PickSlipPdf({
                 <Text style={s.itemName}>{pdfText(item.product_name)}</Text>
               )}
             </View>
+            <Text style={[s.qty, s.colQty]}>{item.qty}</Text>
             <Text style={[s.money, s.colRate]}>{pdfMoney(item.unit_price_paise)}</Text>
             <Text style={[s.money, s.colAmount]}>{pdfMoney(item.line_total_paise)}</Text>
           </View>
         ))}
 
         <View style={s.totalRow}>
-          <Text style={s.colQty} />
           <Text style={s.totalLabel}>Total (incl. GST)</Text>
           <Text style={[s.totalMoney, s.colAmount]}>{pdfMoney(totalPaise)}</Text>
         </View>
