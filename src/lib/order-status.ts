@@ -18,6 +18,10 @@ export function getOrderStatusTag(
   // Approved (Phase 3b): admin-signed-off manual-brand order, salesman
   // read-only — neutral/ink, deliberately NOT the green of Processed.
   if (order.status === "approved") return { tone: "locked", label: "Approved" };
+  // Ready to bill (godown fulfilment): picked + serials captured, awaiting
+  // the accountant's Tally entry. Accent (not green) — still in flight, and
+  // it behaves like approved for the salesman (read-only).
+  if (order.status === "ready_to_bill") return { tone: "accent", label: "Ready to bill" };
 
   const countdown = formatCountdown(order.editable_until, now);
   // Pending approval (Phase 3b): awaiting the admin (amber = "needs an eye").

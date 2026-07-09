@@ -7,6 +7,7 @@ const ROLE_HOME: Record<string, string> = {
   salesman: "/",
   accountant: "/dashboard",
   admin: "/dashboard",
+  godown: "/godown",
 };
 
 export async function updateSession(request: NextRequest) {
@@ -89,9 +90,14 @@ export async function updateSession(request: NextRequest) {
   }
 
   const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isGodownRoute = pathname === "/godown" || pathname.startsWith("/godown/");
   const isSalesmanHomeRoute = pathname === "/";
+  // Godown is confined to /godown (its whole app); everyone else is fenced
+  // OUT of /godown. Salesman/staff fencing is unchanged beyond that.
   const wrongTerritory =
-    (role === "salesman" && isDashboardRoute) || (role !== "salesman" && isSalesmanHomeRoute);
+    (role === "salesman" && (isDashboardRoute || isGodownRoute)) ||
+    (role === "godown" && !isGodownRoute) ||
+    (role !== "salesman" && role !== "godown" && (isSalesmanHomeRoute || isGodownRoute));
 
   if (wrongTerritory) {
     const url = request.nextUrl.clone();

@@ -15,12 +15,13 @@ import { BrandFilter } from "./BrandFilter";
 import type { BrandOption, DashboardOrderRow, SalesmanOption } from "./page";
 import styles from "./OrdersList.module.css";
 
-type StatusFilter = "all" | "submitted" | "pending_approval" | "processed" | "cancelled";
+type StatusFilter = "all" | "submitted" | "pending_approval" | "ready_to_bill" | "processed" | "cancelled";
 
 const STATUS_LABEL: Record<StatusFilter, string> = {
   all: "All",
   submitted: "Submitted",
   pending_approval: "Pending approval",
+  ready_to_bill: "Ready to bill",
   processed: "Processed",
   cancelled: "Cancelled",
 };
@@ -140,6 +141,7 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
     all: scoped.length,
     submitted: scoped.filter((o) => o.status === "submitted").length,
     pending_approval: scoped.filter((o) => o.status === "pending_approval").length,
+    ready_to_bill: scoped.filter((o) => o.status === "ready_to_bill").length,
     processed: scoped.filter((o) => o.status === "processed").length,
     cancelled: scoped.filter((o) => o.status === "cancelled").length,
   };
@@ -182,7 +184,7 @@ export function OrdersList({ initialOrders, salesmen, brands }: OrdersListProps)
 
       <div className={styles.filters}>
         <div className={styles.filterTabs}>
-          {(["all", "submitted", "pending_approval", "processed", "cancelled"] as StatusFilter[]).map((s) => (
+          {(["all", "submitted", "pending_approval", "ready_to_bill", "processed", "cancelled"] as StatusFilter[]).map((s) => (
             <button
               key={s}
               type="button"
