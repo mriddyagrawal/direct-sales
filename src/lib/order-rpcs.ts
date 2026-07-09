@@ -22,15 +22,13 @@ function toItemsPayload(items: Record<string, number>, prices?: Record<string, n
 }
 
 // A network failure (offline, DNS, timeout) throws before the server ever
-// sees the request — retryable. A rejection returned BY the server (window
-// expired, product now unpriced, etc.) is authoritative and must be shown
-// plainly, never silently queued for retry.
+// sees the request — safely retryable by the user (idempotent order ids). A
+// rejection returned BY the server (window expired, product now unpriced,
+// etc.) is authoritative and must be shown plainly.
 //
-// review flag ㉗: this message is deliberately neutral — only submitOrder's
-// caller (NewOrderFlow, create mode) actually queues + auto-retries via
-// lib/pending-orders.ts. update_order_items/cancel_order have no such queue;
-// a caller-specific "will retry automatically" claim belongs in their own UI
-// copy, not baked in here where it would overpromise for edit/cancel.
+// The offline retry QUEUE is gone (owner decision 2026-07-10) — this class
+// now exists purely so callers can show the right words: "you're offline,
+// try again" vs a real rejection. Nothing queues, nothing auto-retries.
 export class OfflineError extends Error {}
 
 interface RpcErrorLike {

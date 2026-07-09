@@ -31,9 +31,10 @@ interface ReviewProps {
   submitError: string | null;
 }
 
-// S5 — editable line list, notes, computed total, submit. Offline/failure:
-// CTA swaps to amber Retry over a "saved on phone" strip (idempotent — see
-// lib/order-rpcs.ts's OfflineError split from a real server rejection).
+// S5 — editable line list, notes, computed total, submit. Any failure
+// (offline included — the queue is gone, owner decision 2026-07-10) shows in
+// the error strip and the salesman simply retries; the idempotent orderId
+// means a retry never creates a duplicate.
 export function Review({
   products,
   prices,
@@ -76,7 +77,6 @@ export function Review({
     .filter((l): l is { productId: string; qty: number; name: string; orderable: boolean } => l !== null);
 
   const total = cartTotalPaise(items, pricesById);
-  const isOffline = submitError === "offline";
 
   return (
     <div className={styles.page}>
@@ -146,26 +146,10 @@ export function Review({
           <span className={styles.totalAmount}>{formatRupees(total)}</span>
         </div>
 
-        {isOffline && (
-          <p className={styles.offlineStrip}>
-            {isEdit
-              ? // review flag ㉗ — edit-mode offline has no persistent retry
-                // queue (only a new order queues); don't claim auto-retry or
-                // "saved" durability it doesn't have. Keep this screen open
-                // and retry, or come back once you have signal.
-                "Not saved yet — you're offline. Keep this screen open and tap Retry once you have signal."
-              : "Saved on phone — not submitted yet. Retrying never creates a duplicate."}
-          </p>
-        )}
-        {submitError && !isOffline && <p className={styles.errorStrip}>{submitError}</p>}
+        {submitError && <p className={styles.errorStrip}>{submitError}</p>}
 
-        <Button
-          variant={isOffline ? "amber" : "primary"}
-          onClick={onSubmit}
-          loading={submitting}
-          disabled={lines.length === 0}
-        >
-          {isOffline ? "Retry" : isEdit ? "Save changes" : "Submit order"}
+        <Button variant="primary" onClick={onSubmit} loading={submitting} disabled={lines.length === 0}>
+          {isEdit ? "Save changes" : "Submit order"}
         </Button>
       </div>
     </div>

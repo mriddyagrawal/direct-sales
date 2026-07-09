@@ -21,8 +21,7 @@ import {
   setLastActiveRetailerId,
   clearLastActiveRetailerId,
 } from "@/lib/cart";
-import { listPending, savePending, removePending } from "@/lib/pending-orders";
-import { submitOrder, updateOrderItems, OfflineError } from "@/lib/order-rpcs";
+import { submitOrder, updateOrderItems } from "@/lib/order-rpcs";
 import type { ProductOption, RetailerOption, EditOrderData } from "./page";
 
 type Step = "retailer" | "order" | "review" | "confirmation";
@@ -46,7 +45,7 @@ interface FlowState {
 type FlowAction =
   | { type: "SELECT_RETAILER"; cart: DraftCart; retailerArea: string | null }
   | { type: "OFFER_RESUME"; draft: DraftCart }
-  | { type: "RESUME_ON_MOUNT"; draft: DraftCart; retailerArea: string | null; offline: boolean }
+  | { type: "RESUME_ON_MOUNT"; draft: DraftCart; retailerArea: string | null }
   | { type: "CONTINUE_RESUME_CANDIDATE" }
   | { type: "START_FRESH_FROM_RESUME"; cart: DraftCart }
   | { type: "DISMISS_RESUME" }
@@ -55,7 +54,6 @@ type FlowAction =
   | { type: "SET_NOTES"; notes: string }
   | { type: "GOTO_STEP"; step: Step }
   | { type: "SUBMIT_START" }
-  | { type: "SUBMIT_OFFLINE" }
   | { type: "SUBMIT_ERROR"; message: string }
   | { type: "SUBMIT_SUCCESS_CREATE"; confirmed: ConfirmedOrder };
 
@@ -71,7 +69,6 @@ function flowReducer(state: FlowState, action: FlowAction): FlowState {
         cart: action.draft,
         retailerArea: action.retailerArea,
         step: "review",
-        submitError: action.offline ? "offline" : state.submitError,
       };
     case "CONTINUE_RESUME_CANDIDATE":
       return state.resumeCandidate
@@ -101,8 +98,6 @@ function flowReducer(state: FlowState, action: FlowAction): FlowState {
       return { ...state, step: action.step };
     case "SUBMIT_START":
       return { ...state, submitting: true, submitError: null };
-    case "SUBMIT_OFFLINE":
-      return { ...state, submitting: false, submitError: "offline" };
     case "SUBMIT_ERROR":
       return { ...state, submitting: false, submitError: action.message };
     case "SUBMIT_SUCCESS_CREATE":
@@ -176,9 +171,8 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
     if (!loaded) return;
     const draft = pruneStaleItems(loaded);
     if (Object.keys(draft.items).length === 0) return;
-    const offline = listPending().some((p) => p.orderId === draft.orderId);
     const retailer = retailers.find((r) => r.id === lastRetailerId);
-    dispatch({ type: "RESUME_ON_MOUNT", draft, retailerArea: retailer?.area ?? null, offline });
+    dispatch({ type: "RESUME_ON_MOUNT", draft, retailerArea: retailer?.area ?? null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -221,7 +215,6 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         ? await updateOrderItems(cart.orderId, cart.notes, cart.items, undefined, cart.prices)
         : await submitOrder(cart.orderId, cart.retailerId, cart.notes, cart.items, cart.prices);
 
-      removePending(cart.orderId);
       if (!isEdit) {
         clearDraft(cart.retailerId);
         clearLastActiveRetailerId();
@@ -233,24 +226,11 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         router.push(`/orders/${cart.orderId}`);
       }
     } catch (error) {
-      if (error instanceof OfflineError) {
-        if (!isEdit) {
-          savePending({
-            orderId: cart.orderId,
-            retailerId: cart.retailerId,
-            retailerName: cart.retailerName,
-            notes: cart.notes,
-            items: cart.items,
-            prices: cart.prices,
-            itemCount: Object.keys(cart.items).length,
-            totalPaise: cartTotalPaise(cart.items, { ...pricesById, ...(cart.prices ?? {}) }),
-            savedAt: nowMs(),
-          });
-        }
-        dispatch({ type: "SUBMIT_OFFLINE" });
-      } else {
-        dispatch({ type: "SUBMIT_ERROR", message: error instanceof Error ? error.message : "Something went wrong." });
-      }
+      // Offline queue removed (owner decision 2026-07-10): a transport failure
+      // surfaces OfflineError's own "You're offline…" message through the same
+      // strip as any rejection — the salesman retries when he has signal (the
+      // idempotent orderId means a retry never duplicates), or writes it down.
+      dispatch({ type: "SUBMIT_ERROR", message: error instanceof Error ? error.message : "Something went wrong." });
     }
   }
 

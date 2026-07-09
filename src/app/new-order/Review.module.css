@@ -149,16 +149,6 @@
   color: var(--color-ink);
 }
 
-.offlineStrip {
-  border: 1px solid var(--color-amber);
-  border-left: 3px solid var(--color-amber);
-  border-radius: var(--radius);
-  padding: 10px 12px;
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-amber);
-}
-
 .errorStrip {
   border: 1px solid var(--color-error);
   border-left: 3px solid var(--color-error);
