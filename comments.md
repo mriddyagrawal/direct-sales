@@ -3438,3 +3438,120 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** `main` is now fully reviewed through c3d7653. (A `godown-scanner-improvements` prompt is staged in the tree — torch/format-hints/scan-region crop for the pick screen — so a follow-up scanner branch is expected next.)
 
 ---
+
+## Review of 800b6a1 — fix(pwa): exclude sw.js + manifest.webmanifest from the auth proxy matcher
+
+**Verdict:** ✅ accept — correct, narrowly-scoped fix: the two public PWA metadata paths now bypass the auth proxy (which was 307-ing them to /login and killing the install prompt). Regex verified to exclude *only* those two paths — no auth-bypass surface introduced.
+
+**Phase / commit goal (as I understood it):** Chrome's installability checker fetches `/manifest.webmanifest` and `/sw.js` **without** session cookies; the auth proxy redirected both to `/login`, so no install prompt. Add both to the matcher's exclusion list.
+
+**What works (verified):**
+- **Regex excludes exactly the right paths** — tested the new matcher in node: `/sw.js` and `/manifest.webmanifest` → **not** matched (proxy skipped); `/dashboard`, `/godown/abc`, `/login`, `/api/x` → still matched (proxy runs); crucially `/manifest.webmanifest/evil` → **still matched** (the alternatives aren't anchored to swallow sub-paths, so no protected route can be smuggled past auth by suffixing). No auth bypass.
+- **Nothing sensitive exposed** — both are public metadata: the manifest is app branding; `sw.js` is the network-passthrough script reviewed in c3d7653 (no secrets, no data). They never needed the session.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** Authorization ✓ — exclusion is limited to two static public assets; every real route (and any `/manifest.webmanifest/*` sub-path) still passes through the auth proxy. No RLS/data/money surface.
+
+**What I tried:** `git show 800b6a1`; ran the exact matcher regex against 7 paths in node (excludes only sw.js/manifest, sub-paths still gated); confirmed `src/proxy.ts` is the middleware entry (build shows "ƒ Proxy (Middleware)").
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Maskable icon padding (ffcc480) → below.
+
+---
+
+## Review of ffcc480 — fix(pwa): more safe-zone padding in the maskable icon (glyph 80% → 58%)
+
+**Verdict:** ✅ accept — icon-only regen; the new maskable icon is the right size and genuinely opaque, fixing both the congested-in-circle look and the transparent-centre-renders-black risk.
+
+**Phase / commit goal (as I understood it):** Regenerate `icon-maskable-512.png` with the glyph at ~58% (inside Android's circle safe zone) on an opaque white ground.
+
+**What works (verified):**
+- **Dimensions correct** — `sips`: **512×512**, matching the manifest's maskable entry.
+- **Genuinely opaque** — PIL alpha extrema: **min 255 / max 255**, i.e. every pixel fully opaque. So even though the PNG carries an alpha channel (`hasAlpha: yes`), there are **no** transparent pixels — the "transparent centre renders black on some launchers" failure the commit targets is actually resolved, not just claimed.
+
+**Blocking issues:** None. **Non-blocking:** None material. (The retained-but-unused alpha channel is harmless; a truly channel-less PNG would be marginally smaller — not worth a re-encode.)
+
+**Domain / correctness checks:** N/A — static asset; no data/logic surface. Only the `maskable` manifest entry consumes it.
+
+**What I tried:** `git show ffcc480 --stat` (binary, 34200→24995 bytes); `sips` dims + `hasAlpha`; PIL alpha extrema to confirm full opacity. (Actual in-circle appearance is a device/DevTools check.)
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried as above.
+
+**Next-commit suggestion:** The scanner targeting rewrite (5dbfbaa) → below.
+
+---
+
+## Review of 5dbfbaa — feat(godown): scanner targeting — reticle-crop decode loop, torch, format hints, serial filter
+
+**Verdict:** ✅ accept — a well-engineered scanner rewrite that fixes the "grabs the wrong barcode" problem with **three independent targeting layers**, keeps the camera lifecycle leak-free, and keeps ZXing out of every non-godown bundle. No backend/RPC/RLS change. One trivial doc-drift note.
+
+**Phase / commit goal (as I understood it):** Replace ZXing's whole-frame `decodeFromVideoDevice` (which locked onto the EAN-13/QR) with an owned stream + throttled reticle-crop decode loop, format hints, a serial content-filter, and torch — so only the LG serial barcode inside the on-screen window is read.
+
+**What works (verified):**
+- **Three targeting layers, all present:** (1) **format hints** restrict the decoder to `CODE_128/39/93` (EAN-13 + QR never attempted); (2) **reticle-crop** — each tick draws only the centered 90%×28% window (mapped through the `object-fit: cover` math into intrinsic pixels) onto a reused offscreen canvas and decodes *that* — a QR above or EAN beside the window is never in the canvas (WYSIWYG); (3) **content-filter** — a decode not matching `\d{3}[A-Z]{4}\d{6}` is **silently ignored** (`extractSerial(raw).parsed === false → return`), no fix-it card.
+- **`PendingConfirm` deleted from the scan path** — the "doesn't look like an LG serial" card is gone; the only manual path is the deliberate per-line "Or type a serial…" field (unchanged). handleDecode keeps the 2.5s identical-read suppressor, qty cap, and within-order de-dup.
+- **`decodeFromCanvas` is real** — confirmed present in the installed `@zxing/browser@0.2.1` (BrowserCodeReader base), not merely type-satisfied.
+- **Torch ON by default, capability-gated** — `getCapabilities().torch` → `applyConstraints({advanced:[{torch:true}]})`, on-screen toggle, iOS/torchless degrade silently. Cleanup turns **torch off before stopping tracks** (some devices leave the LED lit).
+- **Leak-free lifecycle** — one reused canvas + one reader; `clearInterval` + torch-off + `stream.getTracks().stop()` on unmount; the getUserMedia **warm-up race** handled (`cancelled` → stop the just-resolved stream and return). With `decodeFromCanvas` (one-shot) the reader holds no stream/timer, so no `reset()` needed.
+- **Performance shape per spec** — throttled `setInterval` (not per-rAF), native-resolution capture but **decode only the crop**, downscaled to ≤1400px on high-res sensors, `willReadFrequently` on the 2D context.
+- **Bundle split holds** — ZXing is dynamic-imported in Scanner **and** preloaded on `/godown` mount (`PreloadScanner`, same specifiers → same async chunks). Verified: `rootMainFiles` (loaded on every route) contains **no** ZXing; it lives only in dedicated `node_modules_@zxing_*` async chunks. Never in the salesman/accountant/admin initial bundles.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+- **Doc drift** — the Scanner header comment still says "throttled ~9 Hz decode loop"; the `DECODE_MS` constant is 110 here but is lowered to 50 (~20 Hz) in the very next commit (18a47f7), leaving the prose stale. Cosmetic; update the comment when the file is next touched.
+
+**Domain / correctness checks:** No backend/RPC/RLS/state/money change (scanner component + CSS only, as the guardrail requires); `submit_pick`/serials/state machine untouched (still server-authoritative). Resource safety ✓ (camera+torch+loop all stopped on unmount/complete). Secure-context + permission-denied fallbacks preserved.
+
+**What I tried:** Read the full `Scanner.tsx`, `PreloadScanner.tsx`, and the `PickScreen.tsx` diff (PendingConfirm removed, content-filter moved into handleDecode); confirmed `decodeFromCanvas` in `node_modules/@zxing/browser`; traced the object-fit:cover→reticle crop math and the cleanup/warm-up-race; verified the dynamic-import split against `rootMainFiles`; `tsc`/`eslint`/`build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag (doc-drift noted inline, cosmetic). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** The decode-rate tune (18a47f7) → below.
+
+---
+
+## Review of 18a47f7 — tune(godown): scanner decode loop 9 Hz → 20 Hz (DECODE_MS 110→50)
+
+**Verdict:** ✅ accept — a one-constant owner-tuned change (snappier lock-on), safe because the reticle crop — not the decode rate — bounds the per-tick work.
+
+**Phase / commit goal (as I understood it):** After device testing, halve the decode interval (110ms→50ms, ~9→20 Hz) for faster barcode lock-on.
+
+**What works (verified):**
+- **One-line constant change** — `DECODE_MS 110 → 50`; the loop still decodes only the ≤1400px reticle crop, so each tick is the same cheap work at ~2× frequency. Trivially reversible if an older phone runs warm (the commit says as much). No structural change.
+
+**Blocking issues:** None. **Non-blocking:** carries forward the stale "~9 Hz" header comment noted in 5dbfbaa — this commit is what makes it ~20 Hz.
+
+**Domain / correctness checks:** N/A — a throttle constant; no data/logic/lifecycle change.
+
+**What I tried:** `git show 18a47f7` (1 line); confirmed the crop/downscale bound is unchanged so 20 Hz stays cheap; `build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried as above.
+
+**Next-commit suggestion:** The Quick Order polish (36cd303) → below.
+
+---
+
+## Review of 36cd303 — polish(new-order): bigger Quick Order type + fix price-input clip; scanner continuous autofocus
+
+**Verdict:** ✅ accept — presentational type/legibility tweaks + a real clip fix, plus a capability-gated continuous-autofocus on the scanner. Low risk, build clean.
+
+**Phase / commit goal (as I understood it):** Bump Quick Order type sizes for legibility, widen the unit-price input so "Unit price" stops clipping to "Unit pri", enlarge the FlowHeader title, and add continuous autofocus to the scanner.
+
+**What works (verified):**
+- **Quick Order CSS** — brand header 13→15px (+ sticky offset var 34→36px kept in sync), product name 13→15px, price line 12→13px, row min-height 48→52px. The clip fix is real: `.priceInput` width **68→80px** with font **15→13px** — a wider box + smaller figures fits the "Unit price" placeholder. FlowHeader `.title` → 18px. All CSS-module scoped; no logic.
+- **Continuous autofocus (Scanner)** — `getCapabilities().focusMode?.includes("continuous")` → `applyConstraints({advanced:[{focusMode:"continuous"}]})`, **capability-gated exactly like torch**, silent skip + keep default focus when unsupported (no crash). Cuts focus-lock lag.
+
+**Blocking issues:** None. **Non-blocking:** None.
+
+**Domain / correctness checks:** No data/RLS/money/state surface — CSS + a capability-gated MediaTrack constraint. Autofocus failure is caught and ignored (fail-safe).
+
+**What I tried:** `git show 36cd303` (QuickOrder/FlowHeader CSS + the Scanner focusMode block); confirmed the focusMode path is capability-gated + try/caught like torch; `tsc`/`eslint`/`build` clean.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** `main` is fully reviewed through 36cd303. Remaining confidence step is the owner's **device retest on the deployed HTTPS URL** (torch on, EAN/QR ignored, out-of-reticle codes not read) — the camera path is the one thing not verifiable from here.
+
+---
