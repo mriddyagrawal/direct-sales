@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { formatFullTimestamp, formatRupees } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
+import { ShareOrderButton } from "@/components/ShareOrderButton";
+import { buildOrderShareText } from "@/lib/order-share";
 import styles from "./PickSlip.module.css";
 
 interface PickSlipItem {
@@ -43,6 +45,21 @@ export function PickSlip({
   const [pricesOn, setPricesOn] = useState(false);
   const [printedAt] = useState(nowMs);
 
+  // Share exactly what's on screen — prices-off = PICK SLIP, prices-on = ORDER COPY.
+  const shareText = buildOrderShareText({
+    orderRef,
+    brandName,
+    submittedAt,
+    retailerName,
+    retailerArea,
+    retailerPhone,
+    salesmanName,
+    items,
+    totalPaise,
+    notes,
+    withPrices: pricesOn,
+  });
+
   return (
     <div className={styles.page}>
       <div className={styles.chrome}>
@@ -69,6 +86,7 @@ export function PickSlip({
           <button type="button" className={styles.printButton} onClick={() => window.print()}>
             Print
           </button>
+          <ShareOrderButton title={orderRef} text={shareText} className={styles.printButton} />
         </div>
       </div>
 
