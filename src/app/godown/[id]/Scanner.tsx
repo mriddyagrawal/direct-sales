@@ -31,7 +31,7 @@ type TorchConstraintSet = MediaTrackConstraintSet & { torch?: boolean };
 // on unmount (including the getUserMedia warm-up race).
 const RETICLE_W = 0.9; // fraction of the visible video, matches the CSS overlay
 const RETICLE_H = 0.28;
-const DECODE_MS = 110; // ~9 decodes/sec — the throttle is what keeps this light
+const DECODE_MS = 50; // ~20 decodes/sec (owner call: snappier lock-on; the crop keeps each tick cheap)
 const MAX_DECODE_W = 1400; // downscale very high-res crops for cheap decodes
 
 export function Scanner({ onDecode }: ScannerProps) {
