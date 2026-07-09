@@ -1,5 +1,7 @@
 # Spec — Salesman App (mobile-first)
 
+> **2026-07-10:** the Home list, order detail, and bottom nav described below were revamped — see [orders-ui.md](orders-ui.md) (shared OrdersView/OrderDetailView, Orders·Deposits bar, New Order FAB). This doc remains authoritative for the order-taking flow (S3-S6) only.
+
 The salesman's entire job in the app: pick the shop, punch quantities, submit, and fix mistakes within the window. Success metric: a 5–8 line order in **under 90 seconds**, one-handed, on a mid-range Android over spotty 4G. The notebook is the competitor.
 
 ## Flow

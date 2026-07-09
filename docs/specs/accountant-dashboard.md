@@ -1,5 +1,7 @@
 # Spec — Accountant Dashboard (desktop-first)
 
+> **2026-07-10:** the Orders list (S8) and workbench (S9) UI described below were revamped — see [orders-ui.md](orders-ui.md) (shared components, card list, primary-action-by-status, brand-shaped items table). Behavioural rules here still apply unless orders-ui.md says otherwise.
+
 The accountant's command center: see orders the moment they land, lock them before booking into Tally, correct them with a trace, and hand the godown a legible pick slip. Desktop Chrome, keyboard-friendly, information-dense.
 
 ## Screens
