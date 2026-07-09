@@ -7,34 +7,29 @@ interface OrderForStatus {
 }
 
 // Chip = status (design spec §2): the derived lock governs edit *permission*
-// elsewhere, never which chip renders. A processed/cancelled order always
-// shows its own chip regardless of the window.
+// elsewhere, never which chip renders. A billed/cancelled order always shows
+// its own chip regardless of the window. There is no 'submitted' anymore —
+// every order is born pending_approval (lifecycle overhaul, 2026-07-10).
 export function getOrderStatusTag(
   order: OrderForStatus,
   now: Date = new Date(),
 ): { tone: StatusTone; label: string } {
   if (order.status === "cancelled") return { tone: "error", label: "Cancelled" };
-  if (order.status === "processed") return { tone: "processed", label: "Billed" };
-  // Approved (Phase 3b): admin-signed-off manual-brand order, salesman
-  // read-only — neutral/ink, deliberately NOT the green of Processed.
+  if (order.status === "billed") return { tone: "billed", label: "Billed" };
+  // Approved: admin-signed-off scan-brand (LG) order awaiting the godown —
+  // neutral/ink, deliberately NOT the green of Billed.
   if (order.status === "approved") return { tone: "locked", label: "Approved" };
-  // Ready to bill (godown fulfilment): picked + serials captured, awaiting
-  // the accountant's Tally entry. Accent (not green) — still in flight, and
-  // it behaves like approved for the salesman (read-only).
+  // Ready to bill: a fixed brand straight from approval, or LG post-pick —
+  // awaiting the accountant's Tally entry. Accent (not green), still in flight.
   if (order.status === "ready_to_bill") return { tone: "accent", label: "Ready to bill" };
 
-  const countdown = formatCountdown(order.editable_until, now);
-  // Pending approval (Phase 3b): awaiting the admin (amber = "needs an eye").
-  // The salesman can still edit within the window (approval beats the timer),
+  // Pending approval — awaiting the admin (amber = "needs an eye"). The
+  // salesman can still edit within the window (approval beats the timer),
   // but the chip is status, never edit-permission.
   if (order.status === "pending_approval") {
+    const countdown = formatCountdown(order.editable_until, now);
     return { tone: "amber", label: countdown ? `Pending approval · ${countdown.label}` : "Pending approval" };
   }
-  if (countdown) {
-    return {
-      tone: countdown.urgent ? "amber" : "accent",
-      label: `Submitted · ${countdown.label}`,
-    };
-  }
-  return { tone: "locked", label: "Submitted · locked" };
+  // Unknown/legacy status — render it plainly rather than guessing.
+  return { tone: "locked", label: order.status };
 }

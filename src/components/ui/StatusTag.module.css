@@ -39,10 +39,10 @@
   background: var(--color-locked);
 }
 
-.processed {
+.billed {
   color: var(--color-processed);
 }
-.processed .square {
+.billed .square {
   background: var(--color-processed);
 }
 

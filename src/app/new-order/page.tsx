@@ -129,7 +129,7 @@ export default async function NewOrderPage({
       .maybeSingle();
 
     const row = data as unknown as EditOrderRow | null;
-    const editable = row && row.status === "submitted" && new Date(row.editable_until) > new Date();
+    const editable = row && row.status === "pending_approval" && new Date(row.editable_until) > new Date();
     if (!row || !editable) {
       redirect(`/orders/${edit}`);
     }
