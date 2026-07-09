@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FilterDropdown } from "./FilterDropdown";
-import type { SalesmanOption } from "./page";
+import type { SalesmanOption } from "./OrdersView";
 import styles from "./SalesmanFilter.module.css";
 
 interface SalesmanFilterProps {

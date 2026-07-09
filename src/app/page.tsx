@@ -1,22 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
-import { OrderCard } from "@/components/OrderCard";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { SignOutButton } from "@/components/SignOutButton";
-import { formatSectionLabel } from "@/lib/format";
-import { getOrderStatusTag } from "@/lib/order-status";
+import { OrdersView, type OrderListRow, type BrandOption } from "@/components/orders/OrdersView";
 import styles from "./page.module.css";
 
-interface OrderRow {
-  id: string;
-  order_ref: string;
-  submitted_at: string;
-  total_paise: number;
-  status: string;
-  editable_until: string;
-  retailers: { name: string } | null;
-  order_items: { count: number }[];
-}
-
+// Salesman home — the same shared OrdersView the staff dashboard renders
+// (unification, 2026-07-10), wrapped in the phone shell (bottom tab bar +
+// account strip). Same select as the dashboard; RLS scopes it to his own
+// orders. He gains status tabs, search, date-range, and Realtime for free.
+//
+// D8 (decisions.md): a *self*-cancelled order is hidden — it almost always
+// corrects a mistake and should read as "never happened." An office-cancelled
+// order stays visible (real news, not noise). `status.neq.cancelled` alone
+// covers every non-cancelled order; the second clause only decides which
+// *cancelled* orders survive. OrdersView applies the same rule to Realtime
+// events so a self-cancel can't sneak back in live.
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -29,61 +27,31 @@ export default async function Home() {
     .eq("id", user!.id)
     .maybeSingle();
 
-  // No .eq('salesman_id', ...) here on purpose — the orders_select_own RLS
-  // policy already scopes this to the caller's own rows. Same query shape
-  // as the accountant/admin dashboard; RLS is what makes the two return
-  // different rows, not client-side filtering.
-  //
-  // D8 (decisions.md): a *self*-cancelled order is hidden from this list —
-  // it almost always corrects a mistake and should read as "never
-  // happened." An office-cancelled order (cancelled_by is the accountant/
-  // admin, not this salesman) stays visible — that's real news, not noise.
-  // `status.neq.cancelled` alone already covers every non-cancelled order
-  // regardless of cancelled_by; the second clause only decides which
-  // *cancelled* orders survive.
-  const { data } = await supabase
-    .from("orders")
-    .select("id, order_ref, submitted_at, total_paise, status, editable_until, retailers(name), order_items(count)")
-    .or(`status.neq.cancelled,cancelled_by.neq.${user!.id}`)
-    .order("submitted_at", { ascending: false });
-
-  const orders = (data ?? []) as unknown as OrderRow[];
-  const now = new Date();
+  // brands feed the card/table brand label only — the BRAND filter itself is
+  // staff-gated inside OrdersView.
+  const [{ data: orderRows }, { data: brandRows }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select(
+        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)",
+      )
+      .or(`status.neq.cancelled,cancelled_by.neq.${user!.id}`)
+      .order("submitted_at", { ascending: false })
+      .limit(300),
+    supabase.from("brands").select("id, name").eq("active", true).order("name"),
+  ]);
 
   return (
     <div className={styles.page}>
-      {orders.length === 0 ? (
-        <div className={styles.empty}>
-          <p className={styles.emptyText}>
-            No orders yet — take your first order — tap New Order below
-          </p>
-        </div>
-      ) : (
-        <div className={styles.content}>
-          {orders.map((order, index) => {
-            const label = formatSectionLabel(order.submitted_at, now);
-            const previousLabel =
-              index > 0 ? formatSectionLabel(orders[index - 1].submitted_at, now) : null;
-            const showLabel = label !== previousLabel;
-            const status = getOrderStatusTag(order, now);
-
-            return (
-              <div key={order.id}>
-                {showLabel && <p className={styles.sectionLabel}>{label}</p>}
-                <OrderCard
-                  id={order.id}
-                  orderRef={order.order_ref}
-                  totalPaise={order.total_paise}
-                  retailerName={order.retailers?.name ?? "Unknown retailer"}
-                  itemCount={order.order_items?.[0]?.count ?? 0}
-                  statusTone={status.tone}
-                  statusLabel={status.label}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className={styles.content}>
+        <OrdersView
+          initialOrders={(orderRows ?? []) as unknown as OrderListRow[]}
+          salesmen={[]}
+          brands={(brandRows ?? []) as BrandOption[]}
+          role="salesman"
+          currentUserId={user!.id}
+        />
+      </div>
 
       <div className={styles.account}>
         Signed in as {profile?.full_name ?? user?.email} · <SignOutButton />

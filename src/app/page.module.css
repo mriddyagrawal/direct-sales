@@ -8,42 +8,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sectionLabel {
-  font-family: var(--font-figures);
-  font-size: var(--text-section-label-size);
-  letter-spacing: var(--text-section-label-tracking);
-  text-transform: uppercase;
-  color: var(--color-locked);
-  margin-top: 16px;
-}
-
-.sectionLabel:first-child {
-  margin-top: 0;
-}
-
-.empty {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-align: center;
-  padding: 24px;
-}
-
-.emptyText {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  color: var(--color-locked);
-  max-width: 260px;
+  /* No padding here — the shared OrdersView brings its own 16px inset. */
 }
 
 .account {

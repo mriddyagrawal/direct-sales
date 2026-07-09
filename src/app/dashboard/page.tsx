@@ -1,36 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
-import { OrdersList } from "./OrdersList";
+import {
+  OrdersView,
+  type OrderListRow,
+  type SalesmanOption,
+  type BrandOption,
+} from "@/components/orders/OrdersView";
 
-export interface DashboardOrderRow {
-  id: string;
-  order_ref: string;
-  submitted_at: string;
-  total_paise: number;
-  status: string;
-  editable_until: string;
-  cancelled_by: string | null;
-  salesman_id: string;
-  brand_id: string;
-  retailers: { name: string; verified: boolean } | null;
-  profiles: { full_name: string } | null;
-  brands: { name: string; code: string } | null;
-}
-
-export interface SalesmanOption {
-  id: string;
-  full_name: string;
-}
-
-export interface BrandOption {
-  id: string;
-  name: string;
-}
-
-// S8 — orders list. No role/ownership filter on purpose: orders_select_staff
-// (RLS) is what makes accountant/admin see every order; the client never
-// re-derives the scope RLS already enforces.
+// Staff lens on the shared OrdersView (unification, 2026-07-10). No role/
+// ownership filter on purpose: orders_select_staff (RLS) is what makes
+// accountant/admin see every order; the client never re-derives the scope
+// RLS already enforces.
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const [{ data: orderRows }, { data: salesmenRows }, { data: brandRows }] = await Promise.all([
     supabase
@@ -44,9 +28,13 @@ export default async function DashboardPage() {
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
   ]);
 
-  const orders = (orderRows ?? []) as unknown as DashboardOrderRow[];
-  const salesmen = (salesmenRows ?? []) as SalesmanOption[];
-  const brands = (brandRows ?? []) as BrandOption[];
-
-  return <OrdersList initialOrders={orders} salesmen={salesmen} brands={brands} />;
+  return (
+    <OrdersView
+      initialOrders={(orderRows ?? []) as unknown as OrderListRow[]}
+      salesmen={(salesmenRows ?? []) as SalesmanOption[]}
+      brands={(brandRows ?? []) as BrandOption[]}
+      role="staff"
+      currentUserId={user!.id}
+    />
+  );
 }
