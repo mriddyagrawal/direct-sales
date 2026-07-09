@@ -274,23 +274,6 @@
   }
 }
 
-/* Godown hand-off — the scanned serial list the accountant reads into Tally. */
-.serialsBox {
-  margin-top: 16px;
-  padding: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-top: 2px solid var(--color-ink);
-  border-radius: var(--radius);
-}
-
-.serialsHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .copySerials {
   background: none;
   border: none;
@@ -301,31 +284,6 @@
   letter-spacing: 0.05em;
   color: var(--color-accent);
   cursor: pointer;
-}
-
-.serialGroup {
-  margin-top: 10px;
-}
-
-.serialGroupName {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.serialCount {
-  font-family: var(--font-figures);
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--color-locked);
-}
-
-.serialItem {
-  font-family: var(--font-figures);
-  font-size: 13px;
-  color: var(--color-ink);
-  padding: 2px 0 2px 12px;
 }
 
 /* Salesman guidance notes — what the status means for him (ported from the
@@ -412,4 +370,64 @@
 /* Cancel sits red at the FAR END of the secondaries row (spec §3). */
 .cancelAction {
   margin-left: auto;
+}
+
+/* Spec §3 ITEMS — brand shape. */
+.itemsHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.copySerials {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-family: var(--font-figures);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* Model eyebrow above the display name — mono grey, the scan/Tally handle. */
+.modelEyebrow {
+  display: block;
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+  margin-bottom: 1px;
+}
+
+/* Serials nested under their line: indented mono; the pre-pick placeholder
+   is italic ("captured at picking, after approval" — teaches the sequence). */
+.serialSubRow td {
+  padding: 0 0 8px 14px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.serialLine {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.serialPlaceholder {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+/* Fixed brands: the names-only footnote — the table SHAPE signals the brand
+   type, no badge. */
+.namesOnlyNote {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+  padding: 8px 0 0;
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2, Stamp, Pencil, X } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Copy, Pencil, Stamp, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -37,6 +37,7 @@ interface OrderItemRow {
   qty: number;
   line_total_paise: number;
   position: number;
+  products: { tally_name: string } | null;
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
 
@@ -69,6 +70,7 @@ export interface OrderDetailData {
   retailerPhone: string | null;
   retailerVerified: boolean;
   brandName: string | null;
+  showModel: boolean;
   approvedAt: string | null;
   approvedByName: string | null;
   pickedAt: string | null;
@@ -132,13 +134,30 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   }, [initialItems]);
   const catalogById = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
 
+  // Model + serials per original line (spec §3 ITEMS): the model is the
+  // CURRENT product's tally_name (display-only); serials in scan order.
+  // A line newly added in edit mode has neither yet.
+  const lineExtraByProduct = useMemo(() => {
+    const map = new Map<string, { model: string | null; serials: string[] }>();
+    for (const it of initialItems) {
+      map.set(it.product_id, {
+        model: it.products?.tally_name ?? null,
+        serials: [...it.order_item_scans]
+          .sort((a, b) => a.scanned_at.localeCompare(b.scanned_at))
+          .map((s) => s.serial),
+      });
+    }
+    return map;
+  }, [initialItems]);
+
   const lines = Object.entries(items)
     .map(([productId, qty]) => {
       const snap = snapshotById[productId];
       const product = catalogById.get(productId);
       const name = snap?.name ?? product?.name ?? "Unknown product";
       const rate = snap?.price ?? product?.price_paise ?? 0;
-      return { productId, qty, name, rate };
+      const extra = lineExtraByProduct.get(productId);
+      return { productId, qty, name, rate, model: extra?.model ?? null, serials: extra?.serials ?? [] };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -169,10 +188,13 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         })),
     [initialItems],
   );
-  // Serials are the godown→accountant hand-off — staff-only (owner decision;
-  // the salesman's RLS returns no scan rows anyway, this just skips the shell).
-  const showSerials =
-    isStaff && (order.status === "ready_to_bill" || order.status === "billed") && serialGroups.length > 0;
+  // Serials are the godown→accountant hand-off — STAFF-only (owner decision;
+  // the salesman's RLS returns no scan rows anyway). On a show_model brand the
+  // serial rows nest under each line (spec §3); before the pick they read the
+  // teaching placeholder instead ("models at order time; serials after").
+  const showSerialRows = isStaff && order.showModel && mode === "view";
+  const serialsPending = order.status === "pending_approval" || order.status === "approved";
+  const hasAnySerials = serialGroups.length > 0;
 
   async function handleCopySerials() {
     const text = serialGroups.map((g) => `${g.name}\n${g.serials.join("\n")}`).join("\n\n");
@@ -427,7 +449,15 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
       <div className={styles.body}>
         <div className={styles.main}>
-          <p className={styles.sectionLabel}>ITEM · SNAPSHOT AT SUBMIT</p>
+          <div className={styles.itemsHead}>
+            <p className={styles.sectionLabel}>ITEM · SNAPSHOT AT SUBMIT</p>
+            {showSerialRows && hasAnySerials && (
+              <button type="button" className={styles.copySerials} onClick={handleCopySerials}>
+                <Glyph icon={Copy} size={14} />
+                {copied ? "Copied ✓" : "Copy serials"}
+              </button>
+            )}
+          </div>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -440,30 +470,54 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             </thead>
             <tbody>
               {lines.map((line) => (
-                <tr key={line.productId}>
-                  <td>{line.name}</td>
-                  <td className={`${styles.mono} ${styles.numeric}`}>
-                    {mode === "edit" ? (
-                      <Stepper
-                        qty={line.qty}
-                        max={UI_QTY_CAP}
-                        onChange={(next) => handleQtyChange(line.productId, next)}
-                        onTapQuantity={() => {}}
-                      />
-                    ) : (
-                      line.qty
-                    )}
-                  </td>
-                  <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(line.rate)}</td>
-                  <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(line.rate * line.qty)}</td>
-                  {mode === "edit" && (
+                <Fragment key={line.productId}>
+                  <tr>
                     <td>
-                      <button type="button" className={styles.remove} onClick={() => handleQtyChange(line.productId, 0)}>
-                        ✕
-                      </button>
+                      {/* Model eyebrow (spec §3): show_model brands lead each
+                          line with the mono model; both roles see it. */}
+                      {order.showModel && line.model && line.model !== line.name && (
+                        <span className={styles.modelEyebrow}>{line.model}</span>
+                      )}
+                      {line.name}
                     </td>
+                    <td className={`${styles.mono} ${styles.numeric}`}>
+                      {mode === "edit" ? (
+                        <Stepper
+                          qty={line.qty}
+                          max={UI_QTY_CAP}
+                          onChange={(next) => handleQtyChange(line.productId, next)}
+                          onTapQuantity={() => {}}
+                        />
+                      ) : (
+                        line.qty
+                      )}
+                    </td>
+                    <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(line.rate)}</td>
+                    <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(line.rate * line.qty)}</td>
+                    {mode === "edit" && (
+                      <td>
+                        <button type="button" className={styles.remove} onClick={() => handleQtyChange(line.productId, 0)}>
+                          ✕
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                  {/* Serials nest under their line (staff, show_model brands):
+                      real serials once picked, the teaching placeholder before. */}
+                  {showSerialRows && (line.serials.length > 0 || serialsPending) && (
+                    <tr className={styles.serialSubRow}>
+                      <td colSpan={4}>
+                        {line.serials.length > 0 ? (
+                          <span className={styles.serialLine}>
+                            {line.serials.length === 1 ? "SERIAL" : "SERIALS"} {line.serials.join(" / ")}
+                          </span>
+                        ) : (
+                          <em className={styles.serialPlaceholder}>captured at picking, after approval</em>
+                        )}
+                      </td>
+                    </tr>
                   )}
-                </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -489,35 +543,17 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             </div>
           )}
 
+          {!order.showModel && (
+            <p className={styles.namesOnlyNote}>
+              No model / serial tracking — {order.brandName ?? "these"} products carry names only.
+            </p>
+          )}
+
           <div className={styles.totalRow}>
             <span>{lines.length} LINES</span>
             <span className={styles.mono}>Total (incl. GST) {formatRupees(total)}</span>
           </div>
 
-          {/* Godown hand-off: the scanned serials the accountant types into
-              Tally (batch/lot field). Copy-all because they're re-keying. */}
-          {showSerials && (
-            <div className={styles.serialsBox}>
-              <div className={styles.serialsHead}>
-                <p className={styles.sectionLabel}>SERIALS / TRACKING</p>
-                <button type="button" className={styles.copySerials} onClick={handleCopySerials}>
-                  {copied ? "Copied ✓" : "Copy all"}
-                </button>
-              </div>
-              {serialGroups.map((group) => (
-                <div key={group.id} className={styles.serialGroup}>
-                  <p className={styles.serialGroupName}>
-                    {group.name} <span className={styles.serialCount}>×{group.serials.length}</span>
-                  </p>
-                  {group.serials.map((serial) => (
-                    <p key={serial} className={styles.serialItem}>
-                      {serial}
-                    </p>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
 
           {mode === "edit" && requiresReason && (
             <div className={styles.reasonField}>
