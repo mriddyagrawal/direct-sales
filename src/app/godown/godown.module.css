@@ -1,0 +1,117 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 24px;
+  background: var(--color-paper);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 0 -16px;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.brand {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-ink);
+}
+
+.account {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.queueHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 16px 0 10px;
+}
+
+.title {
+  font-family: var(--font-structure);
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
+  color: var(--color-ink);
+}
+
+.count {
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-locked);
+}
+
+.empty {
+  padding: 40px 0;
+  text-align: center;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Queue card — ref + line count + retailer + time. No money anywhere. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: var(--touch-target-min);
+  padding: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+}
+
+.card:active {
+  border-color: var(--color-accent);
+}
+
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ref {
+  font-family: var(--font-figures);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.items {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.retailer {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.time {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+}
