@@ -9,16 +9,25 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#F2F3F5",
     theme_color: "#14181F",
+    // Plain static public/ icons at the standard sizes — Google's WebAPK
+    // minter reliably fetches these (the previous 1000/1250 oddballs via the
+    // app-icon convention were part of why installs fell back to a shortcut).
     icons: [
       {
-        src: "/icon.png",
-        sizes: "1000x1000",
+        src: "/icon-192.png",
+        sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-maskable.png",
-        sizes: "1250x1250",
+        src: "/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-maskable-512.png",
+        sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
       },
