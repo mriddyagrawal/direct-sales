@@ -12,6 +12,7 @@ interface PickSlipItem {
   qty: number;
   unit_price_paise: number;
   line_total_paise: number;
+  tally_name: string | null;
 }
 
 interface PickSlipProps {
@@ -24,12 +25,13 @@ interface PickSlipProps {
   retailerPhone: string | null;
   salesmanName: string;
   brandName: string | null;
+  showModel: boolean;
   items: PickSlipItem[];
 }
 
-// S10 — the godown handoff. Print-CSS, no PDF library. Prices off by
-// default (qty is what the godown reads); toggling them on relabels the
-// sheet ORDER COPY so it can't be misfiled as a price list.
+// S10 — the order-copy sheet (accountant/admin). Always shows prices
+// (owner decision — the godown reads qty in the /godown pick flow, not this
+// sheet). "Print" opens the browser print dialog for now.
 export function PickSlip({
   orderRef,
   submittedAt,
@@ -40,12 +42,12 @@ export function PickSlip({
   retailerPhone,
   salesmanName,
   brandName,
+  showModel,
   items,
 }: PickSlipProps) {
-  const [pricesOn, setPricesOn] = useState(false);
   const [printedAt] = useState(nowMs);
 
-  // Share exactly what's on screen — prices-off = PICK SLIP, prices-on = ORDER COPY.
+  // Prices are always shown now (owner decision) — this is an ORDER COPY.
   const shareText = buildOrderShareText({
     orderRef,
     brandName,
@@ -57,32 +59,16 @@ export function PickSlip({
     items,
     totalPaise,
     notes,
-    withPrices: pricesOn,
+    withPrices: true,
   });
 
   return (
     <div className={styles.page}>
       <div className={styles.chrome}>
         <span className={styles.chromeTitle}>
-          {orderRef} · PICK SLIP PREVIEW
+          {orderRef} · ORDER COPY
         </span>
         <div className={styles.chromeControls}>
-          <div className={styles.toggle}>
-            <button
-              type="button"
-              className={`${styles.toggleButton} ${!pricesOn ? styles.toggleButtonActive : ""}`}
-              onClick={() => setPricesOn(false)}
-            >
-              Prices off
-            </button>
-            <button
-              type="button"
-              className={`${styles.toggleButton} ${pricesOn ? styles.toggleButtonActive : ""}`}
-              onClick={() => setPricesOn(true)}
-            >
-              Prices on
-            </button>
-          </div>
           <button type="button" className={styles.printButton} onClick={() => window.print()}>
             Print
           </button>
@@ -97,7 +83,7 @@ export function PickSlip({
             <p className={styles.ref}>{orderRef}</p>
             {brandName && <p className={styles.slipBrand}>{brandName}</p>}
           </div>
-          <span className={styles.badge}>{pricesOn ? "ORDER COPY" : "PICK SLIP"}</span>
+          <span className={styles.badge}>ORDER COPY</span>
         </div>
 
         <div className={styles.metaGrid}>
@@ -124,27 +110,30 @@ export function PickSlip({
             <tr>
               <th className={styles.qtyHeader}>QTY</th>
               <th>ITEM</th>
-              {pricesOn && <th className={styles.numeric}>RATE</th>}
-              {pricesOn && <th className={styles.numeric}>AMOUNT</th>}
+              <th className={styles.numeric}>RATE</th>
+              <th className={styles.numeric}>AMOUNT</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, i) => (
               <tr key={i}>
                 <td className={styles.qtyCell}>{item.qty}</td>
-                <td>{item.product_name}</td>
-                {pricesOn && <td className={styles.numeric}>{formatRupees(item.unit_price_paise)}</td>}
-                {pricesOn && <td className={styles.numeric}>{formatRupees(item.line_total_paise)}</td>}
+                <td>
+                  {item.product_name}
+                  {showModel && item.tally_name && item.tally_name !== item.product_name && (
+                    <span className={styles.slipModel}>{item.tally_name}</span>
+                  )}
+                </td>
+                <td className={styles.numeric}>{formatRupees(item.unit_price_paise)}</td>
+                <td className={styles.numeric}>{formatRupees(item.line_total_paise)}</td>
               </tr>
             ))}
-            {pricesOn && (
-              <tr className={styles.totalRow}>
-                <td />
-                <td>Total (incl. GST)</td>
-                <td />
-                <td className={styles.numeric}>{formatRupees(totalPaise)}</td>
-              </tr>
-            )}
+            <tr className={styles.totalRow}>
+              <td />
+              <td>Total (incl. GST)</td>
+              <td />
+              <td className={styles.numeric}>{formatRupees(totalPaise)}</td>
+            </tr>
           </tbody>
         </table>
 
