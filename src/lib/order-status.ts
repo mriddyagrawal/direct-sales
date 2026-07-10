@@ -16,6 +16,9 @@ export function getOrderStatusTag(
 ): { tone: StatusTone; label: string; sublabel?: string } {
   if (order.status === "cancelled") return { tone: "error", label: "Cancelled" };
   if (order.status === "billed") return { tone: "billed", label: "Billed" };
+  // Backorder — the remainder split off a partial pick, awaiting a Punch Order
+  // to re-enter the pipeline. Violet, editable until punched.
+  if (order.status === "backorder") return { tone: "backorder", label: "Backorder" };
   // Approved: admin-signed-off scan-brand (LG) order awaiting the godown —
   // neutral/ink, deliberately NOT the green of Billed. Label = "Pending scan"
   // (frontend only; the DB status stays `approved`). Fixed brands never hold

@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Stamp, X } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -14,7 +14,7 @@ import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatRupees } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
-import { updateOrderItems, cancelOrder, processOrder, approveOrder } from "@/lib/order-rpcs";
+import { updateOrderItems, cancelOrder, processOrder, approveOrder, punchOrder } from "@/lib/order-rpcs";
 import styles from "./OrderDetailView.module.css";
 
 const UI_QTY_CAP = 999;
@@ -36,6 +36,7 @@ interface OrderItemRow {
   unit_price_paise: number;
   qty: number;
   line_total_paise: number;
+  picked_qty: number | null;
   position: number;
   products: { tally_name: string } | null;
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
@@ -64,6 +65,8 @@ export interface OrderDetailData {
   cancelledById: string | null;
   cancelledByName: string | null;
   salesmanId: string;
+  parentOrderId: string | null;
+  parentOrderRef: string | null;
   salesmanName: string;
   processedByName: string | null;
   retailerName: string;
@@ -140,13 +143,14 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   // CURRENT product's tally_name (display-only); serials in scan order.
   // A line newly added in edit mode has neither yet.
   const lineExtraByProduct = useMemo(() => {
-    const map = new Map<string, { model: string | null; serials: string[] }>();
+    const map = new Map<string, { model: string | null; serials: string[]; pickedQty: number | null }>();
     for (const it of initialItems) {
       map.set(it.product_id, {
         model: it.products?.tally_name ?? null,
         serials: [...it.order_item_scans]
           .sort((a, b) => a.scanned_at.localeCompare(b.scanned_at))
           .map((s) => s.serial),
+        pickedQty: it.picked_qty,
       });
     }
     return map;
@@ -159,9 +163,26 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       const name = snap?.name ?? product?.name ?? "Unknown product";
       const rate = snap?.price ?? product?.price_paise ?? 0;
       const extra = lineExtraByProduct.get(productId);
-      return { productId, qty, name, rate, model: extra?.model ?? null, serials: extra?.serials ?? [] };
+      return { productId, qty, name, rate, model: extra?.model ?? null, serials: extra?.serials ?? [], pickedQty: extra?.pickedQty ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Once picked, a line shows shipped-vs-ordered; short lines feed the backorder.
+  const anyPicked = initialItems.some((it) => it.picked_qty !== null);
+  const backorderedUnits = initialItems.reduce(
+    (sum, it) => sum + (it.picked_qty !== null ? Math.max(0, it.qty - it.picked_qty) : 0),
+    0,
+  );
+  const isBackorder = order.status === "backorder";
+  // The child backorder (id + ref), read off the 'backordered' event this
+  // order logged when it shipped short.
+  const backorderChild = (() => {
+    const ev = events.find((e) => e.action === "backordered");
+    const details = (ev?.details ?? {}) as Record<string, unknown>;
+    const id = typeof details.child_order_id === "string" ? details.child_order_id : null;
+    const ref = typeof details.child_ref === "string" ? details.child_ref : null;
+    return id && ref ? { id, ref } : null;
+  })();
 
   const total = lines.reduce((sum, l) => sum + l.rate * l.qty, 0);
 
@@ -275,6 +296,21 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not approve the order.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePunch() {
+    setSaving(true);
+    setError(null);
+    try {
+      await punchOrder(order.id);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not punch the order.");
     } finally {
       setSaving(false);
     }
@@ -405,6 +441,30 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           </div>
         </>
       )}
+      {/* Backorder: the remainder split off a partial pick. Its salesman or an
+          admin can edit the quantities (secondaries) then Punch it back into
+          the pipeline (→ pending_approval). */}
+      {isBackorder && (
+        <>
+          {order.parentOrderRef && (
+            <p className={styles.waitLine}>
+              Backorder of{" "}
+              <Link
+                href={`${isStaff ? "/dashboard/orders" : "/orders"}/${order.parentOrderId}`}
+                className={styles.parentLink}
+              >
+                {order.parentOrderRef}
+              </Link>
+            </p>
+          )}
+          {(isOwner || isAdmin) && (
+            <Button variant="primary" onClick={handlePunch} loading={saving || isPending}>
+              <Glyph icon={Send} />
+              Punch order
+            </Button>
+          )}
+        </>
+      )}
 
       {/* SECONDARIES (glyph + label; Cancel red at the far end — spec §3/§5).
           Every write still goes through the role-guarded RPCs; hiding a
@@ -417,7 +477,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             Edit
           </Button>
         )}
-        {salesmanActionable && (
+        {!isStaff && isOwner && (editable || isBackorder) && (
           <Button variant="secondary" onClick={() => router.push(`/new-order?edit=${order.id}`)}>
             <Glyph icon={Pencil} />
             Edit
@@ -449,6 +509,25 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       </div>
 
       {error && !confirmCancel && !confirmProcess && <p className={styles.error}>{error}</p>}
+
+      {/* Shipped short: a partial pick shipped what was picked and backordered
+          the rest into a child order (both roles). */}
+      {anyPicked && backorderedUnits > 0 && (
+        <p className={styles.noteBackorder}>
+          {backorderedUnits} unit{backorderedUnits === 1 ? "" : "s"} backordered
+          {backorderChild && (
+            <>
+              {" → "}
+              <Link
+                href={`${isStaff ? "/dashboard/orders" : "/orders"}/${backorderChild.id}`}
+                className={styles.parentLink}
+              >
+                {backorderChild.ref}
+              </Link>
+            </>
+          )}
+        </p>
+      )}
 
       {/* Salesman guidance notes — what the status means for HIM and what
           happens next (ported verbatim from the old /orders/[id] page). */}
@@ -517,12 +596,21 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                           onChange={(next) => handleQtyChange(line.productId, next)}
                           onTapQuantity={() => {}}
                         />
+                      ) : line.pickedQty !== null && line.pickedQty !== line.qty ? (
+                        // Shipped short: picked / ordered.
+                        <span className={styles.shippedQty}>
+                          {line.pickedQty}/{line.qty}
+                        </span>
                       ) : (
                         line.qty
                       )}
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(line.rate)}</td>
-                    <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(line.rate * line.qty)}</td>
+                    <td className={`${styles.mono} ${styles.numeric}`}>
+                      {/* Shipped amount = (picked ?? ordered) × rate, so the lines
+                          sum to the shipped order total. Edit mode previews live. */}
+                      {formatRupees(line.rate * (mode === "view" ? line.pickedQty ?? line.qty : line.qty))}
+                    </td>
                     {mode === "edit" && (
                       <td>
                         <button type="button" className={styles.remove} onClick={() => handleQtyChange(line.productId, 0)}>
@@ -580,10 +668,22 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           )}
 
           <div className={styles.totalRow}>
-            <span>
-              {lines.reduce((sum, l) => sum + l.qty, 0)} {lines.reduce((sum, l) => sum + l.qty, 0) === 1 ? "unit" : "units"}
+            {/* View: shipped units + the authoritative shipped total (order
+                .totalPaise). Edit: ordered units + the live edited total. */}
+            {(() => {
+              const units =
+                mode === "view"
+                  ? lines.reduce((sum, l) => sum + (l.pickedQty ?? l.qty), 0)
+                  : lines.reduce((sum, l) => sum + l.qty, 0);
+              return (
+                <span>
+                  {units} {units === 1 ? "unit" : "units"}
+                </span>
+              );
+            })()}
+            <span className={styles.mono}>
+              Total (incl. GST) {formatRupees(mode === "view" ? order.totalPaise : total)}
             </span>
-            <span className={styles.mono}>Total (incl. GST) {formatRupees(total)}</span>
           </div>
 
 

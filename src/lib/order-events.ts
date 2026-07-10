@@ -67,8 +67,18 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
     }
     case "approved":
       return `${time} Approved by ${actorLabel}`;
-    case "picked":
-      return `${time} Picked by ${actorLabel}`;
+    case "picked": {
+      // details.lines = [{ name, ordered, picked }] — summarise as picked/ordered.
+      const lines = (details.lines as { ordered?: number; picked?: number }[] | undefined) ?? [];
+      const picked = lines.reduce((s, l) => s + (l.picked ?? 0), 0);
+      const ordered = lines.reduce((s, l) => s + (l.ordered ?? 0), 0);
+      const summary = ordered > 0 ? ` — ${picked}/${ordered} units` : "";
+      return `${time} Picked by ${actorLabel}${summary}`;
+    }
+    case "backordered": {
+      const ref = typeof details.child_ref === "string" ? details.child_ref : "a backorder";
+      return `${time} Backordered → ${ref}`;
+    }
     case "billed":
       return `${time} Billed by ${actorLabel}`;
     default:

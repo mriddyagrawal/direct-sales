@@ -326,6 +326,28 @@
   padding-left: 8px;
 }
 
+/* Backorder note (shipped short → child order) — violet, matches the chip. */
+.noteBackorder {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: #7c3aed;
+  border-left: 2px solid #7c3aed;
+  padding-left: 8px;
+}
+
+/* Parent/child order ref link inside a backorder note. */
+.parentLink {
+  color: #7c3aed;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* "3/5" picked-of-ordered in the QTY cell of a shipped-short line. */
+.shippedQty {
+  color: #7c3aed;
+  font-weight: 700;
+}
+
 /* Orders-UI revamp (spec §3): back-eyebrow + retailer hero + action rows. */
 .backRow {
   display: flex;

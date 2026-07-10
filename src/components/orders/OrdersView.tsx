@@ -42,10 +42,11 @@ export interface BrandOption {
   name: string;
 }
 
-type StatusFilter = "all" | "pending_approval" | "approved" | "ready_to_bill" | "billed" | "cancelled";
+type StatusFilter = "all" | "backorder" | "pending_approval" | "approved" | "ready_to_bill" | "billed" | "cancelled";
 
 const STATUS_LABEL: Record<StatusFilter, string> = {
   all: "All",
+  backorder: "Backorder",
   pending_approval: "Pending approval",
   approved: "Pending scan",
   ready_to_bill: "Ready to bill",
@@ -186,6 +187,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
   });
 
   const tabCounts: Record<StatusFilter, number> = {
+    backorder: scoped.filter((o) => o.status === "backorder").length,
     all: scoped.length,
     pending_approval: scoped.filter((o) => o.status === "pending_approval").length,
     approved: scoped.filter((o) => o.status === "approved").length,
@@ -233,7 +235,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
 
       <div className={styles.filters}>
         <div className={styles.filterTabs}>
-          {(["all", "pending_approval", "approved", "ready_to_bill", "billed", "cancelled"] as StatusFilter[]).map((s) => (
+          {(["all", "backorder", "pending_approval", "approved", "ready_to_bill", "billed", "cancelled"] as StatusFilter[]).map((s) => (
             <button
               key={s}
               type="button"

@@ -55,6 +55,14 @@
   background: var(--color-error);
 }
 
+/* Backorder — a distinct violet (needs punching; not the amber of pending). */
+.backorder {
+  color: #7c3aed;
+}
+.backorder .square {
+  background: #7c3aed;
+}
+
 /* Two-line variant: main label + a smaller sub-line ("editable 1h 59m",
    "waiting for scan"). The square stays aligned to the first line. */
 .lines {
