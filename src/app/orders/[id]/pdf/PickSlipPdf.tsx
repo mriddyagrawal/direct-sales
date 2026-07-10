@@ -115,6 +115,14 @@ const s = StyleSheet.create({
     fontSize: 16,
     marginTop: 4,
   },
+  // Tally bill number under the ref — same mono family, smaller, and a touch
+  // lighter than the ink ref (not the full muted grey).
+  refBill: {
+    fontFamily: "Courier",
+    fontSize: 9,
+    color: "#565e6b",
+    marginTop: 3,
+  },
   badgeCol: {
     alignItems: "flex-end",
     gap: 4,
@@ -287,6 +295,11 @@ export function PickSlipPdf({
             <Text style={s.brand}>GANPATI ENTERPRISES</Text>
             {/* No separate brand line — the ref already carries it (ORD-LG-…). */}
             <Text style={s.ref}>{orderRef}</Text>
+            {/* Tally bill number under the ref — same mono family, smaller and
+                slightly muted. Billed orders only (null → nothing). */}
+            {tallyBillNo ? (
+              <Text style={s.refBill}>Tally Bill: {pdfText(tallyBillNo)}</Text>
+            ) : null}
           </View>
           <View style={s.badgeCol}>
             <Text style={s.badge}>ORDER COPY</Text>
@@ -307,12 +320,6 @@ export function PickSlipPdf({
             {retailerPhone ? <Text style={s.metaMono}>{retailerPhone}</Text> : null}
           </Text>
           <Text style={s.metaLine}>Salesman: {pdfText(salesmanName)}</Text>
-          {/* Bill No only on a billed order (null → omit the line entirely). */}
-          {tallyBillNo ? (
-            <Text style={s.metaLine}>
-              Bill No: <Text style={s.metaMono}>{pdfText(tallyBillNo)}</Text>
-            </Text>
-          ) : null}
         </View>
 
         <Text style={s.linesRule}>{items.length} {items.length === 1 ? "LINE" : "LINES"}</Text>
