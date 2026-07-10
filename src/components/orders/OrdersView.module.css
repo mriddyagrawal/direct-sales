@@ -55,19 +55,26 @@
   display: none;
 }
 
-/* Mobile: ALL tabs visible at once (owner call) — no horizontal scroll.
-   Chips wrap into rows and each chip GROWS to fill its row edge-to-edge,
-   so the wrap reads as an intentional grid, not a ragged overflow. */
+/* Mobile: ALL tabs visible at once (owner call) — a fixed 3-column grid
+   (6 tabs → 2 even rows), no horizontal scroll. Labels may wrap to two lines
+   inside their cell so the boxes stay narrow and uniform ("Pending approval"
+   → "Pending" / "approval"). */
 @media (max-width: 767px) {
   .filterTabs {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
     overflow-x: visible;
   }
 
-  /* Natural wrap, compact (owner mock): chips flow at their own width and
-     wrap — no grow, so a lone last chip never stretches across a full row. */
+  /* The grid cell owns the width; let the label wrap and centre it. Grid
+     stretches every cell to its row's height, so a one-line tab ("All")
+     stays vertically centred beside a two-line neighbour. */
   .filterTab {
-    flex: 0 0 auto;
+    white-space: normal;
+    text-align: center;
+    justify-content: center;
+    padding: 6px 8px;
   }
 }
 
