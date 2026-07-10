@@ -2,6 +2,8 @@
 
 **Status:** designed, not built (2026-07-09). The keystone feature that motivated the whole app: it replaces the "godown photographs every QR into WhatsApp → accountant reads the photos" step with in-app serial scanning and a clean hand-off to the accountant.
 
+> **Stage 1 shipped 2026-07-11 — all-brand fulfilment + partial picking + backorder split.** The godown now fulfils **every** brand (approval routes all brands to `approved`, not just LG). The pick is **brand-aware**: LG scans serials as below; fixed brands (Zeb/Lum) enter a **picked quantity** per line (a stepper on the same pick screen — no scanner, no serials). A pick may be **partial** — the Submit button is live at ≥1 unit; `submit_pick` ships the picked qty (→ `ready_to_bill`, `total_paise` = Σ picked×price) and, when any line is short, **splits** off a new **`backorder`** child order (same salesman, `parent_order_id` link, fresh gapless `order_no`) holding the remainder. A backorder re-enters the pipeline via **`punch_order`** (`backorder → pending_approval`, its salesman or an admin), and is freely editable until punched. Ordered line snapshots stay immutable — `order_items.picked_qty` is additive. Godown RLS widened from `requires_scan`-only to **all-brand** `approved`/`ready_to_bill`. Serials stay LG-only; godown screens stay price-free. Anyone may reach the pick via `/scan/[id]` (universal-scan); the godown `/godown` queue lists all-brand approved orders. *(Stage 2 — dispatch/`dispatched` + godown Pickup/Dispatch/History tabs — is parked.)*
+
 ## Real-world flow (LG)
 1. Salesman negotiates at the shop → submits an LG order (manual price) → **`pending_approval`**.
 2. Owner ("dad") approves the price → **`approved`**. *(all of this already shipped, Phase 3b)*
