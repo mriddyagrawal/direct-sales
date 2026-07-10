@@ -55,14 +55,14 @@
   display: none;
 }
 
-/* Mobile: ALL tabs visible at once (owner call) — a fixed 3-column grid
-   (6 tabs → 2 even rows), no horizontal scroll. Labels may wrap to two lines
-   inside their cell so the boxes stay narrow and uniform ("Pending approval"
-   → "Pending" / "approval"). */
+/* Mobile: ALL tabs visible at once (owner call) — a fixed 4-column grid
+   (sized for up to 8 statuses → 2 even rows; 6 today fill row 1 + 2 of row 2),
+   no horizontal scroll. Labels may wrap to two lines inside their cell so the
+   boxes stay narrow and uniform ("Pending approval" → "Pending" / "approval"). */
 @media (max-width: 767px) {
   .filterTabs {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 6px;
     overflow-x: visible;
   }
