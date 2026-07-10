@@ -17,10 +17,10 @@ export function getOrderStatusTag(
   if (order.status === "cancelled") return { tone: "error", label: "Cancelled" };
   if (order.status === "billed") return { tone: "billed", label: "Billed" };
   // Approved: admin-signed-off scan-brand (LG) order awaiting the godown —
-  // neutral/ink, deliberately NOT the green of Billed. Label = "Pending scan"
+  // neutral/ink, deliberately NOT the green of Billed. Label = "Pending pick"
   // (frontend only; the DB status stays `approved`). Fixed brands never hold
   // this status (they jump to ready_to_bill).
-  if (order.status === "approved") return { tone: "locked", label: "Pending scan" };
+  if (order.status === "approved") return { tone: "locked", label: "Pending pick" };
   // Ready to bill: a fixed brand straight from approval, or LG post-pick —
   // awaiting the accountant's Tally entry. Accent (not green), still in flight.
   if (order.status === "ready_to_bill") return { tone: "accent", label: "Ready to bill" };
