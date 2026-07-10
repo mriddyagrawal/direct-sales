@@ -442,15 +442,14 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
       <div className={styles.body}>
         <div className={styles.main}>
-          <div className={styles.itemsHead}>
-            <p className={styles.sectionLabel}>ITEMS</p>
-            {isStaff && showSerialRows && hasAnySerials && (
+          {isStaff && showSerialRows && hasAnySerials && (
+            <div className={styles.itemsHead}>
               <button type="button" className={styles.copySerials} onClick={handleCopySerials}>
                 <Glyph icon={Copy} size={14} />
                 {copied ? "Copied ✓" : "Copy serials"}
               </button>
-            )}
-          </div>
+            </div>
+          )}
           <table className={styles.table}>
             <thead>
               <tr>
@@ -501,8 +500,15 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                     <tr className={styles.serialSubRow}>
                       <td colSpan={4}>
                         {line.serials.length > 0 ? (
-                          <span className={styles.serialLine}>
-                            {line.serials.length === 1 ? "SERIAL" : "SERIALS"} {line.serials.join(" / ")}
+                          <span className={styles.serialWrap}>
+                            <em className={styles.serialTag}>{line.serials.length === 1 ? "Serial" : "Serials"}</em>
+                            <span className={styles.serialList}>
+                              {line.serials.map((serial) => (
+                                <span key={serial} className={styles.serialLine}>
+                                  {serial}
+                                </span>
+                              ))}
+                            </span>
                           </span>
                         ) : (
                           <em className={styles.serialPlaceholder}>captured at picking, after approval</em>
