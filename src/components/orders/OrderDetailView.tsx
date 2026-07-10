@@ -505,7 +505,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                       <td colSpan={4}>
                         {line.serials.length > 0 ? (
                           <span className={styles.serialWrap}>
-                            <em className={styles.serialTag}>{line.serials.length === 1 ? "Serial" : "Serials"}</em>
+                            <em className={styles.serialTag}>Serials</em>
                             <span className={styles.serialList}>
                               {line.serials.map((serial) => (
                                 <span key={serial} className={styles.serialLine}>
