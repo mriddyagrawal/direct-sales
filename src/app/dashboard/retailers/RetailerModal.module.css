@@ -1,0 +1,103 @@
+/* Mirrors ProductModal.module.css — owner call: the retailers edit
+   window is the same kind of window as the products one. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(20, 24, 31, 0.35);
+  display: flex;
+  /* Phone: dock to the bottom (bottom-sheet). Desktop override below. */
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.panel {
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--color-white);
+  /* Flat sheet, 2px ink top-edge — matches BottomSheet's grammar. */
+  border-top: 2px solid var(--color-ink);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heading {
+  font-family: var(--font-structure);
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
+  color: var(--color-ink);
+}
+
+.closeX {
+  background: none;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-locked);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.errorStrip {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-white);
+  background: var(--color-error);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toggle {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.helper {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-amber);
+}
+
+@media (min-width: 768px) {
+  .scrim {
+    align-items: center;
+  }
+
+  .panel {
+    max-width: 460px;
+    border: 1px solid var(--color-hairline);
+    border-top: 2px solid var(--color-ink);
+    border-radius: var(--radius);
+  }
+}
