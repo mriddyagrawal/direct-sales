@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2, Copy, Pencil, Stamp, X } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Stamp, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -391,12 +391,18 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       {isStaff && order.status === "approved" && (
         <>
           <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
-          {/* Owner call (2026-07-11): the approved→billed override is a WIDE
-              accent button above the secondaries — not a quiet row item. */}
-          <Button variant="primary" onClick={() => setConfirmProcess(true)}>
-            <Glyph icon={Stamp} />
-            Mark billed
-          </Button>
+          {/* Owner call: the approved override splits in half — Mark billed
+              (blue) beside Scan (white). Any role can now scan (2026-07-11). */}
+          <div className={styles.splitRow}>
+            <Button variant="primary" onClick={() => setConfirmProcess(true)}>
+              <Glyph icon={Stamp} />
+              Mark billed
+            </Button>
+            <Button variant="secondary" onClick={() => router.push(`/scan/${order.id}`)}>
+              <Glyph icon={ScanBarcode} />
+              Scan
+            </Button>
+          </div>
         </>
       )}
 
@@ -419,6 +425,14 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         )}
         {order.status !== "billed" && order.status !== "cancelled" && (
           <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="ink" />
+        )}
+        {/* Salesman scans his own approved LG order — Share | Scan splits the
+            secondaries (staff get Scan in the split override above instead). */}
+        {!isStaff && order.status === "approved" && (
+          <Button variant="secondary" onClick={() => router.push(`/scan/${order.id}`)}>
+            <Glyph icon={ScanBarcode} />
+            Scan
+          </Button>
         )}
         {((isStaff && (order.status === "billed" ? isAdmin : order.status !== "cancelled")) ||
           salesmanActionable) && (

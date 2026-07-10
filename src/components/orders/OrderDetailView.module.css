@@ -386,6 +386,16 @@
   gap: 8px;
 }
 
+/* Approved override on staff: Mark billed (blue) | Scan (white), equal halves. */
+.splitRow {
+  display: flex;
+  gap: 8px;
+}
+
+.splitRow > * {
+  flex: 1;
+}
+
 /* Mobile: the secondaries split the row into EQUAL parts (mockup 7c) —
    Edit · Share · Cancel each a third. Desktop keeps content-width buttons
    with Cancel pushed to the far end. */
