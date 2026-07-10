@@ -115,3 +115,43 @@
   font-size: 11px;
   color: var(--color-locked);
 }
+
+/* The pick contents — a hairline divider inside the card, then one row per
+   line (qty + product). Price-free. */
+.pickList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.pickLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* Qty leads — it's what the picker acts on. Mono, bold, fixed width so the
+   product names line up in a column. */
+.pickQty {
+  flex-shrink: 0;
+  min-width: 26px;
+  font-family: var(--font-figures);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pickName {
+  font-family: var(--font-structure);
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+/* The LG model code, muted mono (matches Quick Order's model prefix). */
+.pickModel {
+  font-family: var(--font-figures);
+  color: var(--color-locked);
+}
