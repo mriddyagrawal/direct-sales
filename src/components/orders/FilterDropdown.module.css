@@ -3,18 +3,6 @@
   display: inline-block;
 }
 
-/* Mobile: the dropdown fills whatever cell the filter grid gives it. */
-@media (max-width: 767px) {
-  .wrap {
-    display: block;
-    width: 100%;
-  }
-
-  .trigger {
-    display: flex;
-    width: 100%;
-  }
-}
 
 .trigger {
   display: inline-flex;
@@ -64,4 +52,17 @@
   z-index: 50;
   border-radius: var(--radius);
   box-shadow: 0 8px 28px rgba(20, 24, 31, 0.14);
+}
+
+/* Mobile: the dropdown fills whatever cell the filter grid gives it. */
+@media (max-width: 767px) {
+  .wrap {
+    display: block;
+    width: 100%;
+  }
+
+  .trigger {
+    display: flex;
+    width: 100%;
+  }
 }

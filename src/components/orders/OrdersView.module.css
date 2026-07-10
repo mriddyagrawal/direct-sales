@@ -84,7 +84,7 @@
 @media (max-width: 767px) {
   .filterGroup {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     border-top: 1px solid var(--color-hairline);
     margin: 0 -16px;
     padding: 14px 16px 0;
