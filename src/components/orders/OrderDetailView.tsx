@@ -367,7 +367,15 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="primary" />
       )}
       {isStaff && order.status === "approved" && (
-        <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
+        <>
+          <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
+          {/* Owner call (2026-07-11): the approved→billed override is a WIDE
+              accent button above the secondaries — not a quiet row item. */}
+          <Button variant="primary" onClick={() => setConfirmProcess(true)}>
+            <Glyph icon={Stamp} />
+            Mark billed
+          </Button>
+        </>
       )}
 
       {/* SECONDARIES (glyph + label; Cancel red at the far end — spec §3/§5).
@@ -390,16 +398,10 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         {order.status !== "billed" && order.status !== "cancelled" && (
           <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="secondary" />
         )}
-        {isStaff && order.status === "approved" && (
-          <Button variant="secondary" onClick={() => setConfirmProcess(true)}>
-            <Glyph icon={Stamp} />
-            Mark billed
-          </Button>
-        )}
         {((isStaff && (order.status === "billed" ? isAdmin : order.status !== "cancelled")) ||
           salesmanActionable) && (
           <Button
-            variant="destructive"
+            variant="destructive-filled"
             className={styles.cancelAction}
             onClick={() => setConfirmCancel(true)}
           >
