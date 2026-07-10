@@ -3758,3 +3758,30 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Stage 1 is complete + verified (backend + surfaces + docs). Merge-ready; an owner phone test (partial pick → backorder → punch) is the natural gate before Stage 2 unparks.
 
 ---
+
+## Review of 1c0ef42 — fix(fulfilment): order-detail self-ref embed + backorder child genesis event
+
+**Verdict:** ✅ accept — fixes a runtime bug that 072e423 shipped (and I missed).
+
+**Phase / commit goal (as I understood it):** Two LAN-preview fixes. (1) The `parent_order` self-ref embed in `ORDER_DETAIL_SELECT` hinted the **constraint name** (`orders!orders_parent_order_id_fkey`), which PostgREST can't resolve for a self-FK → **PGRST200 broke EVERY order-detail page**; corrected to the **column hint** `orders!parent_order_id`. (2) `submit_pick` now logs a genesis event on the backorder **child** so its history isn't blank until punched.
+
+**Reviewer miss (own audit, logged for honesty — cf. ㉜🅐):** my 072e423 ✅ ran `npm run build` + read the embed string, but PGRST200 is a *runtime* PostgREST planner error a build can't catch, and I did not exercise a live order-detail query — so the broken embed shipped. Lesson: **verify PostgREST embeds with an actual query, not build+read.**
+
+**What works (verified by execution):**
+- **Embed fixed** (live PostgREST, anon key): OLD `orders!orders_parent_order_id_fkey` → **HTTP 400 `PGRST200`** (the bug); NEW `orders!parent_order_id` → **resolves** (HTTP 401 `permission denied for auth_profile_role` = anon RLS denial, NOT an embed error — an authenticated session passes). Planner now resolves the self-ref → detail pages render.
+- **Child genesis event** (live rolled-back probe): a partial pick logs `backordered` on **both** sides — parent `{child_ref: ORD-ZEB-1065, child_order_id}` → "Backordered → …"; **child** `{parent_ref: ORD-GEN-1064, parent_order_id}` → "Backordered from …". `order-events.ts` branches on `parent_ref` vs `child_ref` correctly.
+- Split logic in the recreated `submit_pick` is unchanged from 34b73d4 (child created, remainder correct — re-proven in the same probe). Migration `20260710190654_…` is standard 14-digit.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** The message notes "existing test backorders backfilled separately" — that backfill is outside this commit's diff (a one-off data touch, not migration logic); fine, just flagged as un-reviewed data.
+
+**Domain / correctness checks:** State machine + money + immutability unaffected (this is event-logging + a query-string fix; the split RPC body is byte-identical to the verified 34b73d4). RLS unaffected.
+
+**What I tried:** curl of old vs new self-ref embed against live PostgREST (400/PGRST200 → resolves); live rolled-back genesis probe reading both parent + child `backordered` event details; read all three file diffs.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Lesson logged (verify embeds by query).
+
+**Next-commit suggestion:** Stage 1 is now runtime-clean. An owner phone pass on the deployed URL (open an order detail + a backorder detail; partial-pick → punch) closes it out.
+
+---
