@@ -368,6 +368,19 @@
   gap: 8px;
 }
 
+/* Mobile: the secondaries split the row into EQUAL parts (mockup 7c) —
+   Edit · Share · Cancel each a third. Desktop keeps content-width buttons
+   with Cancel pushed to the far end. */
+@media (max-width: 767px) {
+  .secondaries > * {
+    flex: 1;
+  }
+
+  .cancelAction {
+    margin-left: 0;
+  }
+}
+
 /* Cancel sits red at the FAR END of the secondaries row (spec §3). */
 .cancelAction {
   margin-left: auto;
