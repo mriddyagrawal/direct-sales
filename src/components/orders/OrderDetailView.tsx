@@ -347,6 +347,9 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         )}
       </div>
 
+      {/* One action BLOCK: primary + secondaries share the same 8px rhythm
+          vertically and horizontally (owner call). */}
+      <div className={styles.actionBlock}>
       {/* PRIMARY action = the status (spec §5): pending → Approve (admin only);
           ready_to_bill → Mark billed; billed/cancelled → Share PDF. `approved`
           deliberately has NO loud primary (§4) — the godown owns the next move;
@@ -409,6 +412,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             Cancel
           </Button>
         )}
+      </div>
       </div>
 
       {error && !confirmCancel && !confirmProcess && <p className={styles.error}>{error}</p>}
