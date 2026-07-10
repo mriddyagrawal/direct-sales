@@ -55,6 +55,21 @@
   display: none;
 }
 
+/* Mobile: ALL tabs visible at once (owner call) — no horizontal scroll.
+   Chips wrap into rows and each chip GROWS to fill its row edge-to-edge,
+   so the wrap reads as an intentional grid, not a ragged overflow. */
+@media (max-width: 767px) {
+  .filterTabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .filterTab {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
 .filterGroup {
   display: flex;
   flex-wrap: wrap;
