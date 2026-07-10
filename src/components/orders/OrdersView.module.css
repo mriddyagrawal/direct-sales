@@ -69,8 +69,13 @@
 
   /* The grid cell owns the width; let the label wrap and centre it. Grid
      stretches every cell to its row's height, so a one-line tab ("All")
-     stays vertically centred beside a two-line neighbour. */
-  .filterTab {
+     stays vertically centred beside a two-line neighbour.
+     NOTE the `.filterTabs` prefix: the base `.filterTab` rule sets
+     white-space: nowrap and sits LATER in the file, so at equal specificity
+     it would win the source-order tie and the label would never wrap (it
+     overflowed the box instead). The descendant selector (0,2,0 > 0,1,0)
+     makes this rule win. */
+  .filterTabs .filterTab {
     white-space: normal;
     text-align: center;
     justify-content: center;
