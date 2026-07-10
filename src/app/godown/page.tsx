@@ -6,12 +6,21 @@ import { formatOrderTimestamp } from "@/lib/format";
 import { PreloadScanner } from "./PreloadScanner";
 import styles from "./godown.module.css";
 
+interface QueueItem {
+  id: string;
+  product_name: string;
+  qty: number;
+  position: number;
+  products: { tally_name: string } | null;
+}
+
 interface QueueRow {
   id: string;
   order_ref: string;
   submitted_at: string;
   retailers: { name: string; area: string | null } | null;
-  order_items: { count: number }[];
+  brands: { show_model: boolean } | null;
+  order_items: QueueItem[];
 }
 
 // The godown pick queue — approved LG orders awaiting serial capture.
@@ -35,9 +44,13 @@ export default async function GodownQueuePage() {
   // Page gate (middleware backstops this) — only the godown role belongs here.
   if (profile?.role !== "godown") redirect("/");
 
+  // Price-free (godown guardrail): product name, qty, model (tally_name) only —
+  // never rate/amount. show_model drives the "model・name" line for LG.
   const { data } = await supabase
     .from("orders")
-    .select("id, order_ref, submitted_at, retailers(name, area), order_items(count)")
+    .select(
+      "id, order_ref, submitted_at, retailers(name, area), brands(show_model), order_items(id, product_name, qty, position, products(tally_name))",
+    )
     .eq("status", "approved")
     .order("submitted_at", { ascending: false });
 
@@ -63,21 +76,47 @@ export default async function GodownQueuePage() {
         <p className={styles.empty}>Nothing to pick — approved orders will appear here.</p>
       ) : (
         <div className={styles.list}>
-          {queue.map((order) => (
-            <Link key={order.id} href={`/godown/${order.id}`} className={styles.card}>
-              <div className={styles.cardTop}>
-                <span className={styles.ref}>{order.order_ref}</span>
-                <span className={styles.items}>
-                  {order.order_items?.[0]?.count ?? 0} {(order.order_items?.[0]?.count ?? 0) === 1 ? "line" : "lines"}
-                </span>
-              </div>
-              <div className={styles.retailer}>
-                {order.retailers?.name ?? "Unknown retailer"}
-                {order.retailers?.area ? ` · ${order.retailers.area}` : ""}
-              </div>
-              <div className={styles.time}>{formatOrderTimestamp(order.submitted_at, now)}</div>
-            </Link>
-          ))}
+          {queue.map((order) => {
+            const lines = [...(order.order_items ?? [])].sort((a, b) => a.position - b.position);
+            const showModel = order.brands?.show_model ?? false;
+            return (
+              <Link key={order.id} href={`/godown/${order.id}`} className={styles.card}>
+                <div className={styles.cardTop}>
+                  <span className={styles.ref}>{order.order_ref}</span>
+                  <span className={styles.items}>
+                    {lines.length} {lines.length === 1 ? "line" : "lines"}
+                  </span>
+                </div>
+                <div className={styles.retailer}>
+                  {order.retailers?.name ?? "Unknown retailer"}
+                  {order.retailers?.area ? ` · ${order.retailers.area}` : ""}
+                </div>
+                <div className={styles.time}>{formatOrderTimestamp(order.submitted_at, now)}</div>
+
+                {/* What to physically pull — qty + product, inside the card,
+                    below a divider. LG shows "model・name" (like Quick Order);
+                    fixed brands just the name. No prices ever. */}
+                <div className={styles.pickList}>
+                  {lines.map((it) => (
+                    <div key={it.id} className={styles.pickLine}>
+                      <span className={styles.pickQty}>{it.qty}×</span>
+                      <span className={styles.pickName}>
+                        {showModel && it.products?.tally_name && it.products.tally_name !== it.product_name ? (
+                          <>
+                            <span className={styles.pickModel}>{it.products.tally_name}</span>
+                            {"・"}
+                            {it.product_name}
+                          </>
+                        ) : (
+                          it.product_name
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
