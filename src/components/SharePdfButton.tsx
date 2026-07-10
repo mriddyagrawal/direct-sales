@@ -60,7 +60,9 @@ export function SharePdfButton({ orderId, orderRef, variant = "secondary" }: Sha
     // collapse. Disabled guards double-taps during the ~2s fetch.
     <Button
       type="button"
-      variant={busy ? "ink" : variant}
+      // Preparing = the INVERSE of the resting look (owner call): an ink
+      // button flips to white, a white/accent one flips to ink.
+      variant={busy ? (variant === "ink" ? "secondary" : "ink") : variant}
       onClick={handleClick}
       disabled={busy}
       aria-busy={busy || undefined}
