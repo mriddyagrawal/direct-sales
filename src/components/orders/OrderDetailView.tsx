@@ -392,7 +392,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         {salesmanActionable && (
           <Button variant="secondary" onClick={() => router.push(`/new-order?edit=${order.id}`)}>
             <Glyph icon={Pencil} />
-            Edit order
+            Edit
           </Button>
         )}
         {order.status !== "billed" && order.status !== "cancelled" && (
