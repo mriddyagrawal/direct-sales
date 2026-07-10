@@ -71,6 +71,7 @@ section wins**:
   | Sign out | `log-out` |
   | Approve | `check-circle` |
   | Mark billed | `stamp` |
+  | Scan (approved order, all roles) | `scan-barcode` |
   | Edit | `pencil` |
   | Share | `share-2` |
   | Cancel | `x` (red) |
@@ -208,8 +209,15 @@ was drawn. Spec:
   a **Mark billed** glyph+label button, so an admin *can* bill directly when
   needed, but the design nudges toward the scan path.
 - **Secondaries otherwise:** Edit (admin) · Share · Cancel (admin), as elsewhere.
+- **Scan button (all roles, 2026-07-11):** scanning is no longer godown-only.
+  On an `approved` order every role gets a **Scan** button (`scan-barcode`,
+  white/`secondary`) → `/scan/[id]`. Staff: the Mark-billed override splits into
+  **Mark billed | Scan** (`.splitRow`, equal halves). Salesman: **Share | Scan**
+  in the secondaries. `/scan/[id]` and `submit_pick` both gate on `approved`, so
+  once picked the order is `ready_to_bill` and the scan screen redirects away.
 - Salesman lens on an `approved` order: the green note "Approved by the office —
-  waiting to be processed." (existing copy), Share PDF, read-only.
+  waiting to be processed." (existing copy), Share PDF, and now **Scan** his own
+  order; read-only otherwise.
 
 ---
 
