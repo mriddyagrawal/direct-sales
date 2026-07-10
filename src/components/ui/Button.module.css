@@ -24,6 +24,13 @@
   color: var(--color-white);
 }
 
+/* Filled green — the "let it through" action (Approve). Same weight as
+   primary; green so approval reads distinctly from billing (blue). */
+.success {
+  background: var(--color-processed);
+  color: var(--color-white);
+}
+
 .secondary {
   background: var(--color-white);
   color: var(--color-ink);
