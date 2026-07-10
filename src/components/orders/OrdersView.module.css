@@ -62,6 +62,29 @@
   gap: 8px;
 }
 
+/* Mobile filter layout (owner mockup 2026-07-11): a full-bleed hairline
+   between the TABS and the filters, then SALESMAN + BRAND sharing one line,
+   DATE and SEARCH full-width each. (nth-last-child so the same rule works
+   for the salesman role, which has no salesman/brand dropdowns.) */
+@media (max-width: 767px) {
+  .filterGroup {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--color-hairline);
+    margin: 0 -16px;
+    padding: 14px 16px 0;
+  }
+
+  .filterGroup > * {
+    min-width: 0;
+  }
+
+  .filterGroup > :nth-last-child(2),
+  .filterGroup > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Folder-tab strip (S8 revamp commit 3). Inactive tabs are plain text — no
    box at all. The active tab is the only one that draws anything: a white,
    hairline box with square-ish top corners and no bottom border, sized to
