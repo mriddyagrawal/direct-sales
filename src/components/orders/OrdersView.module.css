@@ -82,6 +82,14 @@
    DATE and SEARCH full-width each. (nth-last-child so the same rule works
    for the salesman role, which has no salesman/brand dropdowns.) */
 @media (max-width: 767px) {
+  /* THE missing piece (found via LAN test): .filters is a ROW by default, so
+     the filter group was wrapping under the tabs at its intrinsic ~60% width
+     — every rule inside it worked, just inside a too-narrow box. Stack it. */
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .filterGroup {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
