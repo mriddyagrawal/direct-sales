@@ -4,6 +4,14 @@ The state machine, the edit window, numbering, and the audit-event catalog. Enfo
 
 > **Overhauled 2026-07-10 (owner decision):** approval is **universal** (every order, every brand, admin-only), the `submitted` status is **gone**, `processed` is renamed **`billed`**, and `brands.requires_approval` is renamed **`brands.requires_scan`** (its only remaining job: "needs the godown scan step"). Price (`pricing_mode`) and scan (`requires_scan`) are independent brand axes.
 
+> **Fulfilment reshaped — Stage 1, 2026-07-11 (owner decision):** the godown fulfils **every** brand. `approve_order` now routes **all** brands to `approved` (Zeb/Lum no longer skip to `ready_to_bill`); the old `pending_approval → ready_to_bill` edge is removed. The pick is **brand-aware** (LG scans serials, fixed brands enter a picked qty) and may be **partial** — `submit_pick` ships the picked qty (→ `ready_to_bill`, total = Σ picked×price) and, when short, splits off a **new `backorder` child** (same salesman, `parent_order_id` link, fresh gapless `order_no`) holding the remainder. A **new `backorder` status** sits before `pending_approval`; **`punch_order`** promotes it (`backorder → pending_approval`, salesman-owner or admin). Ordered line snapshots (`qty`/`unit_price_paise`/`line_total_paise`) stay immutable — `order_items.picked_qty` is additive; `orders.total_paise` is the **shipped** total `Σ(coalesce(picked_qty, qty) × unit_price)`. The `approved` chip stays labelled **"Pending scan"** (not renamed). New events: `backordered` (links parent→child), `picked` now carries an ordered-vs-picked summary. *(Stage 2 — dispatch/`dispatched` — is parked.)*
+>
+> ```
+> backorder ──punch_order──▶ pending_approval ──approve (admin)──▶ approved  ("Pending scan", ALL brands)
+>       ──submit_pick (LG: scan · Zeb/Lum: qty; partial ok)──▶ ready_to_bill ──process_order──▶ billed
+>    partial pick → original ships picked qty (→ ready_to_bill) + a NEW `backorder` child holds the remainder
+> ```
+
 ## States
 
 ```
