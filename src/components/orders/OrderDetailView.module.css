@@ -390,7 +390,7 @@
 .itemsHead {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -425,10 +425,32 @@
   border-bottom: 1px solid var(--color-hairline);
 }
 
+.serialWrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.serialTag {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-style: italic;
+  color: var(--color-locked);
+  padding-top: 1px;
+}
+
+.serialList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Muted like the model eyebrow (owner call) — the serials are reference
+   data, not a scan target. */
 .serialLine {
   font-family: var(--font-figures);
   font-size: 12px;
-  color: var(--color-ink);
+  color: var(--color-locked);
 }
 
 .serialPlaceholder {
