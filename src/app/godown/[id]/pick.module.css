@@ -57,7 +57,7 @@
 .cameraWrap {
   position: relative;
   margin: 12px 0 0;
-  height: 220px;
+  height: 280px;
   background: var(--color-ink);
   border-radius: var(--radius);
   overflow: hidden;
@@ -69,17 +69,17 @@
   object-fit: cover;
 }
 
-/* The reticle — a wide/short landscape window (barcodes are wide, not tall).
-   MUST stay in sync with Scanner.tsx's RETICLE_W/RETICLE_H (0.9 × 0.28,
+/* The reticle — a wide landscape window (barcodes are wide, not tall).
+   MUST stay in sync with Scanner.tsx's RETICLE_W/RETICLE_H (0.92 × 0.5,
    centered): the decode loop crops exactly this region, so the box is a
    truthful "only this part is read" indicator, not decoration. The huge
    box-shadow dims everything outside it. */
 .reticle {
   position: absolute;
-  left: 5%;
-  right: 5%;
-  top: 36%;
-  bottom: 36%;
+  left: 4%;
+  right: 4%;
+  top: 25%;
+  bottom: 25%;
   border: 2px solid var(--color-accent);
   border-radius: var(--radius);
   box-shadow: 0 0 0 999px rgba(20, 24, 31, 0.45);

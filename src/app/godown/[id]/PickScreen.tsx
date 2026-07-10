@@ -208,7 +208,16 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
                     className={styles.manualInput}
                     value={manualText}
                     onChange={(e) => setManualText(e.target.value)}
-                    placeholder="Or type a serial…"
+                    onKeyDown={(e) => {
+                      // A USB-C / Bluetooth HID barcode scanner "types" the
+                      // serial then sends Enter — treat that like Add, so a
+                      // plug-in scanner works with no extra wiring.
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (addScan(line.id, manualText)) setManualText("");
+                      }
+                    }}
+                    placeholder="Or type / scan a serial…"
                     autoCapitalize="characters"
                     autoCorrect="off"
                     spellCheck={false}
