@@ -3676,3 +3676,36 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Feature branch is complete + verified. Owner phone test on the deployed HTTPS URL (tap Download PDF → native viewer → share to WhatsApp; confirm the LG model line + prices + 404 for a non-visible order). Font registration (₹ glyph) is the natural follow-up. `feature/pickslip-pdf` is merge-ready.
 
 ---
+
+## Review of 34b73d4 — feat(fulfilment): all-brand + partial pick → backorder split (migration + pick UI)
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Stage 1 core of the fulfilment overhaul. Every brand now routes to `approved` (the godown fulfils all, not just LG). The godown picks brand-aware — LG scans serials, fixed brands enter a per-line qty — and a pick may be **partial**. A short pick **splits** the order: the original ships the picked qty (ordered snapshot kept immutable via a new `order_items.picked_qty`; `orders.total_paise` recomputed to the SHIPPED total), and a new `backorder` child (same salesman, `parent_order_id` link, fresh gapless `order_no`) holds the remainder; `punch_order` re-enters it. Scope = the migration + the godown pick screen; the backorder/detail *surfaces* are the next commit.
+
+**What works (verified by execution — 4 live rolled-back probes + build):**
+- **Partial split, fixed/qty path** (migration L441-476): pick 3 of a 5-qty line + 3 of a 3-qty line → original `ready_to_bill`, `total_paise=230700` = SHIPPED Σ(3×13500 + 3×63400), **not** the ordered 257700; child `backorder` total 27000 = 2×13500, `order_no` 1053 > parent 1052, `same_salesman=true`, `parent_ok=true`; only the short line backordered (fully-picked line omitted).
+- **Immutability held** (checklist): the ordered line snapshot is never rewritten — P1 `line_total_paise` stayed 67500 (=5×price) though only 3 shipped; `picked_qty=3` is purely additive.
+- **LG/scan path** (L406-433): 2 scans on a 3-qty line + 2 on a 2-qty line → `picked_qty`=(2,2); serials extracted **server-side** from raw (`PRE123ABCD100001IN`→`123ABCD100001`); within-bill dedup live; shipped total 3000000; child = 1×LG1 remainder.
+- **All-brand approve routing** (L74): a FIXED-brand pending order → `approve_order` → `approved` (was: straight to ready_to_bill).
+- **Guard edges** (L87-146): `pending_approval→ready_to_bill` direct now **rejected**; `backorder→pending_approval` allowed for the salesman-owner (punch). Guard is **BEFORE UPDATE only** (pg_trigger audit) so the `backorder`/`pending_approval` INSERTs bypass it — no false reject.
+- **≥1-unit floor** (L436): picking 0 across the order → "pick at least one unit to submit". **Full pick = no split** (child_ct 0). **`punch_order`** (salesman) → `pending_approval`, resets the edit window (L484).
+- **RLS all-brand pickup** (L523-535): acting as `godown` under RLS, a fixed-brand (`requires_scan=false`) `approved` order is now visible (count 1; was 0 under the old brand gate). `order_items` mirrored; the scans policy was already status-only, correctly left untouched.
+- **Total-recompute trigger** wired AFTER INS/UPD/DEL on `order_items` → `Σ(coalesce(picked_qty,qty)×unit_price)`; pre-pick equals the old `Σ(line_total)`, so existing order totals are unchanged (L25-43).
+- `npm run build` clean (tsc + eslint) at 34b73d4; `/godown/[id]` + `/scan/[id]` compile with the new `submit_pick(p_order_id, p_lines)` signature.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- A backorder created now is **not yet actionable in the UI** — the chip/tone, the "Pending scan"/To-pick relabel, the Punch button, and the picked-vs-ordered detail are the *next* commit (072e423). At 34b73d4 a backorder renders via graceful defaults (status chip → `{tone:locked, label:"backorder"}`; `backordered` event → `time + action`) — **no crash** (confirmed 34b73d4 doesn't touch order-status.ts/order-events.ts; defaults pre-existed), just not user-usable until the surfaces land.
+- Child `editable_until = now()` (already-expired) is cosmetically odd but harmless — a `backorder` is editable by status (not window) in `update_order_items`, and `punch_order` resets it.
+
+**Domain / correctness checks:** State machine ✓ (edges guard-enforced, verified live). Order numbering ✓ (child draws monotonic `order_no` from the sequence; gap-tolerant per D1). Immutable snapshots ✓ (ordered qty/price/line_total untouched — proven). RLS ✓ (godown all-brand `approved`, live role-switched impersonation). Money ✓ (integer paise, bigint mult, shipped totals exact). Locking ✓ (`select … for update` on the order in submit_pick).
+
+**What I tried:** `pg_trigger` timing/event audit (guard=BEFORE UPDATE, recompute=AFTER I/U/D). 4 live rolled-back DO-block probes impersonating godown/admin/salesman via `request.jwt.claims` + role-switch: (1) fixed-qty partial split; (2) LG-scan partial split + serial extraction; (3) approve fixed→approved + full-pick-no-split + zero-pick reject + punch + pending→ready_to_bill reject; (4) RLS godown-sees-fixed-approved. `npm run build`.
+
+**Open flags (cumulative):** No 🔴, no new flag. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (Stage 2 dispatch parked — `dispatched` correctly absent from the status CHECK.)
+
+**Next-commit suggestion:** The surfaces (072e423) — verify a salesman can see + Punch his backorder, the picked-vs-ordered detail reads right, and the "Pending scan"/To-pick relabel is label-only (DB status stays `approved`).
+
+---
