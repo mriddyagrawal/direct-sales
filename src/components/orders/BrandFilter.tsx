@@ -17,7 +17,7 @@ interface BrandFilterProps {
 export function BrandFilter({ brands, value, onChange }: BrandFilterProps) {
   const [open, setOpen] = useState(false);
   const selected = brands.find((b) => b.id === value);
-  const valueLabel = selected ? selected.name : "All brands";
+  const valueLabel = selected ? selected.name : "All";
 
   function select(id: string) {
     onChange(id);
@@ -32,7 +32,7 @@ export function BrandFilter({ brands, value, onChange }: BrandFilterProps) {
           className={`${styles.option} ${value === "all" ? styles.optionActive : ""}`}
           onClick={() => select("all")}
         >
-          All brands
+          All
         </button>
         {brands.map((b) => (
           <button

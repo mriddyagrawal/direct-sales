@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
 import type { DateRange } from "react-day-picker";
 import { createClient } from "@/lib/supabase/client";
@@ -250,13 +250,16 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
           {isStaff && <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />}
           {isStaff && multiBrand && <BrandFilter brands={brands} value={brandId} onChange={setBrandId} />}
           <DateRangeFilter value={range} onChange={setRange} />
-          <input
-            ref={searchRef}
-            className={styles.search}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search ref or retailer"
-          />
+          <div className={styles.searchWrap}>
+            <Glyph icon={Search} size={14} />
+            <input
+              ref={searchRef}
+              className={styles.search}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search ref or retailer"
+            />
+          </div>
         </div>
       </div>
 
