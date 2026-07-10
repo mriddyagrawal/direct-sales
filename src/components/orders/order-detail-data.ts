@@ -13,7 +13,7 @@ export const ORDER_DETAIL_SELECT =
   "cancelled_by_profile:profiles!orders_cancelled_by_fkey(full_name), " +
   "approved_by_profile:profiles!orders_approved_by_fkey(full_name), " +
   "picked_by_profile:profiles!orders_picked_by_fkey(full_name), " +
-  "parent_order:orders!orders_parent_order_id_fkey(order_ref), " +
+  "parent_order:orders!parent_order_id(order_ref), " +
   "brands(name, code, show_model), " +
   "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, picked_qty, position, products(tally_name), order_item_scans(id, serial, scanned_at)), " +
   "order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))";

@@ -76,6 +76,9 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
       return `${time} Picked by ${actorLabel}${summary}`;
     }
     case "backordered": {
+      // On the child order (parent_ref present): its genesis. On the parent
+      // (child_ref present): the split it produced.
+      if (typeof details.parent_ref === "string") return `${time} Backordered from ${details.parent_ref}`;
       const ref = typeof details.child_ref === "string" ? details.child_ref : "a backorder";
       return `${time} Backordered → ${ref}`;
     }
