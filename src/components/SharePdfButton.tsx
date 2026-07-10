@@ -66,7 +66,7 @@ export function SharePdfButton({ orderId, orderRef, variant = "secondary" }: Sha
       aria-busy={busy || undefined}
     >
       <Glyph icon={Share2} />
-      {busy ? "Preparing…" : failed ? "Share failed — retry" : "Share PDF"}
+      {busy ? "Preparing…" : failed ? "Share failed — retry" : "Share"}
     </Button>
   );
 }
