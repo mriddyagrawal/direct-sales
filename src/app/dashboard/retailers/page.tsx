@@ -19,7 +19,7 @@ export default async function RetailersPage() {
   const { data } = await supabase
     .from("retailers")
     .select("id, name, area, phone, verified, active")
-    .order("created_at", { ascending: false });
+    .order("name", { ascending: true });
 
   return <RetailersQueue initialRetailers={(data ?? []) as RetailerRow[]} />;
 }
