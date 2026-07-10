@@ -19,13 +19,14 @@ export function getOrderStatusTag(
   // Backorder — the remainder split off a partial pick, awaiting a Punch Order
   // to re-enter the pipeline. Violet, editable until punched.
   if (order.status === "backorder") return { tone: "backorder", label: "Backorder" };
-  // Approved: admin-signed-off scan-brand (LG) order awaiting the godown —
-  // neutral/ink, deliberately NOT the green of Billed. Label = "Pending scan"
-  // (frontend only; the DB status stays `approved`). Fixed brands never hold
-  // this status (they jump to ready_to_bill).
+  // Approved: admin-signed-off, awaiting the godown pick — ALL brands hold this
+  // now (the Stage-1 fulfilment overhaul routes every brand here, not just LG;
+  // fixed brands no longer skip to ready_to_bill). Neutral/ink, deliberately NOT
+  // the green of Billed. Label = "Pending scan" (owner's choice; frontend only —
+  // the DB status stays `approved`).
   if (order.status === "approved") return { tone: "locked", label: "Pending scan" };
-  // Ready to bill: a fixed brand straight from approval, or LG post-pick —
-  // awaiting the accountant's Tally entry. Accent (not green), still in flight.
+  // Ready to bill: post-pick — any brand now goes approved → godown pick → here
+  // — awaiting the accountant's Tally entry. Accent (not green), still in flight.
   if (order.status === "ready_to_bill") return { tone: "accent", label: "Ready to bill" };
 
   // Pending approval — awaiting the admin (amber = "needs an eye"). The
