@@ -64,9 +64,10 @@
     overflow-x: visible;
   }
 
+  /* Natural wrap, compact (owner mock): chips flow at their own width and
+     wrap — no grow, so a lone last chip never stretches across a full row. */
   .filterTab {
-    flex: 1 1 auto;
-    justify-content: center;
+    flex: 0 0 auto;
   }
 }
 
@@ -77,34 +78,59 @@
   gap: 8px;
 }
 
-/* Mobile filter layout (owner mockup 2026-07-11): a full-bleed hairline
-   between the TABS and the filters, then SALESMAN + BRAND sharing one line,
-   DATE and SEARCH full-width each. (nth-last-child so the same rule works
-   for the salesman role, which has no salesman/brand dropdowns.) */
+/* Desktop: the halves wrapper dissolves so SalesmanFilter/BrandFilter stay
+   direct flex-row items exactly as before. */
+.filterHalves,
+.filterFull {
+  display: contents;
+}
+
+/* Mobile filter layout (owner mock 7a/7b) — deliberately DUMB structure, no
+   grid, no nth-child: the group is a plain column (every child full width by
+   stretch), and the halves wrapper is a plain row splitting 50/50. */
 @media (max-width: 767px) {
-  /* THE missing piece (found via LAN test): .filters is a ROW by default, so
-     the filter group was wrapping under the tabs at its intrinsic ~60% width
-     — every rule inside it worked, just inside a too-narrow box. Stack it. */
   .filters {
     flex-direction: column;
     align-items: stretch;
   }
 
   .filterGroup {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
     border-top: 1px solid var(--color-hairline);
     margin: 0 -16px;
     padding: 14px 16px 0;
   }
 
-  .filterGroup > * {
+  /* GRID, not flex: minmax(0, 1fr) tracks put the zero-minimum on the TRACK
+     itself, so content can NEVER push these past the container — the flex
+     min-width:0 kept losing the CSS-module source-order coin flip. Halves =
+     two tracks, DATE = one full track. */
+  .filterHalves {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .filterFull {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filterHalves > *,
+  .filterFull > * {
     min-width: 0;
   }
 
-  .filterGroup > :nth-last-child(2),
-  .filterGroup > :last-child {
-    grid-column: 1 / -1;
+  .searchWrap {
+    width: 100%;
+  }
+
+  /* Belt: nothing in the filter zone may cause a horizontal scroll. */
+  .filters {
+    overflow-x: hidden;
   }
 }
 
