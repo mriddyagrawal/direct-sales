@@ -27,7 +27,7 @@
 /* Filled green — the "let it through" action (Approve). Same weight as
    primary; green so approval reads distinctly from billing (blue). */
 .success {
-  background: var(--color-processed);
+  background: #49c466; /* owner-picked approve green (lighter than the chip green) */
   color: var(--color-white);
 }
 
