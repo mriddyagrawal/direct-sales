@@ -6,15 +6,16 @@
 import type { OrderDetailData } from "./OrderDetailView";
 
 export const ORDER_DETAIL_SELECT =
-  "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, salesman_id, " +
+  "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, salesman_id, parent_order_id, " +
   "retailers(name, area, phone, verified), " +
   "salesman:profiles!orders_salesman_id_fkey(full_name), " +
   "processed_by_profile:profiles!orders_processed_by_fkey(full_name), " +
   "cancelled_by_profile:profiles!orders_cancelled_by_fkey(full_name), " +
   "approved_by_profile:profiles!orders_approved_by_fkey(full_name), " +
   "picked_by_profile:profiles!orders_picked_by_fkey(full_name), " +
+  "parent_order:orders!orders_parent_order_id_fkey(order_ref), " +
   "brands(name, code, show_model), " +
-  "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, position, products(tally_name), order_item_scans(id, serial, scanned_at)), " +
+  "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, picked_qty, position, products(tally_name), order_item_scans(id, serial, scanned_at)), " +
   "order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))";
 
 export interface OrderDetailItemRow {
@@ -24,6 +25,9 @@ export interface OrderDetailItemRow {
   unit_price_paise: number;
   qty: number;
   line_total_paise: number;
+  // Units actually picked (shipped). Null until the order is picked; the
+  // ordered qty/line_total above stay the immutable placed snapshot.
+  picked_qty: number | null;
   position: number;
   // The CURRENT product's model (display-only, like the pick slip) — the
   // snapshot product_name stays the display name of record.
@@ -56,6 +60,8 @@ export interface OrderDetailQueryRow {
   approved_by: string | null;
   picked_at: string | null;
   salesman_id: string;
+  parent_order_id: string | null;
+  parent_order: { order_ref: string } | null;
   retailers: { name: string; area: string | null; phone: string | null; verified: boolean } | null;
   salesman: { full_name: string } | null;
   processed_by_profile: { full_name: string } | null;
@@ -87,6 +93,8 @@ export function toOrderDetailProps(row: OrderDetailQueryRow): {
       cancelledById: row.cancelled_by,
       cancelledByName: row.cancelled_by_profile?.full_name ?? null,
       salesmanId: row.salesman_id,
+      parentOrderId: row.parent_order_id,
+      parentOrderRef: row.parent_order?.order_ref ?? null,
       salesmanName: row.salesman?.full_name ?? "Unknown",
       processedByName: row.processed_by_profile?.full_name ?? null,
       retailerName: row.retailers?.name ?? "Unknown retailer",
