@@ -63,12 +63,6 @@
   color: var(--color-amber);
 }
 
-.error {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-error);
-}
-
 .empty {
   padding: 24px;
   background: var(--color-white);
@@ -124,12 +118,6 @@
   color: var(--color-locked);
 }
 
-.rowActions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 .newBadge {
   padding: 2px 6px;
   background: var(--color-amber);
@@ -150,34 +138,11 @@
   border-radius: var(--radius);
 }
 
-.editCard {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius);
+
+.rowClickable {
+  cursor: pointer;
 }
 
-.editRow {
-  display: flex;
-  gap: 8px;
-}
-
-.editRow > * {
-  flex: 1;
-}
-
-.helper {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-locked);
-  border-left: 2px solid var(--color-accent);
-  padding-left: 8px;
-}
-
-.editActions {
-  display: flex;
-  gap: 8px;
+.rowClickable:hover {
+  background: rgba(29, 78, 216, 0.04);
 }

@@ -1,23 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { Field } from "@/components/ui/Field";
-import { Button } from "@/components/ui/Button";
+import { RetailerModal } from "./RetailerModal";
 import type { RetailerRow } from "./page";
 import styles from "./RetailersQueue.module.css";
 
 type FilterTab = "all" | "pending" | "verified" | "deactivated";
 
-interface EditForm {
-  name: string;
-  area: string;
-  phone: string;
-}
-
-// S11 — verification queue. A pending row opens straight into inline edit;
-// fixing the spelling *is* the verification act (one motion, one Save).
+// S11 — the retailers ledger. Row-click opens the RetailerModal (the same
+// window shape as the Products page — owner call 2026-07-11); saving an
+// unverified shop verifies it (fixing the spelling IS the verification act).
+// Activate/deactivate lives inside the modal now, like Products.
 //
 // review flag ㉜(🅐): render straight from the `initialRetailers` prop, never
 // copied into useState — see the matching note in ProductsPricing.tsx.
@@ -26,14 +20,7 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
   // Default tab is ALL (owner call 2026-07-11) — pending-verification is one
   // tap away, not the landing view.
   const [tab, setTab] = useState<FilterTab>("all");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<EditForm>({ name: "", area: "", phone: "" });
-  const [saving, setSaving] = useState(false);
-  // review flag ㉜(🅑): which specific row/action is busy, so the spinner
-  // lands on the button actually clicked rather than dimming the whole list.
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<RetailerRow | null>(null);
   const [query, setQuery] = useState("");
 
   const counts = {
@@ -57,64 +44,6 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
     if (q && !`${r.name} ${r.area ?? ""} ${r.phone ?? ""}`.toLowerCase().includes(q)) return false;
     return true;
   });
-
-  function startEdit(r: RetailerRow) {
-    setEditingId(r.id);
-    setForm({ name: r.name, area: r.area ?? "", phone: r.phone ?? "" });
-    setError(null);
-  }
-
-  function discardEdit() {
-    setEditingId(null);
-    setError(null);
-  }
-
-  async function saveAndVerify(id: string) {
-    if (!form.name.trim()) {
-      setError("Shop name is required.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("retailers")
-      .update({
-        name: form.name.trim(),
-        area: form.area.trim() || null,
-        phone: form.phone.trim() || null,
-        verified: true,
-      })
-      .eq("id", id);
-    if (updateError) {
-      setSaving(false);
-      setError(updateError.message);
-      return;
-    }
-    setEditingId(null);
-    setSaving(false);
-    // Stay busy through the refresh (㉜🅑) — see ProductsPricing.tsx note.
-    startTransition(() => {
-      router.refresh();
-    });
-  }
-
-  async function setActive(id: string, active: boolean) {
-    const key = `${id}:${active ? "reactivate" : "deactivate"}`;
-    setBusyKey(key);
-    setError(null);
-    const supabase = createClient();
-    const { error: updateError } = await supabase.from("retailers").update({ active }).eq("id", id);
-    if (updateError) {
-      setBusyKey(null);
-      setError(updateError.message);
-      return;
-    }
-    startTransition(() => {
-      router.refresh();
-      setBusyKey(null);
-    });
-  }
 
   return (
     <div className={styles.page}>
@@ -156,8 +85,6 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
         placeholder="Search retailers — name, area or phone"
       />
 
-      {error && <p className={styles.error}>{error}</p>}
-
       {filtered.length === 0 ? (
         <div className={styles.empty}>
           {q ? `No shops match "${query}".` : tab === "pending" ? "All shops verified." : "No shops in this view."}
@@ -165,51 +92,21 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
       ) : (
         <div className={styles.list}>
           {filtered.map((r) => {
-            if (editingId === r.id) {
-              const needsVerification = !r.verified;
-              return (
-                <div key={r.id} className={styles.editCard}>
-                  <div className={styles.editRow}>
-                    <Field label="Shop name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                  </div>
-                  <div className={styles.editRow}>
-                    <Field label="Area" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
-                    <Field label="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                  </div>
-                  {needsVerification && (
-                    <p className={styles.helper}>
-                      Fix the spelling now — this exact name becomes the Tally ledger mapping in Phase 2.
-                    </p>
-                  )}
-                  <div className={styles.editActions}>
-                    <Button variant="secondary" onClick={discardEdit}>
-                      Discard
-                    </Button>
-                    <Button variant="primary" onClick={() => saveAndVerify(r.id)} loading={saving || isPending}>
-                      Save &amp; verify
-                    </Button>
-                  </div>
-                </div>
-              );
-            }
-
             const needsVerification = r.active && !r.verified;
             const isDeactivated = !r.active;
-
             return (
               <div
                 key={r.id}
-                className={`${styles.row} ${isDeactivated ? styles.rowDeactivated : ""}`}
-                onClick={needsVerification ? () => startEdit(r) : undefined}
-                role={needsVerification ? "button" : undefined}
-                tabIndex={needsVerification ? 0 : undefined}
-                onKeyDown={
-                  needsVerification
-                    ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") startEdit(r);
-                      }
-                    : undefined
-                }
+                className={`${styles.row} ${styles.rowClickable} ${isDeactivated ? styles.rowDeactivated : ""}`}
+                onClick={() => setEditing(r)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setEditing(r);
+                  }
+                }}
               >
                 <div className={styles.rowInfo}>
                   <p className={styles.rowName}>
@@ -221,50 +118,21 @@ export function RetailersQueue({ initialRetailers: retailers }: { initialRetaile
                     {[r.area, r.phone].filter(Boolean).join(" · ") || "No area/phone on file"}
                   </p>
                 </div>
-                <div className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-                  {isDeactivated ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() => setActive(r.id, true)}
-                      loading={busyKey === `${r.id}:reactivate`}
-                    >
-                      Reactivate
-                    </Button>
-                  ) : needsVerification ? (
-                    <>
-                      {/* review flag ㉜(🅒): pending rows previously offered only Edit +
-                          Deactivate — verifying only happened via the row's onClick, which
-                          isn't discoverable. This is the explicit primary action. */}
-                      <Button variant="primary" onClick={() => startEdit(r)}>
-                        Review &amp; verify
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => setActive(r.id, false)}
-                        loading={busyKey === `${r.id}:deactivate`}
-                      >
-                        Deactivate
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="secondary" onClick={() => startEdit(r)}>
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => setActive(r.id, false)}
-                        loading={busyKey === `${r.id}:deactivate`}
-                      >
-                        Deactivate
-                      </Button>
-                    </>
-                  )}
-                </div>
               </div>
             );
           })}
         </div>
+      )}
+
+      {editing && (
+        <RetailerModal
+          retailer={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );
