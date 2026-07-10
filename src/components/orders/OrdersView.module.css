@@ -149,11 +149,15 @@
   padding: 0 12px;
   background: var(--color-white);
   border: 1px solid var(--color-hairline);
-  border-radius: 16px;
+  /* Rectangle, not pill (owner call) — matches the DATE/search boxes. */
+  border-radius: var(--radius);
   font-family: var(--font-structure);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
+  /* Explicit ink: a <button> inherits iOS Safari's system-blue text tint
+     otherwise, so inactive tabs rendered blue on iPhone. */
+  color: var(--color-ink);
 }
 
 .tabCount {
