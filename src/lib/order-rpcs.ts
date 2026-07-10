@@ -116,9 +116,11 @@ export async function cancelOrder(orderId: string, reason?: string): Promise<Ord
   );
 }
 
-export async function processOrder(orderId: string): Promise<OrderRow> {
+// Billing requires the Tally bill number (server validates non-empty; the UI
+// blocks empty too). btrim/normalisation is server-side — send it verbatim.
+export async function processOrder(orderId: string, billNo: string): Promise<OrderRow> {
   const supabase = createClient();
-  return callRpc(() => supabase.rpc("process_order", { p_order_id: orderId }));
+  return callRpc(() => supabase.rpc("process_order", { p_order_id: orderId, p_bill_no: billNo }));
 }
 
 export async function approveOrder(orderId: string): Promise<OrderRow> {

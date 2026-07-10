@@ -49,6 +49,7 @@ export interface PickSlipPdfItem {
   unit_price_paise: number;
   line_total_paise: number;
   tally_name: string | null;
+  serials: string[];
 }
 
 export interface PickSlipPdfProps {
@@ -57,6 +58,7 @@ export interface PickSlipPdfProps {
   submittedAt: string;
   notes: string;
   totalPaise: number;
+  tallyBillNo: string | null;
   retailerName: string;
   retailerArea: string | null;
   retailerPhone: string | null;
@@ -195,6 +197,22 @@ const s = StyleSheet.create({
     color: LOCKED,
     marginTop: 1.5,
   },
+  // Serials nested under the line — mirrors the on-screen order page: an
+  // italic "Serials" tag, then each serial stacked in muted mono.
+  serialWrap: {
+    marginTop: 3,
+  },
+  serialTag: {
+    fontFamily: "Helvetica-Oblique",
+    fontSize: 7,
+    color: LOCKED,
+  },
+  serialLine: {
+    fontFamily: "Courier",
+    fontSize: 8,
+    color: LOCKED,
+    marginTop: 0.5,
+  },
   money: {
     fontFamily: "Courier",
     fontSize: 9,
@@ -252,6 +270,7 @@ export function PickSlipPdf({
   submittedAt,
   notes,
   totalPaise,
+  tallyBillNo,
   retailerName,
   retailerArea,
   retailerPhone,
@@ -288,6 +307,12 @@ export function PickSlipPdf({
             {retailerPhone ? <Text style={s.metaMono}>{retailerPhone}</Text> : null}
           </Text>
           <Text style={s.metaLine}>Salesman: {pdfText(salesmanName)}</Text>
+          {/* Bill No only on a billed order (null → omit the line entirely). */}
+          {tallyBillNo ? (
+            <Text style={s.metaLine}>
+              Bill No: <Text style={s.metaMono}>{pdfText(tallyBillNo)}</Text>
+            </Text>
+          ) : null}
         </View>
 
         <Text style={s.linesRule}>{items.length} {items.length === 1 ? "LINE" : "LINES"}</Text>
@@ -311,6 +336,14 @@ export function PickSlipPdf({
                 </>
               ) : (
                 <Text style={s.itemName}>{pdfText(item.product_name)}</Text>
+              )}
+              {item.serials.length > 0 && (
+                <View style={s.serialWrap}>
+                  <Text style={s.serialTag}>Serials</Text>
+                  {item.serials.map((serial, j) => (
+                    <Text key={j} style={s.serialLine}>{pdfText(serial)}</Text>
+                  ))}
+                </View>
               )}
             </View>
             <Text style={[s.qty, s.colQty]}>{item.qty}</Text>

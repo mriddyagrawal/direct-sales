@@ -59,6 +59,7 @@ export interface OrderDetailData {
   submittedAt: string;
   editableUntil: string;
   processedAt: string | null;
+  tallyBillNo: string | null;
   cancelledAt: string | null;
   cancelledById: string | null;
   cancelledByName: string | null;
@@ -108,6 +109,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const [addQuery, setAddQuery] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmProcess, setConfirmProcess] = useState(false);
+  const [billNo, setBillNo] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -279,10 +281,17 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   }
 
   async function handleProcess() {
+    // Client-side mirror of the RPC's non-empty guard — the server rejects an
+    // empty bill number too (single source of truth), this just saves a round
+    // trip and shows the message inline.
+    if (!billNo.trim()) {
+      setError("Enter the Tally bill number.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await processOrder(order.id);
+      await processOrder(order.id, billNo.trim());
       setConfirmProcess(false);
       startTransition(() => {
         router.refresh();
@@ -344,6 +353,16 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         })()}
         {editable && (
           <p className={styles.byline}>editable until {formatOrderTimestamp(order.editableUntil, now)}</p>
+        )}
+        {/* Billed byline: when + who + the Tally bill number. `Bill #` only
+            renders when present, so the pre-existing billed orders (null bill
+            no) show the byline without it. */}
+        {order.status === "billed" && order.processedAt && (
+          <p className={styles.byline}>
+            billed {formatOrderTimestamp(order.processedAt, now)}
+            {order.processedByName ? ` by ${order.processedByName}` : ""}
+            {order.tallyBillNo ? ` · Bill #${order.tallyBillNo}` : ""}
+          </p>
         )}
       </div>
 
@@ -603,6 +622,14 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         <BottomSheet onClose={() => setConfirmProcess(false)}>
           <p className={styles.confirmTitle}>Mark {order.orderRef} billed?</p>
           <p className={styles.confirmBody}>The salesman&apos;s app goes read-only for this order immediately.</p>
+          <label className={styles.notesLabel}>TALLY BILL NUMBER</label>
+          <input
+            className={styles.billNoInput}
+            value={billNo}
+            onChange={(e) => setBillNo(e.target.value)}
+            placeholder="e.g. GE/2026-27/0421"
+            autoFocus
+          />
           {error && <p className={styles.error}>{error}</p>}
           <div className={styles.editActions}>
             <Button variant="secondary" onClick={() => setConfirmProcess(false)}>

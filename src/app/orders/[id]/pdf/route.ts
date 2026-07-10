@@ -16,6 +16,7 @@ interface PdfItemRow {
   line_total_paise: number;
   position: number;
   products: { tally_name: string } | null;
+  order_item_scans: { serial: string; scanned_at: string }[];
 }
 
 interface PdfOrderRow {
@@ -24,6 +25,7 @@ interface PdfOrderRow {
   submitted_at: string;
   notes: string;
   total_paise: number;
+  tally_bill_no: string | null;
   retailers: { name: string; area: string | null; phone: string | null } | null;
   salesman: { full_name: string } | null;
   brands: { name: string; code: string; show_model: boolean } | null;
@@ -38,7 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data } = await supabase
     .from("orders")
     .select(
-      "order_ref, status, submitted_at, notes, total_paise, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code, show_model), order_items(product_name, qty, unit_price_paise, line_total_paise, position, products(tally_name))",
+      "order_ref, status, submitted_at, notes, total_paise, tally_bill_no, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code, show_model), order_items(product_name, qty, unit_price_paise, line_total_paise, position, products(tally_name), order_item_scans(serial, scanned_at))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -56,6 +58,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       unit_price_paise: it.unit_price_paise,
       line_total_paise: it.line_total_paise,
       tally_name: it.products?.tally_name ?? null,
+      // Serials in scan order — same nesting as the on-screen order page.
+      // Empty for fixed brands / unpicked orders (RLS scopes who sees them).
+      serials: [...(it.order_item_scans ?? [])]
+        .sort((a, b) => a.scanned_at.localeCompare(b.scanned_at))
+        .map((s) => s.serial),
     }));
 
   const buffer = await renderPickSlipPdfBuffer({
@@ -64,6 +71,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     submittedAt: order.submitted_at,
     notes: order.notes,
     totalPaise: order.total_paise,
+    tallyBillNo: order.tally_bill_no,
     retailerName: order.retailers?.name ?? "Unknown retailer",
     retailerArea: order.retailers?.area ?? null,
     retailerPhone: order.retailers?.phone ?? null,
