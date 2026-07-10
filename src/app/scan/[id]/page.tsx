@@ -7,7 +7,7 @@ interface ScanOrderRow {
   order_ref: string;
   status: string;
   retailers: { name: string; area: string | null } | null;
-  brands: { show_model: boolean } | null;
+  brands: { show_model: boolean; requires_scan: boolean } | null;
   order_items: { id: string; product_name: string; qty: number; position: number; products: { tally_name: string } | null }[];
 }
 
@@ -37,7 +37,7 @@ export default async function ScanPage({ params }: { params: Promise<{ id: strin
 
   const { data } = await supabase
     .from("orders")
-    .select("id, order_ref, status, retailers(name, area), brands(show_model), order_items(id, product_name, qty, position, products(tally_name))")
+    .select("id, order_ref, status, retailers(name, area), brands(show_model, requires_scan), order_items(id, product_name, qty, position, products(tally_name))")
     .eq("id", id)
     .maybeSingle();
 
@@ -54,6 +54,7 @@ export default async function ScanPage({ params }: { params: Promise<{ id: strin
       retailerName={order.retailers?.name ?? "Unknown retailer"}
       retailerArea={order.retailers?.area ?? null}
       showModel={order.brands?.show_model ?? false}
+      requiresScan={order.brands?.requires_scan ?? false}
       lines={lines.map((l) => ({ id: l.id, name: l.product_name, qty: l.qty, tally_name: l.products?.tally_name ?? null }))}
       doneHref={detailHref}
     />

@@ -128,23 +128,34 @@ export async function approveOrder(orderId: string): Promise<OrderRow> {
   return callRpc(() => supabase.rpc("approve_order", { p_order_id: orderId }));
 }
 
-// Godown pick submission (godown role only, LG/approval orders only). One
-// batch per order: `scans` is one entry per physical unit, each carrying the
-// RAW scanner output — the serial is derived server-side (authoritative);
-// anything the client extracted is display-only. The RPC validates full
-// per-line coverage and global serial uniqueness, then flips the order
-// approved -> ready_to_bill.
-export interface PickScan {
-  order_item_id: string;
-  raw_scan: string;
+// Promote a backorder back into the pipeline (backorder → pending_approval).
+// Caller must be the order's salesman or an admin (enforced server-side).
+export async function punchOrder(orderId: string): Promise<OrderRow> {
+  const supabase = createClient();
+  return callRpc(() => supabase.rpc("punch_order", { p_order_id: orderId }));
 }
 
-export async function submitPick(orderId: string, scans: PickScan[]): Promise<OrderRow> {
+// Godown pick submission (any active role; a salesman is scoped to his own
+// order server-side). ONE line per ordered item, brand-aware + partial:
+//   • LG (requires_scan): send the picked units' RAW scans — serial derived
+//     server-side, one per picked unit; scanning fewer than ordered is a
+//     partial pick.
+//   • Zeb/Lum: send `picked_qty` (0..ordered); no serials.
+// A short pick splits the order server-side — the original ships the picked
+// qty (→ ready_to_bill), a new `backorder` child holds the remainder. At
+// least one unit across the order is required.
+export interface PickLineInput {
+  order_item_id: string;
+  picked_qty?: number;
+  scans?: string[];
+}
+
+export async function submitPick(orderId: string, lines: PickLineInput[]): Promise<OrderRow> {
   const supabase = createClient();
   return callRpc(() =>
     supabase.rpc("submit_pick", {
       p_order_id: orderId,
-      p_scans: scans as unknown as Database["public"]["Functions"]["submit_pick"]["Args"]["p_scans"],
+      p_lines: lines as unknown as Database["public"]["Functions"]["submit_pick"]["Args"]["p_lines"],
     }),
   );
 }

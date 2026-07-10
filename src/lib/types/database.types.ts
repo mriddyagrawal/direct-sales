@@ -133,6 +133,7 @@ export type Database = {
           id: string
           line_total_paise: number
           order_id: string
+          picked_qty: number | null
           position: number
           product_id: string
           product_name: string
@@ -143,6 +144,7 @@ export type Database = {
           id?: string
           line_total_paise: number
           order_id: string
+          picked_qty?: number | null
           position?: number
           product_id: string
           product_name: string
@@ -153,6 +155,7 @@ export type Database = {
           id?: string
           line_total_paise?: number
           order_id?: string
+          picked_qty?: number | null
           position?: number
           product_id?: string
           product_name?: string
@@ -188,6 +191,7 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          parent_order_id: string | null
           picked_at: string | null
           picked_by: string | null
           processed_at: string | null
@@ -211,6 +215,7 @@ export type Database = {
           notes?: string
           order_no: number
           order_ref: string
+          parent_order_id?: string | null
           picked_at?: string | null
           picked_by?: string | null
           processed_at?: string | null
@@ -234,6 +239,7 @@ export type Database = {
           notes?: string
           order_no?: number
           order_ref?: string
+          parent_order_id?: string | null
           picked_at?: string | null
           picked_by?: string | null
           processed_at?: string | null
@@ -266,6 +272,13 @@ export type Database = {
             columns: ["cancelled_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_parent_order_id_fkey"
+            columns: ["parent_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {
@@ -431,6 +444,7 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          parent_order_id: string | null
           picked_at: string | null
           picked_by: string | null
           processed_at: string | null
@@ -464,6 +478,7 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          parent_order_id: string | null
           picked_at: string | null
           picked_by: string | null
           processed_at: string | null
@@ -502,6 +517,40 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          parent_order_id: string | null
+          picked_at: string | null
+          picked_by: string | null
+          processed_at: string | null
+          processed_by: string | null
+          retailer_id: string
+          salesman_id: string
+          status: string
+          submitted_at: string
+          tally_bill_no: string | null
+          total_paise: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      punch_order: {
+        Args: { p_order_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          brand_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          editable_until: string
+          id: string
+          notes: string
+          order_no: number
+          order_ref: string
+          parent_order_id: string | null
           picked_at: string | null
           picked_by: string | null
           processed_at: string | null
@@ -539,6 +588,7 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          parent_order_id: string | null
           picked_at: string | null
           picked_by: string | null
           processed_at: string | null
@@ -559,7 +609,7 @@ export type Database = {
         }
       }
       submit_pick: {
-        Args: { p_order_id: string; p_scans: Json }
+        Args: { p_lines: Json; p_order_id: string }
         Returns: {
           approved_at: string | null
           approved_by: string | null
@@ -571,6 +621,7 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          parent_order_id: string | null
           picked_at: string | null
           picked_by: string | null
           processed_at: string | null
@@ -608,6 +659,7 @@ export type Database = {
           notes: string
           order_no: number
           order_ref: string
+          parent_order_id: string | null
           picked_at: string | null
           picked_by: string | null
           processed_at: string | null

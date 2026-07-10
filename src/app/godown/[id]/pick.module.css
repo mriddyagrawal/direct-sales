@@ -160,6 +160,13 @@
   cursor: pointer;
 }
 
+/* Fixed-brand pick: the qty stepper sits right-aligned under the line head. */
+.qtyRow {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 12px;
+}
+
 .lineName {
   font-family: var(--font-structure);
   font-size: var(--text-body-size);
