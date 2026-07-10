@@ -13,14 +13,14 @@ interface OrderForStatus {
 export function getOrderStatusTag(
   order: OrderForStatus,
   now: Date = new Date(),
-): { tone: StatusTone; label: string } {
+): { tone: StatusTone; label: string; sublabel?: string } {
   if (order.status === "cancelled") return { tone: "error", label: "Cancelled" };
   if (order.status === "billed") return { tone: "billed", label: "Billed" };
   // Approved: admin-signed-off scan-brand (LG) order awaiting the godown —
   // neutral/ink, deliberately NOT the green of Billed. Label spells out the
   // wait (spec §4, consistent with the "Approved/Waiting for Scan" tab);
   // fixed brands never hold this status (they jump to ready_to_bill).
-  if (order.status === "approved") return { tone: "locked", label: "Approved · waiting for scan" };
+  if (order.status === "approved") return { tone: "locked", label: "Approved", sublabel: "waiting for scan" };
   // Ready to bill: a fixed brand straight from approval, or LG post-pick —
   // awaiting the accountant's Tally entry. Accent (not green), still in flight.
   if (order.status === "ready_to_bill") return { tone: "accent", label: "Ready to bill" };
@@ -30,7 +30,7 @@ export function getOrderStatusTag(
   // but the chip is status, never edit-permission.
   if (order.status === "pending_approval") {
     const countdown = formatCountdown(order.editable_until, now);
-    return { tone: "amber", label: countdown ? `Pending approval · ${countdown.label}` : "Pending approval" };
+    return { tone: "amber", label: "Pending approval", sublabel: countdown?.label };
   }
   // Unknown/legacy status — render it plainly rather than guessing.
   return { tone: "locked", label: order.status };

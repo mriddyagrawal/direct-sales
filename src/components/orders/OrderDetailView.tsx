@@ -324,7 +324,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           <Glyph icon={ChevronLeft} />
           <span className={styles.backRef}>{order.orderRef}</span>
         </Link>
-        <StatusTag tone={statusTag.tone} label={statusTag.label} />
+        <StatusTag tone={statusTag.tone} label={statusTag.label} sublabel={statusTag.sublabel} />
       </div>
 
       {/* Hero (spec §3): the RETAILER is the headline — name bold + large,

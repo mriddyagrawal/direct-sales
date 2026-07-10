@@ -52,3 +52,18 @@
 .error .square {
   background: var(--color-error);
 }
+
+/* Two-line variant: main label + a smaller sub-line ("editable 1h 59m",
+   "waiting for scan"). The square stays aligned to the first line. */
+.lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.35;
+}
+
+.sublabel {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.85;
+}
