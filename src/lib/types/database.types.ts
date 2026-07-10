@@ -196,6 +196,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no: string | null
           total_paise: number
           updated_at: string
         }
@@ -218,6 +219,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no?: string | null
           total_paise: number
           updated_at?: string
         }
@@ -240,6 +242,7 @@ export type Database = {
           salesman_id?: string
           status?: string
           submitted_at?: string
+          tally_bill_no?: string | null
           total_paise?: number
           updated_at?: string
         }
@@ -436,6 +439,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no: string | null
           total_paise: number
           updated_at: string
         }
@@ -468,6 +472,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no: string | null
           total_paise: number
           updated_at: string
         }
@@ -485,7 +490,7 @@ export type Database = {
         Returns: Json
       }
       process_order: {
-        Args: { p_order_id: string }
+        Args: { p_bill_no: string; p_order_id: string }
         Returns: {
           approved_at: string | null
           approved_by: string | null
@@ -505,6 +510,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no: string | null
           total_paise: number
           updated_at: string
         }
@@ -541,6 +547,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no: string | null
           total_paise: number
           updated_at: string
         }
@@ -572,6 +579,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no: string | null
           total_paise: number
           updated_at: string
         }
@@ -608,6 +616,7 @@ export type Database = {
           salesman_id: string
           status: string
           submitted_at: string
+          tally_bill_no: string | null
           total_paise: number
           updated_at: string
         }
