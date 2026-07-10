@@ -4,8 +4,9 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { Stepper } from "@/components/ui/Stepper";
 import { extractSerial } from "@/lib/serial";
-import { submitPick, OfflineError, type PickScan } from "@/lib/order-rpcs";
+import { submitPick, OfflineError, type PickLineInput } from "@/lib/order-rpcs";
 import { Scanner } from "./Scanner";
 import styles from "./pick.module.css";
 
@@ -22,22 +23,42 @@ interface PickScreenProps {
   retailerName: string;
   retailerArea: string | null;
   showModel: boolean;
+  // Brand shape: LG (requires_scan) scans serials; fixed brands enter a picked
+  // quantity per line. Partial is allowed either way (owner call) — the
+  // remainder backorders server-side.
+  requiresScan: boolean;
   lines: PickLine[];
-  // Where "back" and a completed pick return to. Defaults to the godown queue
-  // so the godown flow is unchanged; /scan passes the caller's order detail.
   doneHref?: string;
 }
 
-// The pick screen: tap a line to make it active, scan each physical unit's
-// serial barcode against it (or hand-type when a barcode won't read), then
-// submit the whole pick in ONE batch — scans accumulate client-side so a
-// warehouse dead-spot never blocks picking; the authoritative uniqueness/
-// coverage checks run server-side in submit_pick. No prices on this screen.
-export function PickScreen({ orderId, orderRef, retailerName, retailerArea, showModel, lines, doneHref = "/godown" }: PickScreenProps) {
+// The pick screen — brand-aware + partial.
+//   • LG: scan each physical unit's serial (or hand-type), stop whenever; a
+//     short count backorders the rest. Submit is live as soon as ≥1 is scanned.
+//   • Zeb/Lum: a per-line stepper for the picked qty (defaults to the full
+//     ordered qty — the common all-in-stock case). Submit at ≥1.
+// Scans accumulate client-side so a warehouse dead-spot never blocks picking;
+// the authoritative checks (coverage-per-serial, within-bill uniqueness,
+// split) run server-side in submit_pick. No prices on this screen.
+export function PickScreen({
+  orderId,
+  orderRef,
+  retailerName,
+  retailerArea,
+  showModel,
+  requiresScan,
+  lines,
+  doneHref = "/godown",
+}: PickScreenProps) {
   const router = useRouter();
-  // Raw scans per line — raw strings go to the server verbatim; the serial
-  // shown in the chips is the client-side extraction (display only).
+  // LG: raw scans per line (raw strings go to the server verbatim; the chip
+  // shows the client-side extraction, display-only).
   const [scans, setScans] = useState<Record<string, string[]>>({});
+  // Fixed brands: picked qty per line, defaulting to the full ordered qty.
+  const [picked, setPicked] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const l of lines) map[l.id] = l.qty;
+    return map;
+  });
   const [activeId, setActiveId] = useState<string>(lines[0]?.id ?? "");
   const [manualText, setManualText] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
@@ -49,7 +70,14 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
   const lineFor = (lineId: string) => lines.find((l) => l.id === lineId);
   const totalQty = useMemo(() => lines.reduce((sum, l) => sum + l.qty, 0), [lines]);
   const totalScanned = useMemo(() => Object.values(scans).reduce((sum, list) => sum + list.length, 0), [scans]);
-  const allComplete = lines.every((l) => countFor(l.id) === l.qty);
+  const totalPicked = useMemo(() => lines.reduce((sum, l) => sum + (picked[l.id] ?? 0), 0), [lines, picked]);
+
+  // Progress + submit gate depend on the mode; a partial pick (≥1) is allowed.
+  const doneCount = requiresScan ? totalScanned : totalPicked;
+  const canSubmit = doneCount >= 1;
+  const shortfall = totalQty - doneCount;
+  // LG: once every line is fully scanned, unmount the camera (also stops torch).
+  const allScanned = lines.every((l) => countFor(l.id) === l.qty);
 
   const allSerials = useMemo(() => {
     const set = new Set<string>();
@@ -69,7 +97,7 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
     const trimmed = raw.trim();
     if (!line || trimmed === "") return false;
     if (countFor(lineId) >= line.qty) {
-      showFlash("Line complete — tap the next line first.");
+      showFlash("Line full — tap the next line first.");
       return false;
     }
     const { serial } = extractSerial(trimmed);
@@ -84,17 +112,8 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
 
   function handleDecode(raw: string) {
     if (submitting) return;
-    // The content-filter (the targeting fix): LG boxes carry an EAN-13, a
-    // model code, sometimes a QR. Only a decode matching the serial pattern
-    // counts — anything else is SILENTLY ignored and the loop keeps scanning.
-    // No fix-it card on the scan path; the deliberate override is the
-    // per-line "Or type a serial…" field.
     const { parsed } = extractSerial(raw);
     if (!parsed) return;
-
-    // The camera fires the same barcode repeatedly while it's in frame —
-    // silently ignore an identical read within 2.5s instead of flashing a
-    // duplicate error at someone still holding the box up.
     const now = Date.now();
     const last = lastScanRef.current;
     if (last && last.text === raw && now - last.at < 2500) return;
@@ -103,7 +122,7 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
     const active = lineFor(activeId);
     if (!active) return;
     if (countFor(activeId) >= active.qty) {
-      showFlash("Line complete — tap the next line first.");
+      showFlash("Line full — tap the next line first.");
       return;
     }
     addScan(activeId, raw);
@@ -119,9 +138,9 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
   async function handleSubmit() {
     setSubmitting(true);
     setFlash(null);
-    const payload: PickScan[] = lines.flatMap((l) =>
-      (scans[l.id] ?? []).map((raw) => ({ order_item_id: l.id, raw_scan: raw })),
-    );
+    const payload: PickLineInput[] = requiresScan
+      ? lines.map((l) => ({ order_item_id: l.id, scans: scans[l.id] ?? [] }))
+      : lines.map((l) => ({ order_item_id: l.id, picked_qty: picked[l.id] ?? 0 }));
     try {
       await submitPick(orderId, payload);
       router.push(doneHref);
@@ -129,7 +148,7 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
     } catch (error) {
       setSubmitting(false);
       if (error instanceof OfflineError) {
-        showFlash("You're offline — your scans are safe on this screen. Try again when you have signal.");
+        showFlash("You're offline — your progress is safe on this screen. Try again when you have signal.");
       } else {
         showFlash(error instanceof Error ? error.message : "Could not submit the pick.");
       }
@@ -137,6 +156,19 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
   }
 
   const activeLine = lineFor(activeId);
+
+  function lineName(line: PickLine) {
+    if (showModel && line.tally_name && line.tally_name !== line.name) {
+      return (
+        <>
+          <span className={styles.lineModel}>{line.tally_name}</span>
+          {"・"}
+          {line.name}
+        </>
+      );
+    }
+    return line.name;
+  }
 
   return (
     <div className={styles.page}>
@@ -153,31 +185,46 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
         </div>
       </header>
 
-      {/* Unmounting the scanner once every line is full also stops the
-          camera + torch + decode loop. */}
-      {!allComplete && <Scanner onDecode={handleDecode} />}
+      {/* LG only: the camera. Unmounting once every line is full also stops the
+          camera + torch. Fixed brands never mount a scanner. */}
+      {requiresScan && !allScanned && <Scanner onDecode={handleDecode} />}
 
       {flash && <p className={styles.flash}>{flash}</p>}
 
       <div className={styles.lines}>
         {lines.map((line) => {
+          // ── Fixed brand: a qty stepper (no serials) ──
+          if (!requiresScan) {
+            const p = picked[line.id] ?? 0;
+            return (
+              <div key={line.id} className={styles.line}>
+                <div className={styles.lineHead}>
+                  <span className={styles.lineName}>{lineName(line)}</span>
+                  <span className={`${styles.lineProgress} ${p === line.qty ? styles.lineDone : ""}`}>
+                    {p === line.qty ? "✓ " : ""}
+                    {p} / {line.qty}
+                  </span>
+                </div>
+                <div className={styles.qtyRow}>
+                  <Stepper
+                    qty={p}
+                    max={line.qty}
+                    onChange={(next) => setPicked((prev) => ({ ...prev, [line.id]: next }))}
+                    onTapQuantity={() => {}}
+                  />
+                </div>
+              </div>
+            );
+          }
+
+          // ── LG: scan against the active line ──
           const count = countFor(line.id);
           const full = count === line.qty;
           const active = line.id === activeId;
           return (
             <div key={line.id} className={`${styles.line} ${active ? styles.lineActive : ""}`}>
               <button type="button" className={styles.lineHead} onClick={() => setActiveId(line.id)}>
-                <span className={styles.lineName}>
-                  {showModel && line.tally_name && line.tally_name !== line.name ? (
-                    <>
-                      <span className={styles.lineModel}>{line.tally_name}</span>
-                      {"・"}
-                      {line.name}
-                    </>
-                  ) : (
-                    line.name
-                  )}
-                </span>
+                <span className={styles.lineName}>{lineName(line)}</span>
                 <span className={`${styles.lineProgress} ${full ? styles.lineDone : ""}`}>
                   {full ? "✓ " : ""}
                   {count} / {line.qty}
@@ -209,9 +256,6 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
                     value={manualText}
                     onChange={(e) => setManualText(e.target.value)}
                     onKeyDown={(e) => {
-                      // A USB-C / Bluetooth HID barcode scanner "types" the
-                      // serial then sends Enter — treat that like Add, so a
-                      // plug-in scanner works with no extra wiring.
                       if (e.key === "Enter") {
                         e.preventDefault();
                         if (addScan(line.id, manualText)) setManualText("");
@@ -240,10 +284,11 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
 
       <div className={styles.submitBar}>
         <span className={styles.submitProgress}>
-          {totalScanned} / {totalQty} scanned
-          {!allComplete && activeLine ? ` · scanning ${activeLine.name}` : ""}
+          {doneCount} / {totalQty} picked
+          {shortfall > 0 ? ` · ${shortfall} to backorder` : ""}
+          {requiresScan && !allScanned && activeLine ? ` · scanning ${activeLine.name}` : ""}
         </span>
-        <Button variant="primary" onClick={handleSubmit} disabled={!allComplete} loading={submitting}>
+        <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit} loading={submitting}>
           Submit pick
         </Button>
       </div>
