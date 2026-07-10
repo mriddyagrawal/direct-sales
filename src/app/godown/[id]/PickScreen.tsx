@@ -23,6 +23,9 @@ interface PickScreenProps {
   retailerArea: string | null;
   showModel: boolean;
   lines: PickLine[];
+  // Where "back" and a completed pick return to. Defaults to the godown queue
+  // so the godown flow is unchanged; /scan passes the caller's order detail.
+  doneHref?: string;
 }
 
 // The pick screen: tap a line to make it active, scan each physical unit's
@@ -30,7 +33,7 @@ interface PickScreenProps {
 // submit the whole pick in ONE batch — scans accumulate client-side so a
 // warehouse dead-spot never blocks picking; the authoritative uniqueness/
 // coverage checks run server-side in submit_pick. No prices on this screen.
-export function PickScreen({ orderId, orderRef, retailerName, retailerArea, showModel, lines }: PickScreenProps) {
+export function PickScreen({ orderId, orderRef, retailerName, retailerArea, showModel, lines, doneHref = "/godown" }: PickScreenProps) {
   const router = useRouter();
   // Raw scans per line — raw strings go to the server verbatim; the serial
   // shown in the chips is the client-side extraction (display only).
@@ -121,7 +124,7 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
     );
     try {
       await submitPick(orderId, payload);
-      router.push("/godown");
+      router.push(doneHref);
       router.refresh();
     } catch (error) {
       setSubmitting(false);
@@ -138,7 +141,7 @@ export function PickScreen({ orderId, orderRef, retailerName, retailerArea, show
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Link href="/godown" className={styles.back} aria-label="Back to queue">
+        <Link href={doneHref} className={styles.back} aria-label="Back">
           ‹
         </Link>
         <div className={styles.headInfo}>
