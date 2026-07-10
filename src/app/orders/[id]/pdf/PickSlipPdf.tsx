@@ -77,7 +77,7 @@ const NAVY = "#1e3a8a"; // model line on show_model (LG) items
 // not the DB's 'processed') with the app's tone colours.
 const STATUS_LABEL: Record<string, string> = {
   pending_approval: "PENDING APPROVAL",
-  approved: "PENDING PICK",
+  approved: "PENDING SCAN",
   ready_to_bill: "READY TO BILL",
   billed: "BILLED",
   cancelled: "CANCELLED",

@@ -47,7 +47,7 @@ type StatusFilter = "all" | "pending_approval" | "approved" | "ready_to_bill" | 
 const STATUS_LABEL: Record<StatusFilter, string> = {
   all: "All",
   pending_approval: "Pending approval",
-  approved: "Pending pick",
+  approved: "Pending scan",
   ready_to_bill: "Ready to bill",
   billed: "Billed",
   cancelled: "Cancelled",
