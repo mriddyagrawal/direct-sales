@@ -306,7 +306,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(order.total_paise)}</td>
                     <td>
-                      <StatusTag tone={tag.tone} label={tag.label} />
+                      <StatusTag tone={tag.tone} label={tag.label} sublabel={tag.sublabel} />
                     </td>
                   </tr>
                 );
@@ -332,7 +332,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
                 >
                   <div className={styles.cardEyebrow}>
                     <span className={styles.cardRef}>{order.order_ref}</span>
-                    <StatusTag tone={tag.tone} label={tag.label} />
+                    <StatusTag tone={tag.tone} label={tag.label} sublabel={tag.sublabel} />
                   </div>
                   <div className={styles.cardMain}>
                     <span className={styles.cardRetailer}>
