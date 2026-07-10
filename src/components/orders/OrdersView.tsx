@@ -246,10 +246,18 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
         </div>
         <div className={styles.filterGroup}>
           {/* SALESMAN/BRAND filters are staff-only — a salesman's rows are all
-              his own (RLS), so those filters would be dead weight on a phone. */}
-          {isStaff && <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />}
-          {isStaff && multiBrand && <BrandFilter brands={brands} value={brandId} onChange={setBrandId} />}
-          <DateRangeFilter value={range} onChange={setRange} />
+              his own (RLS). They share one explicit half-half row on mobile
+              (the wrapper is display:contents on desktop, so the desktop flex
+              row is untouched). */}
+          {isStaff && (
+            <div className={styles.filterHalves}>
+              <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />
+              {multiBrand && <BrandFilter brands={brands} value={brandId} onChange={setBrandId} />}
+            </div>
+          )}
+          <div className={styles.filterFull}>
+            <DateRangeFilter value={range} onChange={setRange} />
+          </div>
           <div className={styles.searchWrap}>
             <Glyph icon={Search} size={14} />
             <input
