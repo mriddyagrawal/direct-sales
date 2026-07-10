@@ -8,6 +8,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  /* Default box width, formerly an inline style={{ width: 280 }} on the button.
+     An inline style beats any class rule, so the mobile `width: 100%` below
+     could never win and every filter stayed nailed at 280px inside its fluid
+     grid cell (overflow). As a class rule it's a fair class-vs-class fight, so
+     the media query can shrink it. A caller passing an explicit `width` prop
+     still gets an inline override (desktop-intentional). */
+  width: 280px;
   min-height: 32px;
   padding: 0 10px;
   background: var(--color-white);

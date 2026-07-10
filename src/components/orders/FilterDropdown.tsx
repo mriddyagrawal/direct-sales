@@ -26,7 +26,7 @@ const VIEWPORT_MARGIN = 12; // popover inset from the screen edge on mobile
 export function FilterDropdown({
   caption,
   valueLabel,
-  width = 280,
+  width,
   children,
   open: openProp,
   onOpenChange,
@@ -96,7 +96,7 @@ export function FilterDropdown({
         type="button"
         ref={triggerRef}
         className={styles.trigger}
-        style={{ width }}
+        style={width !== undefined ? { width } : undefined}
         onClick={() => setOpen(!open)}
       >
         <span className={styles.triggerLabel}>{caption}</span>
