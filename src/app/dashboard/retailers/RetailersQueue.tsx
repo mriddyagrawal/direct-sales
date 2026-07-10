@@ -23,7 +23,9 @@ interface EditForm {
 // copied into useState — see the matching note in ProductsPricing.tsx.
 export function RetailersQueue({ initialRetailers: retailers }: { initialRetailers: RetailerRow[] }) {
   const router = useRouter();
-  const [tab, setTab] = useState<FilterTab>("pending");
+  // Default tab is ALL (owner call 2026-07-11) — pending-verification is one
+  // tap away, not the landing view.
+  const [tab, setTab] = useState<FilterTab>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm>({ name: "", area: "", phone: "" });
   const [saving, setSaving] = useState(false);
