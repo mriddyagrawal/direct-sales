@@ -20,7 +20,7 @@ export function getOrderStatusTag(
   // neutral/ink, deliberately NOT the green of Billed. Label spells out the
   // wait (spec §4, consistent with the "Approved/Waiting for Scan" tab);
   // fixed brands never hold this status (they jump to ready_to_bill).
-  if (order.status === "approved") return { tone: "locked", label: "Approved", sublabel: "waiting for scan" };
+  if (order.status === "approved") return { tone: "locked", label: "Waiting for scan" };
   // Ready to bill: a fixed brand straight from approval, or LG post-pick —
   // awaiting the accountant's Tally entry. Accent (not green), still in flight.
   if (order.status === "ready_to_bill") return { tone: "accent", label: "Ready to bill" };
