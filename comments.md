@@ -3709,3 +3709,52 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** The surfaces (072e423) — verify a salesman can see + Punch his backorder, the picked-vs-ordered detail reads right, and the "Pending scan"/To-pick relabel is label-only (DB status stays `approved`).
 
 ---
+
+## Review of 072e423 — feat(fulfilment): backorder + shipped surfaces (chip/tab/tone, detail, punch)
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** The Stage-1 frontend surfaces for what 34b73d4's backend created — a `backorder` chip/tone + a Backorder tab, the picked-vs-ordered detail with the shipped total, the "N units backordered → {child ref}" note, and the "Backorder of {parent}" + Punch Order flow. No backend change.
+
+**What works (verified — read + build + reconciliation):**
+- **Chip/tone:** `backorder` → violet "Backorder" (StatusTag + order-status.ts L21); `approved` stays "Pending scan" (owner decision, explicitly *not* "To pick" — per commit msg + owner).
+- **Backorder tab:** `StatusFilter` + `STATUS_LABEL` + `tabCounts` + the tab array all carry `backorder` (OrdersView L45/49/190/238), placed right after "All"; a salesman sees his own by RLS (the child keeps `salesman_id`).
+- **Punch flow:** `punchOrder` wrapper (order-rpcs.ts L133, added at 34b73d4) → `handlePunch` (L304) → the "Punch order" button (L461, salesman-owner or admin) + "Backorder of {parent ref}" link (L451). A `backorder` is editable (salesman Edit now covers it — matches the RPC's `v_editable` for status='backorder').
+- **Picked-vs-ordered + shipped total reconcile EXACTLY:** a short line shows `{picked}/{qty}` (L601); view-mode line AMOUNT = `rate × pickedQty` (L612) and the total row = `order.totalPaise` (L685, the DB shipped total). Since `Σ rate×picked_qty` == the recompute trigger's `Σ picked×unit_price` == `total_paise`, **the lines sum to the total**. Edit mode uses ordered/live figures. `backorderedUnits = Σ max(0, qty−picked_qty)` (L172); child ref read off the `backordered` event details (L177-184) — both correct.
+- **Events:** `backordered` → "Backordered → {ref}", `picked` → "Picked … {n}/{m}" (order-events.ts).
+- `npm run build` clean (tsc + eslint) at the current tree (8 changed FE files).
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- **Stale comment, order-status.ts L24:** "Fixed brands never hold this status (they jump to ready_to_bill)" is now false — 34b73d4 routes every brand to `approved`. Behavior is fine; the comment misleads a future reader — tidy it. (The "Pending scan" label showing on a *picked-not-scanned* fixed-brand `approved` order is the owner's explicit call, not a defect.)
+
+**Domain / correctness checks:** Money ✓ (view total = DB shipped `total_paise`; lines reconcile; no client recompute drift). RLS ✓ (salesman's own backorder visible; no policy touched here). State machine ✓ (Punch gated by status='backorder', server-enforced by punch_order + guard). Immutable snapshots ✓ (display reads `picked_qty` additively; ordered qty untouched).
+
+**What I tried:** Read the detail lines/total render + the punch / backorder-child derivation; grepped the tab wiring; confirmed `punchOrder` exists + is imported; re-ran `npm run build` at the current tree.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (Trivial: the L24 stale comment above — not ledger-tracked.)
+
+**Next-commit suggestion:** A phone pass on the deployed URL — partial-pick a real order and confirm the salesman sees the shipped detail + his Backorder tab + Punch works end to end.
+
+---
+
+## Review of 8bfa609 — docs(fulfilment): Stage 1 — all-brand pick, partial → backorder, punch
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Document Stage 1 in `order-lifecycle.md` + `godown-fulfilment-design.md`. Docs-only (verified — no non-doc file in the diff).
+
+**What works:** The prose matches what I verified by execution at 34b73d4/072e423 — all-brand → `approved`, the removed `pending_approval→ready_to_bill` edge, brand-aware + partial pick, `submit_pick` ships picked qty → `ready_to_bill` with `total = Σ picked×price`, split → new `backorder` child (same salesman, `parent_order_id`, fresh gapless `order_no`), the `backorder` status before `pending_approval`, `punch_order`, immutable snapshots + additive `picked_qty` + `total_paise` = shipped, the kept "Pending scan" label, the `backordered`/`picked` events, all-brand godown RLS, Stage 2 parked. The lifecycle ASCII diagram is accurate. **No drift.**
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Doc-accuracy only — reconciled every claim against the two verified code/DB reviews above.
+
+**What I tried:** Diffed the two doc additions against the behavior proven in the 34b73d4 + 072e423 reviews.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Stage 1 is complete + verified (backend + surfaces + docs). Merge-ready; an owner phone test (partial pick → backorder → punch) is the natural gate before Stage 2 unparks.
+
+---
