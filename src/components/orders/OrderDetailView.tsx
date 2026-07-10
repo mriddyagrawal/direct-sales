@@ -352,7 +352,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           deliberately has NO loud primary (§4) — the godown owns the next move;
           the admin override rides in the secondaries. */}
       {isStaff && isAdmin && order.status === "pending_approval" && (
-        <Button variant="primary" onClick={handleApprove} loading={saving || isPending}>
+        <Button variant="success" onClick={handleApprove} loading={saving || isPending}>
           <Glyph icon={CheckCircle2} />
           Approve order
         </Button>
