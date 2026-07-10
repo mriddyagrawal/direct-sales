@@ -3,6 +3,19 @@
   display: inline-block;
 }
 
+/* Mobile: the dropdown fills whatever cell the filter grid gives it. */
+@media (max-width: 767px) {
+  .wrap {
+    display: block;
+    width: 100%;
+  }
+
+  .trigger {
+    display: flex;
+    width: 100%;
+  }
+}
+
 .trigger {
   display: inline-flex;
   align-items: center;
