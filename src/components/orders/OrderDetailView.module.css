@@ -459,3 +459,11 @@
   color: var(--color-locked);
 }
 
+
+/* Primary + secondaries as one block: vertical gap == the 8px horizontal
+   gap between the row's buttons. */
+.actionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
