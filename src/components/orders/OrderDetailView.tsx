@@ -396,7 +396,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           </Button>
         )}
         {order.status !== "billed" && order.status !== "cancelled" && (
-          <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="secondary" />
+          <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="ink" />
         )}
         {((isStaff && (order.status === "billed" ? isAdmin : order.status !== "cancelled")) ||
           salesmanActionable) && (
