@@ -4195,3 +4195,33 @@ So: **client price → existing line snapshot → product default (new lines onl
 **Next-commit suggestion:** —
 
 ---
+
+## Review of ee8ddc8 — feat(products): import is a partial patch — a blank cell keeps the existing value
+
+**Verdict:** ✅ accept — FE-only, and a genuine **money-safety** improvement: a blank Price on an existing product no longer nulls it to TBD.
+
+**Phase / commit goal:** Import was a full replace (blank Display → tally, blank Price → TBD even on an existing product), so a partial re-import clobbered untouched fields. New rule: a blank cell on a MATCHED product keeps its current value; a NEW product falls back as before.
+
+**What works (verified — read + resolve matrix + tsc/lint/build):**
+- **Existing values fetched:** the diff query now selects `name, price_paise, active` too, into `existingByTally = Map(tally_name → row)` (match key `(brand_id, tally_name)`, `effTally = tally||display` — unchanged).
+- **Per-field resolve is correct** for matched vs new:
+  - `name = rawName || (matched ? ex.name : rawTally)` — override / keep-existing / new-falls-to-tally. ✓
+  - `pricePaise = priceCell !== "" ? providedPaise : matched ? ex.price_paise : null` — **blank Price on a match re-sends the existing paise (no-op), on a new row → TBD/null.** ✓ (the money-safe fix; `providedPaise` is guaranteed valid — error rows already `continue`d.)
+  - `active = activeCell !== "" ? parseActive(...) : matched ? ex.active : true`. ✓ (`parseActive` only called on a non-blank cell now.)
+  - `status = matched ? "updated" : "new"`; the **preview shows the resolved final values**, and a new hint explains "blank keeps current" for updated rows.
+- **RPC unchanged** (`import_products` still upserts what it's sent; the client now hands it the current value for anything left blank → the overwrite is a no-op). Both-blank / no-category still error.
+- `tsc` / `eslint` / `build` all exit 0. **No DB change** (no live probe needed — RPC behavior identical; only the client-computed payload changed, and it now sends *safer* values).
+
+**Blocking issues:** None.
+
+**Non-blocking observation:** **Category is NOT partial-patchable** — it's still required on every row (blank → "Category is required"), unlike name/price/active. This matches the commit's stated scope (it only claims name/price/active), and the owner tested the no-category-error case, so it's intentional; but it means a price-only bulk re-import still needs the category on each row. Worth a mention if the owner later wants a true price-only patch sheet.
+
+**Domain checks:** Money — **safer** (an existing price is never silently nulled by a blank cell). Catalog key `(brand_id, tally_name)` + `tally_name` non-empty invariant preserved. Immutability/RLS N/A (catalog admin, not orders). Staleness of the fetched existing values is theoretical/pre-existing and a non-issue at this scale.
+
+**What I tried:** Read the full diff; traced the matched-vs-new resolve for name/price/active across the value matrix; confirmed the RPC is untouched and receives no-op values for blanks; `tsc` + `lint` + `build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
