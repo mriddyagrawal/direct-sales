@@ -8,16 +8,19 @@ import { Glyph } from "@/components/ui/Glyph";
 interface SharePdfButtonProps {
   orderId: string;
   orderRef: string;
+  retailerName: string;
   variant?: "primary" | "secondary" | "ink";
 }
 
 // The one pick-slip action (owner decision: share-only, no preview page).
 // Phone: fetches the generated PDF and hands the actual FILE to the native
-// share sheet (WhatsApp gets a real .pdf named after the ref). Desktop (no
+// share sheet (WhatsApp gets a real .pdf named after the ref, with the
+// RETAILER NAME as the attached message/caption — set as both title & text so
+// it reads right whichever field the target app surfaces). Desktop (no
 // file-share support): opens the PDF route directly — the browser's own
 // viewer renders it inline with the proper filename, no per-platform code.
 // A dismissed share sheet (AbortError) is not a failure.
-export function SharePdfButton({ orderId, orderRef, variant = "secondary" }: SharePdfButtonProps) {
+export function SharePdfButton({ orderId, orderRef, retailerName, variant = "secondary" }: SharePdfButtonProps) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const url = `/orders/${orderId}/pdf`;
@@ -43,7 +46,7 @@ export function SharePdfButton({ orderId, orderRef, variant = "secondary" }: Sha
       const blob = await res.blob();
       const file = new File([blob], `${orderRef}.pdf`, { type: "application/pdf" });
       try {
-        await navigator.share({ files: [file], title: orderRef });
+        await navigator.share({ files: [file], title: retailerName, text: retailerName });
       } catch {
         // AbortError — the user closed the sheet. Not a failure.
       }
