@@ -4249,3 +4249,60 @@ So: **client price → existing line snapshot → product default (new lines onl
 **Next-commit suggestion:** —
 
 ---
+
+# STAGE 2 — Dispatch stack (6 commits) — reviewed together, all ✅
+
+The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e · 464d82c · bf210b7`), which I verified live/by-build, then **rebased onto `main`** as `f1b3344 · 39142f6 · f5276b0 · 71fd795 · e46d42a · 0c8d5b8`. **`git range-diff` shows all six `=` (byte-identical)**, so the verifications below (done on the local SHAs) carry to the on-`main` SHAs verbatim. The migration was applied to prod (ledger `20260711195529`) before the FE. Built against the reviewer-hardened prompt (`bb173ff`).
+
+## Review of f1b3344 — feat(db): dispatched status + dispatch_order RPC + godown RLS widening (Stage 2 · commit 1)
+
+**Verdict:** ✅ accept — backend proven by live rolled-back probes; applied to prod. The one prompt-vs-code deviation is **owner-resolved** (see below).
+
+**What works (read + 12-cell live rolled-back probes):**
+- **Additive migration:** cols `dispatched_at`/`dispatched_by(FK profiles)`; `orders_status_check` gains `dispatched`; **bill-no CHECK extended** (`status NOT IN ('billed','dispatched') OR bill_no present`) — a dispatched order keeps a Tally bill number. `guard_order_transition` recreated: **all prior edges preserved** + `billed→dispatched` (role in godown/accountant/admin, else raise) + `dispatched→cancelled`. `dispatch_order(uuid)` SECURITY DEFINER: role-gated → `FOR UPDATE` → `status='billed'` only → sets dispatched + stamps → `dispatched` event; granted to `authenticated`.
+- **RLS widening via `ALTER POLICY`** (preserves FOR SELECT): `orders_/order_items_/order_item_scans_select_godown` extended to `billed/dispatched/cancelled`; **new `order_events_select_godown`** (the history-panel fix).
+- **Live probes (impersonated, txn `raise`d → rolled back):** godown ✅, accountant ✅, admin ✅ each dispatch a `billed` order; **salesman → REJECT** ("only godown/accountant/admin"); non-billed (backorder) → REJECT; **Zebronics (fixed) billed → dispatched** (all brands); admin cancels a dispatched order ✅; **accountant cancel dispatched → REJECT**; and via `SET LOCAL ROLE authenticated`: a **godown user sees the billed order + items + events, and NOT a pending order** (RLS + `order_events_select_godown` both hold). `tsc` clean with regen types.
+- One "unexpected OK" on the first non-billed probe was a real order getting **billed mid-probe** (active prod) — re-confirmed clean against a guaranteed-non-billed order.
+
+**Deviation — OWNER-RESOLVED:** the builder left `cancel_order` unchanged, so `dispatched→cancelled` is **admin-only** (accountant stays pending-only per the 2026-07-11 cancel/edit matrix), whereas the prompt's owner-decision-#2 said "accountant/admin". I flagged it; **owner chose admin-only (2026-07-12)** — so as-shipped is correct, no follow-up.
+
+**Blocking issues:** None. **Domain checks:** state machine (all edges verified live), RLS (godown scope proven, incl. negative), money/immutability untouched, bill-no invariant covers dispatched. `order_no_seq` probes consumed a few nextvals (harmless gaps, D1).
+
+## Review of 39142f6 — feat(orders): shared dispatched vocabulary (Stage 2 · commit 2)
+
+**Verdict:** ✅ accept — clean additive plumbing, no behavior yet. Hits the **3-spot tone** exactly (the thing the hardened prompt insisted on): `getOrderStatusTag` → `{tone:'dispatched',label:'Dispatched'}`; `StatusTone` union gains `"dispatched"`; `.dispatched` CSS (teal `#0d9488`, distinct from billed green). Plus `dispatchOrder` RPC wrapper, `order-events` "Dispatched by {name}", and `ORDER_DETAIL_SELECT` gains `dispatched_at/by` + `dispatched_by_profile` embed → `dispatchedAt/dispatchedByName`. `tsc`/eslint clean.
+
+## Review of f5276b0 — feat(orders): OrderDetailView gains the godown role + Mark dispatched (Stage 2 · commit 3)
+
+**Verdict:** ✅ accept — the reuse-critical commit; **every gotcha from the hardened prompt is handled correctly.**
+- **Two-way `isStaff` audit** ✅ — every salesman `!isStaff` is now explicit `role==='salesman'` (guidance banners, salesman Edit→`/new-order?edit`, salesman Scan, `salesmanActionable`), so the godown lens doesn't inherit salesman UI. The other direction turned out **moot**: the actual per-line serials (`{showSerialRows && …}`, L772) were **never** `isStaff`-gated (only the "Copy serials" button is), so **godown already sees real serials** on a billed/dispatched LG order — builder correctly left it (my prompt over-specified this one).
+- **3-way routing** ✅ — `detailBase`, back-breadcrumb, parent-link, backorder-child-link all resolve `role==='godown' → /godown/orders` (no escape to `/orders`, which godown is fenced out of).
+- **Mark dispatched** ✅ — `Truck` primary on `billed` for `isStaff||isGodown`, never salesman; light `BottomSheet` confirm, **no input**; wired to `dispatchOrder` + `router.refresh()`.
+- **One filled-accent per view** ✅ — on `billed`, Mark dispatched is primary and **Share demotes to the ink secondary** for staff; for godown Share is off entirely (its only action is Mark dispatched); salesman keeps Share primary. Verified the primary/secondary conditions don't double-fill.
+- **Terminal + gating** ✅ — dispatched byline `· dispatched {time} by {name}`; admin **Edit excluded on dispatched**; the Cancel button is godown-safe (`isStaff=false` + `salesmanActionable` now role-scoped) and correctly **admin-only on dispatched** (accountant/godown get no Cancel). `tsc`/`build` clean.
+
+**Non-blocking:** godown doesn't get the staff "Copy serials" button — it *sees* serials per-line, just no copy shortcut. Widen if the owner wants godown to copy at dispatch.
+
+## Review of 71fd795 — feat(orders): Dispatched tab on the shared orders list (Stage 2 · commit 4)
+
+**Verdict:** ✅ accept — `dispatched` added to `StatusFilter`, `STATUS_LABEL` ("Dispatched"), `tabCounts`, and the tab array **right after Billed** (`… billed, dispatched, cancelled, backorder`). Shared component, so the salesman's list gets a read-only Dispatched tab too. `tsc`/`build` clean.
+
+## Review of e46d42a — feat(godown): Dispatch + History tabs reusing OrdersView; GodownTabBar (Stage 2 · commit 5)
+
+**Verdict:** ✅ accept — the godown app, built by **reuse** exactly as scoped.
+- **`OrdersView` role="godown"** ✅ — new `title?` + `statusScope?` props: `statusScope` filters at the `scoped` stage; **chip-tabs hidden** for godown (`{!isGodown && …}`); 3-way `detailBase`; New-Order FAB hidden for godown; empty-state salesman copy audited to `role==='salesman'`; Salesman/Brand filters already `isStaff`-gated (hidden for free — the reuse win).
+- **Routes** ✅ — `/godown/dispatch` (server `.eq('status','billed')`, `statusScope=['billed']`, title "Dispatch") and `/godown/history` (`.in('status', ready_to_bill/dispatched/cancelled)`, title "History") reuse `OrdersView role="godown"`; `/godown/orders/[id]` reuses `OrderDetailView role="godown"` via the **same** `ORDER_DETAIL_SELECT`/`toOrderDetailProps` loader, `catalog=[]`, `isAdmin=false`. Each page has a defense-in-depth `role==='godown'` redirect on top of the middleware fence.
+- **`GodownTabBar`** ✅ — mirrors `BottomTabBar` (Link + `usePathname` + `Glyph`): Pickup·Dispatch·History; on the three list pages, not the scanner/detail. **`proxy.ts`/middleware untouched** (routes auto-fenced by `startsWith('/godown/')` — the reuse win I called out).
+- `tsc`/`build` clean; all 5 godown routes register (`/godown`, `/godown/[id]`, `/godown/dispatch`, `/godown/history`, `/godown/orders/[id]`).
+
+**Non-blocking:** the list `SELECT` string is re-declared per godown page — but that matches the **existing** per-page convention (OrdersView's `ORDERS_SELECT` is module-local, not exported), so it's consistent, not new reinvention; a shared export would prevent future column-drift.
+
+## Review of 0c8d5b8 — docs: dispatch stage + godown reuse (Stage 2 · commit 6)
+
+**Verdict:** ✅ accept — `order-lifecycle.md` (Stage-2 block + the `dispatched` machine), `godown-fulfilment-design.md`, `orders-ui.md` updated. Cross-checked against what I verified: it correctly states `dispatch_order` (godown/accountant/admin, never salesman), the cols/CHECK, the RLS widening incl. `order_events_select_godown`, the reuse-not-fork approach — and crucially **`dispatched → cancelled` is documented ADMIN-only** (matches the owner decision + live behavior; no over-claim). Migration ledger `20260711195529` cited.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **Dispatch Stage 2 fully shipped + reviewer-verified.**
+
+**Next-commit suggestion:** Optional godown "Copy serials" at dispatch (if wanted); export a shared `ORDERS_SELECT` to prevent list-column drift. Neither blocking.
+
+---
