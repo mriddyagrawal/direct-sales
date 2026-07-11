@@ -135,6 +135,15 @@ export async function punchOrder(orderId: string): Promise<OrderRow> {
   return callRpc(() => supabase.rpc("punch_order", { p_order_id: orderId }));
 }
 
+// Admin-only note on a pending_approval order (owner decision 2026-07-11) — one
+// overwritable comment; submitting an empty string CLEARS it. The server gates
+// admin + pending-only; the note rides the RLS'd order row (everyone who can see
+// the order sees it). Cleared automatically when the order is approved.
+export async function setAdminComment(orderId: string, comment: string): Promise<OrderRow> {
+  const supabase = createClient();
+  return callRpc(() => supabase.rpc("set_admin_comment", { p_order_id: orderId, p_comment: comment }));
+}
+
 // Godown pick submission (any active role; a salesman is scoped to his own
 // order server-side). ONE line per ordered item, brand-aware + partial:
 //   • LG (requires_scan): send the picked units' RAW scans — serial derived

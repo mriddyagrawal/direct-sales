@@ -33,7 +33,7 @@ export default async function Home() {
     supabase
       .from("orders")
       .select(
-        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)",
+        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)",
       )
       .or(`status.neq.cancelled,cancelled_by.neq.${user!.id}`)
       .order("submitted_at", { ascending: false })

@@ -25,6 +25,7 @@ export interface OrderListRow {
   status: string;
   editable_until: string;
   cancelled_by: string | null;
+  admin_comment: string | null;
   salesman_id: string;
   brand_id: string;
   retailers: { name: string; verified: boolean } | null;
@@ -55,7 +56,7 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
 };
 
 const ORDERS_SELECT =
-  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
+  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
 
 interface OrdersViewProps {
   initialOrders: OrderListRow[];
@@ -316,6 +317,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
                     <td className={styles.cellRetailer}>
                       {order.retailers?.name ?? "—"}
                       {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
+                      {order.admin_comment && <span className={styles.rowAdminNote}>⚠ {order.admin_comment}</span>}
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(order.total_paise)}</td>
                     <td>
@@ -362,6 +364,10 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
                     {isStaff && <>{order.profiles?.full_name ?? "—"} · </>}
                     {formatOrderTimestamp(order.submitted_at, now)}
                   </div>
+                  {/* Admin's held-stage note — a red line every role sees. */}
+                  {order.admin_comment && (
+                    <div className={styles.cardAdminNote}>⚠ {order.admin_comment}</div>
+                  )}
                 </button>
               );
             })}

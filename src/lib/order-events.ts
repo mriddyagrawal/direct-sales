@@ -82,6 +82,13 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
       const ref = typeof details.child_ref === "string" ? details.child_ref : "a backorder";
       return `${time} Backordered → ${ref}`;
     }
+    case "commented": {
+      // Admin note on a held order — the text, or "cleared" when emptied.
+      const comment = typeof details.comment === "string" ? details.comment.trim() : "";
+      return comment
+        ? `${time} Comment by ${actorLabel}: ${comment}`
+        : `${time} Comment cleared by ${actorLabel}`;
+    }
     case "billed":
       return `${time} Billed by ${actorLabel}`;
     default:

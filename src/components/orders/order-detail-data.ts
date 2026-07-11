@@ -6,7 +6,7 @@
 import type { OrderDetailData } from "./OrderDetailView";
 
 export const ORDER_DETAIL_SELECT =
-  "id, order_ref, status, notes, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, salesman_id, parent_order_id, " +
+  "id, order_ref, status, notes, admin_comment, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, salesman_id, parent_order_id, " +
   "retailers(name, area, phone, verified), " +
   "salesman:profiles!orders_salesman_id_fkey(full_name), " +
   "processed_by_profile:profiles!orders_processed_by_fkey(full_name), " +
@@ -49,6 +49,7 @@ export interface OrderDetailQueryRow {
   order_ref: string;
   status: string;
   notes: string;
+  admin_comment: string | null;
   total_paise: number;
   submitted_at: string;
   editable_until: string;
@@ -84,6 +85,7 @@ export function toOrderDetailProps(row: OrderDetailQueryRow): {
       orderRef: row.order_ref,
       status: row.status,
       notes: row.notes,
+      adminComment: row.admin_comment,
       totalPaise: row.total_paise,
       submittedAt: row.submitted_at,
       editableUntil: row.editable_until,

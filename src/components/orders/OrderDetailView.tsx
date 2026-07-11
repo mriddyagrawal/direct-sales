@@ -14,7 +14,7 @@ import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatRupees } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
-import { updateOrderItems, cancelOrder, processOrder, approveOrder, punchOrder } from "@/lib/order-rpcs";
+import { updateOrderItems, cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment } from "@/lib/order-rpcs";
 import styles from "./OrderDetailView.module.css";
 
 const UI_QTY_CAP = 999;
@@ -56,6 +56,7 @@ export interface OrderDetailData {
   orderRef: string;
   status: string;
   notes: string;
+  adminComment: string | null;
   totalPaise: number;
   submittedAt: string;
   editableUntil: string;
@@ -115,6 +116,9 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [billNo, setBillNo] = useState("");
   const [cancelReason, setCancelReason] = useState("");
+  // Admin held-stage note draft (admin box), seeded from the current note.
+  const [commentDraft, setCommentDraft] = useState(order.adminComment ?? "");
+  const [savingComment, setSavingComment] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -347,6 +351,22 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
     }
   }
 
+  async function handleSetComment() {
+    // Admin-only held-stage note. Empty submission clears it (server + UI).
+    setSavingComment(true);
+    setError(null);
+    try {
+      await setAdminComment(order.id, commentDraft);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the note.");
+    } finally {
+      setSavingComment(false);
+    }
+  }
+
   async function handleProcess() {
     // Client-side mirror of the RPC's non-empty guard — the server rejects an
     // empty bill number too (single source of truth), this just saves a round
@@ -429,6 +449,32 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           </p>
         )}
       </div>
+
+      {/* Admin note (RED) — a held-stage flag from the admin, visible to
+          EVERYONE who can see the order (the salesman included). Distinct from
+          the salesman's own "notes from the field". Cleared on approval. */}
+      {order.adminComment && (
+        <p className={styles.adminNote}>
+          <span className={styles.adminNoteLabel}>Admin note</span>
+          {order.adminComment}
+        </p>
+      )}
+
+      {/* Admin-only: write / edit / clear the held-stage note (pending only). */}
+      {isStaff && isAdmin && order.status === "pending_approval" && (
+        <div className={styles.adminCommentBox}>
+          <label className={styles.adminCommentLabel}>ADMIN NOTE · VISIBLE TO THE SALESMAN</label>
+          <textarea
+            className={styles.adminCommentInput}
+            value={commentDraft}
+            onChange={(e) => setCommentDraft(e.target.value)}
+            placeholder="e.g. confirm 5-star stock before I approve"
+          />
+          <Button variant="secondary" onClick={handleSetComment} loading={savingComment}>
+            {order.adminComment ? "Update note" : "Add note"}
+          </Button>
+        </div>
+      )}
 
       {/* One action BLOCK: primary + secondaries share the same 8px rhythm
           vertically and horizontally (owner call). */}

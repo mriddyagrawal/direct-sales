@@ -529,3 +529,61 @@
   flex-direction: column;
   gap: 8px;
 }
+
+/* Admin held-stage note — RED and unmissable, deliberately distinct from the
+   salesman's "notes from the field". Shown to EVERYONE who can see the order;
+   only an admin can set it (the box below). Cleared on approval. */
+.adminNote {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-error);
+  border-left: 3px solid var(--color-error);
+  border-radius: var(--radius);
+  background: #fef2f2;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-error);
+}
+
+.adminNoteLabel {
+  display: block;
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+/* Admin-only editor for the held-stage note. */
+.adminCommentBox {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adminCommentLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+}
+
+.adminCommentInput {
+  min-height: 60px;
+  padding: 10px 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  resize: vertical;
+}
+
+.adminCommentInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
