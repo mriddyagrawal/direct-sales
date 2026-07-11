@@ -3987,3 +3987,32 @@ The reviewed `4eafbe3 / c1e4c74 / 13d97e2` were rebased onto `main` as **`ce5db5
 **Next-commit suggestion:** —
 
 ---
+
+## Review of 76c8ef9 — feat(godown): "PAKKA?" confirm before a short pick (MERGED variant = 7e918a1 + red-alert restyle)
+
+**Verdict:** ✅ accept — this is the version that **merged to `main`** (parent `d418499`; `f05baf6 = 76c8ef9` byte-identical, two SHAs same content). It is **not** a byte-identical rebase of the earlier-reviewed `7e918a1` — `git range-diff 7e918a1 76c8ef9` shows a delta — so I re-reviewed the delta on the shipped code.
+
+**The delta vs `7e918a1` (full `git diff` — presentational ONLY):**
+- **PickScreen.tsx:** the sheet's title+body are now wrapped in a `confirmAlert` `<div>` with a `⚠️` `confirmIcon` `<span aria-hidden>`; the confirm button's `variant` changed **`primary` → `destructive-filled`**. **Nothing else changed** — `onSubmitTap` (the `shortfall > 0 ? open : submit` gate), `handleSubmit`, `canSubmit`, both `onClick` handlers, and the message text `Aapne {doneCount}/{totalQty} items hi add kiye hai.` are byte-identical to `7e918a1`.
+- **pick.module.css:** `confirmAlert` (centered column), `confirmIcon` (64px glyph), `confirmTitle` now 48px/800/`--color-error` (was header-size/ink), `confirmBody` 19px/600, `confirmActions` buttons `min-height:56px`. Bigger, red, unmissable — the warehouse-emphasis the owner wanted.
+
+**What works (verified — read + range-diff + tsc + eslint + build):**
+- **All `7e918a1` correctness carries over unchanged** (gate is shortfall-driven; `shortfall` can't go negative → full pick submits with no dialog; ≥1 gate intact; Nahi/scrim leave the pick intact; Haan runs the unchanged `handleSubmit()` → server splits the backorder; no double-submit — `Button` disables on `loading`; both `/godown/[id]` + `/scan/[id]`). See the `7e918a1` block above; the diff confirms none of that logic moved.
+- **New markup/CSS valid:** `--color-error` (`#b91c1c`) is a defined token; `destructive-filled` is a real `ButtonVariant`. `⚠️` is `aria-hidden` (decorative — correct, the heading carries the meaning).
+- `npx tsc --noEmit` exit 0; `npm run lint` exit 0; `npm run build` exit 0.
+
+**Blocking issues:** None.
+
+**Non-blocking observations (owner-eyeball, not defects):**
+- The `--color-error` token comment says *"errors + Cancelled only — red is reserved"*; this alert now spends red on a **warning heading + a red confirm button**. Defensible (a short-submit is error-adjacent, and the whole point is to make it feel consequential), but it's a small widening of that reservation — flagging so the owner clocks it.
+- The **red confirm** ("Haan, submit karo") with a **neutral cancel** ("Nahi") inverts the usual "red = the destructive/cancel action" convention. It reads as an intentional *"proceed with the risky short-submit anyway"* pattern (like a red "Delete anyway"), but worth a glance on-device that a rushed picker won't misread which button proceeds.
+
+**Domain / correctness checks:** State machine / backend untouched (client guard only — `submit_pick` still the authority for the ≥1 gate + partial→backorder split). Money / immutability / RLS / order numbering N/A.
+
+**What I tried:** `git range-diff 7e918a1 76c8ef9` + full `git diff` on both files (scoped the change to markup + one variant); confirmed `--color-error` token + `destructive-filled` variant exist; `npx tsc --noEmit`, `npm run lint`, `npm run build` on the shipped tree.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
