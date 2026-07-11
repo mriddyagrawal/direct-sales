@@ -3952,3 +3952,9 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Apply the migration (owner go-ahead) alongside the frontend deploy, then re-verify the cells live.
 
 ---
+
+## Update — cancel/edit permissions MERGED + APPLIED + live-verified (2026-07-11)
+
+The reviewed `4eafbe3 / c1e4c74 / 13d97e2` were rebased onto `main` as **`ce5db56 / 4e5b053 / b3d5070`** — `git range-diff` shows all three `=` (byte-identical), so the ✅×3 verdicts carry over unchanged. The **migration is now APPLIED to prod** (live `cancel_order` / `update_order_items` carry the new bodies — no `editable_until`, the accountant "only an admin may cancel" gate present), and the apply was coordinated with the frontend merge → **no FE/BE mismatch window**. Re-verified on the **applied live functions** (rolled-back probe, test orders discarded): **5/5 cells PASS** — accountant-cancel-billed DENY, admin-cancel-backorder ALLOW, salesman-cancel-approved DENY, accountant-edit-approved DENY, salesman-edit-pending-past-window ALLOW. **The apply-gate pin from the 4eafbe3 review is CLOSED.**
+
+---
