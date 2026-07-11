@@ -3958,3 +3958,32 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 The reviewed `4eafbe3 / c1e4c74 / 13d97e2` were rebased onto `main` as **`ce5db56 / 4e5b053 / b3d5070`** — `git range-diff` shows all three `=` (byte-identical), so the ✅×3 verdicts carry over unchanged. The **migration is now APPLIED to prod** (live `cancel_order` / `update_order_items` carry the new bodies — no `editable_until`, the accountant "only an admin may cancel" gate present), and the apply was coordinated with the frontend merge → **no FE/BE mismatch window**. Re-verified on the **applied live functions** (rolled-back probe, test orders discarded): **5/5 cells PASS** — accountant-cancel-billed DENY, admin-cancel-backorder ALLOW, salesman-cancel-approved DENY, accountant-edit-approved DENY, salesman-edit-pending-past-window ALLOW. **The apply-gate pin from the 4eafbe3 review is CLOSED.**
 
 ---
+
+## Review of 7e918a1 — feat(godown): "PAKKA?" confirm before a short pick
+
+**Verdict:** ✅ accept — client-side short-pick confirm, exactly to prompt; full picks unaffected.
+
+**Phase / commit goal (as I understood it):** A partial pick (`doneCount < totalQty`) opens a `BottomSheet` "PAKKA?" confirm on Submit instead of firing straight through; a full pick submits directly (no dialog). Client-side UX guard only — no backend/RPC/RLS change; `submit_pick`'s ≥1-unit gate + partial→backorder split untouched. Both `/godown/[id]` and `/scan/[id]`.
+
+**What works (verified — read + tsc + eslint + build):**
+- **Gate is exactly shortfall-driven:** new `onSubmitTap()` → `if (shortfall > 0) setConfirmShort(true); else void handleSubmit();`. `shortfall = totalQty - doneCount`, so the sheet opens iff `doneCount < totalQty` (short) and submits straight through when equal (full). The Submit button now calls `onSubmitTap` (was `handleSubmit`).
+- **`shortfall` can never be negative → no missed full-pick path:** scan mode caps per line (`addScan`/`handleDecode` reject once `countFor >= line.qty`), qty mode caps via `Stepper max={line.qty}`, so `doneCount ≤ totalQty` always. Full pick ⇒ `shortfall===0` ⇒ direct submit. ✓
+- **Sheet content verbatim per prompt:** heading `PAKKA?`; body `Aapne {doneCount}/{totalQty} items hi add kiye hai.`; confirm `Haan, submit karo` → `setConfirmShort(false)` + the **unchanged** `handleSubmit()` (server splits the backorder as today); cancel `Nahi` and scrim-tap both just `setConfirmShort(false)` — **pick intact, nothing submitted** (no mutation of `scans`/`picked`).
+- **≥1-unit gate intact:** `canSubmit = doneCount >= 1` still gates `disabled={!canSubmit}`; `onSubmitTap` is only reachable via that button, so the sheet can't open at 0 → sheet range is `1 ≤ doneCount < totalQty`.
+- **No double-submit:** `Button` sets `disabled={disabled || loading}`, so once `handleSubmit` flips `submitting=true` the Submit button is disabled; while the sheet is open the scrim covers the underlying button.
+- **Both routes:** `/scan/[id]/page.tsx` and `/godown/[id]/page.tsx` both render `PickScreen` → the guard appears in both, LG (serials) and fixed (qty) alike (totals already mode-aware, no per-brand branch).
+- `npx tsc --noEmit` exit 0; `npm run lint` (eslint) exit 0; `npm run build` exit 0 (both routes compile).
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** None — minimal + correct; CSS uses the design tokens (`--font-structure`, `--text-header-size`, `--color-ink`), two equal `flex:1` buttons.
+
+**Domain / correctness checks:** State machine / backend untouched (client guard only — `submit_pick` remains the authority for the ≥1 gate + the partial→backorder split). Money / immutability / RLS / order numbering N/A. Prices absent from the pick screen (unchanged).
+
+**What I tried:** Read the full `PickScreen` (shortfall/doneCount/canSubmit derivation, `handleSubmit`, the new `onSubmitTap` + the sheet), `BottomSheet` (scrim-tap → onClose) and `Button` (loading ⇒ disabled) to rule out double-submit; confirmed both routes mount `PickScreen`; `npx tsc --noEmit`, `npm run lint`, `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (The cancel/edit apply-gate pin is CLOSED.)
+
+**Next-commit suggestion:** —
+
+---
