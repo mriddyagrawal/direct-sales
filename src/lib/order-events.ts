@@ -91,6 +91,8 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
     }
     case "billed":
       return `${time} Billed by ${actorLabel}`;
+    case "dispatched":
+      return `${time} Dispatched by ${actorLabel}`;
     default:
       return `${time} ${event.action}`;
   }

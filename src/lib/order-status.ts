@@ -14,6 +14,9 @@ export function getOrderStatusTag(
 ): { tone: StatusTone; label: string; sublabel?: string } {
   if (order.status === "cancelled") return { tone: "error", label: "Cancelled" };
   if (order.status === "billed") return { tone: "billed", label: "Billed" };
+  // Dispatched — the terminal stage after billing (physically shipped). Teal,
+  // distinct from billed's green.
+  if (order.status === "dispatched") return { tone: "dispatched", label: "Dispatched" };
   // Backorder — the remainder split off a partial pick, awaiting a Punch Order
   // to re-enter the pipeline. Violet.
   if (order.status === "backorder") return { tone: "backorder", label: "Backorder" };
