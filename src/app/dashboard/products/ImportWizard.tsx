@@ -85,8 +85,10 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
       const iTally = headers.indexOf("tally name");
       const iPrice = headers.indexOf("price");
       const iActive = headers.indexOf("active");
-      // Category + Display Name are the minimum recognizable schema.
-      if (iCat === -1 || iName === -1) return setStep("unreadable");
+      // Category is required; the "name" can come from EITHER a Display Name or
+      // a Tally Name column (whichever is present fills the other). So the sheet
+      // is recognisable with Category + at least one of the two name columns.
+      if (iCat === -1 || (iName === -1 && iTally === -1)) return setStep("unreadable");
 
       // Diff against the brand's *current* catalog (fetched fresh, not the
       // page's initial snapshot), keyed on (brand_id, tally_name).
@@ -101,19 +103,24 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
         const cells = grid[r] ?? [];
         const cell = (i: number) => (i === -1 ? "" : String(cells[i] ?? "").trim());
         const cat = cell(iCat);
-        const name = cell(iName);
+        const rawName = cell(iName);
+        const rawTally = cell(iTally);
         const priceCell = cell(iPrice);
         const activeCell = cell(iActive);
-        if (!cat && !name && !cell(iTally) && !priceCell && !activeCell) continue; // blank row
+        if (!cat && !rawName && !rawTally && !priceCell && !activeCell) continue; // blank row
 
         const rowNo = r + 1; // 1-based, header is row 1
-        const effTally = effectiveTallyName(cell(iTally), name);
+        // Either column fills the other: the Display Name falls back to the Tally
+        // Name and vice-versa, so one provided value seeds both. Both blank ⇒
+        // caught as an error below.
+        const name = rawName || rawTally; // display ← tally
+        const effTally = effectiveTallyName(rawTally, rawName); // tally ← display
         fileTallies.add(effTally);
 
         const parsedPrice = parsePricePaise(priceCell);
         let reason: string | undefined;
-        if (!name) reason = "Display name is required";
-        else if (!cat) reason = "Category is required";
+        if (!cat) reason = "Category is required";
+        else if (!name) reason = "Display name or Tally name is required";
         else if (!parsedPrice.ok) reason = parsedPrice.error;
 
         if (reason) {
@@ -228,8 +235,8 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
             </div>
 
             <p className={styles.hint}>
-              Expected columns: <strong>Category · Display Name · Tally Name · Price · Active</strong>. Tally Name blank ⇒ uses
-              the display name; Price blank ⇒ TBD.
+              Expected columns: <strong>Category · Display Name · Tally Name · Price · Active</strong>. Category is required; give{" "}
+              <strong>either</strong> Display Name or Tally Name — whichever is blank copies from the other; Price blank ⇒ TBD.
             </p>
             <button type="button" className={styles.linkBtn} onClick={downloadTemplate} disabled={!brandId}>
               Download template
