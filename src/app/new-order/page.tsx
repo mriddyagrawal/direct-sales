@@ -129,7 +129,9 @@ export default async function NewOrderPage({
       .maybeSingle();
 
     const row = data as unknown as EditOrderRow | null;
-    const editable = row && row.status === "pending_approval" && new Date(row.editable_until) > new Date();
+    // The salesman resume/edit flow is pending_approval-only now — the 2h edit
+    // window is gone (owner 2026-07-11). update_order_items enforces this too.
+    const editable = row && row.status === "pending_approval";
     if (!row || !editable) {
       redirect(`/orders/${edit}`);
     }

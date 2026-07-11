@@ -94,11 +94,12 @@ interface OrderDetailViewProps {
 // THE order detail — one component, every role (unification, owner decision
 // 2026-07-10). The role decides which ACTIONS render; the boilerplate
 // (header, lines, total, serials, notes, retailer, history, Share PDF) is
-// identical. Staff: Approve (admin) · Mark billed · inline Edit (+reason
-// after lock) · Cancel with reason · serials panel. Salesman: Edit order
-// (via the Quick Order flow) + Cancel while in-window, read-only after,
-// plus the status guidance notes; no serials. Hiding a button is cosmetic —
-// every write goes through the same role-guarded RPCs either way.
+// identical. Actions follow the cancel/edit permission matrices (owner
+// 2026-07-11): accountant acts only on pending_approval; admin on any live
+// order (inline Edit +reason past approval; Cancel with reason); salesman
+// edits/cancels only his own pending_approval order (the 2h window is gone),
+// read-only after. Hiding a button is cosmetic — every write goes through the
+// same role-guarded RPCs either way.
 export function OrderDetailView({ order, items: initialItems, events, catalog, currentUserId, role, isAdmin }: OrderDetailViewProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"view" | "edit">("view");
@@ -133,14 +134,17 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const now = useMemo(() => new Date(tick), [tick]);
   const isStaff = role === "staff";
   const isOwner = order.salesmanId === currentUserId;
-  // Matches the RPC's editable window: a pending_approval order is still
-  // editable in-window (approval beats the timer), so no reason is demanded.
-  const editable = order.status === "pending_approval" && new Date(order.editableUntil) > now;
-  // The salesman may edit/cancel only his own order, only in-window (the
-  // cancel_order/update_order_items RPCs enforce exactly this server-side).
+  // Editability is status-driven now — the 2h edit-window timer is gone (owner
+  // decision 2026-07-11). A `pending_approval` order is freely editable; once
+  // approved it's locked (admin-only past that, reason-logged, server-side).
+  const editable = order.status === "pending_approval";
+  // The salesman may edit/cancel only his own order, only while it's still
+  // pending_approval (the cancel_order/update_order_items RPCs enforce this).
   const salesmanActionable = !isStaff && isOwner && editable;
+  // A reason is demanded only for an admin editing a locked (post-approval)
+  // order — mode=edit on a non-`editable` order is exactly that case.
   const requiresReason = mode === "edit" && !editable;
-  const statusTag = getOrderStatusTag({ status: order.status, editable_until: order.editableUntil }, now);
+  const statusTag = getOrderStatusTag({ status: order.status });
 
   const snapshotById = useMemo(() => {
     const map: Record<string, { name: string; price: number }> = {};
@@ -414,9 +418,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           const meta = metaParts.filter(Boolean).join(" · ");
           return meta ? <p className={styles.heroMeta}>{meta}</p> : null;
         })()}
-        {editable && (
-          <p className={styles.byline}>editable until {formatOrderTimestamp(order.editableUntil, now)}</p>
-        )}
         {/* Billed byline: when + who + the Tally bill number. `Bill #` only
             renders when present, so the pre-existing billed orders (null bill
             no) show the byline without it. */}
@@ -498,17 +499,20 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       )}
 
       {/* SECONDARIES (glyph + label; Cancel red at the far end — spec §3/§5).
-          Every write still goes through the role-guarded RPCs; hiding a
-          button is cosmetic. Billed-cancel is ADMIN-only (owner decision #1);
-          salesman self-cancel = own + pending + in-window (decision #2). */}
+          Every write still goes through the role-guarded RPCs; hiding a button
+          is cosmetic. Permission matrices (owner 2026-07-11 — see
+          docs/specs/cancel-edit-permissions-proposal.md):
+          EDIT   — salesman & accountant: pending_approval only; admin: any
+                   non-cancelled (reason once past approval).
+          CANCEL — salesman: own pending; accountant: pending only; admin: any. */}
       <div className={styles.secondaries}>
-        {isStaff && order.status !== "cancelled" && mode === "view" && (
+        {isStaff && mode === "view" && (isAdmin ? order.status !== "cancelled" : order.status === "pending_approval") && (
           <Button variant="secondary" onClick={() => setMode("edit")}>
             <Glyph icon={Pencil} />
             Edit
           </Button>
         )}
-        {!isStaff && isOwner && (editable || isBackorder) && (
+        {!isStaff && isOwner && editable && (
           <Button
             variant="secondary"
             loading={navPending && navTarget === `/new-order?edit=${order.id}`}
@@ -533,7 +537,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             Scan
           </Button>
         )}
-        {((isStaff && (order.status === "billed" ? isAdmin : order.status !== "cancelled")) ||
+        {((isStaff && (isAdmin ? order.status !== "cancelled" : order.status === "pending_approval")) ||
           salesmanActionable) && (
           <Button
             variant="destructive-filled"
@@ -574,7 +578,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         <>
           {order.status === "pending_approval" && (
             <p className={styles.noteLocked}>
-              Waiting for office approval{salesmanActionable ? " — you can still edit until the window closes." : "."}
+              Waiting for office approval{salesmanActionable ? " — you can still edit it until it's approved." : "."}
             </p>
           )}
           {order.status === "approved" && (
