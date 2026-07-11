@@ -7,15 +7,18 @@ interface StepperProps {
   max: number;
   onChange: (qty: number) => void;
   onTapQuantity: () => void;
+  // "sm" shrinks the control for dense rows (e.g. the review cart); default
+  // "md" keeps the ≥48px hit area used everywhere else.
+  size?: "md" | "sm";
 }
 
 // [-] qty [+] — the + is the most-tapped control in the app (design spec
 // §"Layout"): ≥48px hit area even where the visual cell is smaller. Tapping
 // the qty number opens the keypad sheet instead of incrementing (typing 24
 // beats tapping + 24 times).
-export function Stepper({ qty, max, onChange, onTapQuantity }: StepperProps) {
+export function Stepper({ qty, max, onChange, onTapQuantity, size = "md" }: StepperProps) {
   return (
-    <div className={styles.stepper}>
+    <div className={`${styles.stepper} ${size === "sm" ? styles.sm : ""}`}>
       <button
         type="button"
         className={`${styles.button} ${styles.buttonMinus}`}

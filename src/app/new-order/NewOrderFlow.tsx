@@ -322,8 +322,10 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         retailerArea={retailerArea}
         isEdit={isEdit}
         onChangeQty={handleChangeQty}
+        onChangePrice={handleChangePrice}
         onNotesChange={handleNotesChange}
         onChangeRetailer={() => goto("retailer")}
+        onAddItem={() => goto("order")}
         onBack={() => goto("order")}
         onSubmit={handleSubmit}
         submitting={submitting}

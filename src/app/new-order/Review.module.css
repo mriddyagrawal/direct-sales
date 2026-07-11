@@ -2,27 +2,42 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background: #f3f4f6;
 }
 
 .content {
   flex: 1;
+  width: 100%;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
+/* ── Retailer header ── */
 .retailerHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-hairline);
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.retailerIcon {
+  display: flex;
+  color: var(--color-locked);
+}
+
+.retailerText {
+  flex: 1;
+  min-width: 0;
 }
 
 .retailerName {
   font-family: var(--font-structure);
-  font-size: var(--text-header-size);
+  font-size: var(--text-body-size);
   font-weight: 700;
   color: var(--color-ink);
 }
@@ -38,29 +53,47 @@
   border: none;
   color: var(--color-accent);
   font-family: var(--font-structure);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 8px;
+  padding: 6px 4px;
+}
+
+/* ── Item card ── */
+.card {
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 
 .line {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
   gap: 12px;
-  padding: 10px 0;
   border-bottom: 1px solid var(--color-hairline);
 }
 
 .lineInfo {
-  min-width: 0;
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 12px 0 12px 12px;
+}
+
+.lineModel {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
 }
 
 .lineName {
   font-family: var(--font-structure);
   font-size: var(--text-body-size);
+  font-weight: 600;
   color: var(--color-ink);
 }
 
@@ -70,31 +103,102 @@
   color: var(--color-locked);
 }
 
+/* Editable unit price (manual / LG lines). */
+.priceEdit {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 3px;
+  max-width: 150px;
+  padding: 3px 8px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.priceEdit:focus-within {
+  border-color: var(--color-accent);
+}
+
+.pricePrefix {
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-locked);
+}
+
+.priceInput {
+  width: 64px;
+  border: none;
+  outline: none;
+  background: none;
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.priceEach {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+.lineControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 12px 0;
+}
+
 .lineAmount {
   font-family: var(--font-figures);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-ink);
-  min-width: 64px;
+  min-width: 62px;
   text-align: right;
 }
 
-.lineActions {
+/* Full-height delete rail on the far LEFT (owner spec): red ✕ on white with a
+   red divider facing the content, inverts to solid red / white ✕ while pressed. */
+.remove {
+  align-self: stretch;
+  width: 44px;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  background: var(--color-white);
+  border: none;
+  border-right: 1px solid var(--color-error);
+  color: var(--color-error);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.05s ease, color 0.05s ease;
 }
 
-.remove {
-  min-width: 40px;
-  min-height: 40px;
+.remove:active {
+  background: var(--color-error);
+  color: var(--color-white);
+}
+
+/* Add another item — returns to the picker with the cart intact. */
+.addItem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
   background: none;
   border: none;
-  color: var(--color-error);
-  font-size: 16px;
+  color: var(--color-accent);
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
+/* ── Notes ── */
 .notesField {
   display: flex;
   flex-direction: column;
@@ -128,12 +232,22 @@
   border-color: var(--color-accent);
 }
 
+/* ── Sticky footer: total + submit ── */
+.footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--color-white);
+  border-top: 1px solid var(--color-hairline);
+}
+
 .totalRow {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding-top: 8px;
-  border-top: 2px solid var(--color-ink);
 }
 
 .totalLabel {
@@ -157,4 +271,17 @@
   font-family: var(--font-structure);
   font-size: 12px;
   color: var(--color-error);
+}
+
+/* Desktop: stop the flow from stretching edge-to-edge on wide screens. */
+@media (min-width: 768px) {
+  .content,
+  .footer {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .content {
+    padding: 24px;
+  }
 }
