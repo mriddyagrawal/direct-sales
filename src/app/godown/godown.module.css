@@ -2,7 +2,8 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 0 16px 24px;
+  /* Bottom clearance for the fixed GodownTabBar (Stage 2). */
+  padding: 0 16px 96px;
   background: var(--color-paper);
 }
 

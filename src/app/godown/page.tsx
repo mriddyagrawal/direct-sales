@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
 import { formatOrderTimestamp } from "@/lib/format";
 import { PreloadScanner } from "./PreloadScanner";
+import { GodownTabBar } from "@/components/GodownTabBar";
 import styles from "./godown.module.css";
 
 interface QueueItem {
@@ -119,6 +120,8 @@ export default async function GodownQueuePage() {
           })}
         </div>
       )}
+
+      <GodownTabBar />
     </div>
   );
 }
