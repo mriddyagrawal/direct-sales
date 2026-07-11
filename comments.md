@@ -4016,3 +4016,39 @@ The reviewed `4eafbe3 / c1e4c74 / 13d97e2` were rebased onto `main` as **`ce5db5
 **Next-commit suggestion:** —
 
 ---
+
+## Review of f4d972f — feat(orders): admin comment on a held (pending_approval) order — red note
+
+**Verdict:** ✅ accept — backend proven by live rolled-back probes (6/6), frontend gating correct, no regression to `approve_order`, no RLS change. Already merged to `main` + **applied to prod** (2 migrations).
+
+**Phase / commit goal (as I understood it):** One overwritable, **admin-only** note on a `pending_approval` order (distinct from the salesman's `orders.notes`); shows as a **red note** on the detail + a **red ⚠ line** on the order card/row for **everyone** who can see the order; **never changes status**; empty **clears** it; logs a `commented` event. Builder addition beyond the prompt: `approve_order` now **clears** the note on approval.
+
+**What works (verified — read + migration-diff + 6 live rolled-back role probes + tsc/build):**
+- **Migrations correct.** `20260711160000` adds `orders.admin_comment` + `set_admin_comment` (SECURITY DEFINER): null-profile reject → **admin-only** (`v_role <> 'admin'` raise) → order-exists → **`pending_approval`-only** → `admin_comment = nullif(btrim(p_comment),'')` (empty clears) → insert `commented` event → **status untouched**. `20260711161000` recreates `approve_order`.
+- **`approve_order` = NO regression.** `diff`'d the new body against the prior (fulfilment-stage1) body: the **only** functional change is `+ admin_comment = null` in the UPDATE. The admin-only gate, `pending_approval`-only guard, all-brands→`approved` routing, and the `approved` event are **byte-identical**. The `commented` event is retained in history (audit trail) even after the note is cleared.
+- **Live rolled-back probes on prod (impersonated via jwt claims; whole txn `raise`d → rolled back, prod untouched): 6/6 PASS** — P1 admin-set → OK, `btrim`'d, **status stays `pending_approval`**, `commented` event logged; P2 accountant-set → **DENY**; P3 salesman-set → **DENY**; P4 admin-empty → **CLEAR** (`admin_comment=NULL`); P5 set-then-`approve_order` → `status='approved'` + `admin_comment=NULL` + **`commented` events retained in history**; P6 comment-on-approved (non-pending) → **DENY**.
+- **Visibility rides the RLS'd row — no RLS change** (grep: 0 `policy`/`row level` in the migration). The salesman's existing own-orders SELECT returns the whole row incl. `admin_comment`; both `ORDERS_SELECT` and `ORDER_DETAIL_SELECT` now include it, so a salesman sees the red line on his **own** order — and only his own (unchanged scoping). By construction, not a new grant.
+- **Frontend gating correct.** Detail: red **"Admin note"** box renders for **ALL roles** (`{order.adminComment && …}`, no role gate); the write box is gated `isStaff && isAdmin && order.status === 'pending_approval'` (textarea seeded from the current note, "Add note"/"Update note" → `setAdminComment` → `router.refresh()`, `variant="secondary"` so it doesn't steal the single filled-accent from Approve). List: red `⚠ {admin_comment}` in the mobile card + desktop row for **every** role, `--color-error`, `-webkit-line-clamp:2` / ellipsis so long notes don't break layout. `order-events` describes `commented` ("Comment by … : …" / "Comment cleared"). Types regenerated.
+- `npx tsc --noEmit` exit 0; `npm run build` exit 0 (at `f4d972f`).
+
+**Blocking issues:** None.
+
+**Non-blocking observations (owner-eyeball, not defects):**
+- **Approval clears the note** (builder addition beyond the prompt). Intended + correct — but note the UX consequence for the owner: once you **Approve**, the red note **disappears** from the card/detail (it only lived to explain *why it was held*). It's not lost — the `commented` text stays in the order **History**. Flagging so it isn't a surprise.
+- Detail `commentDraft` is `useState`-seeded once from `order.adminComment`; after a `router.refresh()` it isn't re-synced from props — harmless here (the admin editing *is* the source of truth), just noting.
+
+**Domain / correctness checks:** State machine untouched (comment never transitions; `approve_order` transition unchanged bar the field clear). Immutability/money N/A (one nullable text column + one admin RPC). RLS unchanged (note rides the row). Order numbering N/A.
+
+**What I tried:** Read both migrations + all FE diffs; `diff`'d old vs new `approve_order` (delta = `admin_comment=null` only); a 6-probe rolled-back `DO` block on prod impersonating admin/accountant/salesman; grepped the migration for RLS changes (none); confirmed `adminComment` mapping, `commented` history string, red-token CSS; `tsc` + `build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
+
+## Note — reviewer-authored fix 0a6ba8f (owner-directed, NOT independently reviewed)
+
+At the owner's explicit instruction I patched a live UI bug directly: **`fix(orders): filter dropdown tracks the trigger on scroll (mobile)`** (`0a6ba8f`, on `main`, parent `f4d972f`). The mobile filter popover is `position:fixed` with a `top` computed once at open and only re-synced on `resize`, so scrolling froze it mid-screen over the list. Fix = re-run the position `sync()` on `scroll` too (rAF-throttled, `capture:true`), so the popover stays glued below the trigger and rides up/off with the page. Client-side only, one component; `tsc`/`lint`/`build` clean. **Self-authored — flagged here for the audit trail since I was both author and reviewer on this one** (owner chose the direct-patch path).
+
+---
