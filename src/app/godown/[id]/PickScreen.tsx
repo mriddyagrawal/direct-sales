@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Stepper } from "@/components/ui/Stepper";
 import { extractSerial } from "@/lib/serial";
 import { submitPick, OfflineError, type PickLineInput } from "@/lib/order-rpcs";
@@ -63,6 +64,8 @@ export function PickScreen({
   const [manualText, setManualText] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Short-pick guard: a partial submit opens a "PAKKA?" confirm first.
+  const [confirmShort, setConfirmShort] = useState(false);
   const lastScanRef = useRef<{ text: string; at: number } | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -153,6 +156,13 @@ export function PickScreen({
         showFlash(error instanceof Error ? error.message : "Could not submit the pick.");
       }
     }
+  }
+
+  // Submit tap: a SHORT pick (some units left) confirms first so it isn't
+  // accidental; a full pick submits straight through (no extra tap).
+  function onSubmitTap() {
+    if (shortfall > 0) setConfirmShort(true);
+    else void handleSubmit();
   }
 
   const activeLine = lineFor(activeId);
@@ -288,10 +298,40 @@ export function PickScreen({
           {shortfall > 0 ? ` · ${shortfall} to backorder` : ""}
           {requiresScan && !allScanned && activeLine ? ` · scanning ${activeLine.name}` : ""}
         </span>
-        <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit} loading={submitting}>
+        <Button variant="primary" onClick={onSubmitTap} disabled={!canSubmit} loading={submitting}>
           Submit pick
         </Button>
       </div>
+
+      {/* Short-pick confirm ("PAKKA?") — client-side guard only; submit_pick
+          still does the real split server-side. Full picks never reach here. */}
+      {confirmShort && (
+        <BottomSheet onClose={() => setConfirmShort(false)}>
+          <div className={styles.confirmAlert}>
+            <span className={styles.confirmIcon} aria-hidden>
+              ⚠️
+            </span>
+            <p className={styles.confirmTitle}>PAKKA?</p>
+            <p className={styles.confirmBody}>
+              Aapne {doneCount}/{totalQty} items hi add kiye hai.
+            </p>
+          </div>
+          <div className={styles.confirmActions}>
+            <Button variant="secondary" onClick={() => setConfirmShort(false)}>
+              Nahi
+            </Button>
+            <Button
+              variant="destructive-filled"
+              onClick={() => {
+                setConfirmShort(false);
+                void handleSubmit();
+              }}
+            >
+              Haan, submit karo
+            </Button>
+          </div>
+        </BottomSheet>
+      )}
     </div>
   );
 }
