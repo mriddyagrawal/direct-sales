@@ -12,6 +12,9 @@ export const runtime = "nodejs";
 interface PdfItemRow {
   product_name: string;
   qty: number;
+  // Units actually picked (shipped). Null on any not-yet-picked order — the
+  // PDF then shows the full ordered line, no strike. 0 = picked, none taken.
+  picked_qty: number | null;
   unit_price_paise: number;
   line_total_paise: number;
   position: number;
@@ -40,7 +43,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data } = await supabase
     .from("orders")
     .select(
-      "order_ref, status, submitted_at, notes, total_paise, tally_bill_no, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code, show_model), order_items(product_name, qty, unit_price_paise, line_total_paise, position, products(tally_name), order_item_scans(serial, scanned_at))",
+      "order_ref, status, submitted_at, notes, total_paise, tally_bill_no, retailers(name, area, phone), salesman:profiles!orders_salesman_id_fkey(full_name), brands(name, code, show_model), order_items(product_name, qty, picked_qty, unit_price_paise, line_total_paise, position, products(tally_name), order_item_scans(serial, scanned_at))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -55,6 +58,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     .map((it) => ({
       product_name: it.product_name,
       qty: it.qty,
+      picked_qty: it.picked_qty,
       unit_price_paise: it.unit_price_paise,
       line_total_paise: it.line_total_paise,
       tally_name: it.products?.tally_name ?? null,
