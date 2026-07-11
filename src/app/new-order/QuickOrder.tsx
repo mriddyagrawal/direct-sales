@@ -174,19 +174,38 @@ export function QuickOrder({
     onChangePrice?.(id, parsed.ok && parsed.paise != null ? parsed.paise : 0);
   }
 
+  // Seed a manual (LG) line's cart price with the product's imported DEFAULT the
+  // moment it enters the cart (qty 0 → ≥1) and nothing's been typed — so the
+  // line total, cart total, AND the submit payload all carry the default with no
+  // extra tap. Typing overrides it; clearing the box falls back to the default
+  // again (CHANGE_PRICE deletes a 0/blank entry, and the server coalesces too).
+  // Fixed brands never seed here — their price is snapshotted server-side.
+  function handleQtyChange(p: ProductOption, next: number) {
+    const prev = items[p.id] ?? 0;
+    if (p.pricing_mode === "manual" && p.price_paise != null && prev === 0 && next >= 1 && prices?.[p.id] == null) {
+      onChangePrice?.(p.id, p.price_paise);
+    }
+    onChangeQty(p.id, next);
+  }
+
   function renderProduct(p: ProductOption) {
     const qty = items[p.id] ?? 0;
     const inCart = qty > 0;
     const isManual = p.pricing_mode === "manual";
     const expanded = expandedIds.has(p.id);
     const entered = prices?.[p.id] ?? snapshotPrices?.[p.id];
+    // Manual (LG) effective price: typed override wins, then the edit snapshot,
+    // then the product's imported DEFAULT (p.price_paise) — so an untouched
+    // manual line reads and bills at its default, and editing an existing order
+    // never re-prices a line (snapshot beats the default).
+    const effective = isManual ? (entered ?? p.price_paise) : entered;
     const priceLabel = isManual
-      ? entered != null
-        ? formatRupees(entered)
+      ? effective != null
+        ? formatRupees(effective)
         : "Tap to price"
       : formatRupees(pricesById[p.id] ?? p.price_paise ?? 0);
     const buffered = priceText[p.id];
-    const inputVal = buffered ?? (entered != null ? String(entered / 100) : "");
+    const inputVal = buffered ?? (effective != null ? String(effective / 100) : "");
     const parsed = isManual && buffered != null && buffered !== "" ? parsePricePaise(buffered) : null;
     const priceError = parsed && !parsed.ok ? parsed.error : null;
 
@@ -238,7 +257,7 @@ export function QuickOrder({
             <Stepper
               qty={qty}
               max={UI_QTY_CAP}
-              onChange={(next) => onChangeQty(p.id, next)}
+              onChange={(next) => handleQtyChange(p, next)}
               onTapQuantity={() => setKeypadProductId(p.id)}
             />
             {priceError && <span className={styles.priceError}>{priceError}</span>}
@@ -361,7 +380,7 @@ export function QuickOrder({
           max={UI_QTY_CAP}
           onCancel={() => setKeypadProductId(null)}
           onSet={(qty) => {
-            onChangeQty(keypadProduct.id, qty);
+            handleQtyChange(keypadProduct, qty);
             setKeypadProductId(null);
           }}
         />
