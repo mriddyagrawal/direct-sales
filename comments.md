@@ -4225,3 +4225,27 @@ So: **client price → existing line snapshot → product default (new lines onl
 **Next-commit suggestion:** —
 
 ---
+
+## Review of 449f754 — feat(products): import keeps existing Category too when the cell is blank
+
+**Verdict:** ✅ accept — completes the partial-patch rule (directly addresses my `ee8ddc8` non-blocking note); FE-only, `ex!` provably safe.
+
+**Phase / commit goal:** Extend "blank keeps existing" to the last field: a blank Category on a MATCHED row keeps the product's current category (was hard-required → clobbered a match into an error). A NEW product still requires one.
+
+**What works (verified — read + safety trace + tsc/lint/build):**
+- **Validation reordered:** `if (!rawName && !rawTally) …; else if (!cat && !matched) "Category is required"` — category is required **only for a new row**; a matched row with blank category passes.
+- **Resolve:** `const category = cat ? normalizeCategory(cat, brandCats) : ex!.category` — value overrides, blank keeps existing.
+- **`ex!` is provably safe:** a blank `cat` only reaches the resolve when `matched` is true — because the `else if (!cat && !matched)` guard errors-and-`continue`s any non-matched blank-category row (and the earlier both-names-blank branch can't co-occur with a match). So `!cat ⇒ matched ⇒ ex defined`. Consistent with the `matched`-guarded `ex!` used for name/price/active.
+- Hint reworded ("a new product also needs a Category"). RPC unchanged; no DB change. `tsc`/`eslint`/`build` exit 0.
+
+**Blocking issues:** None. **Non-blocking:** none — this closes the one observation from the `ee8ddc8` review.
+
+**Domain checks:** Catalog only (category resolve). Money/immutability/RLS untouched. `(brand_id, tally_name)` key + non-empty `tally_name` invariant unchanged.
+
+**What I tried:** Read the diff; proved the `!cat ⇒ matched` invariant that makes `ex!.category` safe; `tsc` + `lint` + `build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
