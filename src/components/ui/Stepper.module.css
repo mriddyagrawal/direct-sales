@@ -55,3 +55,16 @@
   padding: 0 6px;
   cursor: pointer;
 }
+
+/* Small variant (dense rows, e.g. the review cart). */
+.sm .button {
+  min-width: 34px;
+  min-height: 34px;
+  font-size: 15px;
+}
+
+.sm .qty {
+  min-width: 38px;
+  min-height: 34px;
+  font-size: 13px;
+}
