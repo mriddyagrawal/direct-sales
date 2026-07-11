@@ -3807,3 +3807,74 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** —
 
 ---
+
+## Review of 59f96c1 — feat(orders): strike un-picked units on the order page + pick-slip PDF
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** A partially-picked order no longer renders/prints as if fully shipped. Per line (driven by `order_items.picked_qty`): a short line shows the picked figure + the struck ordered qty ("2 3̶"); a zero-taken line struck grey italic with amount = **original** (not ₹0); shipped lines reconcile to `order.total_paise`. On both the detail view and the A5 PDF. Read-only (adds `picked_qty` to the PDF select; no schema).
+
+**What works (verified — read + build):**
+- **PDF 500 avoided by construction:** struck text uses the built-in **`Courier-Oblique` / `Helvetica-Oblique`** faces *directly*, NOT `fontStyle:"italic"` on a bold family (react-pdf's bold PostScript families have no italic axis → "could not resolve font" → route 500). Those are standard-14 fonts (no registration), so the render can't hit that error; the builder documented the exact failure + fix inline. [PickSlipPdf.tsx]
+- **Detail strike coherent** (`OrderDetailView`): `zeroTaken = view && picked_qty===0` → whole row struck, amount = `rate×qty` (original, struck); a short line → picked figure + struck ordered qty, amount = `rate×picked_qty` (shipped); the total stays `order.totalPaise` (the DB shipped total). The un-struck (shipped) amounts reconcile to the total; struck lines read as visually excluded — standard invoice UX. Muted grey (#6b7580); red stays reserved for cancellations. Backorder HISTORY refs are now parent↔child links.
+- `npm run build` clean (tsc + eslint).
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** Verified the PDF path by **read + build, not a live render** — the DB was wiped to 0 orders for rollout, so there's no partial order to produce an actual %PDF from. The font approach is provably correct (standard oblique faces), but an owner spot-check of the **first real partial order's PDF** closes it 100%.
+
+**Domain / correctness checks:** Money ✓ (total = DB shipped `total_paise`; amounts via `formatRupees`, paise). Immutable snapshots ✓ (reads `picked_qty`, writes nothing). No RLS / state-machine / schema surface touched.
+
+**What I tried:** Read the PDF font/strike diff + the `OrderDetailView` qty/amount/total logic; `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
+
+## Review of 3d44216 — docs(specs): cancel/edit permissions matrices + edit-window removal proposal
+
+**Verdict:** ✅ accept (a PROPOSED doc — nothing built)
+
+**Phase / commit goal (as I understood it):** Record the owner-approved cancel & edit permission matrices + the plan to drop the 2h salesman edit window (status-gated instead), touched surfaces, the reverse-cancel finding, reversibility. Explicitly **PROPOSED, not implemented.**
+
+**What works (doc review):**
+- Header clearly marks **"STATUS: PROPOSED — NOT IMPLEMENTED. Do not build from this yet."** ✓ — no code, nothing to execute.
+- Part 1 (window removal) coherent: today = `pending_approval AND editable_until>now()`; proposed = status-only. Rationale (the window predates the universal admin-approval lifecycle) sound; **`editable_until` column RETAINED** (still written by `submit_order`) — matches the safe posture (stop reading it, don't drop). ✓
+- Matches the owner-approved plan I reviewed with the owner; the two behavioural notes (salesman can edit a pending order indefinitely; accountant cancel/edit tightened to pending-only, non-pending → admin-only) are owner-accepted.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None — it's a proposal doc.
+
+**Domain / correctness checks:** Doc-accuracy only.
+
+**What I tried:** Read the doc; cross-checked against the owner-approved plan + the live cancel/edit behaviour.
+
+**Open flags (cumulative):** No 🔴. Carried as above. **Watch when it ships:** verify each matrix cell (role×state) live; confirm no in-flight order is stranded by the new gates; confirm `editable_until` is retained, not dropped.
+
+**Next-commit suggestion:** —
+
+---
+
+## Review of 15cd3f6 — feat(ui): route loading skeletons + nav-button spinners
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Phase-6 #1 — add `loading.tsx` to the 10 remaining routes (login skipped, static form) so a navigation shows a shape-matched skeleton INSTANTLY inside the shell instead of freezing; plus a spinner on the Scan + salesman-Edit nav buttons. Presentation-only.
+
+**What works (verified — count + read + build):**
+- **10 routes gained a `loading.tsx`** → **12 total** (was 2). Skeleton primitive (`ui/Skeleton`, shimmer + reduced-motion) + shared composites (OrderDetailSkeleton, PickSkeleton, ListSkeleton); salesman routes full-page, dashboard routes fill only the content area (chrome persists). Matches the prompt's route table.
+- **Nav spinners done right:** a **dedicated `useTransition`** (`navPending`/`startNav`) with a **`navTarget` key** so that when Edit + Scan co-render (salesman), only the *tapped* button spins (`loading={navPending && navTarget===…}`) — exactly the "separate transition, only the tapped button" spec. [OrderDetailView L124-129, 466/514/529]
+- **Presentation-only** — every changed file is `.tsx`/`.module.css`; no data/query/RPC/RLS/money surface. `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** N/A — pure presentation (loading fallbacks + a button affordance).
+
+**What I tried:** Counted `loading.tsx` (12); confirmed the dedicated-transition + `navTarget` spinner wiring; confirmed the diff is `.tsx`/`.css` only; `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
