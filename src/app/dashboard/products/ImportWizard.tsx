@@ -123,8 +123,8 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
 
         const parsedPrice = parsePricePaise(priceCell); // blank ⇒ ok, paise null
         let reason: string | undefined;
-        if (!cat) reason = "Category is required";
-        else if (!rawName && !rawTally) reason = "Display name or Tally name is required";
+        if (!rawName && !rawTally) reason = "Display name or Tally name is required";
+        else if (!cat && !matched) reason = "Category is required"; // a NEW product needs one; a match keeps its own
         else if (!parsedPrice.ok) reason = parsedPrice.error;
 
         if (reason) {
@@ -136,6 +136,7 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
         // value; a NEW product falls back (name ← tally, price → TBD, active →
         // true). The RPC still overwrites, but for a match we hand it the current
         // value, so a blank changes nothing.
+        const category = cat ? normalizeCategory(cat, brandCats) : ex!.category;
         const name = rawName || (matched ? ex!.name : rawTally);
         const providedPaise = parsedPrice.ok ? parsedPrice.paise : null; // .ok guaranteed — error rows already continued
         const pricePaise = priceCell !== "" ? providedPaise : matched ? ex!.price_paise : null;
@@ -143,7 +144,7 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
 
         rows.push({
           rowNo,
-          category: normalizeCategory(cat, brandCats),
+          category,
           name,
           tallyName: effTally,
           pricePaise,
@@ -249,9 +250,9 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
             </div>
 
             <p className={styles.hint}>
-              Expected columns: <strong>Category · Display Name · Tally Name · Price · Active</strong>. Category is required; give a{" "}
-              <strong>Display Name or Tally Name</strong>. On an existing product a blank cell keeps its current value; a new product
-              uses the Tally name for a blank Display name and TBD for a blank Price.
+              Expected columns: <strong>Category · Display Name · Tally Name · Price · Active</strong>. Give a{" "}
+              <strong>Display Name or Tally Name</strong>; a new product also needs a Category. On an existing product any blank cell
+              keeps its current value; a new product uses the Tally name for a blank Display name and TBD for a blank Price.
             </p>
             <button type="button" className={styles.linkBtn} onClick={downloadTemplate} disabled={!brandId}>
               Download template
