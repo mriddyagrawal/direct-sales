@@ -496,7 +496,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         </Button>
       )}
       {(order.status === "billed" || order.status === "cancelled") && (
-        <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="primary" />
+        <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="primary" />
       )}
       {isStaff && order.status === "approved" && (
         <>
@@ -569,7 +569,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           </Button>
         )}
         {order.status !== "billed" && order.status !== "cancelled" && (
-          <SharePdfButton orderId={order.id} orderRef={order.orderRef} variant="ink" />
+          <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="ink" />
         )}
         {/* Salesman scans his own approved LG order — Share | Scan splits the
             secondaries (staff get Scan in the split override above instead). */}
