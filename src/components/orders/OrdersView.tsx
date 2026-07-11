@@ -317,7 +317,9 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
                     <td className={styles.cellRetailer}>
                       {order.retailers?.name ?? "—"}
                       {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
-                      {order.admin_comment && <span className={styles.rowAdminNote}>⚠ {order.admin_comment}</span>}
+                      {order.admin_comment && order.status === "pending_approval" && (
+                        <span className={styles.rowAdminNote}>⚠ {order.admin_comment}</span>
+                      )}
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(order.total_paise)}</td>
                     <td>
@@ -364,8 +366,9 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
                     {isStaff && <>{order.profiles?.full_name ?? "—"} · </>}
                     {formatOrderTimestamp(order.submitted_at, now)}
                   </div>
-                  {/* Admin's held-stage note — a red line every role sees. */}
-                  {order.admin_comment && (
+                  {/* Admin's held-stage note — a red line every role sees, but
+                      ONLY while pending_approval (hidden once it leaves the stage). */}
+                  {order.admin_comment && order.status === "pending_approval" && (
                     <div className={styles.cardAdminNote}>⚠ {order.admin_comment}</div>
                   )}
                 </button>
