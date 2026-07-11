@@ -295,7 +295,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
             </thead>
             <tbody>
               {finalFiltered.map((order, index) => {
-                const tag = getOrderStatusTag(order, now);
+                const tag = getOrderStatusTag(order);
                 const rowClasses = [
                   index === safeIndex ? styles.rowSelected : "",
                   newIds.has(order.id) ? styles.rowNew : "",
@@ -329,7 +329,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
 
           <div className={styles.cards}>
             {finalFiltered.map((order) => {
-              const tag = getOrderStatusTag(order, now);
+              const tag = getOrderStatusTag(order);
               return (
                 /* Spec §2: ref = mono grey eyebrow + chip; retailer + amount
                    are the two BOLD scan targets; ONE grey meta line

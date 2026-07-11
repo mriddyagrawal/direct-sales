@@ -1,21 +1,19 @@
 import { Button } from "@/components/ui/Button";
 import { StatusTag } from "@/components/ui/StatusTag";
-import { formatRupees, formatCountdown } from "@/lib/format";
+import { formatRupees } from "@/lib/format";
 import styles from "./Confirmation.module.css";
 
 interface ConfirmationProps {
   orderRef: string;
   totalPaise: number;
   retailerName: string;
-  editableUntil: string;
   onBackHome: () => void;
   onViewOrder: () => void;
 }
 
 // S6 — renders only on confirmed server success (data-model.md: an order
 // only exists once submit_order has actually returned it).
-export function Confirmation({ orderRef, totalPaise, retailerName, editableUntil, onBackHome, onViewOrder }: ConfirmationProps) {
-  const countdown = formatCountdown(editableUntil);
+export function Confirmation({ orderRef, totalPaise, retailerName, onBackHome, onViewOrder }: ConfirmationProps) {
   return (
     <div className={styles.page}>
       <div className={styles.check} aria-hidden>
@@ -26,7 +24,7 @@ export function Confirmation({ orderRef, totalPaise, retailerName, editableUntil
       <p className={styles.meta}>
         {retailerName} · {formatRupees(totalPaise)}
       </p>
-      {countdown && <StatusTag tone="accent" label={countdown.label} />}
+      <StatusTag tone="accent" label="Editable until approved" />
       <div className={styles.actions}>
         <Button variant="primary" onClick={onBackHome}>
           Back to Home

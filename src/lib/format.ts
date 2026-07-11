@@ -76,24 +76,6 @@ export function isSameSectionKey(a: string, b: string, now: Date = new Date()): 
   return formatSectionLabel(a, now) === formatSectionLabel(b, now);
 }
 
-// Countdown chip text (minutes only, never seconds — design spec §2 "Status
-// system"): "editable 1h 12m" / "editable 8m". null once the window has
-// passed (the caller then shows the locked chip instead).
-export function formatCountdown(
-  editableUntilIso: string,
-  now: Date = new Date(),
-): { label: string; urgent: boolean } | null {
-  const diffMs = new Date(editableUntilIso).getTime() - now.getTime();
-  if (diffMs <= 0) return null;
-
-  const totalMinutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const label = hours > 0 ? `editable ${hours}h ${minutes}m` : `editable ${minutes}m`;
-
-  return { label, urgent: totalMinutes < 10 };
-}
-
 // ₹ en-IN grouping, e.g. 447800 paise -> "₹4,478" (whole rupees — this app
 // never shows paise fractions; see money-display-paise-conversion memory).
 export function formatRupees(paise: number): string {

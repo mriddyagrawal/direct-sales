@@ -29,7 +29,6 @@ type Step = "retailer" | "order" | "review" | "confirmation";
 interface ConfirmedOrder {
   orderRef: string;
   totalPaise: number;
-  editableUntil: string;
 }
 
 interface FlowState {
@@ -220,7 +219,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         clearLastActiveRetailerId();
         dispatch({
           type: "SUBMIT_SUCCESS_CREATE",
-          confirmed: { orderRef: order.order_ref, totalPaise: order.total_paise, editableUntil: order.editable_until },
+          confirmed: { orderRef: order.order_ref, totalPaise: order.total_paise },
         });
       } else {
         router.push(`/orders/${cart.orderId}`);
@@ -338,7 +337,6 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         orderRef={confirmed.orderRef}
         totalPaise={confirmed.totalPaise}
         retailerName={cart.retailerName}
-        editableUntil={confirmed.editableUntil}
         onBackHome={() => router.push("/")}
         onViewOrder={() => router.push(`/orders/${cart.orderId}`)}
       />
