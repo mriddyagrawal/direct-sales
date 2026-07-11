@@ -4171,3 +4171,27 @@ So: **client price → existing line snapshot → product default (new lines onl
 **Next-commit suggestion:** —
 
 ---
+
+## Review of cf24101 — feat(products): import accepts either Display or Tally name (each fills the other)
+
+**Verdict:** ✅ accept — FE-only import-parse change; either-or name rule correct, RPC untouched.
+
+**Phase / commit goal:** The Excel import required a Display Name; a sheet with only tally/model codes was rejected. New owner rule: give **either** a Display or a Tally name and the blank one copies from the provided one (Category still required).
+
+**What works (verified — read + effectiveTallyName + tsc/lint/build):**
+- **Schema recognition:** `iCat === -1 || (iName === -1 && iTally === -1) → unreadable` — needs Category + **at least one** name column. ✓
+- **Per-row fill:** `name = rawName || rawTally` (display ← tally); `effTally = effectiveTallyName(rawTally, rawName)` = `rawTally.trim() || rawName.trim()` (tally ← display). Truth table holds — display-only → both=display; tally-only → both=tally; both → kept distinct; **neither → error** "Display name or Tally name is required" (Category checked first). Whitespace-only folds to blank via `cell()`'s `.trim()`. Matches the builder's stated truth-table test.
+- **Diff/apply consistent:** New/Updated keyed on `effTally` vs the fresh `(brand_id, tally_name)` catalog; the payload sends `name` + `tally_name: effTally`, **both guaranteed non-empty** for non-error rows → the existing `import_products` RPC is unchanged and never receives a blank. Blank-row skip updated to the raw vars (equivalent). Hint text updated accurately.
+- **No DB change.** `tsc` / `eslint` / `build` all exit 0.
+
+**Blocking issues:** None. **Non-blocking:** none (the empty-string `effTally` on a both-blank error row lands in `fileTallies` but can't collide with a real `tally_name`, so the "untouched" count is unaffected).
+
+**Domain checks:** Catalog integrity — `(brand_id, tally_name)` key preserved, `tally_name` still always non-empty (the invariant `effectiveTallyName` exists to guarantee). Money/immutability/RLS N/A (name parsing only; price path untouched).
+
+**What I tried:** Read the full diff + `effectiveTallyName`; traced the display/tally truth table + the payload/diff keying; `tsc` + `lint` + `build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
