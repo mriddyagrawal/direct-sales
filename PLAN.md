@@ -104,6 +104,27 @@ Realtime vs 30s polling for the dashboard · Tailwind vs vanilla CSS · PWA mani
 
 ---
 
+## Phase 6 — Native-feel & performance (later)
+
+**Goal:** make the deployed app feel like a native app — instant tab switches, no "press → freeze → snap-in ~2s later" — **without a native rewrite.** The app is *already* a standalone installable PWA (`src/app/manifest.ts` `display:standalone` + `public/sw.js` + `SwRegister`); this phase closes the *speed* gap, not the "is it an app" gap.
+
+**Owner framing (2026-07-11):** *"cache everything except the data."* The classic **app-shell PWA model** — cache the shell (JS/CSS/routes) so it opens instantly; keep data live over the network but **client-cache** it so a revisited tab renders instantly from cache and revalidates in the background. That (mounted shell + cached data) is exactly why the YouTube web app's tabs feel instant — not "because it's native."
+
+**The work (impact order):**
+1. **`loading.tsx` skeletons on every route** — only **2 of 13** routes have one today, so navigations freeze until the server render finishes. Instant feedback, low effort, no risk. *(Biggest perceived-speed win.)*
+2. **Client-side data caching** (React Query / SWR) on the hot lists (Orders / Retailers / Products) — there is **no cache lib today** (all SSR server-fetch), so every tab is a fresh round-trip. *(Biggest actual "instant tab" lever.)*
+3. **Prefetch** tab data + keep the app shell mounted so only the content swaps.
+4. **Service-worker shell caching** — the SW is a minimal passthrough today; cache the static shell so the app opens instantly (data still fetched fresh).
+5. **Cut per-navigation server cost** — the middleware runs `getUser()` (auth-server round-trip) + a `profiles` query on **every** request; carry role/active in the session instead. Add the deferred FK indexes (⑭). Confirm Vercel functions + Supabase are **same region**.
+6. **Push the PWA install** — get staff to "Add to Home Screen" (already `standalone`) for the icon + fullscreen look.
+7. **Trim `router.refresh()`** where a local state update suffices (each is a full server re-fetch).
+
+**Explicitly NOT doing:** a **native rewrite** (React Native/Expo — full frontend rewrite, backend reusable; only worth it later for app-store distribution or deep native hardware beyond the camera the PWA already reaches) or a **Capacitor wrap** (same web app in a WebView → tabs stay just as slow; doesn't solve the problem). Full diagnosis + rationale in [docs/future-plans.md](docs/future-plans.md).
+
+**Revisit when:** post-pilot, once the team is on the app daily and navigation latency is the top complaint.
+
+---
+
 ## Unscheduled — [docs/future-plans.md](docs/future-plans.md)
 
 Owner-approved ideas parked outside the committed phases (currently: **order-punch geotagging** — fail-open GPS fix at submit, order tags only, quiet presentation; **RLS/index performance pass** — 4 harmless-at-current-scale `get_advisors(performance)` findings from M1, revisit alongside the billing decision below or if real volume growth makes them matter; **"Cancelled orders" view for the salesman** — the un-hide screen for D8's default-hidden self-cancels, unscheduled until a real ask surfaces; **username-only auth** — swap D9's real-email-lookup login for synthetic `username@…` emails, simpler but reverses working code + needs account recreation, deferred by owner 2026-07-07).

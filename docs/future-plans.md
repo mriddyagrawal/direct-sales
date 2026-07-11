@@ -78,3 +78,23 @@ Ideas the owner has approved in principle but deliberately **not** scheduled int
 **Don't over-build:** at <20 orders/day with LG a subset, volume is tiny — **manual serial entry alone is fine**; the scan is a speed-up, not a blocker. MVP = fulfillment queue + per-line serial entry (scan or type) + submit + a clean export for LG/accountant.
 
 **Depends on / revisit when:** **Phase 2 (Tally sync)** and **Phase 3b (LG)** are live — it rides on both. May graduate from this parking lot into a dedicated PLAN phase + design doc once the structure (roles, Tally trigger, LG-portal integration) is decided.
+
+## App feel & performance — "instant tabs" / native-like PWA (owner-raised 2026-07-11 · PLAN Phase 6)
+
+**The ask:** the deployed app feels slow — tapping a nav tab freezes the current screen for ~2s, then the new screen snaps in all at once, *"like a complete website load."* The owner compared it to the **YouTube app**, where tab switches are instant, and asked whether "converting it into a real app" would fix it. Goal: that native-app snappiness **without a native rewrite.**
+
+**Root cause (diagnosed 2026-07-11 against the code):**
+- **No loading feedback.** Only **2 of 13** routes have a `loading.tsx`, so App-Router navigations to the other 11 freeze on the current page until the server render completes — the exact "press → nothing → snap-in" feel. Navigation *is* proper client-side `<Link>` (no real full reloads, no `window.location`); it just has no skeleton.
+- **No client data cache.** The app has **zero** client-cache library — every page is `ƒ Dynamic` server-fetch, so each tab re-runs middleware `getUser()` (an auth-server round-trip) + a `profiles` query + the page's own DB queries from scratch. Nothing is cached, so no tab is ever instant.
+
+**Owner's framing — *"cache everything except the data."*** i.e. the **app-shell PWA model**: cache the shell (JS/CSS/routes via the service worker) so it loads instantly, keep the data live but **client-cache** it (React Query/SWR) so a revisited tab renders instantly from cache and revalidates in the background. That mounted-shell-plus-cached-data is precisely why the YouTube *web* app feels fast — not because it's native.
+
+**The plan (impact order):** ① `loading.tsx` skeletons on all routes (instant feedback, low-risk); ② React Query/SWR caching on Orders/Retailers/Products (the biggest "instant tab" lever); ③ prefetch tab data + keep the shell mounted; ④ service-worker shell caching (the SW is a minimal passthrough today); ⑤ cut per-nav server cost — carry role/active in the session instead of a `profiles` query every request, add the deferred FK indexes (⑭), confirm Vercel + Supabase are same-region; ⑥ push the PWA "Add to Home Screen" install (already `display:standalone`); ⑦ trim `router.refresh()` where local state suffices.
+
+**Explicitly rejected:**
+- **Native rewrite (React Native/Expo):** true native speed but a **full frontend rewrite** (Supabase backend reusable) — *more* work, not "easier." Only worth it later for app-store distribution or deep native hardware beyond the camera (which the PWA already reaches for barcode scanning).
+- **Capacitor wrap:** ships the web app to the app stores, but it's the **same web app in a WebView** → tabs stay just as slow unless you *also* do the caching work above. Doesn't solve the actual problem.
+
+**Verdict:** the "it's an app" shell already exists (installable standalone PWA); the missing piece is purely the speed layer, fully achievable on the existing Next.js + Supabase stack.
+
+**Revisit when:** the pilot proves daily adoption and speed is the loudest feedback; or the app runs on sustained Supabase Free-tier compute where the per-navigation cost bites harder. (Tracked as **PLAN Phase 6**.)
