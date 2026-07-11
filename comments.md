@@ -3785,3 +3785,25 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** Stage 1 is now runtime-clean. An owner phone pass on the deployed URL (open an order detail + a backorder detail; partial-pick → punch) closes it out.
 
 ---
+
+## Review of 9b42cd1 — feat(orders): reorder status tabs — Backorder moved to end, pipeline order
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Cosmetic — reorder the `OrdersView` status-tab array to read in pipeline order (All · Pending approval · Pending scan · Ready to bill · Billed · Cancelled · Backorder), moving `backorder` from just-after-All to the end.
+
+**What works (verified by inspection — a one-line render-order change):** the diff is a pure reorder of the tab-array literal. Same **7** `StatusFilter` members before and after (`all, backorder, pending_approval, approved, ready_to_bill, billed, cancelled`), none dropped/added — `backorder` just moves index 1 → 6. The `StatusFilter` union, `STATUS_LABEL`, and `tabCounts` are keyed `Record<StatusFilter, …>` maps (order-independent), so only the visual tab order changes. Commit message accurate, incl. "Dispatched omitted — no such status until Stage 2."
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** N/A — pure presentation; no state machine / money / RLS / immutable-snapshot surface touched. Cannot affect the build (identical union members).
+
+**What I tried:** Read the one-line diff; confirmed a same-members reorder (7→7) and that labels/counts are keyed maps, not positional.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
