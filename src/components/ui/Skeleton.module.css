@@ -1,0 +1,29 @@
+.skeleton {
+  display: block;
+  flex: none;
+  background: linear-gradient(
+    90deg,
+    var(--color-hairline) 25%,
+    var(--color-paper) 37%,
+    var(--color-hairline) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* Accessibility: honour reduced-motion — hold a static tint, no shimmer. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--color-hairline);
+  }
+}
