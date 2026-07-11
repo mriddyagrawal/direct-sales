@@ -46,6 +46,9 @@ function pdfText(text: string): string {
 export interface PickSlipPdfItem {
   product_name: string;
   qty: number;
+  // Units actually picked (shipped). Null on a not-yet-picked order → the line
+  // prints in full, no strike. 0 = picked, none taken → whole row struck.
+  picked_qty: number | null;
   unit_price_paise: number;
   line_total_paise: number;
   tally_name: string | null;
@@ -76,6 +79,7 @@ const NAVY = "#1e3a8a"; // model line on show_model (LG) items
 // Status under the ORDER COPY badge — the app's status language ("Billed",
 // not the DB's 'processed') with the app's tone colours.
 const STATUS_LABEL: Record<string, string> = {
+  backorder: "BACKORDER",
   pending_approval: "PENDING APPROVAL",
   approved: "PENDING SCAN",
   ready_to_bill: "READY TO BILL",
@@ -84,6 +88,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
+  backorder: "#7c3aed", // violet (matches the app's backorder tone)
   pending_approval: "#b45309", // amber
   approved: LOCKED,
   ready_to_bill: "#1d4ed8", // accent
@@ -181,13 +186,36 @@ const s = StyleSheet.create({
     borderBottomColor: HAIRLINE,
     alignItems: "flex-start",
   },
-  colQty: { width: 30, textAlign: "right" },
+  colQty: { width: 44, textAlign: "right" },
   colItem: { flex: 1, paddingRight: 6 },
   colRate: { width: 64, textAlign: "right" },
   colAmount: { width: 70, textAlign: "right" },
   qty: {
     fontFamily: "Courier-Bold",
     fontSize: 10,
+  },
+  // Partial pick: the ordered qty struck, beside the picked figure (e.g. picked
+  // "2", then struck "3"). Uses the built-in Courier-Oblique face DIRECTLY, not
+  // fontStyle:"italic" — react-pdf's bold PostScript families have no italic
+  // axis, so `fontStyle` on them errors ("could not resolve font for …").
+  qtyOrderedStruck: {
+    fontFamily: "Courier-Oblique",
+    fontSize: 9,
+    color: LOCKED,
+    textDecoration: "line-through",
+  },
+  // A line ordered but not taken (picked_qty === 0) — struck grey italic,
+  // reading as "on the order, but on backorder". Two variants because struck
+  // text spans both families; each names its own built-in oblique face.
+  struckSans: {
+    color: LOCKED,
+    textDecoration: "line-through",
+    fontFamily: "Helvetica-Oblique",
+  },
+  struckMono: {
+    color: LOCKED,
+    textDecoration: "line-through",
+    fontFamily: "Courier-Oblique",
   },
   itemName: {
     fontSize: 9,
@@ -333,31 +361,58 @@ export function PickSlipPdf({
           <Text style={[s.th, s.colAmount]}>AMOUNT</Text>
         </View>
 
-        {items.map((item, i) => (
-          <View key={i} style={s.row} wrap={false}>
-            <View style={s.colItem}>
-              {showModel && item.tally_name && item.tally_name !== item.product_name ? (
-                <>
-                  <Text style={s.itemModelPrimary}>{pdfText(item.tally_name)}</Text>
-                  <Text style={s.itemNameSecondary}>{pdfText(item.product_name)}</Text>
-                </>
-              ) : (
-                <Text style={s.itemName}>{pdfText(item.product_name)}</Text>
-              )}
-              {item.serials.length > 0 && (
-                <View style={s.serialWrap}>
-                  <Text style={s.serialTag}>Serials</Text>
-                  {item.serials.map((serial, j) => (
-                    <Text key={j} style={s.serialLine}>{pdfText(serial)}</Text>
-                  ))}
-                </View>
-              )}
+        {items.map((item, i) => {
+          // picked_qty null → not-yet-picked order, print in full (no strike).
+          // 0 → nothing taken, strike the whole row. 0<p<qty → partial: show
+          // the picked figure with the ordered qty struck beside it.
+          const picked = item.picked_qty;
+          const zero = picked === 0;
+          const partial = picked !== null && picked > 0 && picked < item.qty;
+          // Short = took fewer than ordered (partial OR zero). Its qty cell shows
+          // the taken figure + struck ordered ("0 1̶"), legible even at one digit.
+          const short = picked !== null && picked < item.qty;
+          // Shipped amount = taken × rate. A zero-taken line keeps its ORIGINAL
+          // amount (struck) rather than "Rs 0", so the reader sees the value
+          // that dropped to backorder; partial recomputes on the picked qty.
+          const amountPaise = partial ? picked * item.unit_price_paise : item.line_total_paise;
+          // Struck (zero-taken) text needs the oblique face matching each cell's
+          // family: mono cells → Courier-Oblique, sans cells → Helvetica-Oblique.
+          const strikeMono = zero ? [s.struckMono] : [];
+          const strikeSans = zero ? [s.struckSans] : [];
+          return (
+            <View key={i} style={s.row} wrap={false}>
+              <View style={s.colItem}>
+                {showModel && item.tally_name && item.tally_name !== item.product_name ? (
+                  <>
+                    <Text style={[s.itemModelPrimary, ...strikeMono]}>{pdfText(item.tally_name)}</Text>
+                    <Text style={[s.itemNameSecondary, ...strikeSans]}>{pdfText(item.product_name)}</Text>
+                  </>
+                ) : (
+                  <Text style={[s.itemName, ...strikeSans]}>{pdfText(item.product_name)}</Text>
+                )}
+                {item.serials.length > 0 && (
+                  <View style={s.serialWrap}>
+                    <Text style={s.serialTag}>Serials</Text>
+                    {item.serials.map((serial, j) => (
+                      <Text key={j} style={s.serialLine}>{pdfText(serial)}</Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <Text style={[s.qty, s.colQty]}>
+                {short ? (
+                  <>
+                    {picked} <Text style={s.qtyOrderedStruck}>{item.qty}</Text>
+                  </>
+                ) : (
+                  item.qty
+                )}
+              </Text>
+              <Text style={[s.money, s.colRate, ...strikeMono]}>{pdfMoney(item.unit_price_paise)}</Text>
+              <Text style={[s.money, s.colAmount, ...strikeMono]}>{pdfMoney(amountPaise)}</Text>
             </View>
-            <Text style={[s.qty, s.colQty]}>{item.qty}</Text>
-            <Text style={[s.money, s.colRate]}>{pdfMoney(item.unit_price_paise)}</Text>
-            <Text style={[s.money, s.colAmount]}>{pdfMoney(item.line_total_paise)}</Text>
-          </View>
-        ))}
+          );
+        })}
 
         <View style={s.totalRow}>
           <Text style={s.totalLabel}>Total (incl. GST)</Text>

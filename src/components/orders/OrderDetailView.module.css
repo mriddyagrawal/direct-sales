@@ -342,10 +342,21 @@
   text-decoration: underline;
 }
 
-/* "3/5" picked-of-ordered in the QTY cell of a shipped-short line. */
-.shippedQty {
-  color: #7c3aed;
-  font-weight: 700;
+/* Partial pick: the ordered qty struck in grey italic, beside the picked
+   figure. Italic + strikethrough reads clearly as "superseded". */
+.orderedStruck {
+  color: var(--color-locked);
+  text-decoration: line-through;
+  font-style: italic;
+  margin-left: 2px;
+}
+
+/* A line ordered but not taken (picked_qty 0) — struck grey italic across the
+   whole row (item, qty, rate, amount): "on the order, but on backorder". */
+.struck {
+  color: var(--color-locked);
+  text-decoration: line-through;
+  font-style: italic;
 }
 
 /* Orders-UI revamp (spec §3): back-eyebrow + retailer hero + action rows. */

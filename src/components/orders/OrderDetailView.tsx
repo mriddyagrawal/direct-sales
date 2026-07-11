@@ -186,6 +186,23 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
   const total = lines.reduce((sum, l) => sum + l.rate * l.qty, 0);
 
+  // A `backordered` HISTORY line references the other order (parent↔child) —
+  // return the ref as a link so it's tappable, mirroring the "Backorder of"
+  // header link. Returns null for every non-linkable event (plain describeEvent).
+  const detailBase = isStaff ? "/dashboard/orders" : "/orders";
+  function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
+    if (e.action !== "backordered") return null;
+    const d = (e.details ?? {}) as Record<string, unknown>;
+    const time = formatOrderTimestamp(e.created_at);
+    if (typeof d.parent_ref === "string" && typeof d.parent_order_id === "string") {
+      return { prefix: `${time} Backordered from `, ref: d.parent_ref, href: `${detailBase}/${d.parent_order_id}` };
+    }
+    if (typeof d.child_ref === "string" && typeof d.child_order_id === "string") {
+      return { prefix: `${time} Backordered → `, ref: d.child_ref, href: `${detailBase}/${d.child_order_id}` };
+    }
+    return null;
+  }
+
   const addQ = addQuery.trim().toLowerCase();
   const addable =
     addQ === ""
@@ -577,10 +594,13 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => (
+              {lines.map((line) => {
+                // Zero taken (picked, none) — the whole line struck in grey.
+                const zeroTaken = mode === "view" && line.pickedQty === 0;
+                return (
                 <Fragment key={line.productId}>
                   <tr>
-                    <td>
+                    <td className={zeroTaken ? styles.struck : undefined}>
                       {/* Model eyebrow (spec §3): show_model brands lead each
                           line with the mono model; both roles see it. */}
                       {order.showModel && line.model && line.model !== line.name && (
@@ -596,20 +616,25 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                           onChange={(next) => handleQtyChange(line.productId, next)}
                           onTapQuantity={() => {}}
                         />
-                      ) : line.pickedQty !== null && line.pickedQty !== line.qty ? (
-                        // Shipped short: picked / ordered.
-                        <span className={styles.shippedQty}>
-                          {line.pickedQty}/{line.qty}
-                        </span>
+                      ) : line.pickedQty !== null && line.pickedQty < line.qty ? (
+                        // Short line (incl. 0 taken): the taken figure stays a
+                        // legible ink number, ordered qty struck beside it —
+                        // "0 3̶" reads far clearer than a lone struck digit.
+                        <>
+                          {line.pickedQty} <span className={styles.orderedStruck}>{line.qty}</span>
+                        </>
                       ) : (
                         line.qty
                       )}
                     </td>
-                    <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(line.rate)}</td>
-                    <td className={`${styles.mono} ${styles.numeric}`}>
+                    <td className={`${styles.mono} ${styles.numeric} ${zeroTaken ? styles.struck : ""}`}>{formatRupees(line.rate)}</td>
+                    <td className={`${styles.mono} ${styles.numeric} ${zeroTaken ? styles.struck : ""}`}>
                       {/* Shipped amount = (picked ?? ordered) × rate, so the lines
-                          sum to the shipped order total. Edit mode previews live. */}
-                      {formatRupees(line.rate * (mode === "view" ? line.pickedQty ?? line.qty : line.qty))}
+                          sum to the shipped order total. A zero-taken line keeps its
+                          ORIGINAL amount (struck), not ₹0. Edit mode previews live. */}
+                      {zeroTaken
+                        ? formatRupees(line.rate * line.qty)
+                        : formatRupees(line.rate * (mode === "view" ? line.pickedQty ?? line.qty : line.qty))}
                     </td>
                     {mode === "edit" && (
                       <td>
@@ -642,7 +667,8 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                     </tr>
                   )}
                 </Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
 
@@ -723,11 +749,26 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
           <div>
             <p className={styles.sectionLabel}>HISTORY</p>
-            {events2.map((e) => (
-              <p key={e.id} className={styles.historyLine}>
-                {describeEvent(e, currentUserId)}
-              </p>
-            ))}
+            {events2.map((e) => {
+              // A `backordered` event names the other order — link that ref to
+              // it. Child side carries parent_ref/parent_order_id, parent side
+              // child_ref/child_order_id; everything else is plain text.
+              const link = backorderEventLink(e);
+              return (
+                <p key={e.id} className={styles.historyLine}>
+                  {link ? (
+                    <>
+                      {link.prefix}
+                      <Link href={link.href} className={styles.parentLink}>
+                        {link.ref}
+                      </Link>
+                    </>
+                  ) : (
+                    describeEvent(e, currentUserId)
+                  )}
+                </p>
+              );
+            })}
           </div>
         </div>
       </div>
