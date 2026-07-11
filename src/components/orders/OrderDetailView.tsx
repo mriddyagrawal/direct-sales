@@ -117,6 +117,16 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // Dedicated NAVIGATION transition — kept separate from the save/approve
+  // `isPending` so a bare router.push shows a spinner on ONLY the tapped
+  // button (instant tap feedback, complementing the route loading.tsx). The
+  // `navTarget` key disambiguates when Edit + Scan co-render (salesman view).
+  const [navPending, startNav] = useTransition();
+  const [navTarget, setNavTarget] = useState<string | null>(null);
+  const navigate = (path: string) => {
+    setNavTarget(path);
+    startNav(() => router.push(path));
+  };
   const [error, setError] = useState<string | null>(null);
   const [tick] = useState(nowMs);
 
@@ -451,7 +461,11 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
               <Glyph icon={Stamp} />
               Mark billed
             </Button>
-            <Button variant="secondary" onClick={() => router.push(`/scan/${order.id}`)}>
+            <Button
+              variant="secondary"
+              loading={navPending && navTarget === `/scan/${order.id}`}
+              onClick={() => navigate(`/scan/${order.id}`)}
+            >
               <Glyph icon={ScanBarcode} />
               Scan
             </Button>
@@ -495,7 +509,11 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           </Button>
         )}
         {!isStaff && isOwner && (editable || isBackorder) && (
-          <Button variant="secondary" onClick={() => router.push(`/new-order?edit=${order.id}`)}>
+          <Button
+            variant="secondary"
+            loading={navPending && navTarget === `/new-order?edit=${order.id}`}
+            onClick={() => navigate(`/new-order?edit=${order.id}`)}
+          >
             <Glyph icon={Pencil} />
             Edit
           </Button>
@@ -506,7 +524,11 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         {/* Salesman scans his own approved LG order — Share | Scan splits the
             secondaries (staff get Scan in the split override above instead). */}
         {!isStaff && order.status === "approved" && (
-          <Button variant="secondary" onClick={() => router.push(`/scan/${order.id}`)}>
+          <Button
+            variant="secondary"
+            loading={navPending && navTarget === `/scan/${order.id}`}
+            onClick={() => navigate(`/scan/${order.id}`)}
+          >
             <Glyph icon={ScanBarcode} />
             Scan
           </Button>
