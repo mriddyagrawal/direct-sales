@@ -80,6 +80,8 @@ export interface OrderDetailData {
   approvedByName: string | null;
   pickedAt: string | null;
   pickedByName: string | null;
+  dispatchedAt: string | null;
+  dispatchedByName: string | null;
 }
 
 interface OrderDetailViewProps {

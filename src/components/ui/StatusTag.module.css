@@ -63,6 +63,14 @@
   background: #7c3aed;
 }
 
+/* Dispatched — teal, distinct from billed's green + backorder's violet. */
+.dispatched {
+  color: #0d9488;
+}
+.dispatched .square {
+  background: #0d9488;
+}
+
 /* Two-line variant: main label + a smaller sub-line ("editable 1h 59m",
    "waiting for scan"). The square stays aligned to the first line. */
 .lines {

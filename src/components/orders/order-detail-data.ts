@@ -6,13 +6,14 @@
 import type { OrderDetailData } from "./OrderDetailView";
 
 export const ORDER_DETAIL_SELECT =
-  "id, order_ref, status, notes, admin_comment, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, salesman_id, parent_order_id, " +
+  "id, order_ref, status, notes, admin_comment, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, dispatched_at, dispatched_by, salesman_id, parent_order_id, " +
   "retailers(name, area, phone, verified), " +
   "salesman:profiles!orders_salesman_id_fkey(full_name), " +
   "processed_by_profile:profiles!orders_processed_by_fkey(full_name), " +
   "cancelled_by_profile:profiles!orders_cancelled_by_fkey(full_name), " +
   "approved_by_profile:profiles!orders_approved_by_fkey(full_name), " +
   "picked_by_profile:profiles!orders_picked_by_fkey(full_name), " +
+  "dispatched_by_profile:profiles!orders_dispatched_by_fkey(full_name), " +
   "parent_order:orders!parent_order_id(order_ref), " +
   "brands(name, code, show_model), " +
   "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, picked_qty, position, products(tally_name), order_item_scans(id, serial, scanned_at)), " +
@@ -60,6 +61,8 @@ export interface OrderDetailQueryRow {
   approved_at: string | null;
   approved_by: string | null;
   picked_at: string | null;
+  dispatched_at: string | null;
+  dispatched_by: string | null;
   salesman_id: string;
   parent_order_id: string | null;
   parent_order: { order_ref: string } | null;
@@ -69,6 +72,7 @@ export interface OrderDetailQueryRow {
   cancelled_by_profile: { full_name: string } | null;
   approved_by_profile: { full_name: string } | null;
   picked_by_profile: { full_name: string } | null;
+  dispatched_by_profile: { full_name: string } | null;
   brands: { name: string; code: string; show_model: boolean } | null;
   order_items: OrderDetailItemRow[];
   order_events: OrderDetailEventRow[];
@@ -109,6 +113,8 @@ export function toOrderDetailProps(row: OrderDetailQueryRow): {
       approvedByName: row.approved_by_profile?.full_name ?? null,
       pickedAt: row.picked_at,
       pickedByName: row.picked_by_profile?.full_name ?? null,
+      dispatchedAt: row.dispatched_at,
+      dispatchedByName: row.dispatched_by_profile?.full_name ?? null,
     },
     items: [...row.order_items].sort((a, b) => a.position - b.position),
     events: [...row.order_events].sort(
