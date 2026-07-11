@@ -12,6 +12,12 @@ The state machine, the edit window, numbering, and the audit-event catalog. Enfo
 >    partial pick → original ships picked qty (→ ready_to_bill) + a NEW `backorder` child holds the remainder
 > ```
 
+> **Edit window removed + cancel/edit permission matrices — 2026-07-11 (owner decision).** The **2h edit window is gone**: editability is purely status-driven — a salesman edits/cancels only his own **`pending_approval`** order (no timer), read-only after. **`editable_until` is retained but no longer read.** New permission matrices (authoritative in **[cancel-edit-permissions-proposal.md](cancel-edit-permissions-proposal.md)**, migration `20260711153000`):
+> - **CANCEL** — salesman: own `pending_approval`; **accountant: `pending_approval` only**; **admin: any live state**. (`backorder → cancelled` is now a legal transition.)
+> - **EDIT** — salesman & accountant: `pending_approval` only; **admin: any live state** (`backorder`/`approved`/`ready_to_bill`/`billed`), reason-logged (`edited_after_lock`).
+>
+> This **supersedes** the "Edit window", the cancel-transition rows, and the per-state edit/cancel tables further down this file — they describe the pre-2026-07-11 model.
+
 ## States
 
 ```

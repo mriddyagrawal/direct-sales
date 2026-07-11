@@ -2,6 +2,8 @@
 
 Supabase Auth email+password, admin-created accounts, no self-signup (D3). Postgres RLS is the permission system; the UI merely reflects it.
 
+> **Cancel/edit permissions changed + edit window removed — 2026-07-11 (owner decision; migration `20260711153000`).** Authoritative matrices live in **[cancel-edit-permissions-proposal.md](cancel-edit-permissions-proposal.md)**. In short: the **2h edit window is gone** (edit/cancel are status-gated, not timed). **CANCEL** — salesman: own `pending_approval`; **accountant: `pending_approval` only**; admin: any live state. **EDIT** — salesman & accountant: `pending_approval` only; admin: any live state (reason-logged past approval). This means `cancel_order` / `update_order_items` now have a **real admin-vs-accountant split** — statements below about accountant editing/cancelling *any* order, or a salesman's "within window", describe the pre-2026-07-11 model.
+
 ## Roles
 
 | Role | Who | Purpose |
