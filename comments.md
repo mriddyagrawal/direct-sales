@@ -3878,3 +3878,77 @@ The decision (admin ≡ accountant *in-app*; oversight-only is convention) is un
 **Next-commit suggestion:** —
 
 ---
+
+## Review of 4eafbe3 — feat(db): cancel/edit permission matrices + drop the 2h edit window
+
+**Verdict:** ✅ accept (migration correct + verified) — **NOT yet applied to prod; the apply is the gated release step (see the pin).**
+
+**Phase / commit goal (as I understood it):** Recreate 3 functions per the proposal — `guard` adds `backorder→cancelled`; `cancel_order` drops the `editable_until` timer (salesman own-pending, accountant pending-only, everything past → admin-only, reason for staff); `update_order_items` drops the timer (salesman & accountant pending-only, post-approval → admin-only + reason). `editable_until` retained (still written, no longer read).
+
+**What works (verified — read + rolled-back per-cell probe + prod-unchanged check):**
+- **SQL read-verified:** all 3 bodies match the proposal matrices; logic sound (guard's `backorder→cancelled` edge + the role branches).
+- **My own rolled-back probe** — applied the exact new bodies in a txn, tested cells, rolled back (prod untouched): **7/7 changed/security cells PASS** — accountant-cancel-billed **DENY**; admin-cancel-backorder **ALLOW** (the new edge / the owner's "illegal transition" bug fixed); salesman-cancel-approved **DENY**; accountant-edit-approved **DENY**; admin-edit-approved no-reason **DENY** / with-reason **ALLOW**; and critically **salesman-edit-pending with `editable_until` 3h in the past → ALLOW** (proves the window is gone). Complements the builder's own 15/15.
+- **Prod confirmed unchanged:** live `cancel_order`/`update_order_items` still carry the old `editable_until` window (migration NOT applied — matches the "gated apply" claim); re-checked after my probe → still old (my DDL rolled back). `editable_until` retained.
+
+**Blocking issues (must fix in next commit):** None.
+
+**🔴-adjacent PIN — release coordination (not a code defect):** **the app is LIVE** — 22 real orders since rollout (`order_no` 1001–1031: 2 `pending_approval` + 1 `backorder` + 10 `billed` + 9 `cancelled`), i.e. orders these matrices govern. The migration is **not applied**, but the frontend (c1e4c74) already assumes the NEW backend. **At release: apply this migration to the live DB at/before the c1e4c74 deploy** — else a salesman editing a >2h `pending_approval` order sees the button (new FE) but the old backend rejects it ("window passed"), plus admin/accountant cancel-past-approval mismatches. 13d97e2 documents this; pinning it as the one thing to get right.
+
+**Domain / correctness checks:** State machine ✓ (guard edges verified). RLS/roles ✓ (role×state gates proven live, rolled back). Money/immutability untouched (permission gates only). Order numbering ✓ (`editable_until` retained not dropped; my probe consumed a few `nextval`s → harmless gaps per D1).
+
+**What I tried:** Read all 3 bodies; `pg_get_functiondef` prod-unchanged check (before + after); a rolled-back txn applying the new bodies + 7 role×state probes into a temp table; live-orders census.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **+ the apply-gate pin above.**
+
+**Next-commit suggestion:** At apply (owner go-ahead): re-run the full cell matrix on the now-live functions + confirm the 2 live pending + 1 backorder aren't stranded.
+
+---
+
+## Review of c1e4c74 — feat(orders): remove edit window/countdown + align cancel/edit buttons to matrices
+
+**Verdict:** ✅ accept (matches the matrices) — ships **with** the 4eafbe3 apply (see that pin).
+
+**Phase / commit goal (as I understood it):** Frontend for the new model (Commits 2+3 combined): `editable = status==='pending_approval'` (no timer), remove the countdown everywhere (delete `formatCountdown`), align Cancel/Edit button visibility to the matrices.
+
+**What works (verified — read + build):**
+- **Window gone:** `editable = order.status === "pending_approval"` (no `editable_until` read); `salesmanActionable = own + pending`; `requiresReason = mode==='edit' && !editable` (admin after-lock). `formatCountdown` deleted from format.ts; countdown removed from order-status.ts + Confirmation/NewOrderFlow/new-order.
+- **Buttons match the matrices:** EDIT → `isAdmin ? status!=='cancelled' : status==='pending_approval'` (admin any non-cancelled, accountant pending-only) + salesman own-pending; CANCEL → same shape. Reconciles to the cancel/edit matrices exactly.
+- `npm run build` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** `editable_until` is still *selected* in a few queries (page.tsx / dashboard/page.tsx `ORDERS_SELECT`, new-order resume-draft, `OrderDetailData`) but no longer read for gating — harmless leftover (matches "retain the column"); prune when convenient.
+
+**⚠️ Release dependency:** this frontend assumes the 4eafbe3 backend is applied; it must NOT reach prod before the migration is applied, or live users hit frontend-allows-but-backend-rejects. Coordinated at deploy per the plan/docs.
+
+**Domain / correctness checks:** Permission-*display* only; the server RPCs remain the enforcement (hiding a button is cosmetic). Build clean.
+
+**What I tried:** Read the editable/button-gating diff + the countdown removals; grepped residual `editable_until`; `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried as above.
+
+**Next-commit suggestion:** —
+
+---
+
+## Review of 13d97e2 — docs(specs): cancel/edit permissions shipped — sync lifecycle + roles specs
+
+**Verdict:** ✅ accept
+
+**Phase / commit goal (as I understood it):** Sync the specs to the new model (Commit 4): the cancel/edit matrices, the window removal, touched surfaces, PROPOSED→(code) shipped.
+
+**What works (doc review):**
+- The matrices match what I verified live (cancel: salesman own-pending / accountant pending / admin any; edit: salesman & accountant pending / admin any-post-approval + reason). Accurate.
+- **Crucially it prominently flags "⚠️ NOT yet applied to prod / not yet deployed"** — the migration is committed but not run against the live DB; the apply is gated at merge/deploy so "the prod DB never diverges from the prod frontend," fully reversible. So the doc does **not** over-claim — it's honest about the apply-gate. ✓
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Doc-accuracy only — cross-checked the matrices + apply-status framing against the live verification and the 4eafbe3/c1e4c74 reviews.
+
+**What I tried:** Read the doc diff; cross-checked matrices + the apply-status note.
+
+**Open flags (cumulative):** No 🔴. Carried as above. The **apply-gate pin (4eafbe3)** is the live release item.
+
+**Next-commit suggestion:** Apply the migration (owner go-ahead) alongside the frontend deploy, then re-verify the cells live.
+
+---
