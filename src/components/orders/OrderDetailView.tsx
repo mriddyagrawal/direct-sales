@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, X } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, Truck, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -14,7 +14,7 @@ import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatRupees } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
-import { updateOrderItems, cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment } from "@/lib/order-rpcs";
+import { updateOrderItems, cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder } from "@/lib/order-rpcs";
 import styles from "./OrderDetailView.module.css";
 
 const UI_QTY_CAP = 999;
@@ -90,7 +90,7 @@ interface OrderDetailViewProps {
   events: RawEventRow[];
   catalog: CatalogProduct[];
   currentUserId: string;
-  role: "salesman" | "staff";
+  role: "salesman" | "staff" | "godown";
   isAdmin: boolean;
 }
 
@@ -116,6 +116,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const [addQuery, setAddQuery] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmProcess, setConfirmProcess] = useState(false);
+  const [confirmDispatch, setConfirmDispatch] = useState(false);
   const [billNo, setBillNo] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   // Admin held-stage note draft (admin box), seeded from the current note.
@@ -139,6 +140,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
   const now = useMemo(() => new Date(tick), [tick]);
   const isStaff = role === "staff";
+  const isGodown = role === "godown";
   const isOwner = order.salesmanId === currentUserId;
   // Editability is status-driven now — the 2h edit-window timer is gone (owner
   // decision 2026-07-11). A `pending_approval` order is freely editable; once
@@ -146,7 +148,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const editable = order.status === "pending_approval";
   // The salesman may edit/cancel only his own order, only while it's still
   // pending_approval (the cancel_order/update_order_items RPCs enforce this).
-  const salesmanActionable = !isStaff && isOwner && editable;
+  const salesmanActionable = role === "salesman" && isOwner && editable;
   // A reason is demanded only for an admin editing a locked (post-approval)
   // order — mode=edit on a non-`editable` order is exactly that case.
   const requiresReason = mode === "edit" && !editable;
@@ -209,7 +211,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   // A `backordered` HISTORY line references the other order (parent↔child) —
   // return the ref as a link so it's tappable, mirroring the "Backorder of"
   // header link. Returns null for every non-linkable event (plain describeEvent).
-  const detailBase = isStaff ? "/dashboard/orders" : "/orders";
+  const detailBase = isStaff ? "/dashboard/orders" : isGodown ? "/godown/orders" : "/orders";
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
     const d = (e.details ?? {}) as Record<string, unknown>;
@@ -392,6 +394,24 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
     }
   }
 
+  async function handleDispatch() {
+    // billed → dispatched (physically shipped). godown/accountant/admin only;
+    // the RPC re-checks the role. No input — a light confirm on the terminal move.
+    setSaving(true);
+    setError(null);
+    try {
+      await dispatchOrder(order.id);
+      setConfirmDispatch(false);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not mark the order dispatched.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleCancel() {
     // Staff must give a reason (RPC demands it); the salesman's in-window
     // self-cancel is reason-free — same rule the RPC applies.
@@ -418,7 +438,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
     <div className={styles.page}>
       {/* Back-eyebrow (spec §3): ‹ REF on the left, status chip on the right. */}
       <div className={styles.backRow}>
-        <Link href={isStaff ? "/dashboard" : "/"} className={styles.breadcrumb}>
+        <Link href={isStaff ? "/dashboard" : isGodown ? "/godown" : "/"} className={styles.breadcrumb}>
           <Glyph icon={ChevronLeft} />
           <span className={styles.backRef}>{order.orderRef}</span>
         </Link>
@@ -434,20 +454,28 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           {!order.retailerVerified && <span className={styles.newBadge}>NEW</span>}
         </p>
         {(() => {
-          const metaParts = isStaff
-            ? [order.retailerArea, order.retailerPhone, order.salesmanName]
-            : [order.retailerArea];
+          // Salesman gets the minimal meta; staff AND godown get the fuller
+          // area · phone · salesman (godown is a read-only staff-like lens).
+          const metaParts =
+            role === "salesman"
+              ? [order.retailerArea]
+              : [order.retailerArea, order.retailerPhone, order.salesmanName];
           const meta = metaParts.filter(Boolean).join(" · ");
           return meta ? <p className={styles.heroMeta}>{meta}</p> : null;
         })()}
         {/* Billed byline: when + who + the Tally bill number. `Bill #` only
             renders when present, so the pre-existing billed orders (null bill
             no) show the byline without it. */}
-        {order.status === "billed" && order.processedAt && (
+        {(order.status === "billed" || order.status === "dispatched") && order.processedAt && (
           <p className={styles.byline}>
             billed {formatOrderTimestamp(order.processedAt, now)}
             {order.processedByName ? ` by ${order.processedByName}` : ""}
             {order.tallyBillNo ? ` · Bill #${order.tallyBillNo}` : ""}
+            {order.status === "dispatched" && order.dispatchedAt
+              ? ` · dispatched ${formatOrderTimestamp(order.dispatchedAt, now)}${
+                  order.dispatchedByName ? ` by ${order.dispatchedByName}` : ""
+                }`
+              : ""}
           </p>
         )}
       </div>
@@ -500,9 +528,22 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           Mark billed
         </Button>
       )}
-      {(order.status === "billed" || order.status === "cancelled") && (
-        <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="primary" />
+      {/* Mark dispatched — the primary on a BILLED order for godown + staff
+          (accountant/admin); never the salesman. Light confirm, no input. */}
+      {order.status === "billed" && (isStaff || isGodown) && (
+        <Button variant="primary" onClick={() => setConfirmDispatch(true)}>
+          <Glyph icon={Truck} />
+          Mark dispatched
+        </Button>
       )}
+      {/* Share PDF is the primary on the read-only terminal views (never godown):
+          a cancelled order, a dispatched order, or a billed order the salesman sees. */}
+      {role !== "godown" &&
+        (order.status === "cancelled" ||
+          order.status === "dispatched" ||
+          (order.status === "billed" && role === "salesman")) && (
+          <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="primary" />
+        )}
       {isStaff && order.status === "approved" && (
         <>
           <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
@@ -532,10 +573,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           {order.parentOrderRef && (
             <p className={styles.waitLine}>
               Backorder of{" "}
-              <Link
-                href={`${isStaff ? "/dashboard/orders" : "/orders"}/${order.parentOrderId}`}
-                className={styles.parentLink}
-              >
+              <Link href={`${detailBase}/${order.parentOrderId}`} className={styles.parentLink}>
                 {order.parentOrderRef}
               </Link>
             </p>
@@ -557,13 +595,15 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                    non-cancelled (reason once past approval).
           CANCEL — salesman: own pending; accountant: pending only; admin: any. */}
       <div className={styles.secondaries}>
-        {isStaff && mode === "view" && (isAdmin ? order.status !== "cancelled" : order.status === "pending_approval") && (
-          <Button variant="secondary" onClick={() => setMode("edit")}>
-            <Glyph icon={Pencil} />
-            Edit
-          </Button>
-        )}
-        {!isStaff && isOwner && editable && (
+        {isStaff &&
+          mode === "view" &&
+          (isAdmin ? order.status !== "cancelled" && order.status !== "dispatched" : order.status === "pending_approval") && (
+            <Button variant="secondary" onClick={() => setMode("edit")}>
+              <Glyph icon={Pencil} />
+              Edit
+            </Button>
+          )}
+        {role === "salesman" && isOwner && editable && (
           <Button
             variant="secondary"
             loading={navPending && navTarget === `/new-order?edit=${order.id}`}
@@ -573,12 +613,19 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             Edit
           </Button>
         )}
-        {order.status !== "billed" && order.status !== "cancelled" && (
-          <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="ink" />
-        )}
+        {/* Share as a SECONDARY wherever it isn't the primary: non-terminal
+            states (both non-godown roles) + a billed order for staff (Mark
+            dispatched took the primary). Not for godown; not for dispatched/
+            cancelled (Share is their primary there). */}
+        {role !== "godown" &&
+          order.status !== "cancelled" &&
+          order.status !== "dispatched" &&
+          !(order.status === "billed" && role === "salesman") && (
+            <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="ink" />
+          )}
         {/* Salesman scans his own approved LG order — Share | Scan splits the
             secondaries (staff get Scan in the split override above instead). */}
-        {!isStaff && order.status === "approved" && (
+        {role === "salesman" && order.status === "approved" && (
           <Button
             variant="secondary"
             loading={navPending && navTarget === `/scan/${order.id}`}
@@ -602,7 +649,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       </div>
       </div>
 
-      {error && !confirmCancel && !confirmProcess && <p className={styles.error}>{error}</p>}
+      {error && !confirmCancel && !confirmProcess && !confirmDispatch && <p className={styles.error}>{error}</p>}
 
       {/* Shipped short: a partial pick shipped what was picked and backordered
           the rest into a child order (both roles). */}
@@ -612,10 +659,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
           {backorderChild && (
             <>
               {" → "}
-              <Link
-                href={`${isStaff ? "/dashboard/orders" : "/orders"}/${backorderChild.id}`}
-                className={styles.parentLink}
-              >
+              <Link href={`${detailBase}/${backorderChild.id}`} className={styles.parentLink}>
                 {backorderChild.ref}
               </Link>
             </>
@@ -624,8 +668,10 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       )}
 
       {/* Salesman guidance notes — what the status means for HIM and what
-          happens next (ported verbatim from the old /orders/[id] page). */}
-      {!isStaff && (
+          happens next (ported verbatim from the old /orders/[id] page). Gated to
+          the SALESMAN explicitly: `!isStaff` would also catch the godown lens,
+          which must NOT inherit these "waiting for approval…" banners. */}
+      {role === "salesman" && (
         <>
           {order.status === "pending_approval" && (
             <p className={styles.noteLocked}>
@@ -869,6 +915,23 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             </Button>
             <Button variant="primary" onClick={handleProcess} loading={saving || isPending}>
               Mark billed
+            </Button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {confirmDispatch && (
+        <BottomSheet onClose={() => setConfirmDispatch(false)}>
+          <p className={styles.confirmTitle}>Mark {order.orderRef} dispatched?</p>
+          <p className={styles.confirmBody}>Confirms the goods have physically shipped — this is the final stage.</p>
+          {error && <p className={styles.error}>{error}</p>}
+          <div className={styles.editActions}>
+            <Button variant="secondary" onClick={() => setConfirmDispatch(false)}>
+              Not yet
+            </Button>
+            <Button variant="primary" onClick={handleDispatch} loading={saving || isPending}>
+              <Glyph icon={Truck} />
+              Mark dispatched
             </Button>
           </div>
         </BottomSheet>
