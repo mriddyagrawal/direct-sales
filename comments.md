@@ -4148,3 +4148,26 @@ So: **client price → existing line snapshot → product default (new lines onl
 **Next-commit suggestion:** — (Safe to set LG product defaults now. Owner-requested admin-price-edit feature is the next build when ready.)
 
 ---
+
+## Review of e990c16 — fix(orders): admin note renders only while pending_approval
+
+**Verdict:** ✅ accept — FE-only render-gate; closes the exact edge I flagged in the `f4d972f` review (approve clears the note but **cancel doesn't**, so a commented→cancelled order kept showing the red note).
+
+**Phase / commit goal:** The red admin note was gated only on `admin_comment` being non-null (no status check). Since `cancel_order` doesn't clear the column (only `approve_order` does), a note set on a held order stayed visible after cancel. Owner decision: the note means "why this is being held" → show ONLY while `pending_approval`.
+
+**What works (verified — read + grep-all-sites + tsc + build):**
+- **All THREE red-note render sites now gated** on `&& order.status === "pending_approval"`: OrdersView desktop row (`rowAdminNote`, L320), OrdersView mobile card (`cardAdminNote`, L371), OrderDetailView detail banner (`adminNote`, L459). Grep for every `order.adminComment`/`order.admin_comment` render usage confirms **no straggler** — the only other refs are the write-box draft seed (L120) + button label (L477), both already inside the admin-only+pending write box.
+- Consistent with the write gate (`isStaff && isAdmin && status === 'pending_approval'`) and with the backend: `set_admin_comment` only allows setting at `pending_approval`, so the note's whole lifecycle is within that stage — gating render there is correct. The `commented` event stays in History (audit trail intact).
+- **FE-only, no DB change.** `tsc` exit 0; `npm run build` exit 0.
+
+**Blocking issues:** None. **Non-blocking:** the column may still carry stale text on a cancelled order (not shown) — cosmetic, owner-accepted ("we don't care"); could be cleared in `cancel_order` someday but not worth a migration.
+
+**Domain checks:** Render-gating only; no state machine / money / RLS / immutability impact.
+
+**What I tried:** Read the 3-site diff; grepped every admin-note render usage to confirm full coverage; `tsc` + `build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
