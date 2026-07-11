@@ -4116,3 +4116,35 @@ Owner-directed direct patch: **`feat(orders): share PDF with the retailer's name
 **Next-commit suggestion (BLOCKING before any LG default is set):** make the existing-manual-line branch keep its snapshot when the client sends no price (server `coalesce(client, existing_snapshot, default)`), then re-run P5b → expect `300000` preserved. Until then, **do not set a default on any LG product.**
 
 ---
+
+## Review of f7c93ef — fix(db): manual default must not overwrite an existing line's snapshot (P5b)
+
+**Verdict:** ✅ accept — **the 🔴 BLOCKING-BEFORE-USE finding from the `7b17607` review is RESOLVED.** Live-verified on the applied prod function; **LG defaults are now safe to set.**
+
+**Phase / commit goal:** Close P5b — the staff edit path (`OrderDetailView` sends no prices) was re-pricing existing manual lines to the *current* default. Fix: the `update_order_items` manual branch now falls back to the line's own snapshot before the default.
+
+**Change is surgical — confirmed by normalized diff vs the prior def (`20260711172707`):** the ONLY change is the manual coalesce (+ a comment):
+`coalesce((item->>'unit_price_paise')::int, (select price_paise from products …))`
+→ `coalesce((item->>'unit_price_paise')::int, (select unit_price_paise from order_items where order_id=p_order_id and product_id=v_product_id), (select price_paise from products where id=v_product_id))`.
+So: **client price → existing line snapshot → product default (new lines only)**. Everything else byte-identical; `submit_order` untouched (no snapshot exists at create); the existing-snapshot subquery reads the pre-update row (the loop's `delete` only drops items absent from the payload). Migration-only commit — **no frontend change** (`OrderDetailView` still sends no prices; the server now makes that safe regardless).
+
+**Live rolled-back re-verification on the APPLIED prod function (`update_order_items`):**
+- **Applied-to-prod check:** live body coalesces against `public.order_items` → `true`.
+- **P5b (the finding):** place manual override `300000` (product default `500000`), then STAFF-edit (admin, qty→3, **no price**) → line stays **`300000`** ✅ — **snapshot KEPT, no longer re-priced.**
+- **New line on the same edit, no price** → **`550000`** (that product's default) ✅ — the intended fallback still works for genuinely new lines.
+- **Explicit admin override on edit** (`123456`) → **`123456`** ✅ — honored.
+- (All in one txn, `raise`d → rolled back; prod untouched.)
+
+**Blocking issues:** None — **the prior blocking finding is closed.**
+
+**Non-blocking:** This is the *defensive* fix (server keeps the snapshot no matter what the client sends). The separate, larger **admin-price-edit** feature (owner-requested: admin may *type* a new price on any brand incl. fixed at pending/backorder) is still to build; its migration will re-do `update_order_items` with a unified rule that already contains this same snapshot fallback — no conflict, this fix is a clean stepping stone.
+
+**Domain checks:** Immutable snapshot — **now HELD on the staff edit path too** (was the violation). Money math verified live (paise). Fixed untamperability + `submit_order` default unchanged (only the manual branch of `update_order_items` touched). Order numbering: probes consumed a few `order_no_seq` nextvals (harmless gaps, D1).
+
+**What I tried:** Read the migration; normalized diff vs the prior def (only the coalesce differs); live rolled-back probe on the applied function incl. the exact P5b scenario + new-line + explicit-override cases; confirmed migration-only (no FE/build impact).
+
+**Open flags (cumulative):** No 🔴 — **the 🔴-before-use (staff-edit manual re-price) is CLEARED.** Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** — (Safe to set LG product defaults now. Owner-requested admin-price-edit feature is the next build when ready.)
+
+---
