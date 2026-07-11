@@ -52,6 +52,12 @@ export function FilterDropdown({
   // rendered at all then, guarded by `open &&` below), so there's nothing to
   // reset on close. useLayoutEffect (not useEffect) so the first open never
   // paints a stale position from a previous open/close cycle.
+  // Because the popover is position:fixed on mobile, we must re-sync its `top`
+  // on scroll too — otherwise it freezes at its open-time screen position while
+  // the page (and the trigger) scroll away underneath it. Re-measuring on each
+  // scroll frame keeps it glued below the trigger, so it rides up with the page
+  // and scrolls off with it (rAF-throttled; capture:true catches nested
+  // scrollers). Desktop hits the `null` branch → no re-render (Object.is).
   useLayoutEffect(() => {
     if (!open) return;
     function sync() {
@@ -69,8 +75,21 @@ export function FilterDropdown({
       });
     }
     sync();
+    let raf = 0;
+    function onScroll() {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        sync();
+      });
+    }
     window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("scroll", onScroll, true);
+      cancelAnimationFrame(raf);
+    };
   }, [open]);
 
   useEffect(() => {
