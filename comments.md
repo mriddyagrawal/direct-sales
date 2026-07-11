@@ -4058,3 +4058,61 @@ At the owner's explicit instruction I patched a live UI bug directly: **`fix(ord
 Owner-directed direct patch: **`feat(orders): share PDF with the retailer's name as the message`** (`6ebeea5`, on `main`, parent `faa5415`). The mobile Web-Share payload was `{ files:[file], title: orderRef }` — WhatsApp attached the order ref as the caption. Changed to `{ files:[file], title: retailerName, text: retailerName }` (both fields, since target apps surface different ones) and threaded a `retailerName` prop into `SharePdfButton` from `OrderDetailView`'s two call sites (`order.retailerName`, already in scope). The PDF **file is still named after the ref** (`${orderRef}.pdf`) — only the share caption changed. Desktop path (opens the PDF, no share text) unaffected. Client-side only, 2 files; `tsc`/`lint`/`build` clean. **Self-authored — flagged for the audit trail** (owner chose the direct-patch path again).
 
 ---
+
+## Review of 4d15f71 — feat(new-order): pre-fill + seed manual (LG) default price into Quick Order
+
+**Verdict:** ✅ accept — the client half of manual-default-price; correct, and the *safe* edit path. (`4d15f71 = 6846c7e` pre-rebase, `git range-diff =`.)
+
+**Phase / commit goal:** A manual (LG) product's `products.price_paise` becomes an optional DEFAULT the client pre-fills + seeds into Quick Order, so an untouched manual line reads & bills at the default with no extra tap; typing overrides; fixed brands never seed.
+
+**What works (verified — read + tsc + build):**
+- **Effective price** = `entered ?? p.price_paise` where `entered = prices?.[id] ?? snapshotPrices?.[id]` → order is **typed/seeded → edit-snapshot → default**. So an untouched line shows/inputs the default, and **editing an existing order shows the snapshot** (snapshot beats default → a placed line isn't re-priced on the display). Only the *manual* `priceLabel`/`inputVal` gained the `?? p.price_paise`; **fixed label unchanged** (`pricesById[id] ?? p.price_paise` catalog path).
+- **Seed-on-add** (`handleQtyChange`): seeds `prices[id] = p.price_paise` via `onChangePrice` **iff** `pricing_mode==='manual' && price_paise != null && prev===0 && next>=1 && prices[id]==null`. So it fires only when a manual line *first* enters the cart with a default and nothing typed — the line total, cart total, and submit payload then all carry the default. Wired into **both** the Stepper `onChange` and the keypad `onSet`.
+- **Fixed never seeds** (guarded by `pricing_mode==='manual'`); **existing lines in an edit never seed** (they have `prev>=1`, so only a *newly added* line seeds — correct). Clearing the box drops the entry (`CHANGE_PRICE` deletes a `<=0` entry) → display falls back to default; the billed value then relies on the server fallback (7b17607).
+- `tsc`/`build` clean.
+
+**Blocking issues:** None. **Non-blocking:** after clearing the box the label shows the default while the input reads empty (buffered `""` wins) — cosmetic, consistent with "override cleared → default applies."
+
+**Domain checks:** Money in paise throughout; immutability intact on THIS path (seed only touches a fresh line, snapshot wins for existing). The fixed untamperable path is untouched here (client price still ignored server-side).
+
+**What I tried:** Read the full `handleQtyChange` + `effective`/`priceLabel`/`inputVal` change and the `NewOrderFlow` `CHANGE_PRICE` reducer (`>0` keeps, else `delete`) + `toItemsPayload` (sends `unit_price_paise` only when a price is set); `tsc`/`build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** — (paired with the server fallback 7b17607, reviewed below.)
+
+---
+
+## Review of 7b17607 — feat(db): manual-brand price falls back to product default (submit_order + update_order_items)
+
+**Verdict:** ✅ accept the feature (works on every intended path; fixed untamperability intact; merged + applied to prod) — **BUT with a 🔴 BLOCKING-BEFORE-USE finding** the builder must fix *before any LG product is given a default*: the STAFF edit path silently re-prices existing manual lines. (`7b17607 = b396df1` pre-rebase, `git range-diff =`.)
+
+**Phase / commit goal:** Server-side belt-and-suspenders for the manual default — if a manual line arrives without a price, fall back to the product default. Migration `20260711172707` recreates `submit_order` + `update_order_items`; the ONLY logic change is the manual-branch coalesce (verified below).
+
+**Change is surgical — confirmed by normalized diff vs the prior defs:**
+- `submit_order` (prior = lifecycle `20260709200230`): only `v_unit_price := (…)::int` → `coalesce((…)::int, v_product.price_paise)`. `v_product` is loaded before the branch → correct default. Everything else = comment/whitespace only.
+- `update_order_items` (prior = cancel_edit `20260711153000`): only `v_unit_price := (…)::int` → `coalesce((…)::int, (select price_paise from products where id = v_product_id))` — a scoped subquery because `v_product` isn't loaded at the top-of-loop validation (sound). Everything else = comment/whitespace only. Role gates / brand guard / before-after audit / delete-removed / fixed branch all unchanged.
+
+**Live rolled-back money-path probes on prod (impersonated; whole txn rolled back — an LG default was set only inside the txn):**
+- **P1** manual, no client price → **`500000` (default)** ✅
+- **P2** manual override `300000` → **`300000`** ✅
+- **P3** manual, NO default, no price → **REJECT** ("invalid manual price") ✅ (validation `>0`/ceiling/reject-if-null intact)
+- **P4** fixed, forged client price `1` → **`1569400` (catalog)** ✅ — **untamperable path NOT regressed**
+- **P5a** placed manual override `300000` (product default `500000`) → **`300000`** ✅
+- **P7** salesman-path edit that SENDS the snapshot (`300000`) → **`300000` preserved** ✅ (the QuickOrder path is safe — it always sends the price)
+
+**🔴 BLOCKING-BEFORE-USE finding — staff edit silently re-prices manual snapshots (P5b):**
+- **P5b:** the SAME overridden order (`300000`), edited via the **STAFF path** — `OrderDetailView` inline editor, which calls `updateOrderItems(id, notes, items, reason)` **without the `prices` arg** ([OrderDetailView.tsx:310](src/components/orders/OrderDetailView.tsx#L310)), so `toItemsPayload` emits `{product_id, qty}` with **no `unit_price_paise`** for every line — resulted in the existing line being **RE-PRICED to `500000` (the current default), destroying the salesman's `300000` deal.** Proven live.
+- **Why:** for an *existing* manual line the new code does `unit_price_paise = coalesce(client_price, current_default)` — it falls back to the **current product default, not the line's existing snapshot**. The prompt's own acceptance ("editing an existing manual order doesn't re-price existing lines — snapshot wins over default") is **violated on the staff path**. The salesman path passes only because QuickOrder happens to resend the snapshot.
+- **Severity / reachability:** it's an **immutable-snapshot + money-integrity** violation and admin edits reach it on **any** status (incl. `edited_after_lock` on a `billed` LG order). It is **DORMANT today** — every LG product's default is currently NULL, so this path `coalesce(null,null)=null` → REJECTs (same loud error as before the migration). It **activates the instant an LG product is given a default** — i.e. the moment the feature is actually used — turning a safe "edit fails" into silent price corruption.
+- **Fix (server, preferred — defense-in-depth):** for an **existing** manual line, prefer the line's own snapshot before the default, e.g. `coalesce(client_price, <existing order_items.unit_price_paise for this line>, product_default)`; a **new** manual line (no existing row) still falls to the default. Equivalently: only overwrite `unit_price_paise` when a client price is actually supplied — mirror the fixed branch, which already leaves the snapshot untouched. (Complementary FE fix: have `OrderDetailView` pass snapshot `prices` into `updateOrderItems` like QuickOrder does.)
+
+**Domain checks:** State machine untouched. Money math verified live (paise, coalesce, ceiling/`>0`). Immutability: **held on submit + salesman-edit + fixed; VIOLATED on staff-edit of manual (the finding).** Fixed untamperability proven (P4). Order numbering: probes consumed a few `order_no_seq` nextvals (non-transactional → harmless gaps, D1).
+
+**What I tried:** Read the full migration + traced both functions; normalized diff vs the two prior defs (only the coalesce differs); 7 live rolled-back probes incl. the staff-vs-salesman edit contrast; `tsc`/`build`.
+
+**Open flags (cumulative):** No standing 🔴, **+ this new 🔴-before-use (staff-edit manual re-price).** Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion (BLOCKING before any LG default is set):** make the existing-manual-line branch keep its snapshot when the client sends no price (server `coalesce(client, existing_snapshot, default)`), then re-run P5b → expect `300000` preserved. Until then, **do not set a default on any LG product.**
+
+---
