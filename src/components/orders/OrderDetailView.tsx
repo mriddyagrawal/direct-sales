@@ -451,9 +451,12 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       </div>
 
       {/* Admin note (RED) — a held-stage flag from the admin, visible to
-          EVERYONE who can see the order (the salesman included). Distinct from
-          the salesman's own "notes from the field". Cleared on approval. */}
-      {order.adminComment && (
+          EVERYONE who can see the order (the salesman included) but ONLY while
+          the order is still pending_approval. Distinct from the salesman's own
+          "notes from the field". Cleared on approval; hidden once the order
+          leaves the held stage (cancelled/approved/…) even if the column still
+          carries the text — the note only means "why this is being held". */}
+      {order.adminComment && order.status === "pending_approval" && (
         <p className={styles.adminNote}>
           <span className={styles.adminNoteLabel}>Admin note</span>
           {order.adminComment}
