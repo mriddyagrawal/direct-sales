@@ -4052,3 +4052,9 @@ The reviewed `4eafbe3 / c1e4c74 / 13d97e2` were rebased onto `main` as **`ce5db5
 At the owner's explicit instruction I patched a live UI bug directly: **`fix(orders): filter dropdown tracks the trigger on scroll (mobile)`** (`0a6ba8f`, on `main`, parent `f4d972f`). The mobile filter popover is `position:fixed` with a `top` computed once at open and only re-synced on `resize`, so scrolling froze it mid-screen over the list. Fix = re-run the position `sync()` on `scroll` too (rAF-throttled, `capture:true`), so the popover stays glued below the trigger and rides up/off with the page. Client-side only, one component; `tsc`/`lint`/`build` clean. **Self-authored — flagged here for the audit trail since I was both author and reviewer on this one** (owner chose the direct-patch path).
 
 ---
+
+## Note — reviewer-authored change 6ebeea5 (owner-directed, NOT independently reviewed)
+
+Owner-directed direct patch: **`feat(orders): share PDF with the retailer's name as the message`** (`6ebeea5`, on `main`, parent `faa5415`). The mobile Web-Share payload was `{ files:[file], title: orderRef }` — WhatsApp attached the order ref as the caption. Changed to `{ files:[file], title: retailerName, text: retailerName }` (both fields, since target apps surface different ones) and threaded a `retailerName` prop into `SharePdfButton` from `OrderDetailView`'s two call sites (`order.retailerName`, already in scope). The PDF **file is still named after the ref** (`${orderRef}.pdf`) — only the share caption changed. Desktop path (opens the PDF, no share text) unaffected. Client-side only, 2 files; `tsc`/`lint`/`build` clean. **Self-authored — flagged for the audit trail** (owner chose the direct-patch path again).
+
+---
