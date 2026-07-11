@@ -93,9 +93,15 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
       // Diff against the brand's *current* catalog (fetched fresh, not the
       // page's initial snapshot), keyed on (brand_id, tally_name).
       const supabase = createClient();
-      const { data: existing } = await supabase.from("products").select("category, tally_name").eq("brand_id", brandId);
+      const { data: existing } = await supabase
+        .from("products")
+        .select("category, tally_name, name, price_paise, active")
+        .eq("brand_id", brandId);
       const brandCats = Array.from(new Set((existing ?? []).map((e) => e.category)));
-      const existingTally = new Set((existing ?? []).map((e) => e.tally_name));
+      // Keyed by tally_name (the match key) so a blank cell on a matched row can
+      // fall back to the product's CURRENT value — a partial-patch import where a
+      // blank means "leave it alone", not "overwrite with a blank/fallback".
+      const existingByTally = new Map((existing ?? []).map((e) => [e.tally_name, e] as const));
 
       const rows: ParsedRow[] = [];
       const fileTallies = new Set<string>();
@@ -110,31 +116,39 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
         if (!cat && !rawName && !rawTally && !priceCell && !activeCell) continue; // blank row
 
         const rowNo = r + 1; // 1-based, header is row 1
-        // Either column fills the other: the Display Name falls back to the Tally
-        // Name and vice-versa, so one provided value seeds both. Both blank ⇒
-        // caught as an error below.
-        const name = rawName || rawTally; // display ← tally
-        const effTally = effectiveTallyName(rawTally, rawName); // tally ← display
+        const effTally = effectiveTallyName(rawTally, rawName); // match key: tally ← display
+        const ex = existingByTally.get(effTally);
+        const matched = ex !== undefined;
         fileTallies.add(effTally);
 
-        const parsedPrice = parsePricePaise(priceCell);
+        const parsedPrice = parsePricePaise(priceCell); // blank ⇒ ok, paise null
         let reason: string | undefined;
         if (!cat) reason = "Category is required";
-        else if (!name) reason = "Display name or Tally name is required";
+        else if (!rawName && !rawTally) reason = "Display name or Tally name is required";
         else if (!parsedPrice.ok) reason = parsedPrice.error;
 
         if (reason) {
-          rows.push({ rowNo, category: cat, name, tallyName: effTally, pricePaise: null, active: true, status: "error", reason });
+          rows.push({ rowNo, category: cat, name: rawName || rawTally, tallyName: effTally, pricePaise: null, active: true, status: "error", reason });
           continue;
         }
+
+        // Partial-patch resolve. A blank cell KEEPS the matched product's current
+        // value; a NEW product falls back (name ← tally, price → TBD, active →
+        // true). The RPC still overwrites, but for a match we hand it the current
+        // value, so a blank changes nothing.
+        const name = rawName || (matched ? ex!.name : rawTally);
+        const providedPaise = parsedPrice.ok ? parsedPrice.paise : null; // .ok guaranteed — error rows already continued
+        const pricePaise = priceCell !== "" ? providedPaise : matched ? ex!.price_paise : null;
+        const active = activeCell !== "" ? parseActive(activeCell) : matched ? ex!.active : true;
+
         rows.push({
           rowNo,
           category: normalizeCategory(cat, brandCats),
           name,
           tallyName: effTally,
-          pricePaise: parsedPrice.ok ? parsedPrice.paise : null,
-          active: parseActive(activeCell),
-          status: existingTally.has(effTally) ? "updated" : "new",
+          pricePaise,
+          active,
+          status: matched ? "updated" : "new",
         });
       }
 
@@ -235,8 +249,9 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
             </div>
 
             <p className={styles.hint}>
-              Expected columns: <strong>Category · Display Name · Tally Name · Price · Active</strong>. Category is required; give{" "}
-              <strong>either</strong> Display Name or Tally Name — whichever is blank copies from the other; Price blank ⇒ TBD.
+              Expected columns: <strong>Category · Display Name · Tally Name · Price · Active</strong>. Category is required; give a{" "}
+              <strong>Display Name or Tally Name</strong>. On an existing product a blank cell keeps its current value; a new product
+              uses the Tally name for a blank Display name and TBD for a blank Price.
             </p>
             <button type="button" className={styles.linkBtn} onClick={downloadTemplate} disabled={!brandId}>
               Download template
@@ -294,6 +309,13 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
                 </tbody>
               </table>
             </div>
+
+            {counts.updated > 0 && (
+              <p className={styles.hint}>
+                <strong>Updated</strong> rows show the value each product will have — a blank cell in your file keeps the product&apos;s
+                current value, so only what you filled in changes.
+              </p>
+            )}
 
             {parsed.untouched > 0 && (
               <p className={styles.hint}>
