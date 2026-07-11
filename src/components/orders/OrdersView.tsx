@@ -235,7 +235,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
 
       <div className={styles.filters}>
         <div className={styles.filterTabs}>
-          {(["all", "backorder", "pending_approval", "approved", "ready_to_bill", "billed", "cancelled"] as StatusFilter[]).map((s) => (
+          {(["all", "pending_approval", "approved", "ready_to_bill", "billed", "cancelled", "backorder"] as StatusFilter[]).map((s) => (
             <button
               key={s}
               type="button"
