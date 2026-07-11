@@ -7,6 +7,8 @@ doc is the source of truth for the *look and behaviour*; the *state machine* liv
 in [order-lifecycle.md](order-lifecycle.md). Where the two touch, this doc defers
 to the lifecycle spec.
 
+> **Dispatch added 2026-07-12 (Stage 2).** New **`dispatched`** chip (teal, distinct from billed's green) + a **Dispatched** tab after Billed on the shared list. On the detail, a billed order gains a **Mark dispatched** primary (`truck` glyph, light confirm, no input) for **godown + staff** (never the salesman); `dispatched` is terminal (Share + admin Cancel; byline gains "· dispatched {time} by {name}"). The **godown** is now a first-class **`role`** on both `OrdersView` and `OrderDetailView` — its **Dispatch**/**History** tabs reuse the list (prices shown; no salesman/brand filters; chip-tabs hidden), its `/godown/orders/[id]` reuses the detail (read-only + Mark dispatched). A fixed **GodownTabBar** (Pickup · Dispatch · History) is the godown's status nav. Audit: every `!isStaff` that meant "salesman" is now an explicit `role === 'salesman'`, so the godown lens never inherits the salesman's guidance banners/actions.
+
 The mockup shipped as images only; this section describes each panel in words so
 the spec is self-contained.
 
