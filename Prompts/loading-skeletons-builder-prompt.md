@@ -60,3 +60,26 @@ Existing pattern to follow: [src/app/loading.tsx](../src/app/loading.tsx) +
 - No data fetching or async work inside a `loading.tsx` — it must render synchronously/instantly.
 - Reuse the existing skeleton look (mirror `src/app/loading.tsx`); don't introduce a spinner.
 - Don't regress the 2 existing loading states.
+
+## Also — a spinner on primary NAVIGATION buttons (owner-requested for the Scan button)
+A `loading.tsx` gives the *destination* instant feedback; complement it by making the
+*button you tapped* show a spinner too (like the Approve / Mark-billed buttons already do),
+so the tap feels acknowledged immediately — the owner specifically wants this on the **Scan**
+button.
+- The **Scan** button (`OrderDetailView`, approved orders → `/scan/[id]`) and other primary
+  **navigation** buttons that currently do a bare `router.push` (e.g. the salesman "Edit
+  order" → `/new-order?edit=…`) get a spinner by wrapping the push in **`useTransition`** and
+  feeding its `isPending` into the shared `Button`'s existing `loading` prop:
+  ```tsx
+  const [navPending, startNav] = useTransition();   // a DEDICATED transition for navigation
+  <Button variant="secondary" loading={navPending}
+          onClick={() => startNav(() => router.push(`/scan/${order.id}`))}>
+    <Glyph icon={ScanBarcode} /> Scan
+  </Button>
+  ```
+  `isPending` stays true from the tap until the destination route's payload is ready, so the
+  button shows its spinner for the whole navigation — matching the RPC buttons' feel.
+- Use a **separate** `useTransition` for navigation (don't reuse the save/approve one) so only
+  the tapped button spins, not unrelated buttons.
+- This is the one deliberate exception to "skeletons not spinners" above — it's a *button*
+  affordance during a nav, not a page loading state.
