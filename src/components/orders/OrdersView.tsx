@@ -71,8 +71,13 @@ interface OrdersViewProps {
   initialOrders: OrderListRow[];
   salesmen: SalesmanOption[];
   brands: BrandOption[];
-  role: "salesman" | "staff";
+  role: "salesman" | "staff" | "godown";
   currentUserId: string;
+  // Godown routes reuse this list read-only: a per-route TITLE ("Dispatch" /
+  // "History") and a STATUS SCOPE that locks the visible set (the godown bottom
+  // bar is the status nav, so the chip-tabs are hidden there).
+  title?: string;
+  statusScope?: string[];
 }
 
 // THE orders list — one component, every role (unification, owner decision
@@ -82,9 +87,10 @@ interface OrdersViewProps {
 // the salesman column; the salesman gets neither (they're all him) and D8
 // self-cancel hiding. New rows arrive via Supabase Realtime (postgres_changes
 // on `orders`, RLS-scoped) within the 5s budget; updates patch in place.
-export function OrdersView({ initialOrders, salesmen, brands, role, currentUserId }: OrdersViewProps) {
+export function OrdersView({ initialOrders, salesmen, brands, role, currentUserId, title, statusScope }: OrdersViewProps) {
   const isStaff = role === "staff";
-  const detailBase = isStaff ? "/dashboard/orders" : "/orders";
+  const isGodown = role === "godown";
+  const detailBase = isStaff ? "/dashboard/orders" : isGodown ? "/godown/orders" : "/orders";
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
@@ -181,6 +187,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
   const multiBrand = brands.length >= 2;
 
   const scoped = orders.filter((o) => {
+    if (statusScope && !statusScope.includes(o.status)) return false;
     if (salesmanId !== "all" && o.salesman_id !== salesmanId) return false;
     if (brandId !== "all" && o.brand_id !== brandId) return false;
     if (range?.from) {
@@ -241,22 +248,26 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
     <div className={styles.page}>
       <div className={styles.titleRow}>
         {/* "My orders" for the salesman (every row is his); "Orders" for staff. */}
-        <h1 className={styles.title}>{isStaff ? "Orders" : "My orders"}</h1>
+        <h1 className={styles.title}>{title ?? (isStaff ? "Orders" : "My orders")}</h1>
       </div>
 
       <div className={styles.filters}>
-        <div className={styles.filterTabs}>
-          {(["all", "pending_approval", "approved", "ready_to_bill", "billed", "dispatched", "cancelled", "backorder"] as StatusFilter[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`${styles.filterTab} ${status === s ? styles.filterTabActive : ""}`}
-              onClick={() => setStatus(s)}
-            >
-              {STATUS_LABEL[s]} <span className={styles.tabCount}>{tabCounts[s]}</span>
-            </button>
-          ))}
-        </div>
+        {/* The godown routes lock their status set (statusScope) and use the
+            bottom bar as the status nav — so the chip-tabs are hidden there. */}
+        {!isGodown && (
+          <div className={styles.filterTabs}>
+            {(["all", "pending_approval", "approved", "ready_to_bill", "billed", "dispatched", "cancelled", "backorder"] as StatusFilter[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`${styles.filterTab} ${status === s ? styles.filterTabActive : ""}`}
+                onClick={() => setStatus(s)}
+              >
+                {STATUS_LABEL[s]} <span className={styles.tabCount}>{tabCounts[s]}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className={styles.filterGroup}>
           {/* SALESMAN/BRAND filters are staff-only — a salesman's rows are all
               his own (RLS). They share one explicit half-half row on mobile
@@ -286,7 +297,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
 
       {finalFiltered.length === 0 ? (
         <p className={styles.empty}>
-          {!isStaff && orders.length === 0
+          {role === "salesman" && orders.length === 0
             ? "No orders yet — take your first order — tap New Order below"
             : "No orders match these filters."}
         </p>
@@ -393,10 +404,13 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       {/* New Order is a floating FAB for BOTH roles (spec §2) — it left the
           salesman bottom bar. The .page bottom padding keeps it off the last
           card. */}
-      <Link href="/new-order" className={styles.fab}>
-        <Glyph icon={Plus} />
-        New Order
-      </Link>
+      {/* No New Order FAB for the godown — it never creates orders. */}
+      {!isGodown && (
+        <Link href="/new-order" className={styles.fab}>
+          <Glyph icon={Plus} />
+          New Order
+        </Link>
+      )}
     </div>
   );
 }
