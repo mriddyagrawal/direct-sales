@@ -4306,3 +4306,34 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** Optional godown "Copy serials" at dispatch (if wanted); export a shared `ORDERS_SELECT` to prevent list-column drift. Neither blocking.
 
 ---
+
+## Review of 53b4801 — feat(db): dispatch remark — orders.dispatch_note + optional p_note on dispatch_order
+
+**Verdict:** ✅ accept — owner-requested (vehicle no. / LR no. captured at dispatch); applied to prod, live-verified. This supersedes the prompt's "no input" dispatch (owner change, migration comment says so).
+
+**What works (read + normalized-check + live rolled-back probe):**
+- Adds nullable `orders.dispatch_note text`; **drops the old `dispatch_order(uuid)`** then recreates as **`dispatch_order(uuid, p_note text DEFAULT NULL)`** — the drop avoids a 1-arg overload ambiguity while the 2-arg default still serves any 1-arg call. `v_note := nullif(btrim(p_note),'')`; `update … dispatch_note=v_note`; event details `{'note': v_note}` when present, `{}` when null. **Every other line byte-identical** to the Stage-2 `dispatch_order` (role gate, `FOR UPDATE`, `billed`-only, stamps, event). Grant re-issued on the 2-arg sig.
+- **Live (impersonated admin, rolled back):** `dispatch_order(uuid,text)` exists ✓, old 1-arg gone ✓; dispatch with `'  MH12 AB 1234 / LR 5567  '` → `dispatch_note='MH12 AB 1234 / LR 5567'` (btrim'd) + event `{"note":"MH12 AB 1234 / LR 5567"}`. Types regenerated.
+
+**Blocking issues:** None. **Non-blocking:** the note is **nullable + optional at the DB** (existing dispatched rows are null; a direct/non-UI RPC call may omit it) — the "required" is **client-only** (§7ff919c). Conscious phased approach (the migration comment plans a later backfill + `NOT NULL`). Fine for a record-keeping field (not a money/security invariant).
+
+**Domain checks:** State machine untouched (still `billed→dispatched` only, role-gated by the guard). Money/immutability N/A. Note logged in history (audit).
+
+## Review of 7ff919c — feat(orders): required dispatch remark in the confirm sheet + byline/history
+
+**Verdict:** ✅ accept — FE for the remark; required client-side, shown everywhere.
+
+**What works (read + tsc/build):**
+- `dispatchOrder(orderId, note?)` → passes `p_note` to the RPC. The confirm `BottomSheet` gains an **autofocus text input** (`dispatchNote` state); `handleDispatch` **requires** it — `if (!dispatchNote.trim()) { setError(...); return }` — before calling the RPC with the trimmed value.
+- **Displayed everywhere:** the dispatched byline appends `· {dispatchNote}`; `order-detail-data` selects `dispatch_note` → `OrderDetailData.dispatchNote`; `order-events` `dispatched` describer includes the note from `details.note`.
+- `tsc`/eslint/build clean.
+
+**Blocking issues:** None. **Non-blocking observations:**
+1. The confirm sheet is **shared**, so the required remark applies to **both** godown *and* staff (accountant/admin dispatching from the dashboard) — intended (owner wants the remark on every dispatch), just noting it's no longer the frictionless "no-input" confirm the original Stage-2 prompt described.
+2. Required is **UI-only** (mirrors the DB-optional column above) — a non-UI dispatch path could still omit the note. Acceptable for a record-keeping field.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** If the remark should be truly mandatory, the later backfill + `NOT NULL` migration (already planned in 53b4801's comment) + an RPC-side `raise` on empty would move enforcement server-side.
+
+---
