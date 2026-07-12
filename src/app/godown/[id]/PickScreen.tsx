@@ -75,9 +75,12 @@ export function PickScreen({
   const totalScanned = useMemo(() => Object.values(scans).reduce((sum, list) => sum + list.length, 0), [scans]);
   const totalPicked = useMemo(() => lines.reduce((sum, l) => sum + (picked[l.id] ?? 0), 0), [lines, picked]);
 
-  // Progress + submit gate depend on the mode; a partial pick (≥1) is allowed.
+  // Progress depends on the mode. A pick of ANY size can be submitted now —
+  // including ZERO, which sends the whole order back to backorder (owner
+  // 2026-07-12). The "PAKKA?" confirm below guards a short/zero submit from
+  // being an accident (it fires whenever shortfall > 0, i.e. anything less than
+  // a full pick — zero included).
   const doneCount = requiresScan ? totalScanned : totalPicked;
-  const canSubmit = doneCount >= 1;
   const shortfall = totalQty - doneCount;
   // LG: once every line is fully scanned, unmount the camera (also stops torch).
   const allScanned = lines.every((l) => countFor(l.id) === l.qty);
@@ -298,7 +301,7 @@ export function PickScreen({
           {shortfall > 0 ? ` · ${shortfall} to backorder` : ""}
           {requiresScan && !allScanned && activeLine ? ` · scanning ${activeLine.name}` : ""}
         </span>
-        <Button variant="primary" onClick={onSubmitTap} disabled={!canSubmit} loading={submitting}>
+        <Button variant="primary" onClick={onSubmitTap} loading={submitting}>
           Submit pick
         </Button>
       </div>
