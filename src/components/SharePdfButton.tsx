@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
+import { pickSlipFileName } from "@/lib/pickslip-filename";
 
 interface SharePdfButtonProps {
   orderId: string;
@@ -14,9 +15,11 @@ interface SharePdfButtonProps {
 
 // The one pick-slip action (owner decision: share-only, no preview page).
 // Phone: fetches the generated PDF and hands the actual FILE to the native
-// share sheet (WhatsApp gets a real .pdf named after the ref, with the
-// RETAILER NAME as the attached message/caption — set as both title & text so
-// it reads right whichever field the target app surfaces). Desktop (no
+// share sheet. The file is named "<ref> - <Retailer>.pdf" — that's the SINGLE
+// carrier of the retailer name, shown as the document title on BOTH platforms.
+// We deliberately DON'T also pass a text/title caption: Android drops it when a
+// file is attached (so it'd surface on iOS only, where it would just duplicate
+// the filename). Filename-only = the name shows once, consistently. Desktop (no
 // file-share support): opens the PDF route directly — the browser's own
 // viewer renders it inline with the proper filename, no per-platform code.
 // A dismissed share sheet (AbortError) is not a failure.
@@ -28,9 +31,11 @@ export function SharePdfButton({ orderId, orderRef, retailerName, variant = "sec
   async function handleClick() {
     setFailed(false);
 
+    const fileName = pickSlipFileName(retailerName, orderRef);
+
     // Feature-detect file sharing with a stand-in File BEFORE fetching, so
     // the desktop path never downloads the blob just to throw it away.
-    const probe = new File([""], `${orderRef}.pdf`, { type: "application/pdf" });
+    const probe = new File([""], fileName, { type: "application/pdf" });
     const canShareFiles =
       typeof navigator !== "undefined" && !!navigator.canShare && navigator.canShare({ files: [probe] });
 
@@ -44,9 +49,9 @@ export function SharePdfButton({ orderId, orderRef, retailerName, variant = "sec
       const res = await fetch(url);
       if (!res.ok) throw new Error(`pdf route returned ${res.status}`);
       const blob = await res.blob();
-      const file = new File([blob], `${orderRef}.pdf`, { type: "application/pdf" });
+      const file = new File([blob], fileName, { type: "application/pdf" });
       try {
-        await navigator.share({ files: [file], title: retailerName, text: retailerName });
+        await navigator.share({ files: [file] });
       } catch {
         // AbortError — the user closed the sheet. Not a failure.
       }
