@@ -187,6 +187,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -214,6 +215,7 @@ export type Database = {
           brand_id: string
           cancelled_at?: string | null
           cancelled_by?: string | null
+          dispatch_note?: string | null
           dispatched_at?: string | null
           dispatched_by?: string | null
           editable_until: string
@@ -241,6 +243,7 @@ export type Database = {
           brand_id?: string
           cancelled_at?: string | null
           cancelled_by?: string | null
+          dispatch_note?: string | null
           dispatched_at?: string | null
           dispatched_by?: string | null
           editable_until?: string
@@ -456,6 +459,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -493,6 +497,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -522,7 +527,7 @@ export type Database = {
       }
       delete_product: { Args: { p_id: string }; Returns: undefined }
       dispatch_order: {
-        Args: { p_order_id: string }
+        Args: { p_note?: string; p_order_id: string }
         Returns: {
           admin_comment: string | null
           approved_at: string | null
@@ -530,6 +535,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -571,6 +577,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -607,6 +614,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -643,6 +651,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -684,6 +693,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -720,6 +730,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
@@ -761,6 +772,7 @@ export type Database = {
           brand_id: string
           cancelled_at: string | null
           cancelled_by: string | null
+          dispatch_note: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           editable_until: string
