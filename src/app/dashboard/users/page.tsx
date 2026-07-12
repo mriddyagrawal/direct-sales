@@ -13,8 +13,6 @@ export interface UserRow {
   created_at: string;
 }
 
-const ROLE_ORDER: Record<string, number> = { admin: 0, accountant: 1, salesman: 2, godown: 3 };
-
 // Admin-only user management. TWO independent gates protect this: the page gate
 // here (redirect any non-admin — the list exposes emails + roles) and, more
 // importantly, an action gate inside every mutation (actions.ts). Middleware
@@ -54,10 +52,10 @@ export default async function UsersPage() {
       email: emailById.get(p.id) ?? "",
       created_at: p.created_at,
     }))
-    .sort(
-      (a, b) =>
-        (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9) ||
-        a.full_name.localeCompare(b.full_name),
+    // Alphabetical by the primary identifier (username, falling back to the
+    // display name) — case-insensitive. No role grouping (owner: A→Z).
+    .sort((a, b) =>
+      (a.username ?? a.full_name).localeCompare(b.username ?? b.full_name, undefined, { sensitivity: "base" }),
     );
 
   return <UsersAdmin users={users} callerId={user.id} />;
