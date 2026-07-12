@@ -82,6 +82,7 @@ export interface OrderDetailData {
   pickedByName: string | null;
   dispatchedAt: string | null;
   dispatchedByName: string | null;
+  dispatchNote: string | null;
 }
 
 interface OrderDetailViewProps {
@@ -117,6 +118,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [confirmDispatch, setConfirmDispatch] = useState(false);
+  const [dispatchNote, setDispatchNote] = useState("");
   const [billNo, setBillNo] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   // Admin held-stage note draft (admin box), seeded from the current note.
@@ -396,11 +398,17 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
   async function handleDispatch() {
     // billed → dispatched (physically shipped). godown/accountant/admin only;
-    // the RPC re-checks the role. No input — a light confirm on the terminal move.
+    // the RPC re-checks the role. The remark (vehicle no. / LR no.) is required
+    // in the UI — the DB column is nullable for now (pre-backfill), so this
+    // client guard is what enforces it.
+    if (!dispatchNote.trim()) {
+      setError("Enter a dispatch remark (vehicle no., LR no., etc.).");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await dispatchOrder(order.id);
+      await dispatchOrder(order.id, dispatchNote.trim());
       setConfirmDispatch(false);
       startTransition(() => {
         router.refresh();
@@ -474,7 +482,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             {order.status === "dispatched" && order.dispatchedAt
               ? ` · dispatched ${formatOrderTimestamp(order.dispatchedAt, now)}${
                   order.dispatchedByName ? ` by ${order.dispatchedByName}` : ""
-                }`
+                }${order.dispatchNote ? ` · ${order.dispatchNote}` : ""}`
               : ""}
           </p>
         )}
@@ -924,6 +932,14 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
         <BottomSheet onClose={() => setConfirmDispatch(false)}>
           <p className={styles.confirmTitle}>Mark {order.orderRef} dispatched?</p>
           <p className={styles.confirmBody}>Confirms the goods have physically shipped — this is the final stage.</p>
+          <label className={styles.notesLabel}>DISPATCH REMARK (vehicle no., LR no., etc.)</label>
+          <input
+            className={styles.billNoInput}
+            value={dispatchNote}
+            onChange={(e) => setDispatchNote(e.target.value)}
+            placeholder="e.g. MH-01-AB-1234"
+            autoFocus
+          />
           {error && <p className={styles.error}>{error}</p>}
           <div className={styles.editActions}>
             <Button variant="secondary" onClick={() => setConfirmDispatch(false)}>

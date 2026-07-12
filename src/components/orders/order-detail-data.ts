@@ -6,7 +6,7 @@
 import type { OrderDetailData } from "./OrderDetailView";
 
 export const ORDER_DETAIL_SELECT =
-  "id, order_ref, status, notes, admin_comment, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, dispatched_at, dispatched_by, salesman_id, parent_order_id, " +
+  "id, order_ref, status, notes, admin_comment, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, dispatched_at, dispatched_by, dispatch_note, salesman_id, parent_order_id, " +
   "retailers(name, area, phone, verified), " +
   "salesman:profiles!orders_salesman_id_fkey(full_name), " +
   "processed_by_profile:profiles!orders_processed_by_fkey(full_name), " +
@@ -63,6 +63,7 @@ export interface OrderDetailQueryRow {
   picked_at: string | null;
   dispatched_at: string | null;
   dispatched_by: string | null;
+  dispatch_note: string | null;
   salesman_id: string;
   parent_order_id: string | null;
   parent_order: { order_ref: string } | null;
@@ -115,6 +116,7 @@ export function toOrderDetailProps(row: OrderDetailQueryRow): {
       pickedByName: row.picked_by_profile?.full_name ?? null,
       dispatchedAt: row.dispatched_at,
       dispatchedByName: row.dispatched_by_profile?.full_name ?? null,
+      dispatchNote: row.dispatch_note,
     },
     items: [...row.order_items].sort((a, b) => a.position - b.position),
     events: [...row.order_events].sort(
