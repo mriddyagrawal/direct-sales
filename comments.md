@@ -4337,3 +4337,26 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** If the remark should be truly mandatory, the later backfill + `NOT NULL` migration (already planned in 53b4801's comment) + an RPC-side `raise` on empty would move enforcement server-side.
 
 ---
+
+## Review of 5ef457e — feat(orders): day-grouped history + remove Mark billed from the Pending-scan screen
+
+**Verdict:** ✅ accept — FE-only; both changes owner-directed and clean.
+
+**Change 1 — day-grouped HISTORY (readability):**
+- Was: every line via the relative `formatOrderTimestamp`, so a same-day order showed times only, a weeks-long one a confusing mix. Now: events grouped by **IST calendar day** with a bold header (**Today / Yesterday / "10 Jul 2026"**), lines carry **time only**.
+- **Correct:** grouping iterates `events2` (chronological) accumulating consecutive same-`istDateKey` events into one group — `istDateKey` = `Intl.DateTimeFormat('en-CA', {timeZone: IST})` → canonical `YYYY-MM-DD` IST. Header via `formatHistoryDayHeader` (Today/Yesterday relative, else absolute IST date). **Yesterday is robust** — `now − 24h` → IST key works because **India has no DST** (24h is always exactly one IST day). `formatOrderTime` (IST `HH:MM`) drives `describeEvent` + the backorder-link line; byline/notes keep the relative style (per the commit). Header derives from the same event's `created_at` as the group key → always consistent.
+
+**Change 2 — Mark billed removed from the `approved` ("Pending scan") screen (owner 2026-07-12):**
+- The approved split (Mark billed | Scan) → **just Scan**; the "Waiting for the godown to scan serials" line stays. So **every order must reach `ready_to_bill` via the godown pick** before billing (consistent with Stage-1's all-brand pick — the shortcut was a pre-Stage-1 legacy override).
+- **FE-only, backend untouched:** `process_order` + the guard's `approved→billed` edge stay **dormant** (door kept, handle removed — owner may restore). **The `ready_to_bill` Mark billed button is intact** (L536) + the confirm sheet (L938) — the normal billing path is unaffected; only the approved-stage override is gone. `confirmProcess`/`Stamp` still used there, so no dead code.
+- `tsc`/eslint/build clean.
+
+**Blocking issues:** None. **Non-blocking:** the `approved→billed` backend path remains reachable in principle (no UI triggers it now) — intentional per the commit; if the shortcut is meant to be permanently closed, the guard edge could be dropped later.
+
+**Domain checks:** State machine unchanged (only a UI button removed; guard/RPCs intact). Money/immutability/RLS N/A. History = the dispute-resolution trail — still complete, just better dated.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
