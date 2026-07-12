@@ -2,18 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ScanBarcode, Truck, History } from "lucide-react";
+import { ScanBarcode, Home, Truck } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
 import styles from "./GodownTabBar.module.css";
 
-// Godown bottom nav (Stage 2, orders-ui): Pickup (/godown) · Dispatch
-// (/godown/dispatch) · History (/godown/history). Shown on the three list
-// pages; NOT on the scanner (/godown/[id]) or the reused order detail
-// (/godown/orders/[id]). Active by exact pathname match.
+// Godown bottom nav: Pickup (/godown) · Home (/godown/home) · Dispatch
+// (/godown/dispatch). Shown on the three list pages; NOT on the scanner
+// (/godown/[id]) or the reused order detail (/godown/orders/[id]). Active by
+// exact pathname match. Home is the browse view (status chip-tabs: Pending
+// scan / Ready to bill / Billed / Dispatched); Pickup stays the login default.
 const TABS = [
   { href: "/godown", label: "Pickup", icon: ScanBarcode },
+  { href: "/godown/home", label: "Home", icon: Home },
   { href: "/godown/dispatch", label: "Dispatch", icon: Truck },
-  { href: "/godown/history", label: "History", icon: History },
 ] as const;
 
 export function GodownTabBar() {
