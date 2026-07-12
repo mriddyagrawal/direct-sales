@@ -4417,3 +4417,24 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** —
 
 ---
+
+## Review of 3194990 — fix(new-order): "View order" opens the creator's own lens (staff → workbench)
+
+**Verdict:** ✅ accept — correct role-aware routing; FE-only.
+
+**Bug:** an admin/accountant who created an order (staff *can* reach `/new-order` — not fenced — and get the New Order FAB) and tapped "View order" landed on the **salesman lens** (`/orders/[id]`, role="salesman" → no Approve, salesman notes) because `NewOrderFlow` hardcoded `/orders/${id}` — while the same order opened from the dashboard used `/dashboard/orders/[id]`.
+
+**What works (read + tsc/build):**
+- `NewOrderFlow` gains a **`detailBase`** prop; **all three** nav points now use it — "View order" (confirmation), the edit-submit redirect, and the edit Back (`isEdit ? ${detailBase}/${id} : goto('retailer')`).
+- `page.tsx` fetches the caller's `profiles.role` and passes **`detailBase = (admin|accountant) ? '/dashboard/orders' : '/orders'`**. So a staff creator opens the new order on the **workbench (with Approve)**, the salesman on his own lens — same order, one correct screen per role.
+- `tsc`/eslint/build clean.
+
+**Blocking issues:** None. **Non-blocking:** none — small, correct, consistent with the 3-way `detailBase` pattern used elsewhere (OrdersView/OrderDetailView).
+
+**Domain checks:** Routing/presentation only — no DB/RLS/money/state-machine impact. `salesmanId = creator` behavior is pre-existing (unchanged).
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
