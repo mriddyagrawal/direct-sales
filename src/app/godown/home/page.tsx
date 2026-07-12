@@ -6,12 +6,14 @@ import { GodownTabBar } from "@/components/GodownTabBar";
 const GODOWN_ORDERS_SELECT =
   "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
 
-// Godown HISTORY tab (Stage 2): a read-only browse of orders past the pick —
-// ready to bill, dispatched, or cancelled. Reuses the shared OrdersView
-// (role="godown"). RLS (orders_select_godown) scopes rows to the godown.
-const HISTORY_STATUSES = ["ready_to_bill", "dispatched", "cancelled"];
+// Godown HOME tab: a browse view of the pipeline the godown works — the same
+// shared OrdersView the office uses (role="godown"), with a few less things
+// (no salesman/brand filters). The chip-tabs are Pending scan · Ready to bill ·
+// Billed · Dispatched (in that order); the first is the default. RLS
+// (orders_select_godown) scopes rows to the godown.
+const HOME_STATUSES = ["approved", "ready_to_bill", "billed", "dispatched"];
 
-export default async function GodownHistoryPage() {
+export default async function GodownHomePage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -25,7 +27,7 @@ export default async function GodownHistoryPage() {
     supabase
       .from("orders")
       .select(GODOWN_ORDERS_SELECT)
-      .in("status", HISTORY_STATUSES)
+      .in("status", HOME_STATUSES)
       .order("submitted_at", { ascending: false })
       .limit(300),
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
@@ -39,8 +41,9 @@ export default async function GodownHistoryPage() {
         brands={(brandRows ?? []) as BrandOption[]}
         role="godown"
         currentUserId={user.id}
-        title="History"
-        statusScope={HISTORY_STATUSES}
+        title="Home"
+        statusScope={HOME_STATUSES}
+        tabs={HOME_STATUSES}
       />
       <GodownTabBar />
     </>

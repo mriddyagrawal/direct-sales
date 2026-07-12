@@ -78,6 +78,10 @@ interface OrdersViewProps {
   // bar is the status nav, so the chip-tabs are hidden there).
   title?: string;
   statusScope?: string[];
+  // Explicit chip-tab set (e.g. the godown Home page: Pending scan / Ready to
+  // bill / Billed / Dispatched). When given, these tabs render even for the
+  // godown (whose single-status routes hide them); the first tab is the default.
+  tabs?: string[];
 }
 
 // THE orders list — one component, every role (unification, owner decision
@@ -87,15 +91,26 @@ interface OrdersViewProps {
 // the salesman column; the salesman gets neither (they're all him) and D8
 // self-cancel hiding. New rows arrive via Supabase Realtime (postgres_changes
 // on `orders`, RLS-scoped) within the 5s budget; updates patch in place.
-export function OrdersView({ initialOrders, salesmen, brands, role, currentUserId, title, statusScope }: OrdersViewProps) {
+export function OrdersView({ initialOrders, salesmen, brands, role, currentUserId, title, statusScope, tabs }: OrdersViewProps) {
   const isStaff = role === "staff";
   const isGodown = role === "godown";
   const detailBase = isStaff ? "/dashboard/orders" : isGodown ? "/godown/orders" : "/orders";
+  // Chip-tabs to render: an explicit `tabs` set (any role) wins; otherwise the
+  // full set for staff/salesman and none for the godown (its bottom bar is the
+  // nav). STATUS_LABEL/tabCounts cover every value, so the cast is safe.
+  const chipTabs =
+    (tabs as StatusFilter[] | undefined) ??
+    (isGodown
+      ? []
+      : (["all", "pending_approval", "approved", "ready_to_bill", "billed", "dispatched", "cancelled", "backorder"] as StatusFilter[]));
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  // Default active tab: the first chip when there's no "All" (godown Home), else "all".
+  const [status, setStatus] = useState<StatusFilter>(() =>
+    chipTabs.length > 0 && !chipTabs.includes("all") ? chipTabs[0] : "all",
+  );
   const [salesmanId, setSalesmanId] = useState("all");
   const [brandId, setBrandId] = useState("all");
   const [range, setRange] = useState<DateRange | undefined>(DEFAULT_RANGE);
@@ -252,11 +267,12 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       </div>
 
       <div className={styles.filters}>
-        {/* The godown routes lock their status set (statusScope) and use the
-            bottom bar as the status nav — so the chip-tabs are hidden there. */}
-        {!isGodown && (
+        {/* Chip-tabs: full set for staff/salesman; an explicit `tabs` set for the
+            godown Home; hidden on the godown's single-status routes (Dispatch),
+            whose bottom bar is the status nav. */}
+        {chipTabs.length > 0 && (
           <div className={styles.filterTabs}>
-            {(["all", "pending_approval", "approved", "ready_to_bill", "billed", "dispatched", "cancelled", "backorder"] as StatusFilter[]).map((s) => (
+            {chipTabs.map((s) => (
               <button
                 key={s}
                 type="button"
