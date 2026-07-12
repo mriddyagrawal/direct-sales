@@ -112,9 +112,14 @@ interface NewOrderFlowProps {
   recentRetailerIds: string[];
   editOrder: EditOrderData | null;
   salesmanId: string;
+  // Detail route for THIS creator's role — staff open the order on the staff
+  // workbench (/dashboard/orders, with Approve etc.), the salesman on his own
+  // lens (/orders). Without this, an admin who creates an order and taps "View
+  // order" lands on the salesman lens (no Approve).
+  detailBase: string;
 }
 
-export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder, salesmanId }: NewOrderFlowProps) {
+export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder, salesmanId, detailBase }: NewOrderFlowProps) {
   const router = useRouter();
   const isEdit = editOrder !== null;
 
@@ -222,7 +227,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
           confirmed: { orderRef: order.order_ref, totalPaise: order.total_paise },
         });
       } else {
-        router.push(`/orders/${cart.orderId}`);
+        router.push(`${detailBase}/${cart.orderId}`);
       }
     } catch (error) {
       // Offline queue removed (owner decision 2026-07-10): a transport failure
@@ -303,7 +308,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         onChangeQty={handleChangeQty}
         onChangePrice={handleChangePrice}
         onReview={() => goto("review")}
-        onBack={() => (isEdit ? router.push(`/orders/${cart.orderId}`) : goto("retailer"))}
+        onBack={() => (isEdit ? router.push(`${detailBase}/${cart.orderId}`) : goto("retailer"))}
       />
     );
   }
@@ -338,7 +343,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         totalPaise={confirmed.totalPaise}
         retailerName={cart.retailerName}
         onBackHome={() => router.push("/")}
-        onViewOrder={() => router.push(`/orders/${cart.orderId}`)}
+        onViewOrder={() => router.push(`${detailBase}/${cart.orderId}`)}
       />
     );
   }
