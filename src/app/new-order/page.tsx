@@ -71,7 +71,7 @@ export default async function NewOrderPage({
   // Catalog = active AND priced only (RLS guarantees it, D2) — never render
   // an unpriced/inactive product; no extra filter needed here, just the
   // ordering the design spec wants (category groups, CSV order within them).
-  const [{ data: productRows }, { data: retailerRows }, { data: recentRows }] = await Promise.all([
+  const [{ data: productRows }, { data: retailerRows }, { data: recentRows }, { data: profile }] = await Promise.all([
     supabase
       .from("products")
       .select("id, category, name, tally_name, price_paise, brand_id, brands(name, pricing_mode, show_model)")
@@ -83,7 +83,14 @@ export default async function NewOrderPage({
       .select("retailer_id, submitted_at")
       .order("submitted_at", { ascending: false })
       .limit(30),
+    supabase.from("profiles").select("role").eq("id", user!.id).maybeSingle(),
   ]);
+
+  // Staff (accountant/admin) can also create orders from the dashboard FAB — so
+  // "View order" on the confirmation must send them to the staff workbench
+  // (/dashboard/orders/[id], with Approve), not the salesman lens (/orders/[id]).
+  const isStaff = profile?.role === "admin" || profile?.role === "accountant";
+  const detailBase = isStaff ? "/dashboard/orders" : "/orders";
 
   const products = (
     (productRows ?? []) as unknown as Array<{
@@ -164,6 +171,7 @@ export default async function NewOrderPage({
       recentRetailerIds={recentRetailerIds}
       editOrder={editOrder}
       salesmanId={user!.id}
+      detailBase={detailBase}
     />
   );
 }
