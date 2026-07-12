@@ -4395,3 +4395,25 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** —
 
 ---
+
+## Review of 252a135 — fix(share): retailer name in the PDF filename, not the share caption (Android)
+
+**Verdict:** ✅ accept — a better cross-platform fix that **supersedes my reviewer-authored `6ebeea5`** (the `title/text` caption). Good catch by the builder.
+
+**Why it's right:** WhatsApp on **Android drops the Web-Share `text`/`title` when a file is attached**, so my earlier caption only ever surfaced on iOS. This carries the retailer name in the **filename** — the one field both platforms show (as the document title) — and drops the caption so it isn't iOS-only / duplicated.
+
+**What works (read + tsc/build):**
+- **New shared helper `pickSlipFileName(retailerName, orderRef)`** → `"<ref> - <retailer>.pdf"` (e.g. `ORD-LG-1029 - Rakesh Traders.pdf`): the **unique ref leads** (two orders for the same shop never collide + sort by order no.), retailer follows for readability. Sanitizes filesystem-reserved `/\:*?"<>|` → space, collapses whitespace, **50-char cap**, falls back to `<ref>.pdf` when the name is empty. Used by **both** the share button (`File.name`) and the server route → consistent filename whether shared or downloaded (good DRY).
+- **`SharePdfButton`:** the probe + real `File` use the helper; `navigator.share({ files: [file] })` — **caption dropped** (was `{title, text}`). Desktop passthrough unchanged.
+- **PDF route `Content-Disposition`:** `inline; filename="<ascii>"; filename*=UTF-8''<encoded>` — ASCII fallback (non-ASCII → `_`; the reserved-char strip already removed `"`, so the quoted `filename=` can't break) **plus RFC 5987 `filename*`** for unicode (Hindi retailer names surface correctly on browsers that honor it). Correct RFC 6266 shape.
+- `tsc`/eslint/build clean.
+
+**Blocking issues:** None. **Non-blocking:** `encodeURIComponent` isn't a byte-perfect RFC 5987 encoder (leaves `'()` unencoded, which are outside `attr-char`) — harmless in practice (browsers are lenient; realistic ASCII names use the `filename=` fallback; `*` is already stripped by the helper). Not worth changing.
+
+**Domain checks:** Presentation only — no DB/RLS/money/state-machine impact. The order ref is still carried in the filename, so nothing lost vs before.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. (My `6ebeea5` caption patch is now superseded by this — the audit note for it stands as history.)
+
+**Next-commit suggestion:** —
+
+---
