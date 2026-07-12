@@ -130,9 +130,9 @@ export async function approveOrder(orderId: string): Promise<OrderRow> {
 
 // Mark a billed order as physically shipped (billed → dispatched). Caller must
 // be godown/accountant/admin (enforced server-side); never the salesman.
-export async function dispatchOrder(orderId: string): Promise<OrderRow> {
+export async function dispatchOrder(orderId: string, note?: string): Promise<OrderRow> {
   const supabase = createClient();
-  return callRpc(() => supabase.rpc("dispatch_order", { p_order_id: orderId }));
+  return callRpc(() => supabase.rpc("dispatch_order", { p_order_id: orderId, p_note: note }));
 }
 
 // Promote a backorder back into the pipeline (backorder → pending_approval).

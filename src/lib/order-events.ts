@@ -91,8 +91,11 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
     }
     case "billed":
       return `${time} Billed by ${actorLabel}`;
-    case "dispatched":
-      return `${time} Dispatched by ${actorLabel}`;
+    case "dispatched": {
+      // The dispatch remark (vehicle no. / LR no.) rides in the event details.
+      const note = typeof details.note === "string" ? details.note.trim() : "";
+      return note ? `${time} Dispatched by ${actorLabel} · ${note}` : `${time} Dispatched by ${actorLabel}`;
+    }
     default:
       return `${time} ${event.action}`;
   }
