@@ -4459,3 +4459,22 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** —
 
 ---
+
+## Review of 494817c — fix: sign-out pending state + users list sorted A→Z
+
+**Verdict:** ✅ accept — two small FE fixes, both correct.
+
+**What works (read + tsc/build):**
+- **`SignOutButton`:** adds a `busy` state — `if (busy) return` double-tap guard + `setBusy(true)` before `signOut()`; button `disabled={busy}` + `aria-busy`, label "Signing out…". No reset (unmounts on nav to `/login`) — correct.
+- **Users list:** dropped the `ROLE_ORDER` grouping; now sorts **A→Z by `username ?? full_name`**, case-insensitive (`localeCompare(…, { sensitivity: 'base' })`) — matches the owner's "A→Z, no role grouping" ask.
+- `tsc`/eslint/build clean. FE-only, no DB change.
+
+**Blocking issues:** None. **Non-blocking:** `handleSignOut` has no `try/catch`, so if `signOut()` rejects (rare — network), `busy` stays true and the button is stuck "Signing out…". Trivial edge (sign-out clears the local session regardless in practice); not worth a guard.
+
+**Domain checks:** Presentation only — the Users page's admin gate + per-action gates are untouched (sort order isn't a security surface).
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
