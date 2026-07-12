@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { renderPickSlipPdfBuffer } from "./PickSlipPdf";
+import { pickSlipFileName } from "@/lib/pickslip-filename";
 
 // Streams the ORDER COPY as a real application/pdf. Lives at the NEUTRAL
 // /orders/[id]/pdf path on purpose: middleware fences salesmen out of
@@ -85,12 +86,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     printedAtIso: new Date().toISOString(),
   });
 
+  // "<ref> - <retailer>.pdf" — matches the phone share filename so a saved copy
+  // carries the shop name too. ASCII fallback + RFC 5987 filename* for unicode.
+  const pdfName = pickSlipFileName(order.retailers?.name ?? "", order.order_ref);
+  const asciiName = pdfName.replace(/[^\x20-\x7E]/g, "_");
+
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       // inline → the phone's native PDF viewer opens it (share from there);
       // the filename is what a download/share saves it as.
-      "Content-Disposition": `inline; filename="${order.order_ref}.pdf"`,
+      "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(pdfName)}`,
       "Cache-Control": "no-store",
     },
   });
