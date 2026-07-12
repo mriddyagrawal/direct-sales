@@ -11,7 +11,7 @@ import { SharePdfButton } from "@/components/SharePdfButton";
 import { Stepper } from "@/components/ui/Stepper";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { getOrderStatusTag } from "@/lib/order-status";
-import { formatOrderTimestamp, formatRupees } from "@/lib/format";
+import { formatOrderTimestamp, formatOrderTime, formatHistoryDayHeader, formatRupees, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
 import { updateOrderItems, cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder } from "@/lib/order-rpcs";
@@ -217,7 +217,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
     const d = (e.details ?? {}) as Record<string, unknown>;
-    const time = formatOrderTimestamp(e.created_at);
+    const time = formatOrderTime(e.created_at);
     if (typeof d.parent_ref === "string" && typeof d.parent_order_id === "string") {
       return { prefix: `${time} Backordered from `, ref: d.parent_ref, href: `${detailBase}/${d.parent_order_id}` };
     }
@@ -555,22 +555,18 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
       {isStaff && order.status === "approved" && (
         <>
           <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
-          {/* Owner call: the approved override splits in half — Mark billed
-              (blue) beside Scan (white). Any role can now scan (2026-07-11). */}
-          <div className={styles.splitRow}>
-            <Button variant="primary" onClick={() => setConfirmProcess(true)}>
-              <Glyph icon={Stamp} />
-              Mark billed
-            </Button>
-            <Button
-              variant="secondary"
-              loading={navPending && navTarget === `/scan/${order.id}`}
-              onClick={() => navigate(`/scan/${order.id}`)}
-            >
-              <Glyph icon={ScanBarcode} />
-              Scan
-            </Button>
-          </div>
+          {/* Mark billed removed from the Pending-scan screen (owner 2026-07-12):
+              every order must reach ready_to_bill via the godown pick first. The
+              approved→billed path stays dormant in process_order in case we
+              restore the shortcut later. */}
+          <Button
+            variant="secondary"
+            loading={navPending && navTarget === `/scan/${order.id}`}
+            onClick={() => navigate(`/scan/${order.id}`)}
+          >
+            <Glyph icon={ScanBarcode} />
+            Scan
+          </Button>
         </>
       )}
       {/* Backorder: the remainder split off a partial pick. Its salesman or an
@@ -880,26 +876,43 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
 
           <div>
             <p className={styles.sectionLabel}>HISTORY</p>
-            {events2.map((e) => {
-              // A `backordered` event names the other order — link that ref to
-              // it. Child side carries parent_ref/parent_order_id, parent side
-              // child_ref/child_order_id; everything else is plain text.
-              const link = backorderEventLink(e);
-              return (
-                <p key={e.id} className={styles.historyLine}>
-                  {link ? (
-                    <>
-                      {link.prefix}
-                      <Link href={link.href} className={styles.parentLink}>
-                        {link.ref}
-                      </Link>
-                    </>
-                  ) : (
-                    describeEvent(e, currentUserId)
-                  )}
-                </p>
-              );
-            })}
+            {/* Grouped by IST calendar day: a bold day header ("Today" /
+                "Yesterday" / "10 Jul 2026") then that day's lines carry the time
+                only. events2 is chronological (oldest first), so the groups run
+                oldest day → Today, and a weeks-long history stays unambiguous. */}
+            {(() => {
+              const groups: { key: string; header: string; events: OrderEventRow[] }[] = [];
+              for (const e of events2) {
+                const key = istDateKey(new Date(e.created_at));
+                const last = groups[groups.length - 1];
+                if (last && last.key === key) last.events.push(e);
+                else groups.push({ key, header: formatHistoryDayHeader(e.created_at, now), events: [e] });
+              }
+              return groups.map((g) => (
+                <div key={g.key} className={styles.historyGroup}>
+                  <p className={styles.historyDate}>{g.header}</p>
+                  {g.events.map((e) => {
+                    // A `backordered` event names the other order — link that ref
+                    // to it (parent↔child); everything else is plain text.
+                    const link = backorderEventLink(e);
+                    return (
+                      <p key={e.id} className={styles.historyLine}>
+                        {link ? (
+                          <>
+                            {link.prefix}
+                            <Link href={link.href} className={styles.parentLink}>
+                              {link.ref}
+                            </Link>
+                          </>
+                        ) : (
+                          describeEvent(e, currentUserId)
+                        )}
+                      </p>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
           </div>
         </div>
       </div>

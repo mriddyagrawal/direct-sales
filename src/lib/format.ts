@@ -35,6 +35,34 @@ export function formatOrderTimestamp(iso: string, now: Date = new Date()): strin
   return `${full}, ${time}`;
 }
 
+// Just the IST clock time ("14:30") — used by the grouped order HISTORY, where
+// the date is carried once by the day-group header (formatHistoryDayHeader)
+// instead of being repeated on every line.
+export function formatOrderTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+// Day header for the grouped order HISTORY: "Today" / "Yesterday" / "10 Jul
+// 2026". Relative for the two most recent days, absolute (unambiguous) beyond —
+// so a history spanning weeks (e.g. a backorder punched later) is never guessy.
+export function formatHistoryDayHeader(iso: string, now: Date = new Date()): string {
+  const key = istDateKey(new Date(iso));
+  if (key === istDateKey(now)) return "Today";
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (key === istDateKey(yesterday)) return "Yesterday";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIME_ZONE,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
 // Always the full "06 Jul 2026, 11:42" — unlike formatOrderTimestamp, never
 // abbreviated to just a time. The pick-slip footer ("Printed ...") needs an
 // unambiguous date even when printed today.
