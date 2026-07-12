@@ -4360,3 +4360,38 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** —
 
 ---
+
+## Review of b2dfd81 — feat(db): zero-pick converts the order to backorder in place (no cancel)
+
+**Verdict:** ✅ accept — owner-directed; state-machine change proven by live rolled-back probes; no regression to full/partial pick.
+
+**What works (read + normalized diff + 3 live probes):**
+- **Guard gains ONE edge:** `old='approved' AND new='backorder' → return new` (line 26); every other edge byte-identical to the Stage-2 guard. No role check on this edge — same pattern as the other pick edges (role enforced in `submit_pick`).
+- **`submit_pick` — only the `not v_any_picked` branch changed** (normalized diff vs the Stage-1 def confirms): was `raise 'pick at least one unit'`; now → **reset every line's `picked_qty` to null** (leaves them cleanly un-picked), **`status='backorder'` in place**, log `backordered {full:true}`, **return — NO child, NO `ready_to_bill`, NO `picked_at`**. The partial/full branches (ship picked → `ready_to_bill`, split a child on shortfall) are untouched.
+- **Live rolled-back probes (submit→approve→pick chain, impersonated, all rolled back):**
+  - **ZERO pick** → `status=backorder`, `picked_qty=NULL`, `{full:true}` event, **0 children**, `picked_at=NULL`, `total_paise=4708200` (= full 3×15694, correct — a full backorder holds the whole order value via `coalesce(null,qty)`).
+  - **FULL pick** → `ready_to_bill`, 0 children (no regression).
+  - **PARTIAL pick** → `ready_to_bill` + a child backorder, remainder qty **2** (no regression).
+- Brand-agnostic: a zero pick is `v_any_picked=false` regardless of brand, and inserts no scans (LG zero-pick → clean backorder too).
+
+**Blocking issues:** None. **Non-blocking:** a zero-pick is effectively a "soft un-fulfil" (`approved→backorder`, re-punchable) available to whoever can already pick (godown/admin/salesman-own via `submit_pick`) — the migration comment calls this out ("NOT a true cancel; only admin truly cancels"). A backorder is non-terminal + punchable, so this isn't a destructive path. Fine.
+
+**Domain checks:** State machine (new edge verified live). **Immutability held** — line snapshots (qty/price/name) untouched; only `picked_qty` reset to null. Money: recompute trigger yields the full total for the backorder (correct). Order numbering: no `nextval` on the zero-pick path (no child) — good.
+
+## Review of 607b4bb — feat(godown): allow a zero pick (whole order → backorder) + history label
+
+**Verdict:** ✅ accept — FE unlock + label; guarded by the existing PAKKA? confirm.
+
+**What works (read + tsc/build):**
+- **≥1 gate removed:** `const canSubmit = doneCount >= 1` deleted; the Submit button dropped `disabled={!canSubmit}` → `<Button onClick={onSubmitTap} loading={submitting}>`. So it's **enabled at 0** (a zero pick is now submittable) yet still disabled **while submitting** (via `loading`, `Button` sets `disabled = disabled||loading`) → no double-submit.
+- **Guarded by PAKKA?:** `onSubmitTap` is unchanged — `shortfall > 0 → setConfirmShort(true)`; a zero pick has `shortfall = totalQty > 0`, so the PAKKA? sheet ("Aapne 0/{y} items hi add kiye hai") fires and requires an explicit confirm before submitting. A full pick still submits directly.
+- **History label:** `order-events` `backordered` describer — `if (details.full === true) return "… Fully backordered — nothing picked"` (distinct from the partial-backorder child-link line).
+- `tsc`/eslint/build clean.
+
+**Blocking issues:** None. **Non-blocking:** the submit button is now enabled even before anything is picked (previously disabled until ≥1) — acceptable since PAKKA? guards an accidental empty submit.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
