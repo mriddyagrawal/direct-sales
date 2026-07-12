@@ -241,6 +241,21 @@
   padding: 4px 0;
 }
 
+/* Grouped history: a bold day header, then that day's time-only lines. */
+.historyGroup {
+  margin-top: 10px;
+}
+.historyGroup:first-of-type {
+  margin-top: 4px;
+}
+.historyDate {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink);
+  padding: 2px 0 2px;
+}
+
 .confirmTitle {
   font-family: var(--font-structure);
   font-size: var(--text-header-size);

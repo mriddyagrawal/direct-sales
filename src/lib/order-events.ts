@@ -1,4 +1,4 @@
-import { formatOrderTimestamp } from "@/lib/format";
+import { formatOrderTime } from "@/lib/format";
 
 // M5.5 swapped the audit-payload key from `sku` (dropped) to `tally_name`.
 // Old order_events retain their `sku` key; new ones carry `tally_name` — read
@@ -45,7 +45,7 @@ function diffLines(before: EventLine[], after: EventLine[]): string {
 // retailer over the phone (order-lifecycle.md's event catalog + S7's
 // HISTORY). This is the dispute-resolution trail — never summarized away.
 export function describeEvent(event: OrderEventRow, currentUserId: string): string {
-  const time = formatOrderTimestamp(event.created_at);
+  const time = formatOrderTime(event.created_at);
   const actorIsSelf = event.actor_id === currentUserId;
   const actorLabel = actorIsSelf ? "you" : (event.actor_name ?? "the office");
   const details = (event.details ?? {}) as Record<string, unknown>;
