@@ -4438,3 +4438,24 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** —
 
 ---
+
+## Review of dd40335 — feat(godown): tabs → Pickup · Home · Dispatch; Home is a status-tabbed browse
+
+**Verdict:** ✅ accept — owner reshape of the godown nav; FE-only, coherent, builds. (Supersedes an **incomplete local `47dfdb7`** — same message, but that commit only carried the `/godown/history` deletion; the home route + nav + OrdersView `tabs` were staged-uncommitted. I flagged it as a would-break-`main` half-commit; **`47dfdb7` never reached `origin/main`** — `dd40335` is the complete version and what landed. Reviewer verified drift resolved before accepting.)
+
+**What works (read + tsc/build + route-registration):**
+- **`/godown/history` → `/godown/home`** (git rename, 69% similar): `HOME_STATUSES = [approved, ready_to_bill, billed, dispatched]`; server `.in('status', HOME_STATUSES)`; `OrdersView role="godown" title="Home" statusScope={HOME_STATUSES} tabs={HOME_STATUSES}`. All four are within the godown RLS grant (Stage-2 widened to approved/ready_to_bill/billed/dispatched/cancelled), so no RLS change needed.
+- **`GodownTabBar`:** Pickup · **Home** (new middle) · Dispatch; History removed. Exact-pathname active state unchanged.
+- **`OrdersView` `tabs` prop:** `chipTabs = tabs ?? (isGodown ? [] : [full set])` — an explicit set renders **even for godown** (Home), while a godown route WITHOUT `tabs` (Dispatch) keeps chip-tabs hidden (`chipTabs.length > 0` guard). Initial `status` defaults to `chipTabs[0]` when the set omits `"all"` (Home → **"approved"/Pending scan** default), else `"all"`. `STATUS_LABEL`/`tabCounts` already cover all four (cast is safe).
+- **Labels match the message** (verified): approved→**"Pending scan"**, ready_to_bill→"Ready to bill", billed→"Billed", dispatched→"Dispatched".
+- `tsc`/eslint/build clean; **route list shows `/godown/home` (and no `/godown/history`)** — all 5 godown routes register.
+
+**Blocking issues:** None (the incomplete-commit risk was pre-`main` and is resolved). **Non-blocking:** `approved` orders show in **both** Pickup (the actionable pick queue) and Home (browse) — intended (act vs browse); Home omits `cancelled` though RLS permits it (owner's "active pipeline" choice).
+
+**Domain checks:** Presentation/routing only — no DB/RLS/money/state-machine change. Reuse held (godown Home is still the shared `OrdersView`, not a fork).
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
