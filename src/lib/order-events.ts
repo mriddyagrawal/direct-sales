@@ -76,6 +76,8 @@ export function describeEvent(event: OrderEventRow, currentUserId: string): stri
       return `${time} Picked by ${actorLabel}${summary}`;
     }
     case "backordered": {
+      // Full backorder (nothing picked): the order converted itself in place.
+      if (details.full === true) return `${time} Fully backordered — nothing picked`;
       // On the child order (parent_ref present): its genesis. On the parent
       // (child_ref present): the split it produced.
       if (typeof details.parent_ref === "string") return `${time} Backordered from ${details.parent_ref}`;
