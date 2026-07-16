@@ -8,7 +8,8 @@ Get **current stock quantities out of Tally** (on a Windows VPS), **into the web
 Build in **four phases, in order.** T1 stands alone. **T2 is a prod DB migration — do NOT apply it until the owner explicitly approves** (two additive nullable columns + one RPC; safe, but the owner signs off on every DB change). T3/T4 depend on T2.
 
 Owner decisions already locked (do not re-litigate):
-- Extractor = **Python + double-click `.bat`**, stdlib-only (no `pip install`), runs on the Tally VPS.
+- Extractor = **Python + double-click `.bat`**, stdlib-only (no `pip install`), runs on the Tally VPS. **Strictly READ-ONLY to Tally** — it only ever sends *Export* requests; it never writes, creates, or alters anything in Tally.
+- Import can **only update existing products** — it never creates an item and never edits name/category/price. An unmatched Tally name is reported, full stop.
 - Import = a **separate "Update stock" button** on the Products page — never touches price/name/category, never creates products.
 - Salesman display = **two-state pill (🟢 in stock + count / 🔴 out of stock) + "as of <date>"** — no amber "Low" tier (owner 2026-07-16).
 - Out-of-stock = **allow the order, show a "will backorder" warning** (never block — the backorder flow already exists).
@@ -31,6 +32,8 @@ Owner decisions already locked (do not re-litigate):
 ---
 
 ## Phase T1 — Windows extractor (`tally-agent/`, standalone, no DB, no app)
+
+> **🔒 READ-ONLY GUARANTEE (hard requirement).** This script must only ever *read* from Tally. Tally's HTTP-XML gateway separates `<TALLYREQUEST>Export</TALLYREQUEST>` (reads data OUT — structurally cannot modify Tally) from `Import`/`Execute` (writes). The script sends **only Export/Collection requests** and must **never** contain `Import`, `Alter`, `Create`, `<IMPORTDATA>`, a `<TALLYMESSAGE>` voucher/master payload, or any write verb — not even commented-out sample code. State this in a comment at the top of the `.py` and plainly in the README. (Standard Tally has no per-request read-only login, so the safety comes from the request *type*, not a Tally-side permission — which is exactly why the script must never build a write envelope.)
 
 New top-level folder **`tally-agent/`** (outside `src/` — Next won't compile it). Files:
 
