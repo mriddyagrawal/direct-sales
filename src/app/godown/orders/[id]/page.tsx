@@ -4,9 +4,9 @@ import { OrderDetailView } from "@/components/orders/OrderDetailView";
 import { ORDER_DETAIL_SELECT, toOrderDetailProps, type OrderDetailQueryRow } from "@/components/orders/order-detail-data";
 
 // Godown lens on the shared OrderDetailView (Stage 2). Same RLS-scoped query as
-// every other role; read-only except Mark dispatched on a billed order. No
-// catalog (no inline editor), isAdmin=false. Distinct from /godown/[id] — that's
-// the bespoke scanner; this is the reused order detail (where dispatch happens).
+// every other role; read-only except Mark dispatched on a billed order.
+// isAdmin=false. Distinct from /godown/[id] — that's the bespoke scanner; this
+// is the reused order detail (where dispatch happens).
 export default async function GodownOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -29,7 +29,6 @@ export default async function GodownOrderDetailPage({ params }: { params: Promis
       order={order}
       items={items}
       events={events}
-      catalog={[]}
       currentUserId={user.id}
       role="godown"
       isAdmin={false}
