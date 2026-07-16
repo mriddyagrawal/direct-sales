@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, Truck, X } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, Truck, Undo2, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -13,7 +13,7 @@ import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatOrderTime, formatHistoryDayHeader, formatRupees, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
-import { cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder } from "@/lib/order-rpcs";
+import { cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder, stepBackOrder } from "@/lib/order-rpcs";
 import styles from "./OrderDetailView.module.css";
 
 interface OrderItemRow {
@@ -104,6 +104,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [confirmDispatch, setConfirmDispatch] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
   const [dispatchNote, setDispatchNote] = useState("");
   const [billNo, setBillNo] = useState("");
   const [cancelReason, setCancelReason] = useState("");
@@ -146,6 +147,11 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
     (isStaff && (isAdmin ? order.status !== "cancelled" : order.status === "pending_approval")) ||
     salesmanActionable;
   const editHref = `/new-order?edit=${order.id}`;
+  // Admin "Undo" (owner 2026-07-17): one stage backward, only from the four
+  // forward stages — never cancelled/pending/backorder. The guard trigger and
+  // step_back_order re-enforce admin server-side; this is just the button gate.
+  const canUndo =
+    isAdmin && ["approved", "ready_to_bill", "billed", "dispatched"].includes(order.status);
   const statusTag = getOrderStatusTag({ status: order.status });
 
   const snapshotById = useMemo(() => {
@@ -197,6 +203,17 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
     const ref = typeof details.child_ref === "string" ? details.child_ref : null;
     return id && ref ? { id, ref } : null;
   })();
+
+  // Per-status Undo confirm copy: the destination + the side effect it carries.
+  // An un-pick that split a backorder names the child it will cancel.
+  const undoCopy: Record<string, string> = {
+    approved: "Send this order back to Pending approval?",
+    ready_to_bill: `Send back to Approved? The pick will be cleared${
+      backorderChild ? ` and backorder ${backorderChild.ref} will be cancelled` : ""
+    }.`,
+    billed: "Send back to Ready to bill? This removes the Tally bill number.",
+    dispatched: "Send back to Billed?",
+  };
 
   // A `backordered` HISTORY line references the other order (parent↔child) —
   // return the ref as a link so it's tappable, mirroring the "Backorder of"
@@ -348,6 +365,25 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not mark the order dispatched.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUndo() {
+    // One stage backward (admin-only, re-checked server-side). No reason —
+    // the RPC audits a 'stepped_back' event itself. A blocked un-pick (advanced
+    // backorder child) raises; the sheet renders that child's ref as a link.
+    setSaving(true);
+    setError(null);
+    try {
+      await stepBackOrder(order.id);
+      setConfirmUndo(false);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not undo the last step.");
     } finally {
       setSaving(false);
     }
@@ -567,6 +603,14 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
             Scan
           </Button>
         )}
+        {/* Admin Undo — red OUTLINE (the inverse of Cancel's fill; inverts to
+            solid red on press). One stage backward, confirm sheet, no reason. */}
+        {canUndo && (
+          <Button variant="destructive" onClick={() => setConfirmUndo(true)}>
+            <Glyph icon={Undo2} />
+            Undo
+          </Button>
+        )}
         {((isStaff && (isAdmin ? order.status !== "cancelled" : order.status === "pending_approval")) ||
           salesmanActionable) && (
           <Button
@@ -581,7 +625,9 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
       </div>
       </div>
 
-      {error && !confirmCancel && !confirmProcess && !confirmDispatch && <p className={styles.error}>{error}</p>}
+      {error && !confirmCancel && !confirmProcess && !confirmDispatch && !confirmUndo && (
+        <p className={styles.error}>{error}</p>
+      )}
 
       {/* Shipped short: a partial pick shipped what was picked and backordered
           the rest into a child order (both roles). */}
@@ -819,6 +865,40 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
             <Button variant="primary" onClick={handleDispatch} loading={saving || isPending}>
               <Glyph icon={Truck} />
               Mark dispatched
+            </Button>
+          </div>
+        </BottomSheet>
+      )}
+
+      {confirmUndo && (
+        <BottomSheet onClose={() => setConfirmUndo(false)}>
+          <p className={styles.confirmTitle}>Undo — {order.orderRef}</p>
+          <p className={styles.confirmBody}>{undoCopy[order.status] ?? "Step this order back one stage?"}</p>
+          {error &&
+            (() => {
+              // A blocked un-pick names the advanced backorder child — make its
+              // ref tappable when it matches the child we know from the events.
+              const m = error.match(/^blocked: finish or cancel backorder (\S+) first/);
+              if (m && backorderChild && backorderChild.ref === m[1]) {
+                return (
+                  <p className={styles.error}>
+                    Blocked — finish or cancel backorder{" "}
+                    <Link href={`${detailBase}/${backorderChild.id}`} className={styles.parentLink}>
+                      {backorderChild.ref}
+                    </Link>{" "}
+                    first.
+                  </p>
+                );
+              }
+              return <p className={styles.error}>{error}</p>;
+            })()}
+          <div className={styles.editActions}>
+            <Button variant="secondary" onClick={() => setConfirmUndo(false)}>
+              Keep as is
+            </Button>
+            <Button variant="destructive" onClick={handleUndo} loading={saving || isPending}>
+              <Glyph icon={Undo2} />
+              Undo
             </Button>
           </div>
         </BottomSheet>

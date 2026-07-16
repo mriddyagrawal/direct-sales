@@ -149,6 +149,16 @@ export async function punchOrder(orderId: string): Promise<OrderRow> {
   return callRpc(() => supabase.rpc("punch_order", { p_order_id: orderId }));
 }
 
+// Admin "Undo": walk the order ONE stage backward (approved→pending_approval,
+// ready_to_bill→approved un-pick, billed→ready_to_bill un-bill,
+// dispatched→billed). Admin-only, reason-free (server audits a 'stepped_back'
+// event). An un-pick with an ADVANCED backorder child raises
+// "blocked: finish or cancel backorder <ref> first" — surfaced with a link.
+export async function stepBackOrder(orderId: string): Promise<OrderRow> {
+  const supabase = createClient();
+  return callRpc(() => supabase.rpc("step_back_order", { p_order_id: orderId }));
+}
+
 // Admin-only note on a pending_approval order (owner decision 2026-07-11) — one
 // overwritable comment; submitting an empty string CLEARS it. The server gates
 // admin + pending-only; the note rides the RLS'd order row (everyone who can see

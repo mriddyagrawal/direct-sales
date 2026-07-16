@@ -43,6 +43,13 @@
   border-color: var(--color-error);
 }
 
+/* Press feedback: the outline inverts to the filled mirror (white on red) —
+   the admin Undo button (owner 2026-07-17), the inverse of Cancel. */
+.destructive:active {
+  background: var(--color-error);
+  color: var(--color-white);
+}
+
 .destructive-filled {
   background: var(--color-error);
   color: var(--color-white);
