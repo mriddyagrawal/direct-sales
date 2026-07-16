@@ -10,7 +10,7 @@ Build in **four phases, in order.** T1 stands alone. **T2 is a prod DB migration
 Owner decisions already locked (do not re-litigate):
 - Extractor = **Python + double-click `.bat`**, stdlib-only (no `pip install`), runs on the Tally VPS.
 - Import = a **separate "Update stock" button** on the Products page — never touches price/name/category, never creates products.
-- Salesman display = **traffic-light pill + exact count + "as of <date>"**.
+- Salesman display = **two-state pill (🟢 in stock + count / 🔴 out of stock) + "as of <date>"** — no amber "Low" tier (owner 2026-07-16).
 - Out-of-stock = **allow the order, show a "will backorder" warning** (never block — the backorder flow already exists).
 - Match **globally on `tally_name`** (one Tally company holds all brands; the file has no brand column).
 - Unmatched Tally names = **report only** (a stock row can't supply name/category/price, so it can't create a product).
@@ -139,12 +139,11 @@ Notes: match **globally** on `tally_name` (NOT brand-scoped — unlike `import_p
 ## Phase T4 — Salesman: stock pill on the Quick Order card
 
 - Add `stock_qty: number | null` + `stock_updated_at: string | null` to `ProductOption` and to the `.select(…)` at [page.tsx:77](../src/app/new-order/page.tsx#L77) (`… , stock_qty, stock_updated_at, brands(…)`), and map them through.
-- In **QuickOrder.tsx**, render a **stock pill** on each product card (near name/price). Rules (constant `LOW_STOCK = 5`, commented as tweakable):
-  - `stock_qty > LOW_STOCK` → 🟢 **In stock · {n}**
-  - `1 ≤ stock_qty ≤ LOW_STOCK` → 🟠 **Low · {n}**
+- In **QuickOrder.tsx**, render a **stock pill** on each product card (near name/price). **Two states only — no amber/"Low" tier, no threshold (owner 2026-07-16):**
+  - `stock_qty > 0` → 🟢 **In stock · {n}**
   - `stock_qty === 0` → 🔴 **Out of stock** + muted sub-note **"will backorder"**
   - `stock_qty === null` → render **nothing** (never synced)
-  - Append **"as of {short date}"** from `stock_updated_at` (add a compact `formatShortDate(iso)` → e.g. `16 Jul`, IST, to `src/lib/format.ts`). Colors via CSS classes (semantic good/warn/critical), not inline styles; readable in light + dark.
+  - Append **"as of {short date}"** from `stock_updated_at` (add a compact `formatShortDate(iso)` → e.g. `16 Jul`, IST, to `src/lib/format.ts`). Colors via CSS classes (semantic good/critical), not inline styles; readable in light + dark.
 - **Out-of-stock = allow + warn, never block:** adding a 0-stock item to the cart must still work (backorder flow handles it). The 🔴 pill + "will backorder" IS the warning; optionally echo a small "⚠ will backorder" note on the cart line when `stock_qty === 0 && qty > 0`. Do **not** disable the stepper or the add button.
 
 **T4 acceptance:** on a device/emulator, a synced in-stock product shows the green pill + count + as-of; a 0-stock product shows the red pill and can still be added (goes to cart, submits, backorders as before); never-synced products show no pill; light/dark both legible. tsc/eslint/build clean. Commit: `feat(new-order): stock pill on the Quick Order card (traffic-light + count + as-of, out-of-stock warns not blocks)`.
