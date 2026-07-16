@@ -196,11 +196,12 @@ export function QuickOrder({
   function renderProduct(p: ProductOption) {
     const qty = items[p.id] ?? 0;
     const inCart = qty > 0;
-    // Light stock tint on the whole row: green in-stock / red out / amber
-    // no-data. Shown only when the row isn't the in-cart blue (that "selected"
-    // highlight wins). Isolated to this one class so it's trivial to pull later.
+    // Light stock tint on the whole row: green in-stock / red out-of-stock.
+    // A never-synced ("No data") row gets NO tint (owner 2026-07-17) — only the
+    // amber pill. Shown only when the row isn't the in-cart blue (that
+    // "selected" highlight wins). Isolated to this one class to pull easily.
     const stockTone =
-      p.stock_qty === null ? styles.tintNone : p.stock_qty > 0 ? styles.tintIn : styles.tintOut;
+      p.stock_qty === null ? "" : p.stock_qty > 0 ? styles.tintIn : styles.tintOut;
     const isManual = p.pricing_mode === "manual";
     // A price input shows for manual (LG) lines as always, and for EVERY line
     // when the admin is editing (canPriceAll). A fixed line for anyone else
