@@ -4,9 +4,10 @@ import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
-import { formatRupees } from "@/lib/format";
+import { formatRupees, formatShortDate } from "@/lib/format";
 import { ProductModal, type BrandOption } from "./ProductModal";
 import { ImportWizard } from "./ImportWizard";
+import { StockImportWizard } from "./StockImportWizard";
 import type { ProductRow } from "./page";
 import styles from "./ProductsPricing.module.css";
 
@@ -51,6 +52,7 @@ export function ProductsPricing({
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
   const [importing, setImporting] = useState(false);
+  const [stockImporting, setStockImporting] = useState(false);
   const [query, setQuery] = useState("");
 
   const priced = products.filter((p) => p.price_paise !== null).length;
@@ -134,6 +136,12 @@ export function ProductsPricing({
             only when it actually differs from the display name (it defaults to
             the name, so echoing it is noise). */}
         {p.tally_name !== p.name && <div className={styles.cardTally}>{p.tally_name}</div>}
+        {p.stock_qty !== null && (
+          <div className={styles.cardTally}>
+            Stock {p.stock_qty}
+            {p.stock_updated_at ? ` · as of ${formatShortDate(p.stock_updated_at)}` : ""}
+          </div>
+        )}
         <button
           type="button"
           className={`${styles.toggle} ${p.active ? styles.toggleOn : styles.toggleOff}`}
@@ -176,6 +184,9 @@ export function ProductsPricing({
         </span>
         {isAdmin && (
           <div className={styles.titleActions}>
+            <Button variant="secondary" onClick={() => setStockImporting(true)}>
+              Update stock
+            </Button>
             <Button variant="secondary" onClick={() => setImporting(true)}>
               Import
             </Button>
@@ -210,6 +221,7 @@ export function ProductsPricing({
                 <th>DISPLAY NAME</th>
                 <th>TALLY NAME</th>
                 <th className={styles.numeric}>PRICE</th>
+                <th className={styles.numeric}>STOCK</th>
                 <th>ACTIVE</th>
               </tr>
             </thead>
@@ -227,6 +239,12 @@ export function ProductsPricing({
                   <td className={`${styles.mono} ${styles.cellMeta}`}>{p.tally_name}</td>
                   <td className={`${styles.mono} ${styles.numeric}`}>
                     {p.price_paise === null ? <span className={styles.tbd}>TBD</span> : formatRupees(p.price_paise)}
+                  </td>
+                  <td
+                    className={`${styles.mono} ${styles.numeric}`}
+                    title={p.stock_updated_at ? `as of ${formatShortDate(p.stock_updated_at)}` : undefined}
+                  >
+                    {p.stock_qty === null ? <span className={styles.tbd}>—</span> : p.stock_qty}
                   </td>
                   <td>
                     <button
@@ -280,6 +298,16 @@ export function ProductsPricing({
           onClose={() => setImporting(false)}
           onDone={() => {
             setImporting(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {stockImporting && (
+        <StockImportWizard
+          onClose={() => setStockImporting(false)}
+          onDone={() => {
+            setStockImporting(false);
             router.refresh();
           }}
         />

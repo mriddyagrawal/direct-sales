@@ -104,6 +104,18 @@ export function isSameSectionKey(a: string, b: string, now: Date = new Date()): 
   return formatSectionLabel(a, now) === formatSectionLabel(b, now);
 }
 
+// Compact IST date "16 Jul" (day + short month, no year) — the stock "as of"
+// stamp on the admin list and the salesman's Quick Order card. Deliberately
+// year-less: stock is a recent, frequently-refreshed figure, so the day+month
+// reads cleaner; use formatFullTimestamp elsewhere when the year matters.
+export function formatShortDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIME_ZONE,
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(iso));
+}
+
 // ₹ en-IN grouping, e.g. 447800 paise -> "₹4,478" (whole rupees — this app
 // never shows paise fractions; see money-display-paise-conversion memory).
 export function formatRupees(paise: number): string {
