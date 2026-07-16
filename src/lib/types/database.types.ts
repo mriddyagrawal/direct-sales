@@ -339,6 +339,8 @@ export type Database = {
           id: string
           name: string
           price_paise: number | null
+          stock_qty: number | null
+          stock_updated_at: string | null
           tally_name: string
           updated_at: string
         }
@@ -350,6 +352,8 @@ export type Database = {
           id?: string
           name: string
           price_paise?: number | null
+          stock_qty?: number | null
+          stock_updated_at?: string | null
           tally_name: string
           updated_at?: string
         }
@@ -361,6 +365,8 @@ export type Database = {
           id?: string
           name?: string
           price_paise?: number | null
+          stock_qty?: number | null
+          stock_updated_at?: string | null
           tally_name?: string
           updated_at?: string
         }
@@ -566,6 +572,10 @@ export type Database = {
       email_for_username: { Args: { p_username: string }; Returns: string }
       import_products: {
         Args: { p_brand_id: string; p_rows: Json }
+        Returns: Json
+      }
+      import_stock: {
+        Args: { p_rows: Json }
         Returns: Json
       }
       process_order: {
