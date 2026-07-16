@@ -4478,3 +4478,93 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Next-commit suggestion:** —
 
 ---
+
+## Review of e4daedb — feat(db): update_order_items — admin retailer change + all-brand price override
+
+**Verdict:** ✅ accept — verified live by execution (8 role/stage probes, all rolled back).
+
+**Phase / commit goal (as I understood it):** Recreate `update_order_items` (drop the 4-arg form, add `p_retailer_id`) so an admin can (a) swap the retailer and (b) override any line's price incl. **fixed** brands, while everything else — role/stage gate, brand guard, before/after audit, delete-removed, P5b snapshot fallback — is preserved. Reason still required past approval.
+
+**What works (live probes on prod, each in its own subtransaction, caught `raise` → 0 writes persisted):**
+- **Price rule `v_may_price = (manual OR admin)`** — proven on a real fixed **ZEB** line (@7200 paise): admin client price `111` → **stored 111** (deliberate override honored); salesman `111` → **7200** (ignored → snapshot); accountant `111` → **7200** (ignored). Fixed-brand untamperability holds for non-admins.
+- **P5b immutability** — admin edits an untouched **manual (LG)** line with **no** `unit_price_paise` key → coalesce falls to the existing snapshot → **1550000 unchanged** (no re-price to default).
+- **Retailer swap = admin-only** — admin `p_retailer_id=R1` → order retailer becomes R1 **and** event logs `retailer_changed:true`; salesman `p_retailer_id=R1` → **unchanged** (ignored); admin bogus uuid → raises "retailer … not found".
+- **Reason gate** — admin post-approval (a real `approved` LG order) with **no** reason → raises "reason is required to edit an order past…"; **with** reason → succeeds, event action = **`edited_after_lock`**.
+- **Signature/ledger:** exactly one `update_order_items(uuid,text,jsonb,text,uuid)` (old 4-arg dropped cleanly); migration `20260716151611` present in `schema_migrations`; `authenticated:EXECUTE` granted.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** Admin can now edit any non-cancelled order incl. **billed** (with reason) — changing items/prices after a Tally bill no. is assigned diverges from the already-issued bill. This is the owner's stated full-edit intent (reason audited); logging it as a business-process caveat, not a code defect.
+
+**Domain / correctness checks:** Money paise-only; totals recompute via the existing `recompute_order_total` trigger; snapshot immutability preserved for all-but-admin (server-enforced exception); state machine untouched (retailer/notes UPDATEs keep status → `guard_order_transition` passes as a no-op, no new edge); before/after audit intact (`tally_name`/qty/price, no `sku`); SECURITY DEFINER + role checks = no RLS leak.
+
+**What I tried:** An 8-case `DO`-block battery impersonating admin (vikram) / salesman (bheeshm, the order's owner) / accountant (abhimanyu) via `set_config('request.jwt.claims', …'sub'…)`, calling `update_order_items` against a real pending ZEB order, a pending LG order, and an `approved` LG order; captured stored prices / `retailer_id` / event action+flags; every sub-test rolled back via a caught `raise`. Plus `pg_proc` / `schema_migrations` / `routine_privileges` checks.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** — (FE wrapper + flow reviewed below.)
+
+---
+
+## Review of 4e454a9 — feat(orders): updateOrderItems wrapper forwards p_retailer_id
+
+**Verdict:** ✅ accept — thin, correct plumbing (part of the cumulative tsc/build below, clean).
+
+**What works:** `updateOrderItems` gains an optional `retailerId?` → `p_retailer_id`; `toItemsPayload` unchanged — it still emits `unit_price_paise` **only when a price is set** ([order-rpcs.ts:14](src/lib/order-rpcs.ts#L14)), so untouched lines send qty-only (server keeps the snapshot) and the admin's overrides — now carried in the `prices` map — flow through. `p_reason` still threaded. Matches the 5-arg RPC exactly.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** No behavior change for non-admins — the server ignores a client price on a fixed brand and a non-admin's `p_retailer_id` (both proven at e4daedb), so widening this wrapper cannot leak the override.
+
+**What I tried:** Read the diff + `toItemsPayload`; type-checked as part of the cumulative `tsc`/build.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
+
+## Review of e94ad48 — feat(new-order): admin full-edit via the reused Quick Order flow
+
+**Verdict:** ⚠️ accept-with-followups — logic correct + tsc/build clean; one loader↔button↔server asymmetry to reconcile (🟡 ㊸).
+
+**Phase / commit goal (as I understood it):** Surface the admin's new powers in the reused Quick Order edit flow — retailer change + all-brand price override + a reason BottomSheet past approval — leaving salesman/accountant unchanged. The server enforces the actual gates (proven at e4daedb); the UI only exposes them.
+
+**What works (read + structural trace of the flow state machine):**
+- **Edit loader ([new-order/page.tsx](src/app/new-order/page.tsx)):** `editable = isAdmin ? status !== 'cancelled' : status === 'pending_approval'` (admin any non-cancelled; salesman/accountant pending-only). `requiresReason = isAdmin && status !== 'pending_approval'` (matches the server `edited_after_lock` gate). Non-editable redirect now uses `${detailBase}/…` (was a hard-coded `/orders/…`, wrong for staff) — good fix.
+- **QuickOrder:** `priceEditable = isManual || canPriceAll` opens a price input on **every** line (fixed included) for an admin editor, pre-filled with the line's current rate; off for everyone else (fixed stays catalog-read-only). Effective-price fallback typed→snapshot→default preserved.
+- **NewOrderFlow:** `canPriceAll = canChangeRetailer = isAdmin && isEdit` (create flow unaffected). Retailer swap = `CHANGE_RETAILER_EDIT` in place (no draft/localStorage) → returns to Review; the retailer-picker Back returns to Review in edit. `retailerChanged = isEdit && cart.retailerId !== editOrder.retailerId` → sends `p_retailer_id` **only on a real change** (matches my T4/T5 probes — no spurious `retailer_changed`). Reason sheet: `requiresReason` opens it on Confirm; **Save disabled on empty reason** (server also rejects — T8a); closes on success and routes to `${detailBase}`.
+- **Review:** the "Change" retailer link renders in edit only when `canChangeRetailer`. All referenced CSS classes are defined.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions (🟡 ㊸ — NEW):** The **page loader** lets an admin load any `status !== 'cancelled'` (**incl. `dispatched`**), but the **Edit button** ([OrderDetailView.tsx:143](src/components/orders/OrderDetailView.tsx#L143)) hides on `dispatched` (`!== 'cancelled' && !== 'dispatched'`), and the RPC allows it. So a dispatched order has **no Edit button yet is editable by deep-link**. No UI path reaches it (admin-only, low risk), but the three gates disagree — reconcile: decide whether dispatched is admin-editable-in-place and make loader = button = server agree. (Overlaps the step-back spec's open un-dispatch question — likely an owner call.)
+
+**Domain / correctness checks:** Untamperable rule + reason/retailer gates all enforced server-side (verified at e4daedb) — the UI is never the source of truth. Money paise-only. Full **browser E2E** of the walk (open → change retailer → override a fixed price → reason → save) still **pending a live device**, as with prior FE reviews.
+
+**What I tried:** Read all five diffs; traced the flow reducer (retailer-change loop, reason-sheet branch, `retailerChanged` guard); confirmed `EditOrderData.retailerId` exists ([page.tsx:26](src/app/new-order/page.tsx#L26)); CSS-class presence check; cumulative `tsc --noEmit` = 0 + `npm run build` → "Compiled successfully".
+
+**Open flags (cumulative):** No 🔴. New 🟡 ㊸. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Reconcile ㊸ (loader vs button on `dispatched`); confirm with the owner whether dispatched is editable-in-place.
+
+---
+
+## Review of ba41901 — refactor(orders): retire the inline editor — Edit routes to Quick Order
+
+**Verdict:** ✅ accept — clean retirement, tsc/build clean, no dead references.
+
+**What works:**
+- Staff **Edit** now navigates to `/new-order?edit=<id>` (as the salesman already did); the two Edit buttons collapse into one `canEdit` gated by the cancel/edit matrix — admin any live order **bar cancelled/dispatched**, accountant pending, salesman own pending ([OrderDetailView.tsx:143](src/components/orders/OrderDetailView.tsx#L143)).
+- `mode="edit"` and all its UI (inline steppers, +Add item, remove, reason field, Save/Discard), the `cancelEdit` fn, and the now-dead `updateOrderItems` call are gone; the `catalog` prop + `CatalogProduct` type dropped; the staff detail page no longer fetches the products catalog; salesman/godown pages drop `catalog={[]}`.
+- `grep` across `src/` for `mode="edit"` / `cancelEdit` / `CatalogProduct` / `catalog=` → **none**. `tsc` = 0, build "Compiled successfully".
+
+**Blocking issues:** None. **Non-blocking suggestions:** Quick Order is now the **sole** editor for every role — good unification; the ㊸ dispatched asymmetry lives in this file's `canEdit` vs the page loader.
+
+**Domain / correctness checks:** The read-only detail view is otherwise unchanged; the RPC still enforces every gate, so retiring the inline UI removes surface without loosening anything.
+
+**What I tried:** Read the diff; grep for dangling references to the removed props/mode; cumulative `tsc` + `npm run build` (both clean).
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊸, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
