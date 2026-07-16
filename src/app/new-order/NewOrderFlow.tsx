@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PickRetailer, type SelectedRetailer } from "./PickRetailer";
 import { QuickOrder } from "./QuickOrder";
@@ -9,6 +9,7 @@ import { Confirmation } from "./Confirmation";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Button } from "@/components/ui/Button";
 import { formatRupees } from "@/lib/format";
+import styles from "./NewOrderFlow.module.css";
 import {
   type DraftCart,
   createDraft,
@@ -43,6 +44,7 @@ interface FlowState {
 
 type FlowAction =
   | { type: "SELECT_RETAILER"; cart: DraftCart; retailerArea: string | null }
+  | { type: "CHANGE_RETAILER_EDIT"; retailerId: string; retailerName: string; retailerArea: string | null }
   | { type: "OFFER_RESUME"; draft: DraftCart }
   | { type: "RESUME_ON_MOUNT"; draft: DraftCart; retailerArea: string | null }
   | { type: "CONTINUE_RESUME_CANDIDATE" }
@@ -60,6 +62,17 @@ function flowReducer(state: FlowState, action: FlowAction): FlowState {
   switch (action.type) {
     case "SELECT_RETAILER":
       return { ...state, cart: action.cart, retailerArea: action.retailerArea, step: "order" };
+    case "CHANGE_RETAILER_EDIT":
+      // Admin-only, edit flow: swap the order's retailer in place (no draft/
+      // localStorage — this order already exists) and return to Review.
+      return state.cart
+        ? {
+            ...state,
+            cart: { ...state.cart, retailerId: action.retailerId, retailerName: action.retailerName },
+            retailerArea: action.retailerArea,
+            step: "review",
+          }
+        : state;
     case "OFFER_RESUME":
       return { ...state, resumeCandidate: action.draft };
     case "RESUME_ON_MOUNT":
@@ -117,11 +130,21 @@ interface NewOrderFlowProps {
   // lens (/orders). Without this, an admin who creates an order and taps "View
   // order" lands on the salesman lens (no Approve).
   detailBase: string;
+  // Admin gets the extra edit powers: change the retailer and override any
+  // line's price (fixed brands included). Only meaningful in the EDIT flow — a
+  // CREATE goes through submit_order, which ignores both (untamperable holds).
+  isAdmin: boolean;
+  // A reason is required for this specific edit (admin past approval) — the
+  // final Confirm opens a reason BottomSheet instead of submitting straight.
+  requiresReason: boolean;
 }
 
-export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder, salesmanId, detailBase }: NewOrderFlowProps) {
+export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder, salesmanId, detailBase, isAdmin, requiresReason }: NewOrderFlowProps) {
   const router = useRouter();
   const isEdit = editOrder !== null;
+  // Admin edit powers, scoped to the edit flow only.
+  const canPriceAll = isAdmin && isEdit;
+  const canChangeRetailer = isAdmin && isEdit;
 
   const pricesById: Record<string, number> = {};
   for (const p of products) if (p.price_paise != null) pricesById[p.id] = p.price_paise;
@@ -164,6 +187,11 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
 
   const { step, cart, retailerArea, resumeCandidate, confirmed, submitting, submitError } = state;
 
+  // Reason BottomSheet (admin post-approval edit) — the final Confirm opens it
+  // instead of submitting; an empty reason blocks the save.
+  const [reasonSheetOpen, setReasonSheetOpen] = useState(false);
+  const [reasonText, setReasonText] = useState("");
+
   // Reopen-the-app resilience (acceptance criterion #2): if a draft was left
   // mid-cart, resume it directly instead of forcing a re-pick through S3. A
   // single dispatch applies every piece of resumed state atomically.
@@ -188,6 +216,17 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
   }
 
   function handleSelectRetailer(retailer: SelectedRetailer) {
+    // Admin edit: changing the retailer on an existing order — no draft/resume
+    // machinery (that's create-only); swap it in place and return to Review.
+    if (isEdit) {
+      dispatch({
+        type: "CHANGE_RETAILER_EDIT",
+        retailerId: retailer.id,
+        retailerName: retailer.name,
+        retailerArea: retailer.area,
+      });
+      return;
+    }
     const existing = loadDraft(retailer.id);
     const pruned = existing ? pruneStaleItems(existing) : null;
     if (pruned && Object.keys(pruned.items).length > 0) {
@@ -211,12 +250,32 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
     dispatch({ type: "SET_NOTES", notes });
   }
 
-  async function handleSubmit() {
+  // The final Confirm on Review: a reason-required edit (admin past approval)
+  // opens the reason sheet; every other case submits straight.
+  function handleReviewSubmit() {
+    if (requiresReason) {
+      setReasonSheetOpen(true);
+      return;
+    }
+    handleSubmit();
+  }
+
+  async function handleSubmit(reason?: string) {
     if (!cart) return;
     dispatch({ type: "SUBMIT_START" });
     try {
+      // Only send the retailer when an admin actually changed it — otherwise the
+      // RPC would log a spurious retailer_changed on every edit.
+      const retailerChanged = isEdit && editOrder !== null && cart.retailerId !== editOrder.retailerId;
       const order = isEdit
-        ? await updateOrderItems(cart.orderId, cart.notes, cart.items, undefined, cart.prices)
+        ? await updateOrderItems(
+            cart.orderId,
+            cart.notes,
+            cart.items,
+            reason,
+            cart.prices,
+            retailerChanged ? cart.retailerId : undefined,
+          )
         : await submitOrder(cart.orderId, cart.retailerId, cart.notes, cart.items, cart.prices);
 
       if (!isEdit) {
@@ -227,6 +286,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
           confirmed: { orderRef: order.order_ref, totalPaise: order.total_paise },
         });
       } else {
+        setReasonSheetOpen(false);
         router.push(`${detailBase}/${cart.orderId}`);
       }
     } catch (error) {
@@ -257,7 +317,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
           recentRetailerIds={recentRetailerIds}
           salesmanId={salesmanId}
           onSelect={handleSelectRetailer}
-          onBack={() => router.push("/")}
+          onBack={() => (isEdit ? goto("review") : router.push("/"))}
         />
         {resumeCandidate && (
           <BottomSheet onClose={() => dispatch({ type: "DISMISS_RESUME" })}>
@@ -305,6 +365,7 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
         prices={cart.prices ?? {}}
         snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}
         snapshotNames={isEdit ? editOrder!.snapshotNames : undefined}
+        canPriceAll={canPriceAll}
         onChangeQty={handleChangeQty}
         onChangePrice={handleChangePrice}
         onReview={() => goto("review")}
@@ -315,24 +376,57 @@ export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder
 
   if (step === "review") {
     return (
-      <Review
-        products={products}
-        prices={cart.prices ?? {}}
-        snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}
-        snapshotNames={isEdit ? editOrder!.snapshotNames : undefined}
-        items={cart.items}
-        notes={cart.notes}
-        retailerName={cart.retailerName}
-        retailerArea={retailerArea}
-        isEdit={isEdit}
-        onChangeQty={handleChangeQty}
-        onNotesChange={handleNotesChange}
-        onChangeRetailer={() => goto("retailer")}
-        onBack={() => goto("order")}
-        onSubmit={handleSubmit}
-        submitting={submitting}
-        submitError={submitError}
-      />
+      <>
+        <Review
+          products={products}
+          prices={cart.prices ?? {}}
+          snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}
+          snapshotNames={isEdit ? editOrder!.snapshotNames : undefined}
+          items={cart.items}
+          notes={cart.notes}
+          retailerName={cart.retailerName}
+          retailerArea={retailerArea}
+          isEdit={isEdit}
+          canChangeRetailer={canChangeRetailer}
+          onChangeQty={handleChangeQty}
+          onNotesChange={handleNotesChange}
+          onChangeRetailer={() => goto("retailer")}
+          onBack={() => goto("order")}
+          onSubmit={handleReviewSubmit}
+          submitting={submitting}
+          submitError={submitError}
+        />
+        {reasonSheetOpen && (
+          <BottomSheet onClose={() => setReasonSheetOpen(false)}>
+            <div className={styles.reasonSheet}>
+              <p className={styles.reasonTitle}>Reason for this change?</p>
+              <p className={styles.reasonBody}>Editing an approved order — the reason is logged to the order history.</p>
+              <label className={styles.reasonLabel}>REASON (required)</label>
+              <textarea
+                className={styles.reasonInput}
+                value={reasonText}
+                onChange={(e) => setReasonText(e.target.value)}
+                placeholder="e.g. shop called with a correction"
+                autoFocus
+              />
+              {submitError && <p className={styles.error}>{submitError}</p>}
+              <div className={styles.reasonActions}>
+                <Button variant="secondary" onClick={() => setReasonSheetOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => handleSubmit(reasonText.trim())}
+                  loading={submitting}
+                  disabled={!reasonText.trim()}
+                >
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          </BottomSheet>
+        )}
+      </>
     );
   }
 

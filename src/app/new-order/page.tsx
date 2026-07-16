@@ -90,6 +90,7 @@ export default async function NewOrderPage({
   // "View order" on the confirmation must send them to the staff workbench
   // (/dashboard/orders/[id], with Approve), not the salesman lens (/orders/[id]).
   const isStaff = profile?.role === "admin" || profile?.role === "accountant";
+  const isAdmin = profile?.role === "admin";
   const detailBase = isStaff ? "/dashboard/orders" : "/orders";
 
   const products = (
@@ -126,6 +127,10 @@ export default async function NewOrderPage({
   }
 
   let editOrder: EditOrderData | null = null;
+  // Admin post-approval edits demand a reason (edited_after_lock) — captured by
+  // a BottomSheet on the final Confirm. Derived here so the flow only has to
+  // obey the flag (a one-liner flip to "always for admin" lives in this gate).
+  let requiresReason = false;
   if (edit) {
     const { data } = await supabase
       .from("orders")
@@ -136,12 +141,16 @@ export default async function NewOrderPage({
       .maybeSingle();
 
     const row = data as unknown as EditOrderRow | null;
-    // The salesman resume/edit flow is pending_approval-only now — the 2h edit
-    // window is gone (owner 2026-07-11). update_order_items enforces this too.
-    const editable = row && row.status === "pending_approval";
+    // Who may edit which stage (owner matrix, unchanged): an ADMIN may edit any
+    // non-cancelled order (reason required past approval); salesman & accountant
+    // stay pending_approval-only (the 2h window is gone — owner 2026-07-11). RLS
+    // scopes the salesman to his own rows and update_order_items re-enforces all
+    // of this — this is only the UX gate that keeps the editor off a locked order.
+    const editable = row && (isAdmin ? row.status !== "cancelled" : row.status === "pending_approval");
     if (!row || !editable) {
-      redirect(`/orders/${edit}`);
+      redirect(`${detailBase}/${edit}`);
     }
+    requiresReason = isAdmin && row.status !== "pending_approval";
 
     const items: Record<string, number> = {};
     const snapshotPrices: Record<string, number> = {};
@@ -172,6 +181,8 @@ export default async function NewOrderPage({
       editOrder={editOrder}
       salesmanId={user!.id}
       detailBase={detailBase}
+      isAdmin={isAdmin}
+      requiresReason={requiresReason}
     />
   );
 }
