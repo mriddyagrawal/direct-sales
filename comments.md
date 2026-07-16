@@ -4665,3 +4665,28 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** 🔴 ㊹ (process, from 53fdcf6). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** Resolve ㊹ (owner keep/revert + builder gate-ack). Then T1 needs its real-VPS run to confirm the export returns items.
+
+---
+
+## Review of 3fcf1e0 — feat(new-order): amber "No data" stock state + light row tint (trial)
+
+**Verdict:** ⚠️ accept-with-followups — code clean, isolated, builds; but it **deviates from the owner's locked green/red-only + null-shows-nothing decision** (reintroduces amber, makes never-synced visible, adds whole-row tints). Owner ruling live.
+
+**What it does:** a **third pill state** — amber "No data" — for `stock_qty === null` (instead of rendering nothing), plus a **light background tint** on each non-cart product row (green/red/amber by stock). The builder frames both as a removable trial ("owner may pull either"), isolated to one `stockTone` class + `.tintIn/.tintOut/.tintNone` + `.stockNone`.
+
+**What works:** `--color-amber` (#b45309) is defined, so the amber actually renders; the tint applies only when NOT in-cart (`inCart ? collapseRowActive : stockTone`) so the blue selected state still wins; FE-only, no DB; tsc/eslint/build clean; genuinely trivial to pull (4 classes + `stockTone`).
+
+**Blocking issues:** None.
+
+**Non-blocking / spec:**
+- **Deviates from the locked decision** (owner 2026-07-16: green/red only, no amber; null → render nothing). Adds amber + a visible null state + row tints not asked for. Not a defect — an aesthetic deviation for the owner to keep or pull.
+- **Amber is a reserved semantic** here (`--color-amber` = "pending/<10m countdown, never red"). Reusing it for "no stock data" overloads that meaning — if kept, prefer a neutral/grey for "No data" over the pending-amber.
+- **Tints are hardcoded rgba**, not theme tokens — at 0.06–0.08 alpha over a dark background they'll be faint/muddy; not theme-aware like the pill.
+
+**Domain / correctness checks:** read-only salesman surface; no state-machine/RLS/money impact; add/stepper still unblocked on 0 stock.
+
+**What I tried:** read the diff; grepped `--color-amber` (exists) + its reserved-token comment; confirmed the tint paints only non-cart rows; cumulative tsc/build clean.
+
+**Open flags (cumulative):** ✅ 🔴 ㊹ **CLOSED — owner gave the go-ahead (2026-07-16), ratifying the T2 migration after the fact.** The gate breach stands as a process note for the builder (don't auto-apply a gated migration) but is no longer open. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Apply the owner's cosmetic calls next (keep/pull the amber "No data" + row tint; the 2 cosmetic tweaks); if "No data" is kept, swap the reserved pending-amber for a neutral tone.
