@@ -4713,3 +4713,21 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Note for the builder:** if you touch the extractor or stock path, `import_stock_agent` (secret-gated) and `import_stock` (admin-gated, manual button) are **two doors to the same stock update** — keep them in sync. The manual "Update stock" button is unchanged and remains the preview-first fallback.
 
 **Open flags (cumulative):** No 🔴 (㊹ closed). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Minor aside (not gating): a leftover `Test Product` (brand OTH, created 2026-07-11) sits in the live catalog — clean up before/at handover.
+
+---
+
+## Review of bc35906 — feat(new-order): tint only in-stock (green) + out-of-stock (red) rows
+
+**Verdict:** ✅ accept — clean, correct, moves toward the owner's green/red-only lean; tsc/build clean.
+
+**What works:** drops the amber row-tint for never-synced products — the `.tintNone` class is removed and its sole use rewritten to `stockTone = p.stock_qty === null ? "" : (p.stock_qty > 0 ? tintIn : tintOut)`. Green/red row tints unchanged; still applied only to non-cart rows (the in-cart blue wins). No dangling `tintNone` reference (grep clean). tsc=0, build "Compiled successfully".
+
+**Blocking issues:** None. **Non-blocking:** the amber **"No data" pill** (distinct from the tint) is still present — that keep/pull/grey call is still with the owner. If pulled/greyed it's the same one-spot change (the null-pill branch + `.stockNone`).
+
+**Domain / correctness checks:** FE-only, read-only salesman surface; no DB/state-machine/RLS/money impact.
+
+**What I tried:** read the diff; grep `tintNone` (gone); cumulative tsc + build clean.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Owner's final call on the amber "No data" pill + the 2 cosmetic tweaks; then merge `feat/tally-stock-sync` → main.
