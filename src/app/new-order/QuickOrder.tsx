@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FlowHeader } from "@/components/ui/FlowHeader";
 import { Stepper } from "@/components/ui/Stepper";
 import { KeypadSheet } from "@/components/ui/KeypadSheet";
-import { formatRupees } from "@/lib/format";
+import { formatRupees, formatShortDate } from "@/lib/format";
 import { cartLineCount, cartTotalPaise } from "@/lib/cart";
 import { parsePricePaise } from "@/lib/price";
 import type { ProductOption } from "./page";
@@ -245,6 +245,22 @@ export function QuickOrder({
               {priceLabel}
               {inCart ? ` · ${qty} in cart` : ""}
             </span>
+            {/* Godown stock from the last Tally sync — two states only (owner
+                2026-07-16): green in-stock+count / red out-of-stock. Never
+                synced (null) shows nothing. Out-of-stock never BLOCKS the sale
+                (the backorder flow handles it) — the red pill + "will backorder"
+                IS the warning. */}
+            {p.stock_qty !== null && (
+              <span className={styles.stockLine}>
+                <span className={`${styles.stockPill} ${p.stock_qty > 0 ? styles.stockIn : styles.stockOut}`}>
+                  {p.stock_qty > 0 ? `In stock · ${p.stock_qty}` : "Out of stock"}
+                </span>
+                {p.stock_qty === 0 && <span className={styles.willBackorder}>will backorder</span>}
+                {p.stock_updated_at && (
+                  <span className={styles.stockAsOf}>as of {formatShortDate(p.stock_updated_at)}</span>
+                )}
+              </span>
+            )}
           </span>
           <span className={`${styles.chevron} ${expanded ? styles.chevronOpen : ""}`} aria-hidden />
         </button>
