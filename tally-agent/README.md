@@ -26,19 +26,32 @@ libraries to install.
      set **TallyPrime/Tally acts as: Server**, **Port: 9000**.
    - Keep **the company open** in Tally whenever you run the export.
 
+3. **(Optional) Turn on one-click auto-submit** — so the export *also* sends the
+   stock into the app automatically, with no file to upload.
+   - In this folder, make a copy of **`agent_config.example.ini`** and name the
+     copy **`agent_config.ini`**.
+   - Open `agent_config.ini` in Notepad and paste the **stock-push secret** (ask
+     the developer) into the `push_secret =` line, then save.
+   - That's it — `supabase_url` and `anon_key` are already filled in. The secret
+     can *only* update stock counts, nothing else, but treat it like a password.
+
 ---
 
 ## Every time you want to update stock
 
 1. **RDP into the VPS** and open **Tally**, then **load the company**.
-2. **Double-click `run-stock-export.bat`** (in this folder).
-   - A black window opens, talks to Tally, and saves a file. Read the message.
-   - It prints the saved file's path, e.g.
-     `C:\Users\<you>\Desktop\GanpatiStock\stock_2026-07-16_1530.csv`
-3. **Open the app** on your phone or laptop → **Products → Update stock** →
-   **upload that CSV** → check the preview → **Apply**.
-4. Done. Each run makes a **new** file (older ones are kept as history) — always
-   upload the newest one.
+2. **Double-click `run-stock-export.bat`** (in this folder). A black window opens,
+   talks to Tally, saves a CSV, and prints the result.
+3. **Then:**
+   - **If you set up auto-submit** (one-time step 3): it submits by itself and
+     prints `Updated N product(s) in the app.` — **you're done, nothing to upload.**
+     It also lists any Tally names that didn't match a product (fix those in the
+     catalog).
+   - **If you didn't:** open the app → **Products → Update stock** → **upload the
+     CSV** it just saved (the path is printed, e.g.
+     `C:\Users\<you>\Desktop\GanpatiStock\stock_2026-07-16_1530.csv`) → check the
+     preview → **Apply**.
+4. Either way, each run also keeps a **new** CSV as history.
 
 ---
 
@@ -62,6 +75,11 @@ libraries to install.
 - **Wrong numbers?** The tool reads each item's **Closing Balance** as-is. Fix the
   stock in Tally, then export again.
 
+- **Auto-submit says "Could not submit to the app"**
+  The internet may be down, or the `push_secret` in `agent_config.ini` is wrong.
+  The CSV is still saved, so you can upload it manually via **Products → Update
+  stock**. If it keeps failing, re-check the secret with the developer.
+
 ---
 
 ## Files in this folder
@@ -71,6 +89,8 @@ libraries to install.
 | `run-stock-export.bat` | Double-click this to run the export. |
 | `stock_export.py` | The actual script (Python). Edit the two config lines at the top only if needed. |
 | `sample-stock.csv` | An example of what the output looks like (`Tally Name,Stock`). |
+| `agent_config.example.ini` | Template for one-click auto-submit — copy to `agent_config.ini` and add the secret. |
+| `agent_config.ini` | *Your* auto-submit config (you create it; holds the secret). Not committed to git. |
 | `README.md` | This file. |
 
 The output CSV is always two columns — **`Tally Name,Stock`** — matched to

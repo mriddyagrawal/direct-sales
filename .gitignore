@@ -9,3 +9,6 @@ node_modules/
 coverage/
 supabase/.temp/
 next-env.d.ts
+
+# Tally agent local config — holds the stock-push secret; never commit it.
+tally-agent/agent_config.ini
