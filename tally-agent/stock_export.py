@@ -18,7 +18,9 @@
 #  Run it by double-clicking run-stock-export.bat. See README.md.
 # =============================================================================
 
+import configparser
 import csv
+import json
 import os
 import re
 import socket
@@ -38,6 +40,12 @@ OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "GanpatiStock")
 
 # How long to wait for Tally to answer (seconds) before giving up.
 TIMEOUT_SECONDS = 15
+
+# Optional auto-submit: if agent_config.ini sits next to this script, the export
+# ALSO pushes the stock straight into the app (one click). Without it, the script
+# just writes the CSV for a manual upload. See README + agent_config.example.ini.
+# (This pushes to OUR app, never to Tally — the Tally side stays strictly read-only.)
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_config.ini")
 # -----------------------------------------------------------------------------
 
 # A Collection "Export" of every StockItem, fetching just Name + ClosingBalance.
@@ -144,6 +152,48 @@ def _write_csv(items):
     return path
 
 
+def _load_push_config():
+    """Return {url, anon, secret} if agent_config.ini is present and complete,
+    else None (auto-push simply off — the CSV is still written for a manual
+    upload). Never raises: a broken config just falls back to CSV-only."""
+    if not os.path.exists(CONFIG_PATH):
+        return None
+    try:
+        cp = configparser.ConfigParser()
+        cp.read(CONFIG_PATH, encoding="utf-8")
+        sec = cp["app"]
+        url = sec.get("supabase_url", "").strip().rstrip("/")
+        anon = sec.get("anon_key", "").strip()
+        secret = sec.get("push_secret", "").strip()
+    except Exception:
+        return None
+    if not (url and anon and secret):
+        return None
+    return {"url": url, "anon": anon, "secret": secret}
+
+
+def _push_to_app(items, cfg):
+    """POST the stock rows to the app's secret-guarded import endpoint
+    (import_stock_agent). Returns (matched, unmatched_list). Raises on a
+    transport/HTTP error so the caller can fall back to the manual upload."""
+    rows = [{"tally_name": name, "stock_qty": qty} for name, qty in items]
+    body = json.dumps({"p_secret": cfg["secret"], "p_rows": rows}).encode("utf-8")
+    endpoint = cfg["url"] + "/rest/v1/rpc/import_stock_agent"
+    req = urllib.request.Request(
+        endpoint,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "apikey": cfg["anon"],
+            "Authorization": "Bearer " + cfg["anon"],
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    return data.get("matched", 0), (data.get("unmatched") or [])
+
+
 def main():
     print("Ganpati stock export - reading from Tally at {} ...".format(TALLY_URL))
     print("(read-only: this only asks Tally to export data; it never changes anything)")
@@ -174,8 +224,38 @@ def main():
     print("   {}".format(path))
     if skipped:
         print("Skipped {} item(s) with a blank name or an unreadable balance.".format(skipped))
+
+    cfg = _load_push_config()
+    if cfg is None:
+        print("")
+        print("Done! Now open the app -> Products -> Update stock -> upload that file.")
+        print("(Tip: set up agent_config.ini to auto-submit next time. See README.)")
+        return 0
+
     print("")
-    print("Done! Now open the app -> Products -> Update stock -> upload that file.")
+    print("Submitting stock to the app ...")
+    try:
+        matched, unmatched = _push_to_app(items, cfg)
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8")
+        except Exception:
+            pass
+        print("   Could not submit to the app (HTTP {}). {}".format(exc.code, detail))
+        print("   The CSV is saved - upload it manually via Products -> Update stock.")
+        return 1
+    except (urllib.error.URLError, socket.timeout, ConnectionError, OSError, ValueError) as exc:
+        print("   Could not submit to the app: {}".format(exc))
+        print("   The CSV is saved - upload it manually via Products -> Update stock.")
+        return 1
+
+    print("   Updated {} product(s) in the app.".format(matched))
+    if unmatched:
+        print("   {} Tally name(s) didn't match a product (fix the name in the catalog):".format(len(unmatched)))
+        print("     " + ", ".join(unmatched))
+    print("")
+    print("Done! Stock is live in the app.")
     return 0
 
 
