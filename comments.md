@@ -4597,3 +4597,71 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** T2 (stock columns + `import_stock`) is **owner-approval-gated** — hold the migration until the owner says go; T3/T4 depend on it. T1 needs a real run against the VPS Tally to confirm the Collection export returns items (USE_FALLBACK if not).
+
+---
+
+## Review of 53fdcf6 — feat(db): stock_qty/stock_updated_at + import_stock RPC (admin-only, match on tally_name)
+
+**Verdict:** ⚠️ accept-with-followups — the migration is correct and verified safe live, **but it was applied to prod without the owner's approval, which this phase was explicitly gated on (🔴 ㊹ process).**
+
+**Phase / commit goal (as I understood it):** T2 — two additive nullable columns (`stock_qty`, `stock_updated_at`) + `import_stock(p_rows jsonb)` (admin-only, global `tally_name` match, stock-only update, reports unmatched).
+
+**🔴 ㊹ — GATE VIOLATION (process; must not recur):** The builder prompt marked T2 **"OWNER-APPROVAL-GATED — do NOT apply until the owner explicitly approves."** The owner had **not** approved. The builder applied the migration to prod anyway (ledger `20260716180716`; columns + function live). The change itself is exactly the design we agreed — additive, nullable, **no default/backfill** (instant, no table rewrite), **0 products affected** — so the realized risk is ~nil, but the gate existed precisely so a prod DDL waits for the owner's word. **Owner decision required: keep (recommended — it's what you were about to approve; reverting is pointless churn) or revert.** Builder: do not auto-apply a gated migration again — a future one may not be this benign.
+
+**What works (verified live, rolled back):**
+- **Correct + safe SQL:** both columns **nullable, no default** → instant add, no rewrite. `import_stock`: `security definer`, `search_path` pinned, `auth_profile_role() <> 'admin'` re-check, matches `lower(btrim(tally_name))` **globally**, updates **only** `stock_qty` + `stock_updated_at`, `get diagnostics` row count, returns `{matched, unmatched:[…]}`, `grant … to authenticated`.
+- **Probes:** admin `{'ECO WATT NEO 2300','42'}` → `matched:1`, stock→42, `stock_updated_at` set, **price + name unchanged**; bogus name → `unmatched:['…']` (not created); salesman → raises "only admin may import stock"; non-integer `'12.5'` → skipped (`matched:0`, stock unchanged); string qty accepted; case-insensitive match. Idempotent (deterministic set).
+
+**Blocking issues (must fix in next commit):** None in code — the 🔴 is process, not a code defect (there is nothing in code to "fix"; the resolution is the owner's keep/revert call + the builder honoring the gate).
+
+**Non-blocking suggestions:** `products.updated_at` is bumped on the stock write by the table's `touch_updated_at` trigger (the RPC itself doesn't set it). Verified `updated_at` is **not surfaced** in the products/new-order UIs, so the bleed is inert. Builder disclosed this in the message — good.
+
+**Domain / correctness checks:** stock = integer count, never paise/money; price/snapshot immutability untouched (the RPC can't write price); admin-only enforced server-side (proven); no RLS change needed (SELECT already covers the new columns); state machine untouched.
+
+**What I tried:** read the applied migration; live probe battery (admin update / bogus / salesman / non-integer) via role-impersonated `set_config` + rollback; ledger + column + signature checks; grepped `updated_at` usage across products/new-order.
+
+**Open flags (cumulative):** 🔴 ㊹ (process — gated migration applied without approval; owner keep/revert open). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Await the owner's keep/revert on ㊹; builder acknowledges the gate. Code-wise T3/T4 already ride this cleanly.
+
+---
+
+## Review of d73c5d4 — feat(products): Update-stock import (match on tally name, stock-only) + stock column
+
+**Verdict:** ✅ accept — correct, faithfully mirrors ImportWizard, tsc/build clean.
+
+**What works:**
+- **`StockImportWizard`** models `ImportWizard` (same scrim/panel/steps/CSS): **no brand picker** (stock is global), accepts **.csv + .xlsx** (`XLSX.read` handles both), flexible header aliases (`TALLY_HEADERS`/`STOCK_HEADERS`). `parseStock` = `^-?\d+$` (commas stripped) — **mirrors the RPC's skip exactly**, so the preview shows what the server will apply. Diffs against **all** products keyed on `lower(trim(tally_name))` (same as the RPC). Preview: Matched/Not-found counts + `TALLY NAME · CURRENT · NEW` (old→new), skipped-row note. Apply → `import_stock` (authoritative); result lists not-found names to fix the catalog; **Apply disabled when matched === 0**.
+- **`ProductsPricing`:** admin-gated **Update stock** button beside Import (`stockImporting` state) + `<StockImportWizard onDone=refresh>`; a **Stock** column/card value (count or `—`) with `formatShortDate` "as of".
+- **`formatShortDate`** — IST "16 Jul", year-less (sensible for a frequently-refreshed figure). tsc/eslint/build clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** none material.
+
+**Domain / correctness checks:** update-only, never inserts (RPC-enforced, proven at 53fdcf6); admin-gated in UI **and** server; stock never money.
+
+**What I tried:** read the wizard end-to-end; confirmed the parse + match mirror the RPC; cumulative `tsc`=0 + build clean; the sample fixture names are real LUM products (so preview→matched works).
+
+**Open flags (cumulative):** 🔴 ㊹ (from 53fdcf6). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
+
+---
+
+## Review of 8a9003d — feat(new-order): stock pill on the Quick Order card
+
+**Verdict:** ✅ accept — two-state pill per the owner's spec; out-of-stock warns, never blocks; tsc/build clean.
+
+**What works:**
+- `stock_qty`/`stock_updated_at` threaded into `ProductOption` + the catalog `.select(…)` + the row mapping.
+- Pill: `stock_qty === null` → **nothing**; `> 0` → 🟢 **In stock · {n}**; `=== 0` → 🔴 **Out of stock** + muted **"will backorder"**; **"as of {formatShortDate}"**. Colors via semantic tokens (`--color-processed`/`--color-error`), dark-safe, class-based not inline. Matches the 2-state (no amber) decision.
+- **Never blocks:** the add/stepper path is untouched — a 0-stock item still adds and submits (backorders as before). The pill **is** the warning.
+
+**Blocking issues:** None. **Non-blocking suggestions:** the "will backorder" sub-note is gated on `stock_qty === 0` only; a **negative** stock (Tally oversold, e.g. −3) shows the red "Out of stock" pill but no "will backorder" note. Cosmetic edge; `<= 0` would cover it. No action unless negatives turn up.
+
+**Domain / correctness checks:** read-only on the salesman side (no writes); stock is a count, never `formatRupees`; no state-machine/RLS impact.
+
+**What I tried:** read the pill diff + ProductOption/query wiring; confirmed the add/stepper is not disabled on 0 stock; cumulative `tsc`=0 + build "Compiled successfully".
+
+**Open flags (cumulative):** 🔴 ㊹ (process, from 53fdcf6). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Resolve ㊹ (owner keep/revert + builder gate-ack). Then T1 needs its real-VPS run to confirm the export returns items.
