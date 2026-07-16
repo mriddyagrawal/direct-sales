@@ -764,6 +764,7 @@ export type Database = {
           p_notes: string
           p_order_id: string
           p_reason?: string
+          p_retailer_id?: string
         }
         Returns: {
           admin_comment: string | null
