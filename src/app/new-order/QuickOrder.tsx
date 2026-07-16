@@ -196,6 +196,11 @@ export function QuickOrder({
   function renderProduct(p: ProductOption) {
     const qty = items[p.id] ?? 0;
     const inCart = qty > 0;
+    // Light stock tint on the whole row: green in-stock / red out / amber
+    // no-data. Shown only when the row isn't the in-cart blue (that "selected"
+    // highlight wins). Isolated to this one class so it's trivial to pull later.
+    const stockTone =
+      p.stock_qty === null ? styles.tintNone : p.stock_qty > 0 ? styles.tintIn : styles.tintOut;
     const isManual = p.pricing_mode === "manual";
     // A price input shows for manual (LG) lines as always, and for EVERY line
     // when the admin is editing (canPriceAll). A fixed line for anyone else
@@ -219,7 +224,7 @@ export function QuickOrder({
     const priceError = parsed && !parsed.ok ? parsed.error : null;
 
     return (
-      <div key={p.id} className={`${styles.collapseRow} ${inCart ? styles.collapseRowActive : ""}`}>
+      <div key={p.id} className={`${styles.collapseRow} ${inCart ? styles.collapseRowActive : stockTone}`}>
         <button
           type="button"
           className={styles.productHead}
@@ -245,22 +250,26 @@ export function QuickOrder({
               {priceLabel}
               {inCart ? ` · ${qty} in cart` : ""}
             </span>
-            {/* Godown stock from the last Tally sync — two states only (owner
-                2026-07-16): green in-stock+count / red out-of-stock. Never
-                synced (null) shows nothing. Out-of-stock never BLOCKS the sale
-                (the backorder flow handles it) — the red pill + "will backorder"
-                IS the warning. */}
-            {p.stock_qty !== null && (
-              <span className={styles.stockLine}>
-                <span className={`${styles.stockPill} ${p.stock_qty > 0 ? styles.stockIn : styles.stockOut}`}>
-                  {p.stock_qty > 0 ? `In stock · ${p.stock_qty}` : "Out of stock"}
-                </span>
-                {p.stock_qty === 0 && <span className={styles.willBackorder}>will backorder</span>}
-                {p.stock_updated_at && (
-                  <span className={styles.stockAsOf}>as of {formatShortDate(p.stock_updated_at)}</span>
-                )}
-              </span>
-            )}
+            {/* Godown stock from the last Tally sync: green in-stock+count / red
+                out-of-stock / amber "No data" when never synced (null). Trial
+                pill (owner may pull the No-data state later). Out-of-stock never
+                BLOCKS the sale (the backorder flow handles it) — the red pill +
+                "will backorder" IS the warning. */}
+            <span className={styles.stockLine}>
+              {p.stock_qty === null ? (
+                <span className={`${styles.stockPill} ${styles.stockNone}`}>No data</span>
+              ) : (
+                <>
+                  <span className={`${styles.stockPill} ${p.stock_qty > 0 ? styles.stockIn : styles.stockOut}`}>
+                    {p.stock_qty > 0 ? `In stock · ${p.stock_qty}` : "Out of stock"}
+                  </span>
+                  {p.stock_qty === 0 && <span className={styles.willBackorder}>will backorder</span>}
+                  {p.stock_updated_at && (
+                    <span className={styles.stockAsOf}>as of {formatShortDate(p.stock_updated_at)}</span>
+                  )}
+                </>
+              )}
+            </span>
           </span>
           <span className={`${styles.chevron} ${expanded ? styles.chevronOpen : ""}`} aria-hidden />
         </button>

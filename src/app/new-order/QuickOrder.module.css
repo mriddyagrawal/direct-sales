@@ -178,6 +178,21 @@
   padding-left: 6px;
 }
 
+/* Light stock tint on the whole row (applied only when NOT in-cart, so the blue
+   selected state above always wins). Very subtle — a glanceable traffic light
+   across the list. Remove these three classes + stockTone to pull the feature. */
+.tintIn {
+  background: rgba(21, 128, 61, 0.06);
+}
+
+.tintOut {
+  background: rgba(185, 28, 28, 0.06);
+}
+
+.tintNone {
+  background: rgba(180, 83, 9, 0.08);
+}
+
 .productHead {
   width: 100%;
   min-height: 52px; /* comfortable phone tap target */
@@ -338,6 +353,11 @@
 
 .stockOut {
   color: var(--color-error);
+}
+
+/* Trial "No data" state (never-synced product) — amber, may be pulled later. */
+.stockNone {
+  color: var(--color-amber);
 }
 
 .willBackorder,
