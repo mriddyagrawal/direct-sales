@@ -4540,6 +4540,7 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 
 **Non-blocking suggestions (🟡 ㊸ — NEW):** The **page loader** lets an admin load any `status !== 'cancelled'` (**incl. `dispatched`**), but the **Edit button** ([OrderDetailView.tsx:143](src/components/orders/OrderDetailView.tsx#L143)) hides on `dispatched` (`!== 'cancelled' && !== 'dispatched'`), and the RPC allows it. So a dispatched order has **no Edit button yet is editable by deep-link**. No UI path reaches it (admin-only, low risk), but the three gates disagree — reconcile: decide whether dispatched is admin-editable-in-place and make loader = button = server agree. (Overlaps the step-back spec's open un-dispatch question — likely an owner call.)
   > **Owner decision (2026-07-16): YES — an admin MAY edit dispatched orders.** Loader + RPC already permit it; the fix is builder-side and one line — drop `&& order.status !== "dispatched"` from the admin branch of `canEdit` in [OrderDetailView.tsx:143](src/components/orders/OrderDetailView.tsx#L143) so the Edit button appears on dispatched (button then = loader = server). Not blocking — the capability already works server-side; the button just under-exposes it.
+  > **✅ ㊸ CLOSED at 7a5e5fe (reviewer-applied at owner's direction):** dropped `&& order.status !== "dispatched"` from `canEdit`'s admin branch — button now = loader = server (admin edits any non-cancelled). tsc + build clean; migration `20260716151611` confirmed live (latest ledger version, 5-arg fn). Merged to `main` with the feature.
 
 **Domain / correctness checks:** Untamperable rule + reason/retailer gates all enforced server-side (verified at e4daedb) — the UI is never the source of truth. Money paise-only. Full **browser E2E** of the walk (open → change retailer → override a fixed price → reason → save) still **pending a live device**, as with prior FE reviews.
 
@@ -4566,6 +4567,6 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 
 **What I tried:** Read the diff; grep for dangling references to the removed props/mode; cumulative `tsc` + `npm run build` (both clean).
 
-**Open flags (cumulative):** No 🔴. Carried 🟡 ㊸, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+**Open flags (cumulative):** No 🔴. ✅ ㊸ CLOSED at 7a5e5fe (dispatched now admin-editable — button opened per owner 2026-07-16). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** —
