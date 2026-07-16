@@ -88,12 +88,18 @@ export async function submitOrder(
   );
 }
 
+// `retailerId` is honored ONLY for an admin (server-enforced) — a non-admin's
+// value is ignored, never changing the order's retailer. `prices` now carries
+// the admin's all-brand overrides too (fixed brands included); the RPC trusts a
+// client price for a manual brand OR when the caller is admin, otherwise the
+// snapshot/catalog wins (untamperable holds).
 export async function updateOrderItems(
   orderId: string,
   notes: string,
   items: Record<string, number>,
   reason?: string,
   prices?: Record<string, number>,
+  retailerId?: string,
 ): Promise<OrderRow> {
   const supabase = createClient();
   return callRpc(() =>
@@ -102,6 +108,7 @@ export async function updateOrderItems(
       p_notes: notes,
       p_items: toItemsPayload(items, prices),
       p_reason: reason,
+      p_retailer_id: retailerId,
     }),
   );
 }
