@@ -138,10 +138,12 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   // pending_approval (the cancel_order/update_order_items RPCs enforce this).
   const salesmanActionable = role === "salesman" && isOwner && editable;
   // Who sees the Edit button (which routes to the Quick Order flow): staff per
-  // the cancel/edit matrix (admin — any live order bar cancelled/dispatched;
-  // accountant — pending only), or the salesman on his own pending order.
+  // the cancel/edit matrix (admin — any live order bar cancelled, dispatched
+  // included per owner 2026-07-16; accountant — pending only), or the salesman
+  // on his own pending order. Matches the page loader + update_order_items (both
+  // already allow any non-cancelled for an admin).
   const canEdit =
-    (isStaff && (isAdmin ? order.status !== "cancelled" && order.status !== "dispatched" : order.status === "pending_approval")) ||
+    (isStaff && (isAdmin ? order.status !== "cancelled" : order.status === "pending_approval")) ||
     salesmanActionable;
   const editHref = `/new-order?edit=${order.id}`;
   const statusTag = getOrderStatusTag({ status: order.status });
