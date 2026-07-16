@@ -1,0 +1,57 @@
+/* Reason BottomSheet (admin post-approval edit) — mirrors the Mark-billed
+   "Tally bill number" sheet in OrderDetailView so the two read identically. */
+.reasonSheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reasonTitle {
+  font-family: var(--font-structure);
+  font-size: var(--text-header-size);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.reasonBody {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.reasonLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+  border-left: 2px solid var(--color-accent);
+  padding-left: 8px;
+}
+
+.reasonInput {
+  min-height: 72px;
+  padding: 10px 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  resize: vertical;
+}
+
+.reasonInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.reasonActions {
+  display: flex;
+  gap: 8px;
+}
+
+.error {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}

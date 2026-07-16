@@ -22,6 +22,9 @@ interface ReviewProps {
   retailerName: string;
   retailerArea: string | null;
   isEdit: boolean;
+  // Admin-only, edit flow: allow swapping the order's retailer (the "Change"
+  // link, otherwise hidden in edit). Salesman/accountant: retailer stays fixed.
+  canChangeRetailer?: boolean;
   onChangeQty: (productId: string, qty: number) => void;
   onNotesChange: (notes: string) => void;
   onChangeRetailer: () => void;
@@ -45,6 +48,7 @@ export function Review({
   retailerName,
   retailerArea,
   isEdit,
+  canChangeRetailer = false,
   onChangeQty,
   onNotesChange,
   onChangeRetailer,
@@ -87,7 +91,7 @@ export function Review({
             <p className={styles.retailerName}>{retailerName}</p>
             {retailerArea && <p className={styles.retailerArea}>{retailerArea}</p>}
           </div>
-          {!isEdit && (
+          {(!isEdit || canChangeRetailer) && (
             <button type="button" className={styles.changeLink} onClick={onChangeRetailer}>
               Change
             </button>

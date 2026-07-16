@@ -34,6 +34,10 @@ interface QuickOrderProps {
   prices?: Record<string, number>; // entered unit prices (paise) for manual/LG lines
   snapshotPrices?: Record<string, number>;
   snapshotNames?: Record<string, string>;
+  // Admin-only, edit flow: an editable price input on EVERY line (fixed brands
+  // included) — the deliberate, server-enforced override to the untamperable
+  // rule. Off for everyone else: fixed prices stay read-only from the catalog.
+  canPriceAll?: boolean;
   onChangeQty: (productId: string, qty: number) => void;
   onChangePrice?: (productId: string, pricePaise: number) => void;
   onReview: () => void;
@@ -55,6 +59,7 @@ export function QuickOrder({
   prices,
   snapshotPrices,
   snapshotNames,
+  canPriceAll = false,
   onChangeQty,
   onChangePrice,
   onReview,
@@ -192,21 +197,25 @@ export function QuickOrder({
     const qty = items[p.id] ?? 0;
     const inCart = qty > 0;
     const isManual = p.pricing_mode === "manual";
+    // A price input shows for manual (LG) lines as always, and for EVERY line
+    // when the admin is editing (canPriceAll). A fixed line for anyone else
+    // stays read-only from the catalog.
+    const priceEditable = isManual || canPriceAll;
     const expanded = expandedIds.has(p.id);
     const entered = prices?.[p.id] ?? snapshotPrices?.[p.id];
-    // Manual (LG) effective price: typed override wins, then the edit snapshot,
-    // then the product's imported DEFAULT (p.price_paise) — so an untouched
-    // manual line reads and bills at its default, and editing an existing order
-    // never re-prices a line (snapshot beats the default).
-    const effective = isManual ? (entered ?? p.price_paise) : entered;
-    const priceLabel = isManual
+    // Effective price on an editable line: typed override wins, then the edit
+    // snapshot, then the product's DEFAULT (the manual imported default OR the
+    // fixed catalog price) — so an untouched line reads and bills at its snapshot
+    // (never re-priced), and a fresh line falls to the catalog/default.
+    const effective = priceEditable ? (entered ?? p.price_paise) : entered;
+    const priceLabel = priceEditable
       ? effective != null
         ? formatRupees(effective)
         : "Tap to price"
       : formatRupees(pricesById[p.id] ?? p.price_paise ?? 0);
     const buffered = priceText[p.id];
     const inputVal = buffered ?? (effective != null ? String(effective / 100) : "");
-    const parsed = isManual && buffered != null && buffered !== "" ? parsePricePaise(buffered) : null;
+    const parsed = priceEditable && buffered != null && buffered !== "" ? parsePricePaise(buffered) : null;
     const priceError = parsed && !parsed.ok ? parsed.error : null;
 
     return (
@@ -242,7 +251,7 @@ export function QuickOrder({
 
         {expanded && (
           <div className={styles.productDrop}>
-            {isManual && (
+            {priceEditable && (
               <label className={styles.priceField}>
                 <span className={styles.pricePrefix}>₹</span>
                 <input
