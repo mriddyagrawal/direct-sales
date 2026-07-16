@@ -4731,3 +4731,57 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** Owner's final call on the amber "No data" pill + the 2 cosmetic tweaks; then merge `feat/tally-stock-sync` → main.
+
+---
+
+## Review of 6beeaaf — feat(db): step_back_order (admin Undo) + 4 backward guard edges
+
+**Verdict:** ✅ accept (correctness) — 11 live probes pass, all rolled back. ⚠️ **Process note:** the migration was applied to prod before I saw an explicit owner go-ahead **to me** (Commit 1 was gated). If the owner authorized it directly with the builder, all good — it's verified correct + safe; flagging only so the gate isn't silently skipped (2nd time — cf. ㊹).
+
+**Phase / goal:** the admin "Undo" backend — `step_back_order(p_order_id)` + four admin-only backward guard edges. Reason-free, one stage back, cancelled is final.
+
+**What works (verified live — 11 scenarios, impersonating admin/accountant via `set_config`, every write rolled back):**
+- **Guard** recreated: all forward edges verbatim + the four backward edges checked first, admin-only; trigger is **UPDATE-only** (confirmed via `pg_trigger`).
+- **Disapprove** (approved→pending_approval): clears `approved_at/by`.
+- **Un-bill** (billed→ready_to_bill): clears `tally_bill_no` + `processed_at/by` in one UPDATE; bill-no CHECK satisfied.
+- **Un-dispatch** (dispatched→billed): clears `dispatched_at/by` + `dispatch_note`, **keeps `tally_bill_no`** (CHECK requires it on `billed` — correct).
+- **Un-pick full** (ready_to_bill→approved, no child): `order_item_scans` deleted (0 left), `picked_qty` NULL, `total_paise` = full ordered sum.
+- **Un-pick + untouched backorder child (partial pick):** the partial pick reduced the total; un-pick **restored it to full**, **cancelled** the child with the exact reason `Original order (#ORD-LUM-1117) pushed back to 'Approved' status.`, parent → approved.
+- **Un-pick blocked (advanced child):** raises `blocked: finish or cancel backorder ORD-BLOCKTEST-1131 first`, parent untouched.
+- **Admin-only:** accountant → `only admin may undo a step`.
+- **Invalid states:** `cancelled` + `pending_approval` both → `cannot be stepped back`.
+- Logs a `stepped_back` `{from,to}` event; `grant … to authenticated` (role re-checked inside).
+
+**Blocking issues:** None (the ⚠️ is process, not a code defect). **Non-blocking:** none.
+
+**Domain / correctness checks:** money/immutability intact — un-pick restores `total_paise` to the full order via `recompute_order_total`'s `coalesce(picked_qty, qty)`; un-bill leaves the total unchanged; no snapshot price rewritten. Admin-only enforced in guard **and** RPC. Cancelled is final (no reverse edge). State machine otherwise untouched.
+
+**What I tried:** 11-scenario `DO`-block battery on real orders in each live state + synthetic untouched/advanced backorder children (`gen_random_uuid()` id — orders.id has no default); migration-ledger + signature + trigger-event checks.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** the FE (below).
+
+---
+
+## Review of b17a868 — feat(orders): admin "Undo" button (step back one stage, red-outline, one-tap confirm)
+
+**Verdict:** ✅ accept — matches the locked design exactly; tsc/eslint/build clean.
+
+**What works:**
+- **`canUndo` = `isAdmin && status ∈ {approved, ready_to_bill, billed, dispatched}`** — never cancelled/pending/backorder, never a non-admin (server re-enforces via the guard + RPC, proven at 6beeaaf).
+- **`stepBackOrder(orderId)`** → `step_back_order`, same `callRpc` wrapper as the other RPCs.
+- **Styling per spec:** reuses `.destructive` (red text + `--color-error` border on white — the **inverse** of Cancel's fill) + a new **`.destructive:active`** inverting to solid red (white on red) on press; `Undo2` (↩) icon.
+- **One-tap confirm, no text field:** BottomSheet titled "Undo — {ref}", body = per-status `undoCopy` naming the destination + side effect (pick cleared / backorder child named / Tally bill number removed). Confirm → `stepBackOrder` → `router.refresh()`; closes on success, **stays open on error**.
+- **Blocked un-pick:** the handler surfaces the RPC's `blocked: …` message; the sheet regex-matches it against `backorderChild` (derived from the order's own `backordered` event: `child_order_id`/`child_ref`) and renders the child ref as a **tappable `Link`** to its detail; else plain error text.
+- `tsc`=0, build "Compiled successfully".
+
+**Blocking issues:** None. **Non-blocking:** none material.
+
+**Domain / correctness checks:** read-only surface (all writes go through the role-guarded RPC); the button gate mirrors the server; no money/state logic in the FE.
+
+**What I tried:** read the full diff (button render @608, confirm sheet @873, `handleUndo` @373, `.destructive:active` styling, wrapper); confirmed `backorderChild` derivation + the blocked-link regex path; cumulative `tsc` + `npm run build` clean.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Feature complete — a device pass on the Undo walk (each of the 4 stages + a blocked un-pick) is the only thing left, plus the owner's merge-to-main call.
