@@ -4570,3 +4570,30 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. ✅ ㊸ CLOSED at 7a5e5fe (dispatched now admin-editable — button opened per owner 2026-07-16). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** —
+
+---
+
+## Review of 002ce5b — feat(tally-agent): Windows stock extractor (stdlib Python + .bat + runbook)
+
+**Verdict:** ✅ accept — read-only guarantee holds; parser + CSV + error path verified by execution.
+
+**Phase / commit goal (as I understood it):** T1 of the Tally stock sync — a standalone Windows extractor (`tally-agent/`, no DB, no app) that POSTs a **read-only** Export request to Tally, parses each stock item's Name + ClosingBalance, and writes a timestamped `Tally Name,Stock` CSV for the web-side Update-stock import.
+
+**What works (verified by actually running it):**
+- **🔒 Read-only guarantee holds.** Both `REQUEST_XML` and the (default-off) `FALLBACK_XML` are `TALLYREQUEST=Export`; `grep` finds zero write verbs (`Import`/`Alter`/`Create`/`<IMPORTDATA>`/`<TALLYMESSAGE>`) anywhere except the header comment that *forbids* them. The Collection is `ISMODIFY="No"`. Nothing in the script can mutate Tally.
+- **Parser** (`_extract_items` + `_parse_qty`) against a crafted mock Tally response: NAME read from **both** an attribute and a child `<NAME>`; balances ` 12.00 Nos`→12, `-3 Nos`→-3, `1,234 Nos`→1234, `0 Nos`→**0 (kept)**, and a name carrying a `\x04` control char → stripped by `_sanitize_xml`; a blank name and an empty `<CLOSINGBALANCE>` are both **skipped** (skip count = 2). Direct `_parse_qty` cases all pass, incl. `None`/non-numeric → `None`.
+- **CSV** (`_write_csv`): `os.makedirs(exist_ok=True)`, header exactly `Tally Name,Stock`, one row per item, filename `stock_2026-07-16_2243.csv` (timestamped, never overwrites). Zeros written (out-of-stock is meaningful).
+- **Unreachable Tally:** pointing `TALLY_URL` at a dead port → `main()` returns **1** and prints the friendly "Could not reach Tally … XML server (port 9000) enabled?" line (no traceback — the `__main__` catch-all wraps `main`). `py_compile` clean.
+- **Runbook artifacts:** `.bat` uses `%~dp0` (double-click-safe from any CWD) + `pause`; README covers Python install (Add-to-PATH), **both** TallyPrime and Tally.ERP9 server config (port 9000), the every-time steps, and the USE_FALLBACK troubleshooting. `sample-stock.csv` names (**ECO WATT NEO 2300**, **EVO D 2300**) are **real LUM products** (verified live) — a genuine fixture for T3.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** Fractional balances round to int (`int(round(float()))`) — correct for Nos-counted electronics; would round only if an item were ever stocked in a fractional unit. Compound units (e.g. "10 Nos, 1 Box") take the first number. Both acceptable for this catalog; no action.
+
+**Domain / correctness checks:** DB-free, app-free (top-level `tally-agent/`, not compiled by Next — confirmed no `.ts` there) → no state-machine/RLS/money surface touched. Stock is an integer count, never routed through paise/`formatRupees`. The owner's hard "read-only to Tally" requirement is met and verified.
+
+**What I tried:** `python3 -m py_compile`; imported the module and ran `_extract_items`/`_parse_qty`/`_write_csv` against a mock XML (attr+child NAME, negative/zero/comma/control-char/blank cases), then read the written CSV back; ran `main()` against a closed port for the unreachable path; `grep` for write verbs; live-checked the two sample `tally_name`s exist in `products` (both LUM).
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** T2 (stock columns + `import_stock`) is **owner-approval-gated** — hold the migration until the owner says go; T3/T4 depend on it. T1 needs a real run against the VPS Tally to confirm the Collection export returns items (USE_FALLBACK if not).
