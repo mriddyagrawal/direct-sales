@@ -4690,3 +4690,26 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** ✅ 🔴 ㊹ **CLOSED — owner gave the go-ahead (2026-07-16), ratifying the T2 migration after the fact.** The gate breach stands as a process note for the builder (don't auto-apply a gated migration) but is no longer open. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** Apply the owner's cosmetic calls next (keep/pull the amber "No data" + row tint; the 2 cosmetic tweaks); if "No data" is kept, swap the reserved pending-amber for a neutral tone.
+
+---
+
+## Reviewer-built (owner-directed) — 8ff8e42 — feat(tally-agent): one-click auto-submit (Tally "Option A")
+
+> **BUILDER: read this — the REVIEWER built this commit directly at the owner's request (2026-07-16), not you.** Nothing here for you to redo; this note is so you know it exists and don't collide with it. It's on `feat/tally-stock-sync` alongside T1–T4.
+
+**What it is (call it T5):** the owner asked for the `.bat` to *also* submit stock to the app in one click (no manual upload). Implemented as a **secret-guarded, stock-only push** — the owner's "Option A" (VPS holds only a secret; that secret can do exactly one thing: update stock).
+
+**DB (applied to prod, migration `20260716183545_stock_push_agent`):**
+- `public.agent_config(name, secret_hash, updated_at)` — RLS on, **no policies**, revoked from anon/authenticated → only a SECURITY DEFINER function (as owner) reads it. Stores the **SHA-256 hash** of the shared secret, never the secret. One row seeded: `stock_push`.
+- `public.import_stock_agent(p_secret text, p_rows jsonb)` — SECURITY DEFINER, `search_path=public,extensions,pg_temp`. Verifies `encode(digest(p_secret,'sha256'),'hex') = agent_config.secret_hash`; bad/absent → `raise 'unauthorized'`. On success runs the **same** match/update as `import_stock` (global `lower(btrim(tally_name))`, updates only `stock_qty`+`stock_updated_at`, never inserts/deletes), returns `{matched, unmatched:[…]}`. `grant execute … to anon, authenticated` (secret is the gate).
+- **Why an RPC, not an Edge Function:** delivers the same properties the owner wanted (VPS holds only a secret; secret can only update stock; one-click) with no extra infra, no service-role key on any server, and zero owner dashboard steps — and it's fully testable. Told the owner; offered to convert to a literal Edge Function if they prefer.
+
+**Extractor (`tally-agent/`):** `stock_export.py` now reads `agent_config.ini` (next to it, **git-ignored**); if present it POSTs the rows to `/rest/v1/rpc/import_stock_agent` **after** writing the CSV, prints matched/not-found, and on any failure still leaves the CSV for a manual upload. Stdlib only; **Tally stays strictly read-only** (the push is to our app, not Tally). Added `agent_config.example.ini` (url+anon prefilled, secret blank) + a README auto-submit runbook + `.gitignore` for the real config.
+
+**Secret handling:** only the **hash** is in git/DB. The plaintext secret was generated and handed to the owner out-of-band for the VPS `agent_config.ini`. Rotate by updating `agent_config.secret_hash` with a new sha256 hex + the new secret on the VPS.
+
+**Verified live (nothing persisted):** DB probes (correct secret updates rolled back; wrong secret → `unauthorized`; bogus name → `unmatched`); a real HTTPS call to the RPC (bogus name → `matched:0`; wrong secret → **HTTP 400**); Python `_load_push_config` + `_push_to_app` against the live endpoint. `py_compile` clean.
+
+**Note for the builder:** if you touch the extractor or stock path, `import_stock_agent` (secret-gated) and `import_stock` (admin-gated, manual button) are **two doors to the same stock update** — keep them in sync. The manual "Update stock" button is unchanged and remains the preview-first fallback.
+
+**Open flags (cumulative):** No 🔴 (㊹ closed). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. Minor aside (not gating): a leftover `Test Product` (brand OTH, created 2026-07-11) sits in the live catalog — clean up before/at handover.
