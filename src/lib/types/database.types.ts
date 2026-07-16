@@ -689,6 +689,43 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      step_back_order: {
+        Args: { p_order_id: string }
+        Returns: {
+          admin_comment: string | null
+          approved_at: string | null
+          approved_by: string | null
+          brand_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          dispatch_note: string | null
+          dispatched_at: string | null
+          dispatched_by: string | null
+          editable_until: string
+          id: string
+          notes: string
+          order_no: number
+          order_ref: string
+          parent_order_id: string | null
+          picked_at: string | null
+          picked_by: string | null
+          processed_at: string | null
+          processed_by: string | null
+          retailer_id: string
+          salesman_id: string
+          status: string
+          submitted_at: string
+          tally_bill_no: string | null
+          total_paise: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_order: {
         Args: {
           p_id: string
