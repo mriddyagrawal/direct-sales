@@ -8,26 +8,13 @@ import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { SharePdfButton } from "@/components/SharePdfButton";
-import { Stepper } from "@/components/ui/Stepper";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { getOrderStatusTag } from "@/lib/order-status";
 import { formatOrderTimestamp, formatOrderTime, formatHistoryDayHeader, formatRupees, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
-import { updateOrderItems, cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder } from "@/lib/order-rpcs";
+import { cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder } from "@/lib/order-rpcs";
 import styles from "./OrderDetailView.module.css";
-
-const UI_QTY_CAP = 999;
-
-// Catalog rows for the staff inline "+ Add item" editor. The salesman page
-// passes [] — his edits go through the Quick Order flow instead.
-export interface CatalogProduct {
-  id: string;
-  name: string;
-  category: string;
-  price_paise: number | null;
-  active: boolean;
-}
 
 interface OrderItemRow {
   id: string;
@@ -89,7 +76,6 @@ interface OrderDetailViewProps {
   order: OrderDetailData;
   items: OrderItemRow[];
   events: RawEventRow[];
-  catalog: CatalogProduct[];
   currentUserId: string;
   role: "salesman" | "staff" | "godown";
   isAdmin: boolean;
@@ -98,23 +84,23 @@ interface OrderDetailViewProps {
 // THE order detail — one component, every role (unification, owner decision
 // 2026-07-10). The role decides which ACTIONS render; the boilerplate
 // (header, lines, total, serials, notes, retailer, history, Share PDF) is
-// identical. Actions follow the cancel/edit permission matrices (owner
-// 2026-07-11): accountant acts only on pending_approval; admin on any live
-// order (inline Edit +reason past approval; Cancel with reason); salesman
-// edits/cancels only his own pending_approval order (the 2h window is gone),
-// read-only after. Hiding a button is cosmetic — every write goes through the
-// same role-guarded RPCs either way.
-export function OrderDetailView({ order, items: initialItems, events, catalog, currentUserId, role, isAdmin }: OrderDetailViewProps) {
+// identical. This view is READ-ONLY: every edit — for the salesman AND for
+// staff — routes to the Quick Order flow (/new-order?edit=…), the sole editor
+// now (owner 2026-07-16). Actions follow the cancel/edit permission matrices
+// (owner 2026-07-11): accountant acts only on pending_approval; admin on any
+// live order (Edit — reason past approval, captured in the flow; Cancel with
+// reason); salesman edits/cancels only his own pending_approval order (the 2h
+// window is gone), read-only after. Hiding a button is cosmetic — every write
+// goes through the same role-guarded RPCs either way.
+export function OrderDetailView({ order, items: initialItems, events, currentUserId, role, isAdmin }: OrderDetailViewProps) {
   const router = useRouter();
-  const [mode, setMode] = useState<"view" | "edit">("view");
-  const [items, setItems] = useState<Record<string, number>>(() => {
+  // Read-only now: the qty map is built once from the fetched lines (editing
+  // lives in the Quick Order flow, not here).
+  const items = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
     for (const it of initialItems) map[it.product_id] = it.qty;
     return map;
-  });
-  const [notes, setNotes] = useState(order.notes);
-  const [reason, setReason] = useState("");
-  const [addQuery, setAddQuery] = useState("");
+  }, [initialItems]);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmProcess, setConfirmProcess] = useState(false);
   const [confirmDispatch, setConfirmDispatch] = useState(false);
@@ -151,9 +137,13 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   // The salesman may edit/cancel only his own order, only while it's still
   // pending_approval (the cancel_order/update_order_items RPCs enforce this).
   const salesmanActionable = role === "salesman" && isOwner && editable;
-  // A reason is demanded only for an admin editing a locked (post-approval)
-  // order — mode=edit on a non-`editable` order is exactly that case.
-  const requiresReason = mode === "edit" && !editable;
+  // Who sees the Edit button (which routes to the Quick Order flow): staff per
+  // the cancel/edit matrix (admin — any live order bar cancelled/dispatched;
+  // accountant — pending only), or the salesman on his own pending order.
+  const canEdit =
+    (isStaff && (isAdmin ? order.status !== "cancelled" && order.status !== "dispatched" : order.status === "pending_approval")) ||
+    salesmanActionable;
+  const editHref = `/new-order?edit=${order.id}`;
   const statusTag = getOrderStatusTag({ status: order.status });
 
   const snapshotById = useMemo(() => {
@@ -161,7 +151,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
     for (const it of initialItems) map[it.product_id] = { name: it.product_name, price: it.unit_price_paise };
     return map;
   }, [initialItems]);
-  const catalogById = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
 
   // Model + serials per original line (spec §3 ITEMS): the model is the
   // CURRENT product's tally_name (display-only); serials in scan order.
@@ -183,9 +172,8 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   const lines = Object.entries(items)
     .map(([productId, qty]) => {
       const snap = snapshotById[productId];
-      const product = catalogById.get(productId);
-      const name = snap?.name ?? product?.name ?? "Unknown product";
-      const rate = snap?.price ?? product?.price_paise ?? 0;
+      const name = snap?.name ?? "Unknown product";
+      const rate = snap?.price ?? 0;
       const extra = lineExtraByProduct.get(productId);
       return { productId, qty, name, rate, model: extra?.model ?? null, serials: extra?.serials ?? [], pickedQty: extra?.pickedQty ?? null };
     })
@@ -208,8 +196,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
     return id && ref ? { id, ref } : null;
   })();
 
-  const total = lines.reduce((sum, l) => sum + l.rate * l.qty, 0);
-
   // A `backordered` HISTORY line references the other order (parent↔child) —
   // return the ref as a link so it's tappable, mirroring the "Backorder of"
   // header link. Returns null for every non-linkable event (plain describeEvent).
@@ -226,15 +212,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
     }
     return null;
   }
-
-  const addQ = addQuery.trim().toLowerCase();
-  const addable =
-    addQ === ""
-      ? []
-      : catalog
-          .filter((p) => p.active && p.price_paise !== null && !items[p.id])
-          .filter((p) => p.name.toLowerCase().includes(addQ))
-          .slice(0, 8);
 
   // Godown-scanned serials per line (scan order), for the accountant to read
   // into Tally. Empty for fixed brands and for approved→processed overrides.
@@ -257,7 +234,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
   // RLS policy scopes him to his own orders). The italic "captured at
   // picking" teaching placeholder stays STAFF-only — the salesman just sees
   // serials once they exist.
-  const showSerialRows = order.showModel && mode === "view";
+  const showSerialRows = order.showModel;
   const serialsPending = isStaff && (order.status === "pending_approval" || order.status === "approved");
   const hasAnySerials = serialGroups.length > 0;
 
@@ -280,52 +257,6 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
     details: e.details,
     created_at: e.created_at,
   }));
-
-  function handleQtyChange(productId: string, qty: number) {
-    setItems((prev) => {
-      const next = { ...prev };
-      if (qty <= 0) delete next[productId];
-      else next[productId] = qty;
-      return next;
-    });
-  }
-
-  function addItem(product: CatalogProduct) {
-    setItems((prev) => ({ ...prev, [product.id]: 1 }));
-    setAddQuery("");
-  }
-
-  function cancelEdit() {
-    const map: Record<string, number> = {};
-    for (const it of initialItems) map[it.product_id] = it.qty;
-    setItems(map);
-    setNotes(order.notes);
-    setReason("");
-    setError(null);
-    setMode("view");
-  }
-
-  async function handleSave() {
-    if (requiresReason && !reason.trim()) {
-      setError("A reason is required to edit this order after its window has passed.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await updateOrderItems(order.id, notes, items, requiresReason ? reason.trim() : undefined);
-      setMode("view");
-      // Stay busy through the refresh (review flag ㉜(🅑)) — see
-      // ProductsPricing.tsx note; same dead-gap shape here.
-      startTransition(() => {
-        router.refresh();
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save changes.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function handleApprove() {
     setSaving(true);
@@ -599,19 +530,14 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                    non-cancelled (reason once past approval).
           CANCEL — salesman: own pending; accountant: pending only; admin: any. */}
       <div className={styles.secondaries}>
-        {isStaff &&
-          mode === "view" &&
-          (isAdmin ? order.status !== "cancelled" && order.status !== "dispatched" : order.status === "pending_approval") && (
-            <Button variant="secondary" onClick={() => setMode("edit")}>
-              <Glyph icon={Pencil} />
-              Edit
-            </Button>
-          )}
-        {role === "salesman" && isOwner && editable && (
+        {/* Edit — the single editor now: routes to the Quick Order flow
+            (/new-order?edit=…) for staff AND salesman alike (owner 2026-07-16;
+            the inline editor is retired). Gate = the cancel/edit matrix. */}
+        {canEdit && (
           <Button
             variant="secondary"
-            loading={navPending && navTarget === `/new-order?edit=${order.id}`}
-            onClick={() => navigate(`/new-order?edit=${order.id}`)}
+            loading={navPending && navTarget === editHref}
+            onClick={() => navigate(editHref)}
           >
             <Glyph icon={Pencil} />
             Edit
@@ -717,13 +643,12 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                 <th className={styles.numeric}>QTY</th>
                 <th className={styles.numeric}>RATE</th>
                 <th className={styles.numeric}>AMOUNT</th>
-                {mode === "edit" && <th />}
               </tr>
             </thead>
             <tbody>
               {lines.map((line) => {
                 // Zero taken (picked, none) — the whole line struck in grey.
-                const zeroTaken = mode === "view" && line.pickedQty === 0;
+                const zeroTaken = line.pickedQty === 0;
                 return (
                 <Fragment key={line.productId}>
                   <tr>
@@ -736,14 +661,7 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                       {line.name}
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>
-                      {mode === "edit" ? (
-                        <Stepper
-                          qty={line.qty}
-                          max={UI_QTY_CAP}
-                          onChange={(next) => handleQtyChange(line.productId, next)}
-                          onTapQuantity={() => {}}
-                        />
-                      ) : line.pickedQty !== null && line.pickedQty < line.qty ? (
+                      {line.pickedQty !== null && line.pickedQty < line.qty ? (
                         // Short line (incl. 0 taken): the taken figure stays a
                         // legible ink number, ordered qty struck beside it —
                         // "0 3̶" reads far clearer than a lone struck digit.
@@ -758,18 +676,11 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
                     <td className={`${styles.mono} ${styles.numeric} ${zeroTaken ? styles.struck : ""}`}>
                       {/* Shipped amount = (picked ?? ordered) × rate, so the lines
                           sum to the shipped order total. A zero-taken line keeps its
-                          ORIGINAL amount (struck), not ₹0. Edit mode previews live. */}
+                          ORIGINAL amount (struck), not ₹0. */}
                       {zeroTaken
                         ? formatRupees(line.rate * line.qty)
-                        : formatRupees(line.rate * (mode === "view" ? line.pickedQty ?? line.qty : line.qty))}
+                        : formatRupees(line.rate * (line.pickedQty ?? line.qty))}
                     </td>
-                    {mode === "edit" && (
-                      <td>
-                        <button type="button" className={styles.remove} onClick={() => handleQtyChange(line.productId, 0)}>
-                          ✕
-                        </button>
-                      </td>
-                    )}
                   </tr>
                   {/* Serials nest under their line (staff, show_model brands):
                       real serials once picked, the teaching placeholder before. */}
@@ -799,79 +710,24 @@ export function OrderDetailView({ order, items: initialItems, events, catalog, c
             </tbody>
           </table>
 
-          {mode === "edit" && (
-            <div className={styles.addItem}>
-              <input
-                className={styles.addInput}
-                value={addQuery}
-                onChange={(e) => setAddQuery(e.target.value)}
-                placeholder="+ Add item — search name or SKU"
-              />
-              {addable.length > 0 && (
-                <div className={styles.addResults}>
-                  {addable.map((p) => (
-                    <button key={p.id} type="button" className={styles.addResult} onClick={() => addItem(p)}>
-                      <span>{p.name}</span>
-                      <span className={styles.mono}>{formatRupees(p.price_paise ?? 0)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           <div className={styles.totalRow}>
-            {/* View: shipped units + the authoritative shipped total (order
-                .totalPaise). Edit: ordered units + the live edited total. */}
+            {/* Shipped units + the authoritative shipped total (order.totalPaise). */}
             {(() => {
-              const units =
-                mode === "view"
-                  ? lines.reduce((sum, l) => sum + (l.pickedQty ?? l.qty), 0)
-                  : lines.reduce((sum, l) => sum + l.qty, 0);
+              const units = lines.reduce((sum, l) => sum + (l.pickedQty ?? l.qty), 0);
               return (
                 <span>
                   {units} {units === 1 ? "unit" : "units"}
                 </span>
               );
             })()}
-            <span className={styles.mono}>
-              Total (incl. GST) {formatRupees(mode === "view" ? order.totalPaise : total)}
-            </span>
+            <span className={styles.mono}>Total (incl. GST) {formatRupees(order.totalPaise)}</span>
           </div>
-
-
-          {mode === "edit" && requiresReason && (
-            <div className={styles.reasonField}>
-              <label className={styles.notesLabel}>REASON (required — edit after lock)</label>
-              <textarea
-                className={styles.notesInput}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. shop called with a correction"
-              />
-            </div>
-          )}
-
-          {mode === "edit" && (
-            <div className={styles.editActions}>
-              <Button variant="secondary" onClick={cancelEdit}>
-                Discard
-              </Button>
-              <Button variant="primary" onClick={handleSave} loading={saving || isPending}>
-                Save changes
-              </Button>
-            </div>
-          )}
         </div>
 
         <div className={styles.rail}>
           <div className={styles.notesBox}>
             <p className={styles.notesLabel}>NOTES FROM THE FIELD</p>
-            {mode === "edit" ? (
-              <textarea className={styles.notesInput} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            ) : (
-              <p className={styles.notesText}>{notes || "— no notes —"}</p>
-            )}
+            <p className={styles.notesText}>{order.notes || "— no notes —"}</p>
           </div>
 
           <div>

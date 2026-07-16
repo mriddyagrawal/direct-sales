@@ -7,8 +7,7 @@ import { ORDER_DETAIL_SELECT, toOrderDetailProps, type OrderDetailQueryRow } fro
 // Identical query to the staff workbench — RLS scopes it to his own orders
 // (anyone else's id → no row → 404) and returns zero order_item_scans rows
 // (that table is staff/godown-only), so nothing here needs a role check
-// beyond passing role="salesman". No catalog: his edits go through the
-// Quick Order flow, not the inline editor.
+// beyond passing role="salesman". His edits go through the Quick Order flow.
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -28,7 +27,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       order={order}
       items={items}
       events={events}
-      catalog={[]}
       currentUserId={user!.id}
       role="salesman"
       isAdmin={false}

@@ -102,50 +102,6 @@
   text-align: right;
 }
 
-.remove {
-  min-width: 32px;
-  min-height: 32px;
-  background: none;
-  border: none;
-  color: var(--color-error);
-  cursor: pointer;
-}
-
-.addItem {
-  position: relative;
-}
-
-.addInput {
-  width: 100%;
-  min-height: 40px;
-  padding: 0 10px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  font-family: var(--font-structure);
-  font-size: 13px;
-}
-
-.addResults {
-  border: 1px solid var(--color-hairline);
-  border-top: none;
-  background: var(--color-white);
-}
-
-.addResult {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--color-hairline);
-  text-align: left;
-  cursor: pointer;
-  font-family: var(--font-structure);
-  font-size: 13px;
-}
-
 .totalRow {
   display: flex;
   justify-content: space-between;
@@ -156,7 +112,6 @@
   color: var(--color-locked);
 }
 
-.reasonField,
 .notesBox {
   display: flex;
   flex-direction: column;
