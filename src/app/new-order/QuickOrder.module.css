@@ -303,6 +303,50 @@
   margin-top: 2px;
 }
 
+/* Godown stock pill — two-state traffic light (green in-stock / red
+   out-of-stock) via the app's semantic tokens (dark-mode safe), with a leading
+   status dot in currentColor. "will backorder" + "as of <date>" are muted. */
+.stockLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.stockPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.stockPill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.stockIn {
+  color: var(--color-processed);
+}
+
+.stockOut {
+  color: var(--color-error);
+}
+
+.willBackorder,
+.stockAsOf {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
 .removeGhost {
   min-height: 40px;
   padding: 0 12px;

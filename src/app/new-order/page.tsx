@@ -12,6 +12,8 @@ export interface ProductOption {
   brand_name: string;
   pricing_mode: string; // 'fixed' | 'manual'
   show_model: boolean; // brand flag — render "{tally_name}・{name}" when true
+  stock_qty: number | null; // godown stock from the last Tally sync; null = never synced
+  stock_updated_at: string | null; // "as of" for the stock figure
 }
 
 export interface RetailerOption {
@@ -74,7 +76,9 @@ export default async function NewOrderPage({
   const [{ data: productRows }, { data: retailerRows }, { data: recentRows }, { data: profile }] = await Promise.all([
     supabase
       .from("products")
-      .select("id, category, name, tally_name, price_paise, brand_id, brands(name, pricing_mode, show_model)")
+      .select(
+        "id, category, name, tally_name, price_paise, brand_id, stock_qty, stock_updated_at, brands(name, pricing_mode, show_model)",
+      )
       .order("category")
       .order("created_at"),
     supabase.from("retailers").select("id, name, area, verified").order("name"),
@@ -101,6 +105,8 @@ export default async function NewOrderPage({
       tally_name: string;
       price_paise: number | null;
       brand_id: string;
+      stock_qty: number | null;
+      stock_updated_at: string | null;
       brands: { name: string; pricing_mode: string; show_model: boolean } | null;
     }>
   ).map((r) => ({
@@ -113,6 +119,8 @@ export default async function NewOrderPage({
     brand_name: r.brands?.name ?? "",
     pricing_mode: r.brands?.pricing_mode ?? "fixed",
     show_model: r.brands?.show_model ?? false,
+    stock_qty: r.stock_qty,
+    stock_updated_at: r.stock_updated_at,
   })) as ProductOption[];
   const retailers = (retailerRows ?? []) as RetailerOption[];
 
