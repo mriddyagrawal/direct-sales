@@ -4853,3 +4853,23 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** ✅ **Owner confirmed the null-as-out-of-stock reversal was intended (2026-07-17) — accepted, no revert.** Feature complete + live; the null/unsynced → "Out of Stock" trade-off is owner-accepted.
+
+---
+
+## Review of ad2a0b2 — feat(stock): pill reads "available N" in a rounded rectangle; red row tint dropped
+
+**Verdict:** ✅ accept — FE-only cosmetic (owner-directed 2026-07-17); tsc/build clean.
+
+**What changed:**
+- **Order-detail pill:** partial lines now read **"Partial Stock: available {s}"** (was the "{s}/{qty}" fraction — read like a pick figure); "Out of Stock" unchanged. Pill shape → **6px rounded rectangle** (was a 999px capsule).
+- **Quick Order row tint:** **green in-stock only** — the red out-of-stock background wash removed (`.tintOut` deleted; `stockTone = stockCount > 0 ? tintIn : ""`). The red pill still carries the out-of-stock signal.
+
+**What works:** no dangling `.tintOut` references (grep clean); `tsc`=0, build clean; consistent with the null→out-of-stock model.
+
+**Blocking issues:** None. **Non-blocking:** none. **Domain:** display-only; no DB / count / money impact.
+
+**What I tried:** read the full diff (both surfaces + both CSS files); grep `tintOut`; `tsc` + `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
