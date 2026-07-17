@@ -4785,3 +4785,49 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** Feature complete — a device pass on the Undo walk (each of the 4 stages + a blocked un-pick) is the only thing left, plus the owner's merge-to-main call.
+
+---
+
+## Review of 91465f3 — feat(db): order_items.stock_at_order snapshot + backfill existing to qty
+
+**Verdict:** ✅ accept — verified live (submit + edit capture + clean backfill); migration on prod.
+
+**Phase / goal:** capture `products.stock_qty` at order time into `order_items.stock_at_order` (a static order-time snapshot, like `product_name`/`unit_price_paise`) + backfill historical lines to `= qty` so they show no pill.
+
+**What works (verified live — submit/edit rolled back; backfill is the one-time historical fix):**
+- **Migration** `20260717065631` applied; `order_items.stock_at_order` (nullable) added.
+- **Backfill:** 159 lines → **0 NULLs, 0 differ from qty** — every pre-feature line = its own qty (reads as in-stock, no pill), exactly as spec'd (`= qty`, not a flat constant). A NULL now only ever means a genuinely-unsynced **new** order.
+- **`submit_order`** (recreated verbatim + one added value): a new order captures `stock_at_order = v_product.stock_qty` per line — a **stocked** product → **26**, an **unsynced** (null-stock) product → **null**.
+- **`update_order_items`** (admin full-edit): a line **added** via edit captures `stock_at_order` (**26**); an **existing** edited line **keeps its snapshot** (5→5, untouched) — the edit path never rewrites the order-time fact.
+
+**Blocking issues:** None. **Non-blocking:** none. (Commit 1 was the gated migration; applied via the builder — the established owner-directed flow — and verified correct. No longer flagging this pattern per the owner.)
+
+**Domain / correctness checks:** `stock_at_order` is a plain count, never money; immutable order-time snapshot; ordering behaviour unchanged (no block/decrement); no other column/behaviour touched; instant `add column` (nullable, no rewrite).
+
+**What I tried:** ledger/column/backfill counts (0 nulls, 0≠qty across 159 lines); rolled-back `submit_order` probe (stocked + null products in one ZEB order, as a salesman) + `update_order_items` add-line probe (new line 26, existing line unchanged, with a reason since that order is `billed`).
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** FE (below).
+
+---
+
+## Review of 354c94b — feat(orders): per-line stock-at-order pill on the order detail (all roles)
+
+**Verdict:** ✅ accept — matches the locked spec exactly; tsc/eslint/build clean.
+
+**What works:**
+- **`order-detail-data.ts`** (the single source for all three detail routes → salesman + staff + godown): `stock_at_order` added to the `order_items` embed + `OrderDetailItemRow`.
+- **`stockAtOrderPill(stock, qty)`** helper: `null → "N/A"/na`; `0 → "Out of Stock"/short`; `< qty → "Partial Stock: {stock}/{qty}"/short`; **`>= qty → null` (no pill)** — exactly the locked table.
+- **Render** guarded on `pill &&` (tsc-verified non-null before access); two tone classes — `.stockAtOrderNa` (orange `--color-amber`) / `.stockAtOrderShort` (red `--color-error`), both defined, light+dark legible.
+- `tsc`=0, build "Compiled successfully".
+
+**Blocking issues:** None. **Non-blocking:** none material.
+
+**Domain / correctness checks:** read-only display; the pill is a plain count never routed through `formatRupees`; static (never recomputed live); shown to every role via the shared component; in-stock lines render nothing (only problems flagged), per the owner.
+
+**What I tried:** read the full diff (select embed, interface, helper, render guard, CSS tones); confirmed the helper's `>= qty → null` + the `pill &&` render guard; cumulative `tsc` + `npm run build` clean. A device pass to eyeball the pill colours is the only thing I can't cover.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** — Feature complete + live on `main`. Optional later: hide the pill for pre-ship orders if the (already-suppressed via backfill) historical lines ever need it.
