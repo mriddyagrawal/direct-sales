@@ -4831,3 +4831,25 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** — Feature complete + live on `main`. Optional later: hide the pill for pre-ship orders if the (already-suppressed via backfill) historical lines ever need it.
+
+---
+
+## Review of 7552278 — feat(stock): NULL counts as out of stock everywhere — N/A + "No data" dropped
+
+**Verdict:** ✅ accept (code is clean) — **⚠️ but this reverses the N/A/orange decision the owner gave the reviewer earlier today; the commit attributes the reversal to the owner. Confirming intent.**
+
+**What changed (display-only; DB unchanged):** NULL stock (not on Tally / never synced) now renders as **"Out of Stock" (red)** on both surfaces; the third state is gone.
+- **QuickOrder** ([QuickOrder.tsx](../src/app/new-order/QuickOrder.tsx)): `stockCount = p.stock_qty ?? 0` drives the red "Out of stock" pill + "will backorder" + the red row tint; the amber "No data" pill + `.stockNone` removed.
+- **Order detail** ([OrderDetailView.tsx](../src/components/orders/OrderDetailView.tsx)): `stockAtOrderPill` folds NULL via `?? 0` → "Out of Stock"; single red tone on `.stockAtOrderPill`; `.stockAtOrderNa`/`.stockAtOrderShort` dropped. `order_items.stock_at_order` still stores NULL faithfully.
+
+**Verification:** on `main` + pushed (live/deploying); grep finds **no dangling refs** to the dropped classes; `tsc`=0, build clean; internally consistent.
+
+**⚠️ Owner-confirm flag:** Earlier today (2026-07-17) the owner locked, to the reviewer: detail pill null → **"N/A" orange**; QuickOrder null → nothing. This commit reverses both (null → "Out of Stock"), crediting the owner. **If the owner made this call directly with the builder, it's clean — accept as-is.** **Trade-off to be aware of:** treating *unknown/unsynced* stock as *out of stock* means a product that's genuinely in stock but not yet Tally-synced (e.g. a newly added product before the next sync) reads **"Out of Stock"** everywhere — which could discourage a real sale. (The `= qty` backfill still protects historical orders — they show nothing, not a false "Out of Stock".)
+
+**Blocking issues:** None. **Non-blocking:** the trade-off above. **Domain:** FE-only; DB snapshot unchanged; count never money.
+
+**What I tried:** read the full diff (both surfaces + both CSS files); grep for dropped-class references; `tsc` + `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Owner confirms the null-as-out-of-stock reversal was intended; if not, revert (the N/A/orange version is one commit back at `354c94b`).
