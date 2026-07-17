@@ -4873,3 +4873,47 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** —
+
+---
+
+## Review of 3963758 — feat(db): order_items.list_price_at_order snapshot in submit_order + update_order_items
+
+**Verdict:** ✅ accept — verified live; migration on prod; no backfill (correct).
+
+**What works (verified live, rolled back):**
+- Migration `20260717100428`; `order_items.list_price_at_order` (nullable) added; **no backfill** (0 non-null after the DDL — historical lines stay NULL → no comparison, as designed; a backfill from current price would fabricate discounts on old orders).
+- **`submit_order`** captures `list_price_at_order = v_product.price_paise`:
+  - **Manual (LG), salesman priced below default:** list = **4167400** (default), charged = **4000000** (entered) → **gap** ✓.
+  - **Manual, null-default product:** list = **null**, charged = 999999 → no comparison ✓.
+  - **Fixed (ZEB):** client price ignored → list = charged = catalog **52400** → no gap ✓ (an untouched fixed line never shows a false discount; an admin override later would).
+- **`update_order_items`** new-line insert also carries `list_price_at_order = v_product.price_paise` (same one-line addition; existing-line UPDATE untouched → an order-time list is never rewritten, and an admin price override on an existing line surfaces as a gap against the captured list).
+
+**Blocking issues:** None. **Non-blocking:** none. **Domain / correctness:** paise; immutable order-time snapshot; no other column/behaviour changed; instant nullable add.
+
+**What I tried:** ledger/column/no-backfill checks; rolled-back `submit_order` probe across manual-discount / manual-null-default / fixed; migration grep confirming **both** insert paths carry the column.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** FE (below).
+
+---
+
+## Review of 15db0fc — feat(orders): list-vs-charged price on the order detail (struck list + order discount summary)
+
+**Verdict:** ✅ accept — matches the locked design exactly; tsc/eslint/build clean.
+
+**What works:**
+- **`order-detail-data.ts`:** `list_price_at_order` in the embed + `OrderDetailItemRow` (single source → all roles).
+- **RATE cell:** when `listPriceAtOrder != null && > 0 && !== rate` → **struck list** (`.listStruck`) + charged rate + signed delta `round((rate−list)/list×100)` (`−N%` discount / `+N%` markup). At-list / null-list → just the rate. Matches the chosen "struck list + charged inline".
+- **Order summary:** `listTotal = Σ (listPriceAtOrder ?? rate) × (pickedQty ?? qty)`; rendered only when `listTotal !== order.totalPaise` → **List ₹X** + the signed order delta (1 decimal) beside the Total. Nulls wash out, and the basis matches `order.totalPaise` (recompute uses `coalesce(picked_qty, qty)`), so at-list orders show nothing new.
+- CSS `.listStruck` / `.rateDelta` / `.listTotalRow` all defined; `tsc`=0, build "Compiled successfully".
+
+**Blocking issues:** None. **Non-blocking:** a net-zero order (a discount on one line exactly offset by a markup on another, to the rupee) won't show the order summary though the per-line gaps still show — correct (no net discount); noting for completeness.
+
+**Domain / correctness checks:** read-only display; paise via `formatRupees`; the delta % is derived; every role.
+
+**What I tried:** read the full diff (embed, both interfaces, RATE cell, summary calc); confirmed the CSS classes are defined, the delta sign, and the summary basis; cumulative `tsc` + `npm run build`. A device eyeball of the struck styling is the only thing I can't do.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** — Feature complete + live on `main`.
