@@ -36,16 +36,15 @@ interface OrderItemRow {
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
 
-// Order-time stock pill (owner 2026-07-17): flags PROBLEMS only — an in-stock
+// Order-time stock flag (owner 2026-07-17): flags PROBLEMS only — an in-stock
 // line (stock >= qty) renders nothing. Static: derived from the snapshot,
 // never from live stock. NULL (no Tally data at order time) is treated as NOT
-// IN STOCK (owner 2026-07-17 — the N/A state was dropped).
+// IN STOCK. Text matches the Quick Order pill's voice (sentence case, "·"),
+// with "available N" — not a fraction, which read like a pick figure.
 function stockAtOrderPill(stock: number | null, qty: number): string | null {
   const s = stock ?? 0;
-  if (s === 0) return "Out of Stock";
-  // "available N", not "N/qty" (owner 2026-07-17) — the fraction read like a
-  // pick figure; this states plainly how many the godown had at order time.
-  if (s < qty) return `Partial Stock: available ${s}`;
+  if (s === 0) return "Out of stock";
+  if (s < qty) return `Partial stock · available ${s}`;
   return null;
 }
 
@@ -760,9 +759,9 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                         <span className={styles.modelEyebrow}>{line.model}</span>
                       )}
                       {line.name}
-                      {/* Order-time stock pill (all roles): problems only —
-                          red Out of Stock / Partial (NULL counts as out of
-                          stock). In-stock lines show nothing. */}
+                      {/* Order-time stock flag (all roles): problems only —
+                          dot + red text below the name, Quick Order style
+                          (NULL counts as out of stock). In-stock: nothing. */}
                       {(() => {
                         const pill = stockAtOrderPill(line.stockAtOrder, line.qty);
                         return pill ? <span className={styles.stockAtOrderPill}>{pill}</span> : null;

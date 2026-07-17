@@ -102,24 +102,30 @@
   text-align: right;
 }
 
-/* Order-time stock pill on a line item (all roles): a static snapshot flag —
-   red Out of Stock / Partial (a NULL snapshot counts as out of stock; the
-   orange N/A state was dropped, owner 2026-07-17). Colored text + hairline
-   outline, token-based so light + dark both read. In-stock lines: no pill. */
+/* Order-time stock flag on a line item (all roles): a static snapshot flag —
+   red Out of stock / Partial (a NULL snapshot counts as out of stock). Styled
+   EXACTLY like the Quick Order stock pill (owner 2026-07-17): a currentColor
+   dot + colored text, no box/border, on its own line BELOW the item name.
+   In-stock lines: nothing. */
 .stockAtOrderPill {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 7px;
-  border-radius: 6px; /* rounded-corner rectangle, not a capsule (owner) */
-  border: 1px solid currentColor;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
   color: var(--color-error);
-  font-family: var(--font-figures);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  vertical-align: 1px;
+}
+
+.stockAtOrderPill::before {
+  content: "";
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .totalRow {
