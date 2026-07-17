@@ -28,6 +28,10 @@ interface OrderItemRow {
   // Stock AT ORDER TIME (static snapshot, like the price). NULL = the product
   // had no Tally stock data when ordered. A count, never money.
   stock_at_order: number | null;
+  // LIST price at order time (paise) — the reference unit_price_paise (the
+  // charged rate) is compared against. NULL (historical / unpriced manual
+  // default) → no comparison shown. Immutable snapshot.
+  list_price_at_order: number | null;
   products: { tally_name: string } | null;
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
@@ -182,7 +186,13 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   const lineExtraByProduct = useMemo(() => {
     const map = new Map<
       string,
-      { model: string | null; serials: string[]; pickedQty: number | null; stockAtOrder: number | null }
+      {
+        model: string | null;
+        serials: string[];
+        pickedQty: number | null;
+        stockAtOrder: number | null;
+        listPriceAtOrder: number | null;
+      }
     >();
     for (const it of initialItems) {
       map.set(it.product_id, {
@@ -192,6 +202,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           .map((s) => s.serial),
         pickedQty: it.picked_qty,
         stockAtOrder: it.stock_at_order,
+        listPriceAtOrder: it.list_price_at_order,
       });
     }
     return map;
@@ -212,9 +223,22 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         serials: extra?.serials ?? [],
         pickedQty: extra?.pickedQty ?? null,
         stockAtOrder: extra?.stockAtOrder ?? null,
+        listPriceAtOrder: extra?.listPriceAtOrder ?? null,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  // List-vs-charged (owner 2026-07-17, on-screen only): a line is "off-list"
+  // when its captured list price exists and differs from the charged rate.
+  // The order-level list total uses the same shipped basis as total_paise
+  // (picked ?? qty), so the two totals compare like-for-like; a NULL list
+  // contributes the charged rate (no fabricated gap on historical lines).
+  const listTotal = lines.reduce(
+    (sum, l) => sum + (l.listPriceAtOrder ?? l.rate) * (l.pickedQty ?? l.qty),
+    0,
+  );
+  const offList = listTotal !== order.totalPaise && listTotal > 0;
+  const orderDeltaPct = offList ? Math.round(((order.totalPaise - listTotal) / listTotal) * 1000) / 10 : 0;
 
   // Once picked, a line shows shipped-vs-ordered; short lines feed the backorder.
   const anyPicked = initialItems.some((it) => it.picked_qty !== null);
@@ -756,7 +780,24 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                         line.qty
                       )}
                     </td>
-                    <td className={`${styles.mono} ${styles.numeric} ${zeroTaken ? styles.struck : ""}`}>{formatRupees(line.rate)}</td>
+                    <td className={`${styles.mono} ${styles.numeric} ${zeroTaken ? styles.struck : ""}`}>
+                      {/* Off-list line: struck LIST + charged rate, signed
+                          delta beneath. At-list / no-list → just the rate. */}
+                      {line.listPriceAtOrder != null &&
+                      line.listPriceAtOrder > 0 &&
+                      line.listPriceAtOrder !== line.rate ? (
+                        <>
+                          <span className={styles.listStruck}>{formatRupees(line.listPriceAtOrder)}</span>{" "}
+                          {formatRupees(line.rate)}
+                          {(() => {
+                            const d = Math.round(((line.rate - line.listPriceAtOrder) / line.listPriceAtOrder) * 100);
+                            return <span className={styles.rateDelta}>{`${d >= 0 ? "+" : "−"}${Math.abs(d)}%`}</span>;
+                          })()}
+                        </>
+                      ) : (
+                        formatRupees(line.rate)
+                      )}
+                    </td>
                     <td className={`${styles.mono} ${styles.numeric} ${zeroTaken ? styles.struck : ""}`}>
                       {/* Shipped amount = (picked ?? ordered) × rate, so the lines
                           sum to the shipped order total. A zero-taken line keeps its
@@ -794,6 +835,14 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
             </tbody>
           </table>
 
+          {/* Off-list order: the list total above the charged Total, and the
+              signed order-level delta beside it. At-list orders: nothing new. */}
+          {offList && (
+            <div className={styles.listTotalRow}>
+              <span />
+              <span className={styles.mono}>List {formatRupees(listTotal)}</span>
+            </div>
+          )}
           <div className={styles.totalRow}>
             {/* Shipped units + the authoritative shipped total (order.totalPaise). */}
             {(() => {
@@ -804,7 +853,16 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                 </span>
               );
             })()}
-            <span className={styles.mono}>Total (incl. GST) {formatRupees(order.totalPaise)}</span>
+            <span className={styles.mono}>
+              Total (incl. GST) {formatRupees(order.totalPaise)}
+              {offList && (
+                <span className={styles.totalDelta}>
+                  {" "}
+                  ({orderDeltaPct >= 0 ? "+" : "−"}
+                  {Math.abs(orderDeltaPct)}%)
+                </span>
+              )}
+            </span>
           </div>
         </div>
 
