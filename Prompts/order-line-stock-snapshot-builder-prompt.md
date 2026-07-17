@@ -40,11 +40,12 @@ Stock (`products.stock_qty`, synced from Tally) is advisory — ordering never b
 
 ## Commit 1 — DB: `stock_at_order` + capture in the two insert paths  ⚠️ owner-approval-gated
 Migration `YYYYMMDDHHMMSS_order_line_stock_snapshot.sql` (apply via MCP, reconcile filename to the ledger):
-1. `alter table public.order_items add column stock_at_order integer;` (nullable — null = not on Tally / not captured; instant, no rewrite).
+1. `alter table public.order_items add column stock_at_order integer;` (nullable; instant, no rewrite).
+1b. **Backfill existing rows** (owner 2026-07-17): `update public.order_items set stock_at_order = qty where stock_at_order is null;` — sets every pre-feature line to its **own ordered qty**, so it reads as **in-stock (no pill)** instead of a misleading N/A. **Use `= qty`, never a flat constant** — a flat 500 would wrongly flag any line with `qty > 500` as "Partial Stock: 500/600". After this, a NULL can only come from a *new* order of a product with no Tally stock → **N/A stays meaningful**.
 2. `create or replace function public.submit_order(...)` — recreate from its **current** body, adding `stock_at_order` (value `v_product.stock_qty`) to the `order_items` insert.
 3. `create or replace function public.update_order_items(...)` — recreate from its **current** body, adding `stock_at_order = v_product.stock_qty` to the **new-line INSERT only**.
 
-**Acceptance (reviewer verifies live, rolled back):** a new order (fixed + manual brand) captures `stock_at_order = products.stock_qty` per line (incl. NULL for an unsynced product and 0 for an out-of-stock one); an admin full-edit that **adds** a line captures its `stock_at_order`, while an **existing** edited line keeps its original snapshot; no other column/behaviour changes. Commit: `feat(db): order_items.stock_at_order snapshot in submit_order + update_order_items`.
+**Acceptance (reviewer verifies live, rolled back):** a new order (fixed + manual brand) captures `stock_at_order = products.stock_qty` per line (incl. NULL for an unsynced product and 0 for an out-of-stock one); an admin full-edit that **adds** a line captures its `stock_at_order`, while an **existing** edited line keeps its original snapshot; the **backfill** left every pre-existing line at `stock_at_order = qty` (no historical NULLs); no other column/behaviour changes. Commit: `feat(db): order_items.stock_at_order snapshot + backfill existing to qty`.
 
 ## Commit 2 — FE: the per-line stock pill
 - **`order-detail-data.ts`:** add `stock_at_order` to the `order_items(...)` embed in `ORDER_DETAIL_SELECT`, and `stock_at_order: number | null` to `OrderDetailItemRow`. (`toOrderDetailProps` passes items through — no mapping change.)
@@ -63,5 +64,5 @@ Migration `YYYYMMDDHHMMSS_order_line_stock_snapshot.sql` (apply via MCP, reconci
 - Branch off `main`; **DB migration only after owner OK**; Commit 2 DB-free.
 - Read newest `comments.md` first; fix any ❌.
 - `stock_at_order` is a count, never money. Snapshot is immutable — never recompute or backfill it live.
-- **Heads-up (call it out, don't fix):** orders placed **before** this ships have `stock_at_order = NULL` on every line, so they'll all show **N/A** (no snapshot existed). Going forward it's accurate. Do **not** backfill from current stock (that would be wrong — it isn't the order-time value).
+- **Historical rows are backfilled to `= qty`** (step 1b) so they show no pill and NULL stays meaningful. Do **not** backfill from *current stock* (that's a wrong order-time value); `= qty` just means "treat as fully covered / unknown."
 - Commit messages literally accurate — the REVIEWER verifies by execution.
