@@ -4852,4 +4852,4 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
-**Next-commit suggestion:** Owner confirms the null-as-out-of-stock reversal was intended; if not, revert (the N/A/orange version is one commit back at `354c94b`).
+**Next-commit suggestion:** ✅ **Owner confirmed the null-as-out-of-stock reversal was intended (2026-07-17) — accepted, no revert.** Feature complete + live; the null/unsynced → "Out of Stock" trade-off is owner-accepted.
