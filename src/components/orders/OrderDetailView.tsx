@@ -39,7 +39,9 @@ interface OrderItemRow {
 function stockAtOrderPill(stock: number | null, qty: number): string | null {
   const s = stock ?? 0;
   if (s === 0) return "Out of Stock";
-  if (s < qty) return `Partial Stock: ${s}/${qty}`;
+  // "available N", not "N/qty" (owner 2026-07-17) — the fraction read like a
+  // pick figure; this states plainly how many the godown had at order time.
+  if (s < qty) return `Partial Stock: available ${s}`;
   return null;
 }
 

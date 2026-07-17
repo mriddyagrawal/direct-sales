@@ -196,12 +196,12 @@ export function QuickOrder({
   function renderProduct(p: ProductOption) {
     const qty = items[p.id] ?? 0;
     const inCart = qty > 0;
-    // Light stock tint on the whole row: green in-stock / red out-of-stock.
-    // NULL (never synced) counts as NOT IN STOCK (owner 2026-07-17 — the amber
-    // "No data" state was dropped). Shown only when the row isn't the in-cart
-    // blue (that "selected" highlight wins).
+    // Light stock tint on the whole row: GREEN in-stock only (owner 2026-07-17
+    // — the red out-of-stock wash was dropped; the red pill carries that
+    // signal). NULL (never synced) counts as NOT IN STOCK. Shown only when the
+    // row isn't the in-cart blue (that "selected" highlight wins).
     const stockCount = p.stock_qty ?? 0;
-    const stockTone = stockCount > 0 ? styles.tintIn : styles.tintOut;
+    const stockTone = stockCount > 0 ? styles.tintIn : "";
     const isManual = p.pricing_mode === "manual";
     // A price input shows for manual (LG) lines as always, and for EVERY line
     // when the admin is editing (canPriceAll). A fixed line for anyone else
