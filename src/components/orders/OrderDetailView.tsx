@@ -25,8 +25,21 @@ interface OrderItemRow {
   line_total_paise: number;
   picked_qty: number | null;
   position: number;
+  // Stock AT ORDER TIME (static snapshot, like the price). NULL = the product
+  // had no Tally stock data when ordered. A count, never money.
+  stock_at_order: number | null;
   products: { tally_name: string } | null;
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
+}
+
+// Order-time stock pill (owner 2026-07-17): flags PROBLEMS only — an in-stock
+// line (stock >= qty) renders nothing. Static: derived from the snapshot,
+// never from live stock.
+function stockAtOrderPill(stock: number | null, qty: number): { text: string; tone: "na" | "short" } | null {
+  if (stock === null) return { text: "N/A", tone: "na" };
+  if (stock === 0) return { text: "Out of Stock", tone: "short" };
+  if (stock < qty) return { text: `Partial Stock: ${stock}/${qty}`, tone: "short" };
+  return null;
 }
 
 interface RawEventRow {
@@ -164,7 +177,10 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   // CURRENT product's tally_name (display-only); serials in scan order.
   // A line newly added in edit mode has neither yet.
   const lineExtraByProduct = useMemo(() => {
-    const map = new Map<string, { model: string | null; serials: string[]; pickedQty: number | null }>();
+    const map = new Map<
+      string,
+      { model: string | null; serials: string[]; pickedQty: number | null; stockAtOrder: number | null }
+    >();
     for (const it of initialItems) {
       map.set(it.product_id, {
         model: it.products?.tally_name ?? null,
@@ -172,6 +188,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           .sort((a, b) => a.scanned_at.localeCompare(b.scanned_at))
           .map((s) => s.serial),
         pickedQty: it.picked_qty,
+        stockAtOrder: it.stock_at_order,
       });
     }
     return map;
@@ -183,7 +200,16 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
       const name = snap?.name ?? "Unknown product";
       const rate = snap?.price ?? 0;
       const extra = lineExtraByProduct.get(productId);
-      return { productId, qty, name, rate, model: extra?.model ?? null, serials: extra?.serials ?? [], pickedQty: extra?.pickedQty ?? null };
+      return {
+        productId,
+        qty,
+        name,
+        rate,
+        model: extra?.model ?? null,
+        serials: extra?.serials ?? [],
+        pickedQty: extra?.pickedQty ?? null,
+        stockAtOrder: extra?.stockAtOrder ?? null,
+      };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -707,6 +733,21 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                         <span className={styles.modelEyebrow}>{line.model}</span>
                       )}
                       {line.name}
+                      {/* Order-time stock pill (all roles): problems only —
+                          red Out of Stock / Partial, orange N/A (no Tally
+                          data). In-stock lines show nothing. */}
+                      {(() => {
+                        const pill = stockAtOrderPill(line.stockAtOrder, line.qty);
+                        return pill ? (
+                          <span
+                            className={`${styles.stockAtOrderPill} ${
+                              pill.tone === "na" ? styles.stockAtOrderNa : styles.stockAtOrderShort
+                            }`}
+                          >
+                            {pill.text}
+                          </span>
+                        ) : null;
+                      })()}
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>
                       {line.pickedQty !== null && line.pickedQty < line.qty ? (

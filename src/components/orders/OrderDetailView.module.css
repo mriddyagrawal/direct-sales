@@ -102,6 +102,32 @@
   text-align: right;
 }
 
+/* Order-time stock pill on a line item (all roles): a static snapshot flag —
+   red (out/partial) or orange (no Tally data). Colored text + hairline outline,
+   class-based tokens so light + dark both read. In-stock lines get no pill. */
+.stockAtOrderPill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-family: var(--font-figures);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+
+.stockAtOrderShort {
+  color: var(--color-error);
+}
+
+.stockAtOrderNa {
+  color: var(--color-amber);
+}
+
 .totalRow {
   display: flex;
   justify-content: space-between;
