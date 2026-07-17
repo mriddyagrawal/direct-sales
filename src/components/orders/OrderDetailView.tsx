@@ -34,11 +34,12 @@ interface OrderItemRow {
 
 // Order-time stock pill (owner 2026-07-17): flags PROBLEMS only — an in-stock
 // line (stock >= qty) renders nothing. Static: derived from the snapshot,
-// never from live stock.
-function stockAtOrderPill(stock: number | null, qty: number): { text: string; tone: "na" | "short" } | null {
-  if (stock === null) return { text: "N/A", tone: "na" };
-  if (stock === 0) return { text: "Out of Stock", tone: "short" };
-  if (stock < qty) return { text: `Partial Stock: ${stock}/${qty}`, tone: "short" };
+// never from live stock. NULL (no Tally data at order time) is treated as NOT
+// IN STOCK (owner 2026-07-17 — the N/A state was dropped).
+function stockAtOrderPill(stock: number | null, qty: number): string | null {
+  const s = stock ?? 0;
+  if (s === 0) return "Out of Stock";
+  if (s < qty) return `Partial Stock: ${s}/${qty}`;
   return null;
 }
 
@@ -734,19 +735,11 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                       )}
                       {line.name}
                       {/* Order-time stock pill (all roles): problems only —
-                          red Out of Stock / Partial, orange N/A (no Tally
-                          data). In-stock lines show nothing. */}
+                          red Out of Stock / Partial (NULL counts as out of
+                          stock). In-stock lines show nothing. */}
                       {(() => {
                         const pill = stockAtOrderPill(line.stockAtOrder, line.qty);
-                        return pill ? (
-                          <span
-                            className={`${styles.stockAtOrderPill} ${
-                              pill.tone === "na" ? styles.stockAtOrderNa : styles.stockAtOrderShort
-                            }`}
-                          >
-                            {pill.text}
-                          </span>
-                        ) : null;
+                        return pill ? <span className={styles.stockAtOrderPill}>{pill}</span> : null;
                       })()}
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>

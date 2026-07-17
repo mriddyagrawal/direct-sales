@@ -180,8 +180,8 @@
 
 /* Light stock tint on the whole row (applied only when NOT in-cart, so the blue
    selected state above always wins). Very subtle — a glanceable traffic light
-   across the list. Only in-stock (green) and out-of-stock (red) are tinted; a
-   never-synced "No data" row is left untinted (owner 2026-07-17). */
+   across the list: green in-stock / red out-of-stock, where a never-synced
+   (NULL) product counts as out of stock (owner 2026-07-17). */
 .tintIn {
   background: rgba(21, 128, 61, 0.06);
 }
@@ -350,11 +350,6 @@
 
 .stockOut {
   color: var(--color-error);
-}
-
-/* Trial "No data" state (never-synced product) — amber, may be pulled later. */
-.stockNone {
-  color: var(--color-amber);
 }
 
 .willBackorder,
