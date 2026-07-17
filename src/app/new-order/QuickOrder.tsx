@@ -197,11 +197,11 @@ export function QuickOrder({
     const qty = items[p.id] ?? 0;
     const inCart = qty > 0;
     // Light stock tint on the whole row: green in-stock / red out-of-stock.
-    // A never-synced ("No data") row gets NO tint (owner 2026-07-17) — only the
-    // amber pill. Shown only when the row isn't the in-cart blue (that
-    // "selected" highlight wins). Isolated to this one class to pull easily.
-    const stockTone =
-      p.stock_qty === null ? "" : p.stock_qty > 0 ? styles.tintIn : styles.tintOut;
+    // NULL (never synced) counts as NOT IN STOCK (owner 2026-07-17 — the amber
+    // "No data" state was dropped). Shown only when the row isn't the in-cart
+    // blue (that "selected" highlight wins).
+    const stockCount = p.stock_qty ?? 0;
+    const stockTone = stockCount > 0 ? styles.tintIn : styles.tintOut;
     const isManual = p.pricing_mode === "manual";
     // A price input shows for manual (LG) lines as always, and for EVERY line
     // when the admin is editing (canPriceAll). A fixed line for anyone else
@@ -251,24 +251,18 @@ export function QuickOrder({
               {priceLabel}
               {inCart ? ` · ${qty} in cart` : ""}
             </span>
-            {/* Godown stock from the last Tally sync: green in-stock+count / red
-                out-of-stock / amber "No data" when never synced (null). Trial
-                pill (owner may pull the No-data state later). Out-of-stock never
-                BLOCKS the sale (the backorder flow handles it) — the red pill +
+            {/* Godown stock from the last Tally sync: green in-stock+count /
+                red out-of-stock — two states only; NULL (never synced) counts
+                as out of stock (owner 2026-07-17). Out-of-stock never BLOCKS
+                the sale (the backorder flow handles it) — the red pill +
                 "will backorder" IS the warning. */}
             <span className={styles.stockLine}>
-              {p.stock_qty === null ? (
-                <span className={`${styles.stockPill} ${styles.stockNone}`}>No data</span>
-              ) : (
-                <>
-                  <span className={`${styles.stockPill} ${p.stock_qty > 0 ? styles.stockIn : styles.stockOut}`}>
-                    {p.stock_qty > 0 ? `In stock · ${p.stock_qty}` : "Out of stock"}
-                  </span>
-                  {p.stock_qty === 0 && <span className={styles.willBackorder}>will backorder</span>}
-                  {p.stock_updated_at && (
-                    <span className={styles.stockAsOf}>as of {formatShortDate(p.stock_updated_at)}</span>
-                  )}
-                </>
+              <span className={`${styles.stockPill} ${stockCount > 0 ? styles.stockIn : styles.stockOut}`}>
+                {stockCount > 0 ? `In stock · ${stockCount}` : "Out of stock"}
+              </span>
+              {stockCount === 0 && <span className={styles.willBackorder}>will backorder</span>}
+              {p.stock_updated_at && (
+                <span className={styles.stockAsOf}>as of {formatShortDate(p.stock_updated_at)}</span>
               )}
             </span>
           </span>
