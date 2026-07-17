@@ -132,6 +132,7 @@ export type Database = {
         Row: {
           id: string
           line_total_paise: number
+          list_price_at_order: number | null
           order_id: string
           picked_qty: number | null
           position: number
@@ -144,6 +145,7 @@ export type Database = {
         Insert: {
           id?: string
           line_total_paise: number
+          list_price_at_order?: number | null
           order_id: string
           picked_qty?: number | null
           position?: number
@@ -156,6 +158,7 @@ export type Database = {
         Update: {
           id?: string
           line_total_paise?: number
+          list_price_at_order?: number | null
           order_id?: string
           picked_qty?: number | null
           position?: number
