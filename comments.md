@@ -4917,3 +4917,23 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** — Feature complete + live on `main`.
+
+---
+
+## Review of df755dd — feat(orders): stock flag restyled to the Quick Order look (dot + text, below the name)
+
+**Verdict:** ✅ code clean (FE-only, tsc/build pass) — **but owner-attributed cosmetic pending the owner's direct confirmation (3rd consecutive restyle of this same flag).**
+
+**What changed (logic UNCHANGED — problems only, NULL = out-of-stock, in-stock nothing):** the order-detail stock flag drops the rounded-rectangle box and mirrors the Quick Order pill — a `currentColor` dot + red text (font-structure 11px/600) on its **own line below** the item name (was inline). Text voice: "Out of stock" / "Partial stock · available N".
+
+**Verification:** on `main` + pushed (live); `tsc`=0, build clean; `stockAtOrderPill` behaviour byte-for-byte the same as before.
+
+**⚠️ Owner-attribution churn (process):** third consecutive restyle of the same order-detail stock flag — `7552278` (owner-confirmed to me) → `ad2a0b2` (owner-attributed, **not** confirmed to me) → `df755dd` (owner-attributed, **not** confirmed to me). The owner is currently asking whether these were authorized. Holding "accept" as **provisional** until the owner confirms the end state — I should not keep rubber-stamping owner-attributed pill cosmetics without a direct nod. Revert target if unwanted: the `354c94b` pill (or wherever the owner wants).
+
+**Blocking issues:** None. **Domain:** display-only; no DB/logic/money.
+
+**What I tried:** read the diff; confirmed the pill logic is unchanged; `tsc` + `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Owner locks the flag's final look + text once; from here I confirm pill changes with the owner directly before accepting, not on the builder's attribution.
