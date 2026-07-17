@@ -132,6 +132,34 @@
   color: var(--color-locked);
 }
 
+/* List-vs-charged (on-screen only). The struck LIST rate sits beside the
+   charged rate; the signed delta reads beneath it; the order-level List line
+   sits just above the Total. All muted — the charged figures stay the loud
+   ones. Money via formatRupees; the % is derived, display-only. */
+.listStruck {
+  text-decoration: line-through;
+  color: var(--color-locked);
+}
+
+.rateDelta {
+  display: block;
+  font-size: 10px;
+  color: var(--color-locked);
+}
+
+.listTotalRow {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 6px;
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.totalDelta {
+  color: var(--color-locked);
+}
+
 .notesBox {
   display: flex;
   flex-direction: column;
