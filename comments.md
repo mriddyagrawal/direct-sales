@@ -4937,3 +4937,23 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** ✅ **Owner confirmed the current flag is good (2026-07-19) — "all of this looks good."** `ad2a0b2` + `df755dd` ratified, accepted **final** (dot + "Out of stock" / "Partial stock · available N", below the item name). Going forward I confirm pill/cosmetic changes with the owner directly, not on builder attribution.
+
+---
+
+## Review of c302a12 — feat(orders): colour the list-price deltas — discount red, markup green
+
+**Verdict:** ✅ code clean (FE-only, tsc/build pass) — owner-attributed cosmetic; quick colour-mapping confirm requested (per the cosmetic-confirmation commitment).
+
+**What changed (display-only, numbers + computation unchanged):** the signed % deltas now carry colour — discount (charged < list, −) → `--color-error` red; markup (+) → `--color-processed` green. Applies to the per-line % (under the struck list) **and** the order-level % (beside the Total, also bumped to 600 weight). New `.deltaDown`/`.deltaUp` classes; `+0%` → green.
+
+**Verification:** on `main` + live; `tsc`=0, build clean; the delta values are unchanged from `15db0fc`.
+
+**Note:** attributed to owner (2026-07-19), not confirmed to me directly — surfacing the semantic for a quick nod (discount = red = margin given away; markup = green = extra margin). Clean either way, trivially flippable.
+
+**Blocking issues:** None. **Domain:** display-only; no DB/logic/money-math change.
+
+**What I tried:** read the diff; confirmed delta computation unchanged; `tsc` + `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** Owner nods (or flips) the discount-red / markup-green mapping.
