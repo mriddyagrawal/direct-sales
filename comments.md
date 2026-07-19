@@ -4957,3 +4957,47 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** Owner nods (or flips) the discount-red / markup-green mapping.
+
+---
+
+## Review of 1f4a510 (+ migration 20260719150009 void-for-all) — feat(db): deposits + deposit_events + create/update/void RPCs + RLS
+
+**Verdict:** ✅ accept — verified live (11-probe battery); the audit log, 1-hour window gate, and void-with-reason are all correct.
+
+**What works (verified live, rolled back):**
+- Tables: **`deposits`** (id, deposit_no, deposit_ref, retailer_id, salesman_id, amount_paise, method, note, editable_until, voided_at/by, void_reason, created_at) + **`deposit_events`** (deposit_id, actor_id, action, details, created_at). Applied as **two honest migrations** (`_deposits` then `_deposits_void_for_all` — void widened to salesman+admin per the owner's "same for the salesman").
+- **`create_deposit`:** sets `salesman_id`=caller, `editable_until`=+1h, `DEP-` ref; **logs 'created'**; amount 0 → "amount must be greater than…", bad method → raise.
+- **`update_deposit`:** gate `(owner AND now() < editable_until AND not voided) OR admin`; **logs 'updated' {before, after}** — proven: `{amount 50000→60000, method cash→cheque, note orig→edited, retailer}`; refuses a **different salesman** and the salesman **after the window**; **admin edits after the window** (90000/online).
+- **`void_deposit`:** same gate; **reason required for both** (empty → "a reason is required to void a deposit"); sets `voided_at/by/reason`; **logs 'voided' {reason}**; refuses a different salesman. **No `delete_deposit` exists** — nothing is hard-deletable.
+- **RLS:** `deposits` salesman→own (`salesman_id = auth.uid()`) / staff→all; `deposit_events` **staff-only**; RLS enabled on both; all writes go through the SECURITY DEFINER RPCs.
+
+**Blocking issues:** None. **Domain / correctness checks:** money paise + `amount_paise > 0` CHECK; **append-only ledger** (void, never delete) with a **full before→after audit trail** — exactly the owner's "keep the logs somehow"; window + role enforced server-side, not just UI.
+
+**What I tried:** 11-scenario `DO`-block battery (create + validate; update owner/other/after-window/admin; void owner/no-reason/other) impersonating salesman / salesman2 / admin via `set_config`, all rolled back; table/RPC/policy-qual inspection.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** FE (below).
+
+---
+
+## Review of 2b13ad9 · da012d6 · 381ef97 — feat: deposits FE (salesman ledger · new/edit/void flow · office view)
+
+**Verdict:** ✅ accept — matches the per-role design; tsc/eslint/build clean.
+
+**What works:**
+- **`deposit-rpcs.ts`:** `createDeposit` / `updateDeposit` / **`voidDeposit(id, reason)`** (no delete), `callRpc` wrapper.
+- **Salesman `/deposits`** (phone-first): own deposits, **hero Today/This-week totals excluding voided**, day-grouped history, method chips, in-window **Edit**, **New-deposit FAB**.
+- **New/edit/void flow** (`DepositFlow`): PickRetailer → amount (`parsePricePaise`) → method (Cash/Cheque/Online) → note → `create_deposit`; edit prefilled → `update_deposit`; **Void with a required reason** (client-checked "A reason is required…" + server-enforced); edit-mode gated to **active + (in-window or admin)**.
+- **Office `/dashboard/deposits`** (shared `DepositsView role="staff"`, **responsive** — 3 `@media`, desktop table ↔ mobile cards): **per-method + per-salesman reconciliation totals** for the chosen day (admin also week/month), `SalesmanFilter`, **voided rows struck + excluded from every total** (both roles), **admin-only per-row Edit/Void** (accountant view-only via `isAdmin`), New-deposit FAB. New **Wallet "Deposits"** dashboard nav tab.
+- `tsc`=0, build "Compiled successfully".
+
+**Blocking issues:** None. **Non-blocking:** the audit trail is captured but there's **no in-app viewer** yet (owner-deferred — all in `deposit_events`, ready whenever).
+
+**Domain / correctness checks:** money paise end-to-end (`parsePricePaise`/`formatRupees`); voided excluded from totals for both roles; the server RPCs are the source of truth and the UI gates mirror them (salesman in-window / admin anytime / accountant view-only).
+
+**What I tried:** read the flow + `DepositsView` + rpcs + nav; grep-confirmed the voided-exclusion, the void-reason gate, the edit gate, and the responsive `@media`; cumulative `tsc` + `npm run build`. A device eyeball of the desktop-table↔mobile-cards is the only thing I can't do.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** — Deposits complete + live on `main`. Optional later: an admin audit-log viewer (the `deposit_events` data is already captured).
