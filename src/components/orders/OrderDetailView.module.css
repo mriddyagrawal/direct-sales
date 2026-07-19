@@ -150,7 +150,6 @@
 .rateDelta {
   display: block;
   font-size: 10px;
-  color: var(--color-locked);
 }
 
 .listTotalRow {
@@ -163,7 +162,18 @@
 }
 
 .totalDelta {
-  color: var(--color-locked);
+  font-weight: 600;
+}
+
+/* Delta colouring (owner 2026-07-19): a discount (charged < list, −) reads RED
+   — a loss against the list — and a markup (+) reads GREEN. Applies to both
+   the per-line % and the order-level (%). */
+.deltaDown {
+  color: var(--color-error);
+}
+
+.deltaUp {
+  color: var(--color-processed);
 }
 
 .notesBox {

@@ -790,7 +790,13 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                           {formatRupees(line.rate)}
                           {(() => {
                             const d = Math.round(((line.rate - line.listPriceAtOrder) / line.listPriceAtOrder) * 100);
-                            return <span className={styles.rateDelta}>{`${d >= 0 ? "+" : "−"}${Math.abs(d)}%`}</span>;
+                            // Signed AND colored (owner 2026-07-19): a discount
+                            // (−) reads red, a markup (+) reads green.
+                            return (
+                              <span className={`${styles.rateDelta} ${d >= 0 ? styles.deltaUp : styles.deltaDown}`}>
+                                {`${d >= 0 ? "+" : "−"}${Math.abs(d)}%`}
+                              </span>
+                            );
                           })()}
                         </>
                       ) : (
@@ -855,7 +861,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
             <span className={styles.mono}>
               Total (incl. GST) {formatRupees(order.totalPaise)}
               {offList && (
-                <span className={styles.totalDelta}>
+                <span className={`${styles.totalDelta} ${orderDeltaPct >= 0 ? styles.deltaUp : styles.deltaDown}`}>
                   {" "}
                   ({orderDeltaPct >= 0 ? "+" : "−"}
                   {Math.abs(orderDeltaPct)}%)
