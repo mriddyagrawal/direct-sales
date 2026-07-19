@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReceiptText, Store, Package, Users } from "lucide-react";
+import { ReceiptText, Store, Package, Users, Wallet } from "lucide-react";
 import { SignOutButton } from "@/components/SignOutButton";
 import { Glyph } from "@/components/ui/Glyph";
 import styles from "./DashboardNav.module.css";
@@ -22,6 +22,7 @@ const BASE_TABS = [
   },
   { href: "/dashboard/retailers", label: "Retailers", icon: Store, match: (p: string) => p.startsWith("/dashboard/retailers") },
   { href: "/dashboard/products", label: "Products", icon: Package, match: (p: string) => p.startsWith("/dashboard/products") },
+  { href: "/dashboard/deposits", label: "Deposits", icon: Wallet, match: (p: string) => p.startsWith("/dashboard/deposits") },
 ];
 
 // Users is admin-only — an accountant never sees the tab (and the page + every
