@@ -4936,4 +4936,4 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
-**Next-commit suggestion:** Owner locks the flag's final look + text once; from here I confirm pill changes with the owner directly before accepting, not on the builder's attribution.
+**Next-commit suggestion:** ✅ **Owner confirmed the current flag is good (2026-07-19) — "all of this looks good."** `ad2a0b2` + `df755dd` ratified, accepted **final** (dot + "Out of stock" / "Partial stock · available N", below the item name). Going forward I confirm pill/cosmetic changes with the owner directly, not on builder attribution.
