@@ -5001,3 +5001,23 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** — Deposits complete + live on `main`. Optional later: an admin audit-log viewer (the `deposit_events` data is already captured).
+
+---
+
+## Review of f761202 — feat(deposits): note under the amount on the dashboard table + "#" seed for UPI
+
+**Verdict:** ✅ accept — clean FE UX polish (owner-attributed 2026-07-19); tsc/build clean.
+
+**What changed:**
+- **Office table:** the note (cheque no. / UPI ref) moved from under the RETAILER to under the AMOUNT — it reads with the money it explains; void reasons stay under the retailer.
+- **DepositFlow:** picking **Online (UPI)** seeds the note box with **"#"** (a paste-the-ref nudge), freely backspaceable; switching method clears the seed **only if it's still the untouched "#"**; a bare "#" is **never saved** as a note (`cleanNote = trim === '#' ? '' : trim`).
+
+**What works:** the seed-toggle + cleanNote logic are careful — only the exact untouched "#" is seeded/removed/stripped, so no junk notes land and a real "#12345" ref is preserved; tsc=0, build clean; on `main` + live.
+
+**Blocking issues:** None. **Domain:** display/UX only; no DB/money-math change.
+
+**What I tried:** read the diff (table note placement + the seed/cleanNote logic); `tsc` + `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
