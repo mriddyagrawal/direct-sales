@@ -346,10 +346,12 @@ export function DepositsView({ deposits, role, isAdmin = false }: DepositsViewPr
                       <td className={voided ? styles.voided : ""}>
                         {d.retailers?.name ?? "Unknown retailer"}
                         {voided && d.void_reason && <span className={styles.voidNote}>voided: {d.void_reason}</span>}
-                        {!voided && d.note && <span className={styles.tableNote}>{d.note}</span>}
                       </td>
+                      {/* Note sits UNDER the amount (owner 2026-07-19) — the
+                          cheque no. / UPI ref reads with the money it explains. */}
                       <td className={`${styles.mono} ${styles.numeric} ${voided ? styles.voided : ""}`}>
                         {formatRupees(d.amount_paise)}
+                        {!voided && d.note && <span className={styles.tableNote}>{d.note}</span>}
                       </td>
                       <td>
                         <MethodChip method={d.method} />

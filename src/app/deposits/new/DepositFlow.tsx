@@ -68,6 +68,15 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     setStep("form");
   }
 
+  // Picking Online (UPI) seeds the note with "#" as a nudge to paste the UPI
+  // ref — plain state, so it's freely backspaceable. Switching away removes
+  // the seed only if it's still exactly the untouched "#".
+  function pickMethod(m: DepositMethod) {
+    setMethod(m);
+    if (m === "online" && note.trim() === "") setNote("#");
+    else if (m !== "online" && note === "#") setNote("");
+  }
+
   async function handleSave() {
     const parsed = parsePricePaise(amountText);
     if (!parsed.ok) {
@@ -85,11 +94,13 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     if (!retailer) return; // unreachable — the form step requires a pick
     setSaving(true);
     setError(null);
+    // An untouched "#" seed is not a note — never save it as one.
+    const cleanNote = note.trim() === "#" ? "" : note.trim();
     try {
       if (isEdit) {
-        await updateDeposit(editDeposit!.id, retailer.id, parsed.paise, method, note.trim() || undefined);
+        await updateDeposit(editDeposit!.id, retailer.id, parsed.paise, method, cleanNote || undefined);
       } else {
-        await createDeposit(retailer.id, parsed.paise, method, note.trim() || undefined);
+        await createDeposit(retailer.id, parsed.paise, method, cleanNote || undefined);
       }
       router.push(returnTo);
       router.refresh();
@@ -166,7 +177,7 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
               key={m.value}
               type="button"
               className={`${styles.methodBtn} ${method === m.value ? styles.methodBtnActive : ""}`}
-              onClick={() => setMethod(m.value)}
+              onClick={() => pickMethod(m.value)}
             >
               {m.label}
             </button>
