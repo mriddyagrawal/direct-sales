@@ -1,0 +1,174 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.retailerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.retailerName {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.retailerArea {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.changeLink {
+  background: none;
+  border: none;
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+  padding: 8px;
+}
+
+.fieldLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  color: var(--color-locked);
+  border-left: 2px solid var(--color-accent);
+  padding-left: 8px;
+  margin-top: 8px;
+}
+
+/* Big, satisfying amount entry — the number is the point of the screen. */
+.amountField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.amountField:focus-within {
+  border-color: var(--color-accent);
+}
+
+.amountPrefix {
+  font-family: var(--font-figures);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-locked);
+}
+
+.amountInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  font-family: var(--font-figures);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.methodSeg {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.methodBtn {
+  min-height: var(--touch-target-min);
+  background: var(--color-white);
+  border: none;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+}
+
+.methodBtn + .methodBtn {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.methodBtnActive {
+  background: var(--color-accent);
+  color: var(--color-white);
+}
+
+.noteInput {
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+}
+
+.noteInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.error {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}
+
+.confirmTitle {
+  font-family: var(--font-structure);
+  font-size: var(--text-header-size);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.confirmBody {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reasonInput {
+  min-height: 72px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  resize: vertical;
+}
