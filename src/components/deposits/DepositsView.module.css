@@ -1,0 +1,446 @@
+/* Deposits — salesman ledger + office reconciliation (owner design 2026-07-19).
+   Same visual grammar as the Orders list: hairlines, mono figures, muted meta,
+   day-group headers; totals are the hero. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  padding-bottom: 96px; /* room for the FAB */
+}
+
+.title {
+  font-family: var(--font-structure);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* ---- Salesman hero: Today · This week ---- */
+.heroBand {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+
+.heroStat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.heroLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  color: var(--color-locked);
+}
+
+.heroValue {
+  font-family: var(--font-figures);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.heroValueBig {
+  font-size: 28px;
+}
+
+/* ---- Staff controls + reconciliation hero ---- */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.dayPicker {
+  min-height: 44px;
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.rangeSeg {
+  display: inline-flex;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.rangeBtn {
+  min-height: 44px;
+  padding: 0 14px;
+  background: var(--color-white);
+  border: none;
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+}
+
+.rangeBtn + .rangeBtn {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.rangeBtnActive {
+  background: var(--color-ink);
+  color: var(--color-white);
+}
+
+.reconGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 720px) {
+  .reconGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.reconCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+}
+
+.reconLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  color: var(--color-locked);
+  border-left: 2px solid var(--color-accent);
+  padding-left: 8px;
+}
+
+.reconLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.reconTotal {
+  padding-top: 6px;
+  border-top: 2px solid var(--color-ink);
+  font-weight: 700;
+}
+
+.reconAmount {
+  font-family: var(--font-figures);
+  font-weight: 600;
+}
+
+.reconEmpty {
+  color: var(--color-locked);
+}
+
+/* ---- Day-grouped list ---- */
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupHeader {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+  padding: 10px 0 6px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  text-decoration: none;
+  color: inherit;
+}
+
+.rowTappable {
+  cursor: pointer;
+}
+
+.rowTappable:active {
+  background: var(--color-paper);
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rowRetailer {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.rowMeta {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+.rowSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.rowAmount {
+  font-family: var(--font-figures);
+  font-size: var(--text-body-size);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.rowTime {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+/* ---- Method chips: dot + text, same language as the stock pills ---- */
+.methodChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.methodChip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.methodCash {
+  color: var(--color-processed);
+}
+
+.methodCheque {
+  color: var(--color-amber);
+}
+
+.methodOnline {
+  color: var(--color-accent);
+}
+
+/* ---- Empty state ---- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.emptyLead {
+  font-family: var(--font-structure);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.emptyHint {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+/* ---- Voided rows: struck + muted, everywhere ---- */
+.voided {
+  text-decoration: line-through;
+  color: var(--color-locked);
+}
+
+.rowVoided td {
+  color: var(--color-locked);
+}
+
+.voidNote,
+.tableNote {
+  display: block;
+  font-size: 11px;
+  color: var(--color-locked);
+  text-decoration: none;
+}
+
+/* ---- Desktop table (staff) ↔ mobile cards — OrdersView's split ---- */
+.table {
+  display: none;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-align: left;
+  color: var(--color-locked);
+  border-bottom: 2px solid var(--color-ink);
+  padding: 8px 10px 6px;
+}
+
+.table td {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 10px;
+  vertical-align: top;
+}
+
+.mono {
+  font-family: var(--font-figures);
+}
+
+.numeric {
+  text-align: right;
+}
+
+.actionsCell {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.actionLink {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+  padding: 6px 8px;
+}
+
+.actionVoid {
+  background: none;
+  border: none;
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-error);
+  cursor: pointer;
+  padding: 6px 8px;
+}
+
+@media (min-width: 768px) {
+  .table {
+    display: table;
+  }
+
+  .cardsMobile {
+    display: none;
+  }
+}
+
+/* ---- Void sheet (reason required) ---- */
+.confirmTitle {
+  font-family: var(--font-structure);
+  font-size: var(--text-header-size);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.confirmBody {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.reasonLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+  border-left: 2px solid var(--color-accent);
+  padding-left: 8px;
+}
+
+.reasonInput {
+  min-height: 72px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  resize: vertical;
+}
+
+.error {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ---- FAB (mirrors the Orders New-order FAB) ---- */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  background: var(--color-accent);
+  color: var(--color-white);
+  border-radius: 24px;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (min-width: 1024px) {
+  .fab {
+    right: 32px;
+    bottom: 32px;
+  }
+}
