@@ -44,6 +44,118 @@ export type Database = {
         }
         Relationships: []
       }
+      deposit_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          deposit_id: string
+          details: Json
+          id: number
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          deposit_id: string
+          details?: Json
+          id?: number
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          deposit_id?: string
+          details?: Json
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deposit_events_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "deposits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deposit_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deposits: {
+        Row: {
+          amount_paise: number
+          created_at: string
+          deposit_no: number
+          deposit_ref: string
+          editable_until: string
+          id: string
+          method: string
+          note: string | null
+          retailer_id: string
+          salesman_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          amount_paise: number
+          created_at?: string
+          deposit_no?: number
+          deposit_ref: string
+          editable_until: string
+          id?: string
+          method: string
+          note?: string | null
+          retailer_id: string
+          salesman_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          amount_paise?: number
+          created_at?: string
+          deposit_no?: number
+          deposit_ref?: string
+          editable_until?: string
+          id?: string
+          method?: string
+          note?: string | null
+          retailer_id?: string
+          salesman_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deposits_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deposits_salesman_id_fkey"
+            columns: ["salesman_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deposits_voided_by_fkey"
+            columns: ["voided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_events: {
         Row: {
           action: string
@@ -537,6 +649,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_deposit: {
+        Args: {
+          p_amount_paise: number
+          p_method: string
+          p_note?: string
+          p_retailer_id: string
+        }
+        Returns: {
+          amount_paise: number
+          created_at: string
+          deposit_no: number
+          deposit_ref: string
+          editable_until: string
+          id: string
+          method: string
+          note: string | null
+          retailer_id: string
+          salesman_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "deposits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       delete_product: { Args: { p_id: string }; Returns: undefined }
       dispatch_order: {
         Args: { p_note?: string; p_order_id: string }
@@ -811,6 +952,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_deposit: {
+        Args: {
+          p_amount_paise: number
+          p_id: string
+          p_method: string
+          p_note?: string
+          p_retailer_id: string
+        }
+        Returns: {
+          amount_paise: number
+          created_at: string
+          deposit_no: number
+          deposit_ref: string
+          editable_until: string
+          id: string
+          method: string
+          note: string | null
+          retailer_id: string
+          salesman_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "deposits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_order_items: {
         Args: {
           p_items: Json
@@ -850,6 +1021,30 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      void_deposit: {
+        Args: { p_id: string; p_reason: string }
+        Returns: {
+          amount_paise: number
+          created_at: string
+          deposit_no: number
+          deposit_ref: string
+          editable_until: string
+          id: string
+          method: string
+          note: string | null
+          retailer_id: string
+          salesman_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "deposits"
           isOneToOne: true
           isSetofReturn: false
         }
