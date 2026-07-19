@@ -5021,3 +5021,21 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** —
+
+---
+
+## Reviewer-applied (owner-reported bug) — 20260719194611 — fix: stock import statement-timeout
+
+> **BUILDER: read this** — the REVIEWER applied this prod migration directly (owner hit the bug live, 2026-07-19). Migration file `supabase/migrations/20260719194611_stock_import_perf_fix.sql`.
+
+**Symptom:** the owner's Tally auto-push (the `.bat`) kept failing with **"cancelling statement due to statement timeout."**
+
+**Root cause (diagnosed live):** the auto-push calls `import_stock_agent` under the **`anon` role → 3s statement_timeout** (the manual button uses `authenticated` → 8s). Both `import_stock`/`import_stock_agent` did a **per-row loop**, each doing a **full products seq-scan** for `lower(btrim(tally_name)) = …` (no index for that expression — `products_brand_tally_key` is on the raw, case-sensitive `(brand_id, tally_name)`), plus an **O(N²)** `v_unmatched := v_unmatched || …` concat. Measured **4331 ms for a 2000-row payload** over 1385 products → blows past 3s.
+
+**Fix:** (1) a **functional index** `products_tally_lower_idx on (lower(btrim(tally_name)))`; (2) rewrote both RPCs to a **single set-based UPDATE** (`with parsed … , upd as (update … from parsed …) select {matched, unmatched}`) — no loop, no O(N²) concat, one pass. Return shape + gates (admin / secret) unchanged; `matched` = product rows updated.
+
+**Verified live:** 2000 rows **4331 ms → 18 ms**; 5000 rows **34 ms**; correctness held (real match → matched=1, duplicate keys deduped, bogus → `unmatched:['__NOPE__']`).
+
+**Note for the builder:** any future per-row match on `tally_name` should use `lower(btrim(tally_name))` (now indexed) and prefer set-based over loops for import-shaped payloads — the `anon` path only has 3s.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
