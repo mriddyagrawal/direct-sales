@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
@@ -67,6 +67,61 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
 const ORDERS_SELECT =
   "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
 
+// Filter state persisted across a navigation away-and-back (open an order, hit
+// back — the tab/salesman/brand/date/search you had are still there). Kept in
+// sessionStorage: sticky through a working session, clean on a fresh app open
+// (a phone PWA is backgrounded/killed constantly — a filter silently surviving
+// for days would leave someone stuck on a stale/empty view). Keyed per route
+// so each list surface (salesman "/", staff "/dashboard", the godown pages)
+// keeps its own. The DateRange's Dates ride as ISO strings.
+interface PersistedFilters {
+  query: string;
+  status: StatusFilter;
+  salesmanId: string;
+  brandId: string;
+  from: string | null;
+  to: string | null;
+}
+
+// The five filters live in ONE reducer (not five useStates) so the on-mount
+// restore is a single `dispatch` — the app's established resume-from-storage
+// pattern (NewOrderFlow.RESUME_ON_MOUNT), which the `set-state-in-effect` lint
+// rule allows, unlike a setState in an effect.
+interface FilterState {
+  query: string;
+  status: StatusFilter;
+  salesmanId: string;
+  brandId: string;
+  range: DateRange | undefined;
+}
+
+type FilterAction =
+  | { type: "query"; value: string }
+  | { type: "status"; value: StatusFilter }
+  | { type: "salesman"; value: string }
+  | { type: "brand"; value: string }
+  | { type: "range"; value: DateRange | undefined }
+  | { type: "restore"; patch: Partial<FilterState> };
+
+function filterReducer(state: FilterState, action: FilterAction): FilterState {
+  switch (action.type) {
+    case "query":
+      return { ...state, query: action.value };
+    case "status":
+      return { ...state, status: action.value };
+    case "salesman":
+      return { ...state, salesmanId: action.value };
+    case "brand":
+      return { ...state, brandId: action.value };
+    case "range":
+      return { ...state, range: action.value };
+    case "restore":
+      return { ...state, ...action.patch };
+    default:
+      return state;
+  }
+}
+
 interface OrdersViewProps {
   initialOrders: OrderListRow[];
   salesmen: SalesmanOption[];
@@ -104,16 +159,20 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       ? []
       : (["all", "pending_approval", "approved", "ready_to_bill", "billed", "dispatched", "cancelled", "backorder"] as StatusFilter[]));
   const router = useRouter();
+  // One persisted-filter bucket per list route (see PersistedFilters).
+  const pathname = usePathname();
+  const storageKey = `ganpati:orders-filters:${pathname}`;
   const [orders, setOrders] = useState(initialOrders);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
-  const [query, setQuery] = useState("");
   // Default active tab: the first chip when there's no "All" (godown Home), else "all".
-  const [status, setStatus] = useState<StatusFilter>(() =>
-    chipTabs.length > 0 && !chipTabs.includes("all") ? chipTabs[0] : "all",
-  );
-  const [salesmanId, setSalesmanId] = useState("all");
-  const [brandId, setBrandId] = useState("all");
-  const [range, setRange] = useState<DateRange | undefined>(DEFAULT_RANGE);
+  const [filters, dispatchFilter] = useReducer(filterReducer, chipTabs, (tabs): FilterState => ({
+    query: "",
+    status: tabs.length > 0 && !tabs.includes("all") ? tabs[0] : "all",
+    salesmanId: "all",
+    brandId: "all",
+    range: DEFAULT_RANGE(), // lazy init runs once on mount → "now" captured fresh
+  }));
+  const { query, status, salesmanId, brandId, range } = filters;
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [tick, setTick] = useState(nowMs);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -184,6 +243,61 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
     // isStaff/currentUserId are stable props — this resubscribes only if the
     // role somehow changed under us (it can't; belt and suspenders for lint).
   }, [isStaff, currentUserId]);
+
+  // Restore persisted filters ONCE on mount — in an effect, not the useState
+  // initializer, so the first client render matches the server (defaults) and
+  // never trips a hydration mismatch (sessionStorage is client-only). Each
+  // value is validated against the CURRENT props before it's applied — a saved
+  // salesman who's since been deactivated, or a status that isn't a live tab,
+  // falls back to the default instead of stranding the user on an empty list.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (!raw) return;
+      const p = JSON.parse(raw) as Partial<PersistedFilters>;
+      const patch: Partial<FilterState> = {};
+      if (typeof p.query === "string") patch.query = p.query;
+      if (typeof p.status === "string" && chipTabs.includes(p.status as StatusFilter)) patch.status = p.status as StatusFilter;
+      if (typeof p.salesmanId === "string" && (p.salesmanId === "all" || salesmen.some((s) => s.id === p.salesmanId)))
+        patch.salesmanId = p.salesmanId;
+      if (typeof p.brandId === "string" && (p.brandId === "all" || brands.some((b) => b.id === p.brandId)))
+        patch.brandId = p.brandId;
+      // The whole bucket is written together, so a present entry always carries
+      // the range: both null = the user deliberately cleared it (→ undefined),
+      // otherwise the saved dates.
+      patch.range =
+        p.from || p.to ? { from: p.from ? new Date(p.from) : undefined, to: p.to ? new Date(p.to) : undefined } : undefined;
+      dispatchFilter({ type: "restore", patch });
+    } catch {
+      // Corrupt/blocked storage — ignore and keep the defaults.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist on every filter change. The first (mount) run is skipped so it can
+  // never clobber a stored bucket with the defaults BEFORE the restore effect
+  // above has read it — after that, each change writes through.
+  const hydratedForWrite = useRef(false);
+  useEffect(() => {
+    if (!hydratedForWrite.current) {
+      hydratedForWrite.current = true;
+      return;
+    }
+    try {
+      const payload: PersistedFilters = {
+        query,
+        status,
+        salesmanId,
+        brandId,
+        from: range?.from ? range.from.toISOString() : null,
+        to: range?.to ? range.to.toISOString() : null,
+      };
+      sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch {
+      // Storage disabled/full — non-fatal; filters just won't persist.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const now = useMemo(() => new Date(tick), [tick]);
 
@@ -277,7 +391,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
                 key={s}
                 type="button"
                 className={`${styles.filterTab} ${status === s ? styles.filterTabActive : ""}`}
-                onClick={() => setStatus(s)}
+                onClick={() => dispatchFilter({ type: "status", value: s })}
               >
                 {STATUS_LABEL[s]} <span className={styles.tabCount}>{tabCounts[s]}</span>
               </button>
@@ -291,12 +405,12 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
               row is untouched). */}
           {isStaff && (
             <div className={styles.filterHalves}>
-              <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={setSalesmanId} />
-              {multiBrand && <BrandFilter brands={brands} value={brandId} onChange={setBrandId} />}
+              <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={(value) => dispatchFilter({ type: "salesman", value })} />
+              {multiBrand && <BrandFilter brands={brands} value={brandId} onChange={(value) => dispatchFilter({ type: "brand", value })} />}
             </div>
           )}
           <div className={styles.filterFull}>
-            <DateRangeFilter value={range} onChange={setRange} />
+            <DateRangeFilter value={range} onChange={(value) => dispatchFilter({ type: "range", value })} />
           </div>
           <div className={styles.searchWrap}>
             <Glyph icon={Search} size={14} />
@@ -304,7 +418,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
               ref={searchRef}
               className={styles.search}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => dispatchFilter({ type: "query", value: e.target.value })}
               placeholder="Search ref or retailer"
             />
           </div>
