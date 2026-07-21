@@ -5093,3 +5093,34 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** —
+
+---
+
+## Review of b5e446f — feat(new-order): Quick Order stock-first grouping — in-stock categories then "(out of stock)" categories per brand, all alphabetical
+
+**Verdict:** ✅ accept — implements the owner-locked spec (prompt `86eb4d8`) exactly; algorithm proven by execution, tsc/eslint/build all clean.
+
+**Goal:** within each brand, split every category by stock so a category renders up to twice — its in-stock items (plain header) then its out-of-stock/never-synced items (`{Category} (out of stock)` header). All in-stock categories precede all out-of-stock ones; brands, categories-per-block, and products-by-name all A→Z. Pure client regroup, no DB.
+
+**What works (verified by execution):**
+- **Algorithm invariants proven** — I extracted the commit's exact `toCategoryGroups` + partition (`(stock_qty ?? 0) > 0` in / `<= 0` out) and ran it over a dataset mirroring the **real LG shape** (pulled live: `LG Speaker`/`Microwave`/`Refrigerator` with a null-heavy mix + scattered qty>0 + an explicit qty=0, in creation order). All five invariants hold: (1) every in-stock group precedes every out-of-stock group; (2) categories A→Z within each block; (3) products A→Z within each category; (4) classification correct — **qty=0 AND null both land in the out block**, qty>0 in the in block; (5) no product lost or duplicated. Output header sequence was exactly `LG Speaker / Microwave / Refrigerator` (in) then the same three `(out of stock)`.
+- **A category with only out-of-stock items renders just the `(out of stock)` header** (empty in-stock partition → no group) — no empty/ghost headers. Confirmed in the simulation.
+- **Key uniqueness holds** — `renderCategory` keys on `` `${category}__${out?'out':'in'}` ``; a category appears at most once per block per brand, and the flat `allCategories` path only runs single-brand (`!showBrandTier` ⇒ `effectiveBrand!==null` or `!multiBrand` ⇒ `visible` is one brand), so no sibling-key collision on either render path.
+- **`visible` now memoized** on `[products, q, effectiveBrand]` and `brandGroups` keyed off `[visible]`; the dropped `items`/`brandFilter`/`query` deps are carried transitively (items→cartBrandId→effectiveBrand; query→q) — no stale grouping, no render-loop.
+- **Per-row stock pills, search, cart, "no longer orderable" section untouched.** Search still splits in/out because grouping is built from the filtered `visible`.
+- tsc `--noEmit`=0; `eslint QuickOrder.tsx` clean; `npm run build` success on HEAD b5e446f. Commit message claims literally accurate.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+- Product sort is `name.localeCompare` (lexical), so numeric-in-name widths sort lexically (e.g. `180L` before `90L`). Matches the spec ("alphabetical by name") and is expected, not a defect — flag only if the owner later wants natural/numeric sort.
+- LG's 511 never-synced items now form a large `(out of stock)` block under LG — expected per the owner's null→out decision (the in-stock items still float to the top, which was the goal).
+- The live LG data shows many **duplicate-named** products (e.g. repeated `LG SPEAKER`, `Single Door Fridge 185L 2⋆ (Shiny Steel)`) — distinct SKU rows that now cluster together under the sort. Pre-existing catalog data, **not** introduced here; noting for a future data-hygiene pass, not against this commit.
+
+**Domain / correctness checks:** FE-only — **no DB / query / RLS / money touched** (confirmed: no `.select`/RPC/migration in the diff). Mobile Quick Order is the hero surface; grouping/ordering verified by execution rather than by reading JSX. Scale guard-comment left in place (client regroup valid under the row cap; DB-side ordering/search/virtualization deferred to the Bajaj perf pass — correct).
+
+**What I tried:** read the full diff; pulled the live LG stock distribution (per-category null/zero/positive mix); wrote + ran a Node harness of the commit's exact grouping algorithm asserting the 5 invariants (all pass); `npx tsc --noEmit`; `npx eslint src/app/new-order/QuickOrder.tsx`; `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** the "Now available"/"N available" order-detail tag (prompt `4c911ce`) is the other queued spec; otherwise the Bajaj perf pass is where this page's DB-side/virtualized version lands.
