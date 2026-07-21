@@ -177,6 +177,23 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
   const [tick, setTick] = useState(nowMs);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Salesman-filter options = the canonical salesmen UNION whoever actually
+  // owns a loaded order. submit_order stamps salesman_id = the creator, so an
+  // admin (or accountant) who creates/punches an order owns it — role-scoping
+  // the list to 'salesman' would drop those orders from the filter entirely.
+  // Names come off each order's profiles join; deriving from `orders` keeps it
+  // fresh as Realtime adds rows. Additive: every canonical salesman still
+  // appears. Defined here (above the restore effect) so the persisted-filter
+  // validation can check against it too.
+  const salesmanOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of salesmen) map.set(s.id, s.full_name);
+    for (const o of orders) if (!map.has(o.salesman_id)) map.set(o.salesman_id, o.profiles?.full_name ?? "Unknown");
+    return [...map.entries()]
+      .map(([id, full_name]) => ({ id, full_name }))
+      .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [salesmen, orders]);
+
   useEffect(() => {
     const id = setInterval(() => setTick(nowMs()), 30000);
     return () => clearInterval(id);
@@ -258,7 +275,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       const patch: Partial<FilterState> = {};
       if (typeof p.query === "string") patch.query = p.query;
       if (typeof p.status === "string" && chipTabs.includes(p.status as StatusFilter)) patch.status = p.status as StatusFilter;
-      if (typeof p.salesmanId === "string" && (p.salesmanId === "all" || salesmen.some((s) => s.id === p.salesmanId)))
+      if (typeof p.salesmanId === "string" && (p.salesmanId === "all" || salesmanOptions.some((s) => s.id === p.salesmanId)))
         patch.salesmanId = p.salesmanId;
       if (typeof p.brandId === "string" && (p.brandId === "all" || brands.some((b) => b.id === p.brandId)))
         patch.brandId = p.brandId;
@@ -405,7 +422,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
               row is untouched). */}
           {isStaff && (
             <div className={styles.filterHalves}>
-              <SalesmanFilter salesmen={salesmen} value={salesmanId} onChange={(value) => dispatchFilter({ type: "salesman", value })} />
+              <SalesmanFilter salesmen={salesmanOptions} value={salesmanId} onChange={(value) => dispatchFilter({ type: "salesman", value })} />
               {multiBrand && <BrandFilter brands={brands} value={brandId} onChange={(value) => dispatchFilter({ type: "brand", value })} />}
             </div>
           )}
