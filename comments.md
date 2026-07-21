@@ -5039,3 +5039,57 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Note for the builder:** any future per-row match on `tally_name` should use `lower(btrim(tally_name))` (now indexed) and prefer set-based over loops for import-shaped payloads — the `anon` path only has 3s.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+---
+
+## Review of c173aae — feat(orders): persist list filters across navigation (sessionStorage)
+
+**Verdict:** ✅ accept — FE-only reducer refactor + per-route filter persistence; tsc/eslint/build all clean, logic sound.
+
+**What changed:** the five orders-list filters (search / status tab / salesman / brand / date range) moved from 5 `useState`s into ONE `useReducer` (`filterReducer` + `FilterAction`), and now persist to `sessionStorage` keyed per route (`ganpati:orders-filters:<pathname>`). Restore runs in an on-mount effect (validated against current props); a write effect persists on every change, skipping the first (mount) run.
+
+**What works (verified):**
+- **`DEFAULT_RANGE()` is genuinely callable** — [lib/date-range.ts:58](src/lib/date-range.ts#L58) `export function DEFAULT_RANGE(): DateRange | undefined`; the reducer lazy-init calls it explicitly, and the old `useState(DEFAULT_RANGE)` was a lazy initializer of the same function — both correct, no regression (the `min(uuid)`-style trap of calling a non-function does not apply).
+- **Hydration-safe:** restore is in an effect, not the `useReducer` initializer, so the first client render matches the SSR defaults — no mismatch (sessionStorage is client-only). Confirmed by a clean `next build` (all routes compiled).
+- **No default-clobber:** the write effect's `hydratedForWrite` ref skips the mount run, so it can't overwrite a stored bucket with defaults before the restore effect reads it. Effect order (restore defined above write) + the skip make the mount sequence safe whether or not a bucket exists.
+- **Prop-validated restore:** a saved status not in the current `chipTabs`, a `salesmanId` not in `salesmen`, or a `brandId` not in `brands` falls back to default instead of stranding the user on an empty list; range round-trips via ISO. Per-route key isolates salesman `/`, staff `/dashboard`, and godown lists.
+- tsc `--noEmit` = 0; `eslint OrdersView.tsx` = clean; `npm run build` = success.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** sessionStorage (not local) is the right call for a PWA that's killed often — a filter silently surviving for days would strand someone; no change wanted.
+
+**Domain / correctness checks:** FE-only, **no DB / RLS / money touched**. Order state machine, snapshots, RLS all untouched. Mobile Quick Order not in this commit (this is the orders *list*). Filter predicate logic unchanged — only the state plumbing moved.
+
+**What I tried:** read the full diff; traced restore/write effect ordering + the `hydratedForWrite` skip; confirmed `DEFAULT_RANGE` is a function; `npx tsc --noEmit`, `npx eslint`, `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** — (5696acb already builds on this, reviewed below).
+
+---
+
+## Review of 5696acb — fix(orders): salesman filter lists every order-owner, incl. admin/accountant
+
+**Verdict:** ✅ accept — correct, additive fix; tsc/eslint/build clean.
+
+**Phase / goal:** `submit_order` stamps `salesman_id` = whoever creates/punches the order, so admin/accountant-owned orders were unfilterable (the dropdown sourced only `profiles.role='salesman'`). Fix derives the filter options as the canonical salesmen UNION the distinct owners of the loaded orders.
+
+**What works (verified):**
+- **`salesmanOptions`** ([OrdersView.tsx:187](src/components/orders/OrdersView.tsx#L187)) = `salesmen` ∪ `{o.salesman_id → o.profiles?.full_name ?? "Unknown"}` over loaded `orders`, deduped by id (Map), sorted by name; memoized on `[salesmen, orders]` so it stays fresh as Realtime adds rows. Types check out: it yields `{id, full_name}` and `SalesmanOption` is exactly `{id, full_name}` ([:36](src/components/orders/OrdersView.tsx#L36)); `OrderListRow` carries `salesman_id` + `profiles.full_name` ([:29](src/components/orders/OrdersView.tsx#L29), [:32](src/components/orders/OrdersView.tsx#L32)), both already in `ORDERS_SELECT`.
+- **Additive:** every canonical salesman still appears (seeded first); admin/accountant owners are added, not substituted.
+- The filter predicate (`o.salesman_id !== salesmanId`, [:337](src/components/orders/OrdersView.tsx#L337)) already keys on `salesman_id`, so selecting an admin/accountant id filters correctly with no predicate change.
+- **Restore validation upgraded consistently** — the persisted `salesmanId` now validates against `salesmanOptions` (not just `salesmen`), so an admin/accountant filter survives back-nav too (folds cleanly into c173aae).
+- tsc `--noEmit` = 0; eslint clean; `npm run build` = success.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:** an owner whose orders fall outside the bounded initial fetch (page.tsx caps ~300) won't appear in the dropdown until their rows load — acceptable and consistent with the existing bounded-fetch seam; a null owner name renders "Unknown" (cosmetic, rare).
+
+**Domain / correctness checks:** FE-only, **no DB change** — this reads existing joined data; RLS/state-machine/money untouched. Same self-maintaining pattern DepositsView already uses.
+
+**What I tried:** read the diff; confirmed `OrderListRow` fields + `SalesmanOption` shape against the derived options and `SalesmanFilter` prop type; `npx tsc --noEmit`, `npx eslint`, `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** —
