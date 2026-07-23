@@ -5171,3 +5171,34 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** 🔴 ㊸ **CLOSED** (products.module.css tracked at 7db83ff). No 🔴 open. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **Products page (f7dce1b + 7db83ff) now complete & shippable.**
 
 **Next-commit suggestion:** the "Now available"/"N available" order-detail tag (`4c911ce`) is the remaining queued spec (still pending the owner's recovery-only-vs-every-line call).
+
+---
+
+## Review of 58a4b85 — feat(orders): live "Now available"/"N available" tag on order-time-short lines (current godown stock vs ordered qty)
+
+**Verdict:** ✅ accept — implements the `4c911ce` spec exactly (the **recovery-only** variant); logic proven by a 12-case truth table + real-data classification, tsc/eslint/build clean.
+
+**Goal:** a green live-availability tag beside the immutable red order-time pill, on lines that were SHORT at order time — `current ≥ qty` → "Now available", `1..qty-1` → "{n} available", else nothing; only on not-yet-fulfilled orders; both pills shown together.
+
+**What works (verified by execution):**
+- **Truth table — 12 cases pass** (`nowavail_test.mjs`, faithful copy of `stockAtOrderPill` + `nowAvailableTag` + the call-site gate): out/partial-at-order × {current ≥ qty → "Now available", 1..qty-1 → "{n} available", 0/null → red-only} × {approved/pending/backorder/ready → green shows; billed/dispatched/cancelled → red-only}; in-stock-at-order (pill null) → nothing; `s==qty` at order → nothing. Every expected pill+tag pair matched.
+- **Real-data classification correct** — ran the exact gate as SQL over live short-at-order lines: all current ones sit on **billed/cancelled** orders → "red pill only (status fulfilled)", none wrongly showing green. (No active-status short line exists right now to render the green path live — a data state, not a defect; the truth table covers that path.)
+- **Data embed** — `order-detail-data.ts` widened `products(tally_name)` → `products(tally_name, stock_qty)`; both `OrderDetailItemRow.products` and OrderDetailView's local `OrderItemRow.products` gain `stock_qty: number | null` (kept in sync). **RLS fine, no policy change** — the salesman already reads `products.stock_qty` (Quick Order shows it to him); the embed reads the same column via the order_items→products join under the same row-level products policy.
+- **Threading** — `currentStock` carried through `lineExtraByProduct` (`it.products?.stock_qty ?? null`) → `lines` (`extra?.currentStock ?? null`), mirroring `stockAtOrder`.
+- **Gate** — `liveTag = pill !== null && NOT_FULFILLED.includes(order.status) ? nowAvailableTag(currentStock, qty) : null`; `NOT_FULFILLED = [backorder, pending_approval, approved, ready_to_bill]`. Requires a red pill (was short) so it never appears on an always-in-stock line; `if (!pill && !liveTag) return null`.
+- **Show-both / CSS** — red pill + green tag wrapped in a new `.stockFlags` flex row (gap, wrap); shared dot+text style, `.stockAtOrderPill` red `--color-error` / `.nowAvailablePill` green `--color-processed`, 7px round dot. The red order-time snapshot is **untouched** in meaning/presence (still on every status). All roles.
+- tsc `--noEmit`=0; eslint clean; `npm run build` success on HEAD 58a4b85.
+
+**Blocking issues:** None.
+
+**Non-blocking / notes:**
+- This is the **recovery-only** build (tag only on lines short at order time) — the owner's open **recovery-only vs. current-availability-on-every-line** call was never made; the prompt defaulted to recovery-only and the builder built that. If the owner later wants every line to surface live availability (incl. lines that went short *after* ordering), that's an additive follow-up.
+- `currentStock` is **total godown stock, not reserved per order** (the owner-accepted caveat pinned in `4c911ce`) — two open orders for the same restocked product can both read "Now available". Informational nudge, not a reservation.
+
+**Domain / correctness checks:** FE + **one embed column only** — no DB migration / RPC / RLS / money change (confirmed in the diff). Immutable order-time snapshot preserved (red pill logic/markup unchanged). Null current stock → no tag (unknown ≠ available), consistent with the order-time pill's null→out rule.
+
+**What I tried:** read the full diff (tsx + data + css); `tsc --noEmit`; `eslint` on both TS files; wrote + ran a 12-case truth-table harness of the helpers + gate (all pass); ran the gate as SQL over live short-at-order lines (all correctly red-only on billed/cancelled); reasoned RLS from the existing salesman `stock_qty` read in Quick Order; `npm run build`.
+
+**Open flags (cumulative):** No 🔴 open (㊸ CLOSED at 7db83ff). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **Queue clear:** Products page + Now-available tag both shipped & reviewed.
+
+**Next-commit suggestion:** none outstanding — Bajaj perf pass (brand-scope + server search + virtualization) is the next big rock when the owner greenlights the Bajaj re-import.
