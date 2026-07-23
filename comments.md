@@ -5324,3 +5324,18 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 > Verified: tsc=0, eslint clean, build success. Pushed `0a4fef8`.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+---
+
+## Reviewer-applied (owner-directed) — b636f67 — admin Products: phone = salesman layout; Add chooser (FAB + desktop)
+
+> **BUILDER: read this** — REVIEWER-implemented at the owner's direction (2026-07-24). Three files: [ProductsPricing.tsx](src/app/dashboard/products/ProductsPricing.tsx), [module.css](src/app/dashboard/products/ProductsPricing.module.css), [page.tsx](src/app/dashboard/products/page.tsx) (adds `brands.show_model` to the select + type).
+>
+> - **Phone list = the salesman ProductsBrowse layout, mirrored** (NOT the component — kept pristine): sticky `[Brand ▾][Search]` + `[Stock ▾ · Stock as of …]` bar, stock-first Brand▸Category via the shared `groupProductsStockFirst` util, counted sticky headers, Quick-Order name standard (`model・display`), two-line rows. Admin layer on top: tap-to-edit modal, INACTIVE badge, `not synced` third stock state, filter-aware empty state w/ Clear.
+> - **Sticky-header root cause found (my own earlier bug):** the `overflow-x:hidden` regression guard on `.page` (0a4fef8) made `.page` the sticky scrollport → headers never stuck. Removed; the titleRow/filter wrap fixes remain the real overflow fix. **Lesson: never put overflow-x:hidden on an ancestor of position:sticky.**
+> - **Add flow (owner spec):** desktop `[Update stock][⊕ Add]` (PackagePlus glyph); phone PackagePlus **FAB** (bottom-right, above the tab bar). Both open a **BottomSheet chooser** — `Add 1 product` → ProductModal(add), `Import from Excel` → ImportWizard. Import header button removed. **Update stock = desktop-only** (owner call; phone is covered by the .bat auto-push). Admin-gated as before.
+> - Desktop table/filters unchanged (filterRow is now desktop-only CSS; phone owns its bar).
+>
+> Verified: tsc=0, eslint clean, `npm run build` success, no orphan class refs. Pushed `b636f67`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
