@@ -126,16 +126,30 @@ export function ProductsPricing({
   }, [filteredProducts]);
   const multiBrandProducts = mobileGroups.length >= 2;
 
+  // Latest sync across the catalog — one "Stock as of" line on the phone list
+  // (the salesman-page pattern) instead of a per-card "as of" echo.
+  const stockAsOf = useMemo(() => {
+    let max: string | null = null;
+    for (const p of products) if (p.stock_updated_at && (max === null || p.stock_updated_at > max)) max = p.stock_updated_at;
+    return max;
+  }, [products]);
+
   function closeAndRefresh() {
     setModal(null);
     router.refresh();
   }
 
-  function renderCard(p: ProductRow) {
+  // Phone row (2026-07-23 redesign) — the retailers/salesman list grammar
+  // replaces the bordered cards: flat hairline rows, tally eyebrow only when it
+  // differs, price left / stock pill right, INACTIVE badge instead of an inline
+  // toggle (activate/deactivate lives in the modal, like Retailers). The admin
+  // stock pill keeps the null distinction the salesman page doesn't need:
+  // >0 green "N in stock" · 0 red "out of stock" · null muted "not synced".
+  function renderMobileRow(p: ProductRow) {
     return (
       <div
         key={p.id}
-        className={`${styles.card} ${styles.clickable} ${!p.active ? styles.cardInactive : ""}`}
+        className={`${styles.mRow} ${styles.clickable} ${!p.active ? styles.mRowInactive : ""}`}
         role="button"
         tabIndex={0}
         onClick={() => setModal({ mode: "edit", product: p })}
@@ -146,33 +160,23 @@ export function ProductsPricing({
           }
         }}
       >
-        <div className={styles.cardTop}>
-          <span className={styles.cardName}>{p.name}</span>
+        {p.tally_name !== p.name && <p className={styles.mEyebrow}>{p.tally_name}</p>}
+        <p className={styles.mName}>
+          {p.name}
+          {!p.active && <span className={styles.inactiveBadge}>INACTIVE</span>}
+        </p>
+        <div className={styles.mMeta}>
           <span className={styles.mono}>
             {p.price_paise === null ? <span className={styles.tbd}>—</span> : formatRupees(p.price_paise)}
           </span>
+          {p.stock_qty === null ? (
+            <span className={styles.mNotSynced}>not synced</span>
+          ) : p.stock_qty > 0 ? (
+            <span className={`${styles.mStockPill} ${styles.mStockIn}`}>{p.stock_qty} in stock</span>
+          ) : (
+            <span className={`${styles.mStockPill} ${styles.mStockOut}`}>out of stock</span>
+          )}
         </div>
-        {/* Brand + category now live in the sticky headers; show a Tally line
-            only when it actually differs from the display name (it defaults to
-            the name, so echoing it is noise). */}
-        {p.tally_name !== p.name && <div className={styles.cardTally}>{p.tally_name}</div>}
-        {p.stock_qty !== null && (
-          <div className={styles.cardTally}>
-            Stock {p.stock_qty}
-            {p.stock_updated_at ? ` · as of ${formatShortDate(p.stock_updated_at)}` : ""}
-          </div>
-        )}
-        <button
-          type="button"
-          className={`${styles.toggle} ${p.active ? styles.toggleOn : styles.toggleOff}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleActive(p);
-          }}
-          disabled={busy.has(p.id)}
-        >
-          {p.active ? "Active" : "Inactive"}
-        </button>
       </div>
     );
   }
@@ -315,13 +319,24 @@ export function ProductsPricing({
           </table>
 
           <div className={`${styles.cards} ${multiBrandProducts ? styles.cardsTwoTier : ""}`}>
+            {stockAsOf && <p className={styles.mAsOf}>Stock as of {formatShortDate(stockAsOf)}</p>}
             {mobileGroups.map((bg) => (
               <section key={bg.brandId}>
-                {multiBrandProducts && <div className={styles.mBrandHeader}>{bg.brandName}</div>}
+                {multiBrandProducts && (
+                  <div className={styles.mBrandHeader}>
+                    <span>{bg.brandName}</span>
+                    <span className={styles.mHeaderCount}>
+                      {bg.categories.reduce((n, c) => n + c.products.length, 0)} products
+                    </span>
+                  </div>
+                )}
                 {bg.categories.map((c) => (
                   <section key={c.category}>
-                    <div className={styles.mCatHeader}>{c.category}</div>
-                    {c.products.map(renderCard)}
+                    <div className={styles.mCatHeader}>
+                      <span>{c.category}</span>
+                      <span className={styles.mHeaderCount}>{c.products.length}</span>
+                    </div>
+                    {c.products.map(renderMobileRow)}
                   </section>
                 ))}
               </section>

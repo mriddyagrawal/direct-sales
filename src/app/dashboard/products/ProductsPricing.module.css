@@ -210,6 +210,10 @@
   position: sticky;
   top: 0;
   z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
   background: var(--color-white);
   font-family: var(--font-structure);
   font-size: 13px;
@@ -226,6 +230,10 @@
   position: sticky;
   top: var(--pm-offset);
   z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
   background: var(--color-white);
   font-family: var(--font-figures);
   font-size: 11px;
@@ -233,47 +241,119 @@
   text-transform: uppercase;
   color: var(--color-accent);
   border-bottom: 1px solid var(--color-hairline);
-  margin: 8px -16px 8px;
+  margin: 8px -16px 0;
   padding: 6px 16px 4px;
 }
 
-.card {
+/* Muted count on the right of both sticky headers (matches the salesman
+   Products page + the desktop title count). */
+.mHeaderCount {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-locked);
+}
+
+/* One "Stock as of" line for the whole phone list (salesman-page pattern) —
+   the per-card "as of" echo is gone. */
+.mAsOf {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+  padding: 2px 0 6px;
+}
+
+/* Phone rows (2026-07-23 redesign) — retailers/salesman list grammar instead
+   of bordered cards: flat rows split by hairlines, tap anywhere to edit. */
+.mRow {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
+  gap: 3px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
 }
 
-.cardInactive {
-  opacity: 0.6;
+.mRowInactive {
+  opacity: 0.55;
 }
 
-.cardTop {
+/* Tally/model eyebrow — only rendered when it differs from the display name. */
+.mEyebrow {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+.mName {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.cardName {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   font-family: var(--font-structure);
   font-size: 14px;
   font-weight: 600;
   color: var(--color-ink);
 }
 
-.cardTally {
+/* State badge in the retailers voice (DEACTIVATED) — the row shows state; the
+   activate/deactivate ACTION lives in the edit modal, like Retailers. */
+.inactiveBadge {
+  padding: 2px 6px;
+  background: var(--color-locked);
+  color: var(--color-white);
   font-family: var(--font-figures);
-  font-size: 12px;
-  color: var(--color-locked);
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: var(--radius);
 }
 
-.card .toggle {
-  align-self: flex-start;
+/* Meta line: price left, stock right (the salesman two-line row layout). */
+.mMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+/* Stock pill — dot + text like Quick Order / salesman Products. The admin page
+   keeps the third state the salesman page folds away: null = never synced. */
+.mStockPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.mStockPill::before {
+  content: "";
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.mStockIn {
+  color: var(--color-processed);
+}
+
+.mStockOut {
+  color: var(--color-error);
+}
+
+.mNotSynced {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-locked);
 }
 
 @media (min-width: 768px) {
