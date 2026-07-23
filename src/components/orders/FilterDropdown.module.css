@@ -65,6 +65,17 @@
   box-shadow: 0 8px 28px rgba(20, 24, 31, 0.14);
 }
 
+/* Desktop: the popover is at least as wide as its trigger box, so the open
+   menu lines up with the box beneath it instead of floating narrower (owner
+   2026-07-24 — the Deposits SALESMAN dropdown). min-width (not width) lets
+   richer content, e.g. the date-range popover, still grow past the box. Mobile
+   keeps its own viewport-pinned sizing (mobileStyle inline width), untouched. */
+@media (min-width: 768px) {
+  .popover {
+    min-width: 100%;
+  }
+}
+
 /* Mobile: the dropdown fills whatever cell the filter grid gives it. */
 @media (max-width: 767px) {
   .wrap {
