@@ -5251,3 +5251,43 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Notes:** filters are client-side over the loaded catalog — fine under the row cap (admin fetch is uncapped `.order(category,name)`, ~1388 rows < 3000), same latent cap caveat as the rest (the products-search-count-fix / Bajaj perf pass is where server-side lands). The admin page is still **flat** (not stock-first like the salesman page) and its **count** stays the total (not filtered) — both left as-is, owner didn't ask.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+---
+
+## Review of 4a758e4 — feat(orders): unify stock pills into one traffic-light scale (red/amber/green)
+
+**Verdict:** ⚠️ accept-with-followups — the code is **correct and verified**, but it's a **large behavioural/visual shift** that reworks the recovery-only tag we shipped 3 commits ago and reintroduces amber. It's **already merged to main + deployed** (via 5a38dfa), so the followups are *owner-confirm-or-adjust*, not pre-merge.
+
+**Goal:** make the order-detail order-time pill + live tag share one `out=red / partial=amber / full=green` tone scale, and change the live tag from "recovery-only (short at order time)" to "shown whenever current godown stock ≠ the frozen snapshot."
+
+**What works (verified by execution):**
+- **13-case truth table passes** (`trafficlight_test.mjs`, faithful copy of `stockAtOrderPill` + `liveStockTag` + the `NOT_FULFILLED` gate): order-time pill → `Out of stock[out]` (0) / `Partial stock · available N[partial]` (<qty) / none (≥qty); live tag → `"{cur} available now"` only when `cur !== snapshot` (both null→0), tone `out`(0)/`partial`(<qty)/`full`(≥qty); suppressed on billed/dispatched/cancelled; the `cur==snapshot` suppression kills the was-out/still-out double-red.
+- **`--color-amber` exists** (globals.css `#b45309`) so `.tonePartial` actually renders amber; `.toneOut`=`--color-error`, `.toneFull`=`--color-processed`. Shared `.stockPill` + `toneClass()`.
+- tsc `--noEmit`=0, eslint clean, `npm run build` success on the merged main tip.
+
+**Blocking issues:** None — logic is sound.
+
+**Followups (owner-confirm — these are LIVE):**
+1. 🟡 ㊹ **Amber is back.** Owner removed amber on 2026-07-16 (bc8f6d7, "🟢/🔴 only, no low-stock yellow") — but that was the *sync/Quick-Order* pill; this amber is on the *order-detail partial* pill (a different surface), and the code attributes it to "owner 2026-07-23". Different context, but it reintroduces yellow to the app's stock language — **confirm intended.**
+2. 🟡 **Every-line tag may be noisy.** The live tag now fires on **any** not-yet-fulfilled line whose stock changed at all — including lines that were **full at order and are still full** (truth-table case snapshot 10 → current 8, qty 5 → green **"8 available now"** with no order-time pill). Since Tally syncs move stock constantly, **most** order lines will now carry a tag, vs the subtle recovery-only before. Owner should eyeball a real multi-line order to confirm it isn't clutter.
+3. `"0 available now"` renders for a line emptied since order (partial 2 → 0). Slightly awkward phrasing; confirm.
+
+This **reverses the recovery-only tag** (58a4b85, which is what's described one section up) in favour of the every-line direction — that was the open owner question; this resolves it as *every-line*.
+
+**What I tried:** read the full diff; wrote + ran a 13-case truth-table harness (all pass); `grep --color-amber` (defined); `tsc`/`eslint`/`npm run build` on merged main.
+
+**Open flags (cumulative):** No 🔴. New 🟡 ㊹ (amber + every-line live-tag now live — owner confirm). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+---
+
+## Review of 5a38dfa — Merge feat/now-available-tag: unified traffic-light stock pills
+
+**Verdict:** ✅ accept — clean merge; both diverged lines land intact, build green.
+
+**What works (verified):** two parents — `9eca7c0` (main: my admin-Products brand/stock filters + em-dash + Tag icon + filtered count) and `4a758e4` (the traffic-light rework). The branches had diverged at `91ca312`; the merge's own diff is **only** the two `OrderDetailView` files (traffic-light) — **no overlap** with the admin-Products files, so no conflict, no artifacts. Confirmed all of c795ad8 / 9eca7c0 / 4a758e4 are ancestors of the tip; `tsc`=0, `eslint` clean, `npm run build` success on `5a38dfa`; pushed to `origin/main` → deploying. My admin-Products work is now definitively on main via the first parent.
+
+**Blocking issues:** None. **Domain:** merge only; the design flags live in the 4a758e4 block above (🟡 ㊹).
+
+**What I tried:** `git show 5a38dfa` (parents + stat), `git merge-base --is-ancestor` for all four shas, `tsc`/`eslint`/`build` on the merged tip.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
