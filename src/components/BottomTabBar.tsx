@@ -2,19 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReceiptText, Wallet } from "lucide-react";
+import { Tag, ReceiptText, Wallet } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
 import styles from "./BottomTabBar.module.css";
 
-// Salesman bottom bar (orders-ui spec §6): Orders (/) · Deposits (/deposits).
-// New Order left the bar — it's the floating FAB now (§2). Deposits is a live,
-// tappable tab routing to a "Coming soon!" placeholder (owner decision #3);
-// the real feature later replaces the page without touching this nav.
+// Salesman bottom bar: Products (/products) · Orders (/) · Deposits (/deposits)
+// — Orders in the CENTER (owner 2026-07-23). New Order left the bar (it's the
+// floating FAB, orders-ui §2). Default landing is unchanged — the app still
+// opens on / (Orders); only the tab order changed. Products is the read-only
+// pricelist/stocklist reference.
 export function BottomTabBar() {
   const pathname = usePathname();
 
   return (
     <nav className={styles.bar}>
+      <Link
+        href="/products"
+        className={[styles.tab, pathname === "/products" ? styles.active : ""].join(" ")}
+      >
+        <Glyph icon={Tag} />
+        Products
+      </Link>
       <Link href="/" className={[styles.tab, pathname === "/" ? styles.active : ""].join(" ")}>
         <Glyph icon={ReceiptText} />
         Orders

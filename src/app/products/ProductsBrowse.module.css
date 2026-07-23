@@ -1,0 +1,204 @@
+/* Mirrors the Quick Order catalog look (search bar, sticky brand/category
+   headers, stock pill) for a read-only browse. The sticky offsets use the same
+   live-measured --search-bar-height as QuickOrder.module.css. */
+.wrap {
+  --search-bar-height: 88px; /* SSR/no-JS fallback; measured live on mount */
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.searchBar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.searchRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.brandSelect {
+  flex: 0 0 auto;
+  max-width: 42%;
+  min-height: 44px;
+  padding: 0 8px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.asOf {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--color-locked);
+}
+
+.resultMeta {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--color-locked);
+}
+
+.list {
+  flex: 1;
+  padding: 0 16px;
+  --brand-header-height: 36px;
+  --brand-offset: 0px;
+}
+
+.listTwoTier {
+  --brand-offset: var(--brand-header-height);
+}
+
+/* Brand tier — heavier header above the category bars, with a muted count. */
+.brandHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-structure);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+  color: var(--color-ink);
+  background: var(--color-white);
+  border-bottom: 2px solid var(--color-ink);
+  margin: 0 -16px;
+  padding: 8px 16px;
+  position: sticky;
+  top: var(--search-bar-height);
+  z-index: 9;
+}
+
+.brandCount {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--color-locked);
+}
+
+.categoryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-figures);
+  font-size: 12px;
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-accent);
+  border-bottom: 1px solid var(--color-hairline);
+  margin: 8px -16px 0;
+  padding: 8px 16px 4px;
+  position: sticky;
+  top: calc(var(--search-bar-height) + var(--brand-offset));
+  z-index: 8;
+  background: var(--color-white);
+}
+
+.categoryHeader:first-child {
+  margin-top: 0;
+}
+
+/* Two-line read-only row. */
+.row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.rowName {
+  font-family: var(--font-structure);
+  font-size: 15px;
+  font-weight: var(--text-body-weight);
+  color: var(--color-ink);
+}
+
+.modelPrefix {
+  color: var(--color-locked);
+  font-weight: 400;
+}
+
+.rowLine2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 3px;
+}
+
+.price {
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-locked);
+}
+
+/* Stock pill — same two-state traffic light as Quick Order: currentColor round
+   dot + text; green in-stock / red out-of-stock (null counts as out). */
+.stockPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.stockPill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.stockIn {
+  color: var(--color-processed);
+}
+
+.stockOut {
+  color: var(--color-error);
+}
+
+.empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--color-locked);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}

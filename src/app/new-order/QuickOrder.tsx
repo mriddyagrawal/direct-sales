@@ -7,6 +7,12 @@ import { KeypadSheet } from "@/components/ui/KeypadSheet";
 import { formatRupees, formatShortDate } from "@/lib/format";
 import { cartLineCount, cartTotalPaise } from "@/lib/cart";
 import { parsePricePaise } from "@/lib/price";
+import {
+  groupProductsStockFirst,
+  brandGroupCount,
+  type StockCategoryGroup,
+  type StockBrandGroup,
+} from "@/lib/product-grouping";
 import type { ProductOption } from "./page";
 import styles from "./QuickOrder.module.css";
 
@@ -16,16 +22,10 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/\s+/g, "");
 }
 
-interface CategoryGroup {
-  category: string;
-  outOfStock: boolean; // true = the "(out of stock)" block (stock_qty 0 or null)
-  products: ProductOption[];
-}
-interface BrandGroup {
-  brandId: string;
-  brandName: string;
-  categories: CategoryGroup[];
-}
+// The stock-first grouping now lives in @/lib/product-grouping (shared with the
+// salesman Products page); these alias the generic shapes to this screen's row.
+type CategoryGroup = StockCategoryGroup<ProductOption>;
+type BrandGroup = StockBrandGroup<ProductOption>;
 
 interface QuickOrderProps {
   products: ProductOption[];
@@ -137,54 +137,8 @@ export function QuickOrder({
     [products, q, effectiveBrand],
   );
 
-  // Stock-first grouping (owner 2026-07-21): within each brand, split every
-  // category by stock so a category can render up to TWICE — its in-stock items
-  // (plain header) then its out-of-stock/never-synced items ("(out of stock)"
-  // header). All in-stock categories precede all out-of-stock ones. Everything
-  // A→Z: brands, categories within each block, and products by name.
-  //
-  // Scale note: this is a pure client regroup, correct only while the catalog
-  // fits under the PostgREST row cap (752 now, cap 3000). Past the cap the DB —
-  // ordered category, created_at — decides which rows arrive, so a client
-  // regroup can't guarantee in-stock rows survive; DB-side stock ordering +
-  // server search + virtualization is the queued Bajaj perf pass, NOT this.
-  const brandGroups: BrandGroup[] = useMemo(() => {
-    function toCategoryGroups(list: ProductOption[], outOfStock: boolean): CategoryGroup[] {
-      const byCat = new Map<string, ProductOption[]>();
-      for (const p of list) {
-        const arr = byCat.get(p.category) ?? [];
-        if (arr.length === 0) byCat.set(p.category, arr);
-        arr.push(p);
-      }
-      return [...byCat.entries()]
-        .map(([category, ps]) => ({
-          category,
-          outOfStock,
-          products: [...ps].sort((a, b) => a.name.localeCompare(b.name)), // items A→Z
-        }))
-        .sort((a, b) => a.category.localeCompare(b.category)); // categories A→Z
-    }
-    const byBrand = new Map<string, { brandName: string; products: ProductOption[] }>();
-    for (const p of visible) {
-      let bg = byBrand.get(p.brand_id);
-      if (!bg) {
-        bg = { brandName: p.brand_name, products: [] };
-        byBrand.set(p.brand_id, bg);
-      }
-      bg.products.push(p);
-    }
-    return [...byBrand.entries()]
-      .map(([brandId, bg]) => {
-        const inStock = bg.products.filter((p) => (p.stock_qty ?? 0) > 0);
-        const outStock = bg.products.filter((p) => (p.stock_qty ?? 0) <= 0); // 0 AND null → out
-        return {
-          brandId,
-          brandName: bg.brandName,
-          categories: [...toCategoryGroups(inStock, false), ...toCategoryGroups(outStock, true)],
-        };
-      })
-      .sort((a, b) => a.brandName.localeCompare(b.brandName)); // brands A→Z
-  }, [visible]);
+  // Stock-first grouping (shared util, byte-identical to b5e446f).
+  const brandGroups: BrandGroup[] = useMemo(() => groupProductsStockFirst(visible), [visible]);
 
   const showBrandTier = effectiveBrand === null && multiBrand;
   const allCategories = brandGroups.flatMap((bg) => bg.categories);
@@ -414,7 +368,10 @@ export function QuickOrder({
         ) : showBrandTier ? (
           brandGroups.map((bg) => (
             <section key={bg.brandId}>
-              <div className={styles.brandHeader}>{bg.brandName}</div>
+              <div className={styles.brandHeader}>
+                <span>{bg.brandName}</span>
+                <span className={styles.brandCount}>{brandGroupCount(bg)} products</span>
+              </div>
               {bg.categories.map((c) => renderCategory(c))}
             </section>
           ))
