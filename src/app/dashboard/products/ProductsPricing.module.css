@@ -148,7 +148,16 @@
   letter-spacing: 0.06em;
   color: var(--color-locked);
   height: 32px;
+  /* Match the body cells' 12px right padding so each header sits over its
+     column's values (esp. the right-aligned #/PRICE/STOCK), not 12px off. */
+  padding-right: 12px;
   border-bottom: 2px solid var(--color-ink);
+}
+
+/* #/PRICE/STOCK headers right-align over their right-aligned values — the
+   header's .numeric class alone loses to `.table thead th` on specificity. */
+.table thead th.numeric {
+  text-align: right;
 }
 
 .table tbody tr {
