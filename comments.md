@@ -5367,6 +5367,8 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 > **Follow-up `b0f8607` (owner reversed on the magnifier once shown what it was):** the lucide `Search` lens (14px) added to all THREE products search boxes — salesman [ProductsBrowse](src/app/products/ProductsBrowse.tsx), admin phone bar, admin desktop row — via the OrdersView `searchWrap` pattern (wrapper owns border/bg/icon + `:focus-within` accent, naked input inside). Heights/backgrounds/placeholders unchanged; the broader look-unification remains declined (supersedes only the magnifier part of the `009a709` note).
 >
 > **Follow-up `5e69d39` (owner repro: chips "scroll till the filters end"):** sticky lesson #3 — **a sticky element is bounded by its PARENT's box**; as a `.filters` child the chip row un-stuck once the filter zone scrolled past. Chips moved to a direct `.page` sibling above `.filters` (JSX move only, styling untouched) → they now pin for the entire list. Desktop unaffected (chips/filter-group were already separate wrapped rows; inter-row gap 8→12px via the page gap). The three sticky laws now on record for this repo: (1) no `overflow` on ancestors, (2) the scrollport must be the intended scroller, (3) the parent must span the full scroll range.
+>
+> **Follow-up `1118bb3` (owner devtools screenshot: doubled spacing under the chips):** the band's 8px paddings stacked on `.page`'s 12px gap (~20px dead air). Band padding 8→6px + `margin-bottom: -8px` → net ~10px below the chips. Phone-only.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
