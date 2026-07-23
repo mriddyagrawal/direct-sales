@@ -5,8 +5,8 @@
 ## What & why
 The salesman already sees price/stock/search inside Quick Order, but only *as an order flow* (must pick a retailer, cart locks to one brand). This is a **pure read-only reference** he can pull up mid-conversation to look up a price or check stock — no retailer, no cart, no editing. Owner-locked design (2026-07-23):
 - A **new "Products" tab** in the salesman bottom bar → `/products`.
-- **Search + brand filter + Brand▸Category stock-first grouping** (the same sort just shipped in Quick Order, b5e446f).
-- **Two-line row:** name (`model・display` per the Quick Order standard) · **price** (`₹` if the product has one, else an em dash `—`) · **stock** (`N in stock` / `out of stock`).
+- **Search + brand chips + Brand▸Category stock-first grouping** (the same sort just shipped in Quick Order, b5e446f).
+- **Two-line row:** name (`model・display` per the Quick Order standard) on line 1; on line 2 the **price** (`₹` if the product has one, else an em dash `—`) **left-aligned** and the **stock** (`N in stock` / `out of stock`) **right-aligned**.
 - Read-only. v1 is reference only — **no** "start order" / "copy" affordances.
 
 ## De-dup (the point the owner raised) — extract the grouping into one shared util
@@ -67,20 +67,21 @@ supabase.from("products")
 Map to a `ProductRow` (id, category, name, tally_name, price_paise, brand_id, brand_name, show_model, stock_qty, stock_updated_at) — same fields Quick Order's `ProductOption` carries minus `pricing_mode`. Render the phone shell: `<TopStrip …/>` + `<ProductsBrowse products={…}/>` + `<BottomTabBar/>` (same wrapper as [page.tsx](../src/app/page.tsx)). Get the salesman's name for TopStrip the same way home does.
 
 **`src/app/products/ProductsBrowse.tsx`** (client) — read-only:
-- **Sticky search input** + **BrandFilter** (reuse [BrandFilter](../src/components/orders/BrandFilter.tsx)); brand-tier headers when "all brands", flat when one brand is picked — same pattern as Quick Order.
+- **Sticky search input** + a **brand chip row** (NOT the dropdown): one chip per brand plus a leading "All brands", styled like OrdersView's status tabs ([`.filterTab`/`.filterTabActive`](../src/components/orders/OrdersView.module.css)) — active chip highlighted, single tap to filter. **Derive the chips from brands actually present in the loaded products** (like Quick Order's `brandOptions` — a brand with zero products never gets a chip), sorted A→Z; the row **scrolls horizontally** (`overflow-x:auto`) so it never wraps as brands grow. When "All brands" is active show brand-tier headers; when a brand chip is active, flat (that brand only).
 - **"Stock as of <t>"** line above the list: `t` = the most recent `stock_updated_at` across products (reuse `formatShortDate` from `@/lib/format`, matching Quick Order's "as of" voice); omit if none synced.
-- Build groups with `groupProductsStockFirst(visible)`; render sticky **brand** and **category** headers (category label `= group.outOfStock ? `${category} (out of stock)` : category`), exactly like Quick Order.
+- Build groups with `groupProductsStockFirst(visible)`; render sticky **brand** and **category** headers. **Brand header** = `{brandName}` + a muted total count (`{n} products`), like the category header's count. **Category header** label `= group.outOfStock ? `${category} (out of stock)` : category` + its count — exactly like Quick Order.
 - **Two-line row** per product:
-  - Line 1 — name using the **Quick Order standard** ([QuickOrder.tsx:237](../src/app/new-order/QuickOrder.tsx#L237)): `show_model && tally_name && tally_name !== name ? <span>{tally_name}</span>・{name} : name`.
-  - Line 2 — **price**: `price_paise != null ? formatRupees(price_paise) : "—"` · **stock pill**: `stock_qty != null && stock_qty > 0` → green dot + `{stock_qty} in stock`; else red dot + `out of stock` (null counts as out — same rule as Quick Order / the order-time pill). Reuse the stock-pill visual (`--color-processed` green / `--color-error` red, 7px dot) from [QuickOrder.module.css](../src/app/new-order/QuickOrder.module.css#L324) `.stockPill`/`.stockIn`/`.stockOut`.
+  - Line 1 — name using the **Quick Order standard** ([QuickOrder.tsx:237](../src/app/new-order/QuickOrder.tsx#L237)): `show_model && tally_name && tally_name !== name ? <span>{tally_name}</span>・{name} : name` (the `・` middle-dot, not a bullet).
+  - Line 2 — a flex row, **price left / stock right**: **price** (`price_paise != null ? formatRupees(price_paise) : "—"`) left-aligned; **stock pill** right-aligned — `stock_qty != null && stock_qty > 0` → green **round** dot + `{stock_qty} in stock`; else red round dot + `out of stock` (null counts as out — same rule as Quick Order / the order-time pill). Reuse the stock-pill visual (`--color-processed` green / `--color-error` red, 7px **`border-radius:50%`** dot) from [QuickOrder.module.css](../src/app/new-order/QuickOrder.module.css#L324) `.stockPill`/`.stockIn`/`.stockOut`.
 - **Empty-search state** ("No products match …" + clear) like Quick Order. No cart bar, no stepper, no keypad, no price inputs — this component never mutates.
 
 ## Nav
 Add a third tab to **[BottomTabBar.tsx](../src/components/BottomTabBar.tsx)**: `Products` → `/products`, active when `pathname === "/products"`. Icon: a lucide catalog/price glyph (`Tag` or `PackageSearch`); use `Glyph` like the others. Update the file's header comment (it currently says "Orders · Deposits").
 
 ## Acceptance (REVIEWER verifies by execution)
-- `/products` renders for a salesman: search + brand filter + "Stock as of …", Brand▸Category **stock-first** (in-stock categories, then `(out of stock)`), everything A→Z.
-- Row shows name in the `model・display` standard (a Bajaj/LG row shows tally + display; a Zebronics row just the name), price `₹…`/`—`, and `N in stock`/`out of stock`.
+- `/products` renders for a salesman: search + **brand chip row** + "Stock as of …", Brand▸Category **stock-first** (in-stock categories, then `(out of stock)`), everything A→Z.
+- **Brand chips reflect the real catalog** — one per brand that has products (today: EOL · LG · Luminous · Other · Zebronics), plus "All brands"; a zero-product brand (Bajaj/Sargam right now) gets **no** chip; tapping a chip scopes the list; the row scrolls horizontally.
+- Row shows name in the `model・display` standard (a Bajaj/LG row shows tally + display; a Zebronics row just the name), with the `・` separator; line 2 has price `₹…`/`—` on the left and the round-dot stock pill `N in stock`/`out of stock` on the right.
 - A priced product (Zebronics) shows `₹`; an unpriced manual product (most LG) shows `—`; an in-stock item shows its count; a 0/null item shows "out of stock".
 - Search finds by name / model / category / brand and still splits in/out.
 - **Quick Order is visually unchanged** (grouping identical after the util extraction) — verify build + the b5e446f grouping invariants still hold.
