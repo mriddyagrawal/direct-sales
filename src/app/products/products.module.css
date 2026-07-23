@@ -1,0 +1,13 @@
+/* Salesman shell — same as the Orders home (page.module.css): full-height
+   flex column, the middle scrolls under a fixed top strip + bottom bar. */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
