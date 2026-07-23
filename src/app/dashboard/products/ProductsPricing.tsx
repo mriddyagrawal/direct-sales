@@ -6,7 +6,6 @@ import { PackagePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
-import { BottomSheet } from "@/components/ui/BottomSheet";
 import { formatRupees, formatShortDate } from "@/lib/format";
 import { groupProductsStockFirst, brandGroupCount } from "@/lib/product-grouping";
 import { ProductModal, type BrandOption } from "./ProductModal";
@@ -432,28 +431,32 @@ export function ProductsPricing({
         </button>
       )}
 
+      {/* Add chooser — bottom sheet on phone, centered panel on desktop (the
+          ProductModal responsive pattern, owner 2026-07-24). */}
       {addChooser && (
-        <BottomSheet onClose={() => setAddChooser(false)}>
-          <p className={styles.chooserTitle}>Add products</p>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setAddChooser(false);
-              setModal({ mode: "add" });
-            }}
-          >
-            Add 1 product
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setAddChooser(false);
-              setImporting(true);
-            }}
-          >
-            Import from Excel
-          </Button>
-        </BottomSheet>
+        <div className={styles.chooserScrim} onClick={() => setAddChooser(false)}>
+          <div className={styles.chooserPanel} onClick={(e) => e.stopPropagation()}>
+            <p className={styles.chooserTitle}>Add products</p>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setAddChooser(false);
+                setModal({ mode: "add" });
+              }}
+            >
+              Add 1 product
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAddChooser(false);
+                setImporting(true);
+              }}
+            >
+              Import from Excel
+            </Button>
+          </div>
+        </div>
       )}
 
       {modal && (
