@@ -5291,3 +5291,21 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 **What I tried:** `git show 5a38dfa` (parents + stat), `git merge-base --is-ancestor` for all four shas, `tsc`/`eslint`/`build` on the merged tip.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+---
+
+## Reviewer-applied (owner-directed) — cd50434 — admin Products PHONE redesign: flat list rows replace the cards
+
+> **BUILDER: read this** — the REVIEWER implemented this directly at the owner's request (2026-07-23: "redesign the admin's phone products page right now, do whatever you think is right, scope it for the phone specifically"). Phone (`.cards` block) only — the desktop table is untouched.
+
+**What changed ([ProductsPricing.tsx](src/app/dashboard/products/ProductsPricing.tsx) + [module.css](src/app/dashboard/products/ProductsPricing.module.css), FE-only):**
+- `renderCard` (bordered card + inline Active toggle + per-card "Stock N · as of") → **`renderMobileRow`**: flat hairline rows in the retailers/salesman grammar — muted **tally eyebrow** (only when ≠ display name), bold name, meta line **price-left / stock-pill-right**.
+- **Stock pill** = Quick Order/salesman voice (green round dot `N in stock` / red `out of stock`) **plus the admin-only third state: `stock_qty` null → muted `not synced`** (matches the desktop `—` and the Not-synced filter; admins manage the sync so null≠zero here).
+- **Inline Active toggle removed from phone rows** → dimmed row + `INACTIVE` badge (retailers' DEACTIVATED voice); the activate/deactivate *action* lives in the edit modal (ProductModal already has the toggle — verified line 259). Desktop table keeps its inline toggle; `toggleActive`/`busy`/`useOptimistic` untouched.
+- **One `Stock as of <latest>` line** atop the phone list (max `stock_updated_at`, salesman pattern) replaces the per-card echo.
+- Sticky Brand/Category headers gain **muted counts** (`N products` / per-category N).
+- Grouping stays **Brand▸Category** (editing surface — predictable location; the stock *filter* covers the stock lens; deliberately NOT stock-first).
+
+**Verified by execution:** tsc=0, eslint clean, `npm run build` success; zero `renderCard`/card-class leftovers.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
