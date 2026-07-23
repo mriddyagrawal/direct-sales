@@ -5355,6 +5355,8 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 > - **Products phone filter bar v2 (owner respec):** `[All brands ▾][All stock ▾]` split the top line 50/50 → full-width search on its own line → `Stock as of …` under the search (left, muted).
 >
 > Verified: tsc=0, eslint clean, `npm run build` success. Pushed `bda8c6d`. **Watch on real devices:** godown pages have their own GodownTabBar/shell — owner says godown+salesman already look right; only the dashboard shell changed.
+>
+> **Follow-up `78030c2` (owner repro: "finger on a ribbon scrolls it, one ribbon off-screen; then it stopped"):** a `100dvh` box can transiently exceed the *visible* screen — dvh doesn't track the on-screen keyboard, URL-bar transitions, or leftover page zoom — and then the document scrolls the whole box as a unit. Hardened: phone `.shell` is now `position:fixed; inset:0` (document can never scroll, keyboard or not) + `overscroll-behavior-y:contain` on `.main`. Desktop untouched. Note: the salesman shell (same 100dvh pattern, un-pinned) can in principle show the same transient under a keyboard — owner reports it "gorgeous," so left alone; pin it the same way if ever reported.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
