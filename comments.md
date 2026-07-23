@@ -5309,3 +5309,18 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 **Verified by execution:** tsc=0, eslint clean, `npm run build` success; zero `renderCard`/card-class leftovers.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+---
+
+## Reviewer-applied (owner-reported bug) — 0a4fef8 — phone overflow + density fix on the admin Products list
+
+> **BUILDER: read this** — owner screenshot (2026-07-24) showed the phone page rendering **zoomed-out with "+ Add product" off-screen** and right-edge content cut. Root cause: **`.titleRow` had no wrap** — title + count + 3 action buttons ≈ 600px min-content forced the page wider than the viewport (this predated the cd50434 redesign but the new count string made it obvious). Fixes, all in [ProductsPricing.tsx](src/app/dashboard/products/ProductsPricing.tsx)/[module.css](src/app/dashboard/products/ProductsPricing.module.css), phone-scoped:
+> - `.titleRow`/`.titleActions` wrap (buttons drop to their own row); `.count` `white-space:nowrap` (no more 3-line tower); `.page` `max-width:100% + overflow-x:hidden` guard.
+> - Filter selects `flex:1 1 130px` on phone (Brand/Stock split the second row 50/50 under the full-width search); desktop `flex:0 0 auto`.
+> - Row hierarchy fix: the tally **eyebrow above** the name read inverted on Bajaj (name=numeric code, tally=description) — now the bold name leads with the muted mono tally **inline after**, wrapping naturally; rows 3 lines → 2, tighter padding.
+>
+> **Data observation for the owner/builder:** the re-imported Bajaj catalog (566 rows, live) has `name` = numeric code and `tally_name` = human description — the **inverse** of the LG convention (model code in `tally_name`). Stock still matches (Tally names = descriptions?), but display-name-of-record being a bare code will read odd on order lines/PDFs. Worth a deliberate owner call at some point; not changed here.
+>
+> Verified: tsc=0, eslint clean, build success. Pushed `0a4fef8`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
