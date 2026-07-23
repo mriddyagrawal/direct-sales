@@ -3,11 +3,17 @@
 .page {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  /* Pinned to the viewport (owner repro 2026-07-24, same fix as the
+     dashboard shell): a plain 100dvh box can transiently exceed the VISIBLE
+     screen (keyboard/URL-bar/zoom) and then the document scrolls the whole
+     box — ribbons slide. fixed+inset:0 makes that impossible. */
+  position: fixed;
+  inset: 0;
 }
 
 .content {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
