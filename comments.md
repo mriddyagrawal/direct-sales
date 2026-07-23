@@ -5153,3 +5153,21 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** 🔴 ㊸ — **`products.module.css` untracked, breaks a clean build/deploy** (fix = `git add` it next commit). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** `git add src/app/products/products.module.css` and commit — nothing else may land on top of a build-broken base (CLAUDE.md rule). Once green, this is a clean ✅.
+
+---
+
+## Review of 7db83ff — fix(products): track products.module.css — untracked shell CSS broke the prod build
+
+**Verdict:** ✅ accept — the exact fix the f7dce1b blocker called for; 🔴 ㊸ **CLOSED**.
+
+**What works (verified):** the commit adds **only** `src/app/products/products.module.css` (13 lines — the salesman shell: `.page` full-height flex column, `.content` scroll) — byte-for-byte the file I reviewed at f7dce1b. `git ls-files src/app/products/` now lists it; `git status` shows it no longer untracked. It's the missing import target of [page.tsx:6](src/app/products/page.tsx#L6), so a clean checkout now resolves `./products.module.css` — I'd already proven the build **passes with the file present** (and **fails without it**) at f7dce1b, and the file is now committed → a fresh Vercel build/deploy succeeds. No other file touched; the f7dce1b feature (correct on review) is now shippable.
+
+**Blocking issues:** None. **Non-blocking:** none.
+
+**Domain / correctness checks:** FE-only, CSS-only; no DB/RLS/money/state-machine surface.
+
+**What I tried:** `git show 7db83ff --stat` (single-file add); `git ls-files` + `git status` (now tracked, nothing relevant untracked); compared the committed content to the f7dce1b working-tree file I reviewed (identical); relied on the f7dce1b execution proof (build passes with the file, fails without).
+
+**Open flags (cumulative):** 🔴 ㊸ **CLOSED** (products.module.css tracked at 7db83ff). No 🔴 open. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **Products page (f7dce1b + 7db83ff) now complete & shippable.**
+
+**Next-commit suggestion:** the "Now available"/"N available" order-detail tag (`4c911ce`) is the remaining queued spec (still pending the owner's recovery-only-vs-every-line call).
