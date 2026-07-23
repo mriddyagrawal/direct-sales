@@ -416,6 +416,9 @@
 .orderedStruck {
   color: var(--color-locked);
   text-decoration: line-through;
+  /* Black line over the grey digits (owner 2026-07-24) — decoration colour is
+     independent of text colour since CSS3. */
+  text-decoration-color: var(--color-ink);
   font-style: italic;
   margin-left: 2px;
 }
@@ -425,6 +428,9 @@
 .struck {
   color: var(--color-locked);
   text-decoration: line-through;
+  /* Black line here too — it propagates through the cell's children (incl.
+     the red stock pill) in THIS colour, which is the look the owner liked. */
+  text-decoration-color: var(--color-ink);
   font-style: italic;
 }
 
