@@ -255,7 +255,18 @@
   letter-spacing: 0.06em;
   color: var(--color-locked);
   height: 32px;
+  /* 12px right padding on every cell (headers + body, below) spaces the
+     columns so TOTAL and STATUS stop colliding, and keeps each header aligned
+     with its column's values. Desktop only — the table is display:none on
+     phone (cards render instead). */
+  padding-right: 12px;
   border-bottom: 2px solid var(--color-ink);
+}
+
+/* TOTAL header right-aligns over its right-aligned amounts — the header's
+   .numeric class alone loses to `.table thead th` on specificity. */
+.table thead th.numeric {
+  text-align: right;
 }
 
 .table tbody tr {
@@ -276,6 +287,7 @@
   font-family: var(--font-structure);
   font-size: var(--text-body-size);
   color: var(--color-ink);
+  padding-right: 12px;
 }
 
 .mono {
@@ -418,21 +430,12 @@
   }
 
   .filters {
-    /* Sits flush on the table's top rule (no gap), so the active tab
-       (commit 3's folder-tab strip) can visually connect to the ledger
-       below it — cancels .page's own 12px gap for just this pair of
-       siblings. Desktop-only: the mobile card list has no "top rule" for
-       a tab to connect to, so mobile keeps the normal gap. */
-    margin-bottom: -12px;
-  }
-
-  .filterGroup {
-    /* Only the tabs need to touch the table's top rule (for the folder-tab
-       overlap) — the salesman/date/search boxes don't, and sitting flush
-       against it left them with no breathing room. Nudge this group back
-       up by a couple px within the row (align-items:center on .filters
-       means adding margin-bottom here shifts it up, not down). */
-    margin-bottom: 2px;
+    /* A real gap sits between the filter cluster (esp. the date/search line)
+       and the table's top rule (owner 2026-07-24, desktop only). The active
+       status tab is a filled dark box now — it no longer overlaps the ledger
+       like the old white folder tab, so the page's 12px sibling gap is left to
+       show through instead of being cancelled to flush. */
+    margin-bottom: 0;
   }
 
   .table {
