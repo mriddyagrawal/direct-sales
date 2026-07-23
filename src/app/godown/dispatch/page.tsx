@@ -1,12 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { OrdersView, type OrderListRow, type BrandOption } from "@/components/orders/OrdersView";
+import { fetchOrdersList } from "@/lib/queries/orders";
+import { OrdersView, type BrandOption } from "@/components/orders/OrdersView";
 import { GodownTabBar } from "@/components/GodownTabBar";
-
-// Same column set as the dashboard/home OrdersView selects — the godown may see
-// prices/amounts (owner: "don't go the extra mile hiding them").
-const GODOWN_ORDERS_SELECT =
-  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
 
 // Godown DISPATCH tab (Stage 2): billed orders awaiting a physical ship-out.
 // Reuses the shared OrdersView (role="godown"); Mark dispatched lives on the
@@ -21,20 +17,18 @@ export default async function GodownDispatchPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
   if (profile?.role !== "godown") redirect("/");
 
-  const [{ data: orderRows }, { data: brandRows }] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(GODOWN_ORDERS_SELECT)
-      .eq("status", "billed")
-      .order("submitted_at", { ascending: false })
-      .limit(300),
+  // Same column set as the dashboard/home OrdersView selects — the godown may
+  // see prices/amounts (owner: "don't go the extra mile hiding them"). Query
+  // via the shared builder (spec D12).
+  const [orderRows, { data: brandRows }] = await Promise.all([
+    fetchOrdersList(supabase, "godown-dispatch", user.id),
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
   ]);
 
   return (
     <>
       <OrdersView
-        initialOrders={(orderRows ?? []) as unknown as OrderListRow[]}
+        initialOrders={orderRows}
         salesmen={[]}
         brands={(brandRows ?? []) as BrandOption[]}
         role="godown"
