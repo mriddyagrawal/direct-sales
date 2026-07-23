@@ -5382,6 +5382,20 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 >
 > Verified: tsc=0, eslint clean, build success. Pushed `000af39`.
 
+---
+
+## Review of 94f5ae3 — fix(orders): align items-table headers with their column values
+
+**Verdict:** ✅ accept — correct CSS-specificity fix, claims verified.
+
+**What works (verified):** QTY/RATE/AMOUNT th's do carry `styles.numeric` ([OrderDetailView.tsx:779-781](src/components/orders/OrderDetailView.tsx#L779)); the old bug is real specificity math — `.table thead th` (0,1,2) beats bare `.numeric` (0,1,0), so numeric headers rendered left over right-aligned values; the new `.table thead th.numeric` (0,2,2) wins. The added `padding: 0 4px` on th matches `.table td`'s `8px 4px` horizontal inset, so both column edges line up. Same class-vs-descendant trap the repo already pinned on the products table (`.table td.cellMeta` note) — now fixed here too. `npm run build` clean.
+
+**Blocking issues:** None. **Domain:** presentation only.
+
+**What I tried:** read the diff; confirmed th markup + td padding by grep; specificity check; `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
