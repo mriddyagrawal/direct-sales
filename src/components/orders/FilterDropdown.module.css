@@ -47,8 +47,12 @@
   text-align: left;
 }
 
+/* Lucide ChevronDown SVG (owner 2026-07-24) — replaces the text ▾, which each
+   platform drew from its own symbol font. Same 14px chevron as the Products
+   filters; currentColor picks up the muted tone. */
 .chevron {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
   color: var(--color-locked);
 }
 

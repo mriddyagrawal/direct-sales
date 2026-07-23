@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { Glyph } from "@/components/ui/Glyph";
 import styles from "./FilterDropdown.module.css";
 
 interface FilterDropdownProps {
@@ -121,7 +123,7 @@ export function FilterDropdown({
         <span className={styles.triggerLabel}>{caption}</span>
         <span className={styles.triggerValue}>{valueLabel}</span>
         <span className={styles.chevron} aria-hidden>
-          ▾
+          <Glyph icon={ChevronDown} size={14} />
         </span>
       </button>
 
