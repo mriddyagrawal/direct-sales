@@ -83,7 +83,16 @@
   letter-spacing: 0.05em;
   color: var(--color-locked);
   height: 28px;
+  /* Match the body cells' 4px horizontal padding so each header sits directly
+     over its column's values (both edges), not 4px off. */
+  padding: 0 4px;
   border-bottom: 2px solid var(--color-ink);
+}
+
+/* QTY/RATE/AMOUNT headers right-align over their right-aligned values — the
+   header's .numeric class alone loses to `.table thead th` on specificity. */
+.table thead th.numeric {
+  text-align: right;
 }
 
 .table td {
