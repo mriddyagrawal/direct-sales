@@ -53,22 +53,35 @@
   gap: 8px;
 }
 
-.search {
+/* Desktop search box — magnifier + border on the wrapper (orders parity,
+   owner 2026-07-24); naked input inside. */
+.searchBox {
   flex: 1 1 240px;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-height: 40px;
   padding: 0 12px;
   background: var(--color-white);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius);
+  color: var(--color-locked);
+}
+
+.searchBox:focus-within {
+  border-color: var(--color-accent);
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
   font-family: var(--font-structure);
   font-size: var(--text-body-size);
   color: var(--color-ink);
-}
-
-.search:focus {
-  outline: none;
-  border-color: var(--color-accent);
 }
 
 /* Brand + stock filter selects — beside the search on desktop; on phone they
@@ -279,21 +292,32 @@
   -webkit-appearance: none;
 }
 
-.pSearch {
+.pSearchBox {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-height: 44px;
   padding: 0 12px;
   background: var(--color-paper);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius);
+  color: var(--color-locked);
+}
+
+.pSearchBox:focus-within {
+  border-color: var(--color-accent);
+}
+
+.pSearch {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
   font-family: var(--font-structure);
   font-size: var(--text-body-size);
   color: var(--color-ink);
-}
-
-.pSearch:focus {
-  outline: none;
-  border-color: var(--color-accent);
 }
 
 .pAsOf {
