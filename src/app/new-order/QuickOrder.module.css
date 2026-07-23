@@ -104,6 +104,9 @@
 /* Brand header — the heavier, distinct top tier above the navy category
    bars. Full-bleed (same −16px trick as the category bar). */
 .brandHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-family: var(--font-structure);
   font-size: 15px;
   font-weight: 700;
@@ -117,6 +120,16 @@
   position: sticky;
   top: var(--search-bar-height);
   z-index: 9;
+}
+
+/* Muted product count on the right of the brand header (matches the category
+   header's count treatment). */
+.brandCount {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--color-locked);
 }
 
 .categoryHeader {
