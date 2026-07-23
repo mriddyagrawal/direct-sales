@@ -69,8 +69,12 @@
     top: 0;
     z-index: 20;
     background: var(--color-paper);
-    margin: 0 -16px;
-    padding: 8px 16px;
+    /* Slim band (owner 2026-07-24): the chips have their own inner padding
+       and the page's 12px gap already separates siblings — the band adds just
+       6px of breathing room, and the -8px bottom margin eats most of the
+       doubled band-padding + page-gap below the chips. */
+    margin: 0 -16px -8px;
+    padding: 6px 16px;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
