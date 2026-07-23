@@ -41,21 +41,40 @@ interface OrderItemRow {
 // never from live stock. NULL (no Tally data at order time) is treated as NOT
 // IN STOCK. Text matches the Quick Order pill's voice (sentence case, "·"),
 // with "available N" — not a fraction, which read like a pick figure.
-function stockAtOrderPill(stock: number | null, qty: number): string | null {
+// Traffic-light severity of an availability figure vs the ordered qty — one
+// scale shared by BOTH pills so a colour means the same thing everywhere:
+//   out (red) 0 · partial (amber) 1..qty-1 · full (green) ≥ qty  (owner 2026-07-23).
+type StockTone = "out" | "partial" | "full";
+
+function toneClass(tone: StockTone): string {
+  if (tone === "out") return styles.toneOut;
+  if (tone === "partial") return styles.tonePartial;
+  return styles.toneFull;
+}
+
+function stockAtOrderPill(stock: number | null, qty: number): { text: string; tone: StockTone } | null {
   const s = stock ?? 0;
-  if (s === 0) return "Out of stock";
-  if (s < qty) return `Partial stock · available ${s}`;
+  if (s === 0) return { text: "Out of stock", tone: "out" };
+  if (s < qty) return { text: `Partial stock · available ${s}`, tone: "partial" };
   return null;
 }
 
-// GREEN live-availability tag on a line that was short AT ORDER TIME (owner
-// 2026-07-21): how many of the product are in the godown NOW (live stock_qty).
-// current ≥ ordered qty → "Now available"; 1..qty-1 → "{current} available now"
-// (owner 2026-07-23); 0/NULL → null (still nothing to fill). Gated at the call
-// site to lines that carry a red order-time pill and to not-yet-fulfilled orders.
-function nowAvailableTag(current: number | null, qty: number): string | null {
-  if (current == null || current <= 0) return null;
-  return current >= qty ? "Now available" : `${current} available now`;
+// LIVE availability tag: how many of the product are in the godown NOW (live
+// stock_qty), shown ONLY when that differs from the order-time snapshot — NULL
+// on either side normalises to 0 (owner 2026-07-23). Label is always
+// "{N} available now" (incl. "0 available now"); colour tracks current vs the
+// ordered qty. current == snapshot → null: the frozen pill already says it, and
+// this also kills the was-out/still-out double-red. Status-gated at the call
+// site to not-yet-fulfilled orders.
+function liveStockTag(
+  current: number | null,
+  stockAtOrder: number | null,
+  qty: number,
+): { text: string; tone: StockTone } | null {
+  const cur = current ?? 0;
+  if (cur === (stockAtOrder ?? 0)) return null;
+  const tone: StockTone = cur === 0 ? "out" : cur < qty ? "partial" : "full";
+  return { text: `${cur} available now`, tone };
 }
 
 // Statuses where the recovery tag is meaningful (order not yet shipped). Hidden
@@ -776,24 +795,31 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                         <span className={styles.modelEyebrow}>{line.model}</span>
                       )}
                       {line.name}
-                      {/* Order-time stock flag (all roles): problems only —
-                          dot + red text below the name, Quick Order style
-                          (NULL counts as out of stock). In-stock: nothing.
-                          A GREEN "Now available"/"N available" recovery tag sits
-                          beside it when the line was short at order time (pill
-                          present) AND the order isn't yet fulfilled — live
-                          godown stock vs the ordered qty. */}
+                      {/* Stock flags (all roles), stacked below the name in the
+                          shared traffic-light scale (red out / amber partial /
+                          green full). Top: the FROZEN order-time pill — problems
+                          only (out / partial), nothing if it was fully covered.
+                          Below: the LIVE tag, shown on not-yet-fulfilled orders
+                          whenever current godown stock differs from that snapshot
+                          — "{N} available now", coloured by current vs ordered. */}
                       {(() => {
                         const pill = stockAtOrderPill(line.stockAtOrder, line.qty);
-                        const liveTag =
-                          pill !== null && NOT_FULFILLED.includes(order.status)
-                            ? nowAvailableTag(line.currentStock, line.qty)
-                            : null;
+                        const liveTag = NOT_FULFILLED.includes(order.status)
+                          ? liveStockTag(line.currentStock, line.stockAtOrder, line.qty)
+                          : null;
                         if (!pill && !liveTag) return null;
                         return (
                           <span className={styles.stockFlags}>
-                            {pill && <span className={styles.stockAtOrderPill}>{pill}</span>}
-                            {liveTag && <span className={styles.nowAvailablePill}>{liveTag}</span>}
+                            {pill && (
+                              <span className={`${styles.stockPill} ${toneClass(pill.tone)}`}>
+                                {pill.text}
+                              </span>
+                            )}
+                            {liveTag && (
+                              <span className={`${styles.stockPill} ${toneClass(liveTag.tone)}`}>
+                                {liveTag.text}
+                              </span>
+                            )}
                           </span>
                         );
                       })()}
