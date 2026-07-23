@@ -30,8 +30,16 @@
   gap: 8px;
 }
 
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .search {
-  width: 100%;
+  flex: 1 1 240px;
+  min-width: 0;
   min-height: 40px;
   padding: 0 12px;
   background: var(--color-white);
@@ -43,6 +51,25 @@
 }
 
 .search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* Brand + stock filter selects — sit beside the search on desktop, wrap under
+   it on narrow screens. Same border/height voice as the search input. */
+.filterSelect {
+  min-height: 40px;
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.filterSelect:focus {
   outline: none;
   border-color: var(--color-accent);
 }
