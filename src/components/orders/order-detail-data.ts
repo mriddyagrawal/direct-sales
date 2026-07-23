@@ -16,7 +16,7 @@ export const ORDER_DETAIL_SELECT =
   "dispatched_by_profile:profiles!orders_dispatched_by_fkey(full_name), " +
   "parent_order:orders!parent_order_id(order_ref), " +
   "brands(name, code, show_model), " +
-  "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, picked_qty, position, stock_at_order, list_price_at_order, products(tally_name), order_item_scans(id, serial, scanned_at)), " +
+  "order_items(id, product_id, product_name, unit_price_paise, qty, line_total_paise, picked_qty, position, stock_at_order, list_price_at_order, products(tally_name, stock_qty), order_item_scans(id, serial, scanned_at)), " +
   "order_events(id, action, actor_id, details, created_at, profiles!order_events_actor_id_fkey(full_name))";
 
 export interface OrderDetailItemRow {
@@ -40,8 +40,10 @@ export interface OrderDetailItemRow {
   // NULL shows no comparison. Immutable: an edit never rewrites it.
   list_price_at_order: number | null;
   // The CURRENT product's model (display-only, like the pick slip) — the
-  // snapshot product_name stays the display name of record.
-  products: { tally_name: string } | null;
+  // snapshot product_name stays the display name of record. stock_qty is the
+  // product's CURRENT godown stock (live, Tally-synced) — feeds the green
+  // "Now available" recovery tag on order-time-short lines.
+  products: { tally_name: string; stock_qty: number | null } | null;
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
 

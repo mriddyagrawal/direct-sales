@@ -32,7 +32,7 @@ interface OrderItemRow {
   // charged rate) is compared against. NULL (historical / unpriced manual
   // default) → no comparison shown. Immutable snapshot.
   list_price_at_order: number | null;
-  products: { tally_name: string } | null;
+  products: { tally_name: string; stock_qty: number | null } | null;
   order_item_scans: { id: string; serial: string; scanned_at: string }[];
 }
 
@@ -47,6 +47,20 @@ function stockAtOrderPill(stock: number | null, qty: number): string | null {
   if (s < qty) return `Partial stock · available ${s}`;
   return null;
 }
+
+// GREEN live-availability tag on a line that was short AT ORDER TIME (owner
+// 2026-07-21): how many of the product are in the godown NOW (live stock_qty).
+// current ≥ ordered qty → "Now available"; 1..qty-1 → "{current} available";
+// 0/NULL → null (still nothing to fill). Gated at the call site to lines that
+// carry a red order-time pill and to not-yet-fulfilled orders.
+function nowAvailableTag(current: number | null, qty: number): string | null {
+  if (current == null || current <= 0) return null;
+  return current >= qty ? "Now available" : `${current} available`;
+}
+
+// Statuses where the recovery tag is meaningful (order not yet shipped). Hidden
+// on billed/dispatched/cancelled — done, so a "now available" nudge is noise.
+const NOT_FULFILLED = ["backorder", "pending_approval", "approved", "ready_to_bill"];
 
 interface RawEventRow {
   id: number;
@@ -191,6 +205,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         pickedQty: number | null;
         stockAtOrder: number | null;
         listPriceAtOrder: number | null;
+        currentStock: number | null;
       }
     >();
     for (const it of initialItems) {
@@ -202,6 +217,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         pickedQty: it.picked_qty,
         stockAtOrder: it.stock_at_order,
         listPriceAtOrder: it.list_price_at_order,
+        currentStock: it.products?.stock_qty ?? null,
       });
     }
     return map;
@@ -223,6 +239,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         pickedQty: extra?.pickedQty ?? null,
         stockAtOrder: extra?.stockAtOrder ?? null,
         listPriceAtOrder: extra?.listPriceAtOrder ?? null,
+        currentStock: extra?.currentStock ?? null,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -761,10 +778,24 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
                       {line.name}
                       {/* Order-time stock flag (all roles): problems only —
                           dot + red text below the name, Quick Order style
-                          (NULL counts as out of stock). In-stock: nothing. */}
+                          (NULL counts as out of stock). In-stock: nothing.
+                          A GREEN "Now available"/"N available" recovery tag sits
+                          beside it when the line was short at order time (pill
+                          present) AND the order isn't yet fulfilled — live
+                          godown stock vs the ordered qty. */}
                       {(() => {
                         const pill = stockAtOrderPill(line.stockAtOrder, line.qty);
-                        return pill ? <span className={styles.stockAtOrderPill}>{pill}</span> : null;
+                        const liveTag =
+                          pill !== null && NOT_FULFILLED.includes(order.status)
+                            ? nowAvailableTag(line.currentStock, line.qty)
+                            : null;
+                        if (!pill && !liveTag) return null;
+                        return (
+                          <span className={styles.stockFlags}>
+                            {pill && <span className={styles.stockAtOrderPill}>{pill}</span>}
+                            {liveTag && <span className={styles.nowAvailablePill}>{liveTag}</span>}
+                          </span>
+                        );
                       })()}
                     </td>
                     <td className={`${styles.mono} ${styles.numeric}`}>

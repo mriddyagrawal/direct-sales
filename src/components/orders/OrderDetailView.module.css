@@ -107,19 +107,41 @@
    EXACTLY like the Quick Order stock pill (owner 2026-07-17): a currentColor
    dot + colored text, no box/border, on its own line BELOW the item name.
    In-stock lines: nothing. */
-.stockAtOrderPill {
+/* The stock flags line (below the item name): the red order-time snapshot pill
+   and — when the line was short at order time and the order isn't yet fulfilled
+   — the green "Now available" recovery tag beside it, one small gap apart. The
+   row owns the top margin + gap so each pill is a plain inline dot+text. */
+.stockFlags {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 3px;
+}
+
+.stockAtOrderPill,
+.nowAvailablePill {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 3px;
   font-family: var(--font-structure);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
+}
+
+/* Red = the immutable order-time snapshot (out/partial at order time). */
+.stockAtOrderPill {
   color: var(--color-error);
 }
 
-.stockAtOrderPill::before {
+/* Green = live godown stock now (the recovery readout). */
+.nowAvailablePill {
+  color: var(--color-processed);
+}
+
+.stockAtOrderPill::before,
+.nowAvailablePill::before {
   content: "";
   flex-shrink: 0;
   width: 7px;
