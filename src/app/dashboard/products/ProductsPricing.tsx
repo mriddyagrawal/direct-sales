@@ -346,42 +346,41 @@ export function ProductsPricing({
             className={`${styles.phone} ${multiBrandProducts ? styles.phoneTwoTier : ""}`}
             ref={phoneRef}
           >
+            {/* Sticky bar as an even 2-col grid (owner 2026-07-24): the two
+                selects stack left at IDENTICAL size; search and the as-of line
+                fill the right column. */}
             <div className={styles.pBar} ref={phoneBarRef}>
-              <div className={styles.pBarRow}>
-                <select
-                  className={styles.pBrandSelect}
-                  value={brandFilter}
-                  onChange={(e) => setBrandFilter(e.target.value)}
-                  aria-label="Brand"
-                >
-                  <option value="all">All brands</option>
-                  {brandOptions.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  className={styles.pSearch}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search name, model, brand"
-                />
-              </div>
-              <div className={styles.pBarRow2}>
-                <select
-                  className={styles.pStockSelect}
-                  value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "out" | "nosync")}
-                  aria-label="Stock"
-                >
-                  <option value="all">All stock</option>
-                  <option value="in">In stock</option>
-                  <option value="out">Out of stock</option>
-                  <option value="nosync">Not synced</option>
-                </select>
-                {stockAsOf && <span className={styles.pAsOf}>Stock as of {formatShortDate(stockAsOf)}</span>}
-              </div>
+              <select
+                className={styles.pSelect}
+                value={brandFilter}
+                onChange={(e) => setBrandFilter(e.target.value)}
+                aria-label="Brand"
+              >
+                <option value="all">All brands</option>
+                {brandOptions.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                className={styles.pSearch}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, model, brand"
+              />
+              <select
+                className={styles.pSelect}
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "out" | "nosync")}
+                aria-label="Stock"
+              >
+                <option value="all">All stock</option>
+                <option value="in">In stock</option>
+                <option value="out">Out of stock</option>
+                <option value="nosync">Not synced</option>
+              </select>
+              {stockAsOf && <span className={styles.pAsOf}>Stock as of {formatShortDate(stockAsOf)}</span>}
             </div>
 
             {filteredProducts.length === 0 ? (
@@ -436,7 +435,14 @@ export function ProductsPricing({
       {addChooser && (
         <div className={styles.chooserScrim} onClick={() => setAddChooser(false)}>
           <div className={styles.chooserPanel} onClick={(e) => e.stopPropagation()}>
-            <p className={styles.chooserTitle}>Add products</p>
+            {/* Same header grammar as ProductModal/ImportWizard: 21px token
+                heading + the 16px ✕ (owner 2026-07-24 — the 3 popups match). */}
+            <div className={styles.chooserHeader}>
+              <h2 className={styles.chooserHeading}>Add products</h2>
+              <button type="button" className={styles.chooserClose} onClick={() => setAddChooser(false)} aria-label="Close">
+                ✕
+              </button>
+            </div>
             {/* Two EQUAL choices — option rows, not a primary CTA + secondary
                 (a chooser has no "preferred" answer; the blue slab read wrong). */}
             <button

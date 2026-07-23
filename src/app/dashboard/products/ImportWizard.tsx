@@ -254,7 +254,7 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
               <strong>Display Name or Tally Name</strong>; a new product also needs a Category. On an existing product any blank cell
               keeps its current value; a new product uses the Tally name for a blank Display name and TBD for a blank Price.
             </p>
-            <button type="button" className={styles.linkBtn} onClick={downloadTemplate} disabled={!brandId}>
+            <button type="button" className={styles.linkBtn} onClick={downloadTemplate}>
               Download template
             </button>
           </div>
@@ -372,7 +372,7 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
         {step === "unreadable" && (
           <div className={styles.body}>
             <p className={styles.errorStrip}>Couldn&apos;t read this file — not a valid .xlsx or the columns don&apos;t match.</p>
-            <button type="button" className={styles.linkBtn} onClick={downloadTemplate} disabled={!brandId}>
+            <button type="button" className={styles.linkBtn} onClick={downloadTemplate}>
               Download template
             </button>
             <div className={styles.actions}>
