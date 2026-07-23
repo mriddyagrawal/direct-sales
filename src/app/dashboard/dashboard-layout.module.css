@@ -1,21 +1,36 @@
+/* Phone (owner 2026-07-24): the SALESMAN box model — a fixed 100dvh flex
+   column (strip / scrolling main / tab bar) where only .main scrolls. The
+   strip and bar are static flex children, so they can never scroll away AND
+   the bar can never detach mid-scroll (the old position:fixed bar floated
+   mid-screen while the browser URL bar collapsed — fixed elements track the
+   visual viewport during that transition; in-flow children don't).
+   DOM order is [rail, mobileTop, mobileBottom, main] (nav renders a fragment),
+   so flex `order` arranges the column: strip 0 · main 1 · bar 2. */
 .shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100dvh;
 }
 
 .main {
+  order: 1;
   flex: 1;
   min-width: 0;
-  padding-bottom: 60px; /* clears the mobile bottom tab bar */
+  min-height: 0;
+  overflow-y: auto; /* the only scroller on phone — sticky headers pin to it */
 }
 
 @media (min-width: 768px) {
+  /* Desktop: rail + window-scrolling main, exactly as before. */
   .shell {
     flex-direction: row;
+    height: auto;
+    min-height: 100vh;
   }
 
   .main {
-    padding-bottom: 0;
+    order: 0;
+    overflow-y: visible;
+    min-height: auto;
   }
 }
