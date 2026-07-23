@@ -5124,3 +5124,32 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Next-commit suggestion:** the "Now available"/"N available" order-detail tag (prompt `4c911ce`) is the other queued spec; otherwise the Bajaj perf pass is where this page's DB-side/virtualized version lands.
+
+---
+
+## Review of f7dce1b — feat(products): read-only salesman Products page (pricelist + stocklist + search) + shared stock-first grouping util
+
+**Verdict:** ❌ **reject — deploy-breaking commit hygiene bug.** The *code* is correct and matches the spec end-to-end, but a **required CSS module is untracked**, so a fresh checkout (Vercel deploy from `main`) fails to build. One-file fix, but it must land in the very next commit before anything else.
+
+**Phase / goal:** new read-only salesman `/products` reference (price + stock + search), plus extracting the b5e446f stock-first grouping into a shared `lib/` util used by Quick Order and the new page; add a brand-header product count to both.
+
+**🔴 Blocking issue (must fix in the very next commit):**
+- **`src/app/products/products.module.css` is UNTRACKED** — `git status` shows it `??`, `git ls-files src/app/products/` lists only `ProductsBrowse.module.css`/`ProductsBrowse.tsx`/`page.tsx`, and it is **not** in commit f7dce1b. But the *committed* [products/page.tsx:6](src/app/products/page.tsx#L6) does `import styles from "./products.module.css"` and uses `styles.page`/`styles.content`. **Proven by execution:** moving the file aside (simulating a clean checkout) and running `npm run build` fails immediately — `Turbopack build failed: Module not found: Can't resolve './products.module.css'` at page.tsx line 6. The local build only passed because the file exists uncommitted in the working tree. **Fix: `git add src/app/products/products.module.css` and commit.** (Live site is not down — Vercel keeps the last good deploy on build failure — but the Products page can't deploy until this lands.)
+
+**What works (verified — all correct, gated only by the blocker above):**
+- **Shared util `lib/product-grouping.ts`** — `groupProductsStockFirst<StockGroupable>` is **character-identical** to the b5e446f `brandGroups` body; re-ran the 5-invariant Node harness → all pass (in→out order, brands/categories/products A→Z, `qty=0` and null → out). `brandGroupCount` sums the category blocks. A genuine pure move.
+- **QuickOrder.tsx** — now aliases `CategoryGroup`/`BrandGroup` to the generics and calls `groupProductsStockFirst(visible)`; the **only** behavioural change is the muted `{n} products` count on the brand header ([QuickOrder.module.css](src/app/new-order/QuickOrder.module.css) `.brandHeader`→flex + new `.brandCount`). Grouping/order/rows otherwise untouched — confirmed identical.
+- **page.tsx** — RLS-scoped catalog fetch (`…, brands(name, show_model)`, minus `pricing_mode`), `redirect("/login")` when unauthed, phone shell (TopStrip + ProductsBrowse + BottomTabBar). No new fetch privileges.
+- **ProductsBrowse.tsx** — sticky search + **brand `<select>` dropdown** (options from `brandOptions`, derived from loaded products so zero-product brands never appear, A→Z, default "All brands" — Quick Order parity ✓); "Stock as of `{formatShortDate(max stock_updated_at)}`"; groups via the shared util; **two-line rows** — line 1 name in the `model・display` standard with the `・` separator, line 2 price-left (`formatRupees` / `—`) and **round-dot** stock pill right (`{n} in stock` green `--color-processed` / `out of stock` red `--color-error`, null→out); counted sticky brand + category headers (`(out of stock)` suffix); empty-search state; a nice `{visible} of {n} products` result meta while searching. **Never mutates** — no cart/stepper/keypad/price input.
+- **BottomTabBar** — three tabs **Products (Tag) · Orders (ReceiptText) · Deposits (Wallet)**, Orders centered, `/` still the default landing, "Orders" label kept (not "Home").
+- With the untracked file present: `tsc --noEmit`=0, `eslint` clean on all new files, `npm run build` succeeds and `/products` registers.
+
+**Non-blocking suggestions:** the searching `{visible} of {n} products` meta uses the loaded `products.length` — fine under the row cap (752<3000); it becomes approximate past the cap, same caveat as the scale note already in the code.
+
+**Domain / correctness checks:** **FE-only — no DB / migration / RLS / RPC** (fetch is the same salesman catalog scope Quick Order already reads). Money stays paise → `formatRupees`; null price → `—` (never `₹0`/`₹NaN`). Mobile-first read-only surface; grouping verified by execution. Null stock → "out of stock" consistent with Quick Order + the order-time pill.
+
+**What I tried:** read all 7 files; `git ls-files`/`git status` → confirmed `products.module.css` untracked & absent from the commit; **moved it aside → `npm run build` → `Module not found: Can't resolve './products.module.css'` → restored it**; `tsc --noEmit`; `eslint` on the 4 new/changed TS files; diffed the util against b5e446f + re-ran the invariant harness (all pass).
+
+**Open flags (cumulative):** 🔴 ㊸ — **`products.module.css` untracked, breaks a clean build/deploy** (fix = `git add` it next commit). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+**Next-commit suggestion:** `git add src/app/products/products.module.css` and commit — nothing else may land on top of a build-broken base (CLAUDE.md rule). Once green, this is a clean ✅.
