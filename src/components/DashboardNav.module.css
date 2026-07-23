@@ -2,7 +2,13 @@
   display: none;
 }
 
+/* Static flex children of the 100dvh shell (owner 2026-07-24) — the salesman
+   box model. order: strip 0 · main 1 (layout css) · bar 2. Neither is fixed,
+   so the strip is always visible and the bar can't detach during the URL-bar
+   collapse (the old fixed-position mid-scroll float bug). */
 .mobileTop {
+  order: 0;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -13,13 +19,11 @@
 }
 
 .mobileBottom {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 30;
+  order: 2;
+  flex-shrink: 0;
   display: flex;
-  height: 60px;
+  align-items: stretch;
+  height: 70px; /* salesman-bar parity (was a fixed 60px strip) */
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--color-white);
   border-top: 1px solid var(--color-hairline);

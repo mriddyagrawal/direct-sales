@@ -346,40 +346,42 @@ export function ProductsPricing({
             className={`${styles.phone} ${multiBrandProducts ? styles.phoneTwoTier : ""}`}
             ref={phoneRef}
           >
-            {/* Sticky bar as an even 2-col grid (owner 2026-07-24): the two
-                selects stack left at IDENTICAL size; search and the as-of line
-                fill the right column. */}
+            {/* Sticky bar (owner 2026-07-24 v2): the two filters split the top
+                line 50/50, the search takes its own full line below, "Stock as
+                of" sits under the search. */}
             <div className={styles.pBar} ref={phoneBarRef}>
-              <select
-                className={styles.pSelect}
-                value={brandFilter}
-                onChange={(e) => setBrandFilter(e.target.value)}
-                aria-label="Brand"
-              >
-                <option value="all">All brands</option>
-                {brandOptions.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+              <div className={styles.pFilterPair}>
+                <select
+                  className={styles.pSelect}
+                  value={brandFilter}
+                  onChange={(e) => setBrandFilter(e.target.value)}
+                  aria-label="Brand"
+                >
+                  <option value="all">All brands</option>
+                  {brandOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={styles.pSelect}
+                  value={stockFilter}
+                  onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "out" | "nosync")}
+                  aria-label="Stock"
+                >
+                  <option value="all">All stock</option>
+                  <option value="in">In stock</option>
+                  <option value="out">Out of stock</option>
+                  <option value="nosync">Not synced</option>
+                </select>
+              </div>
               <input
                 className={styles.pSearch}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, model, brand"
               />
-              <select
-                className={styles.pSelect}
-                value={stockFilter}
-                onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "out" | "nosync")}
-                aria-label="Stock"
-              >
-                <option value="all">All stock</option>
-                <option value="in">In stock</option>
-                <option value="out">Out of stock</option>
-                <option value="nosync">Not synced</option>
-              </select>
               {stockAsOf && <span className={styles.pAsOf}>Stock as of {formatShortDate(stockAsOf)}</span>}
             </div>
 

@@ -232,9 +232,9 @@
   --pm-brand-offset: 36px;
 }
 
-/* Sticky bar — an EVEN 2-col grid (owner 2026-07-24): both selects stack in
-   the left column at identical size; search + the as-of line fill the right.
-   Full-bleed (cancels .page's 16px inset) so it reads as a band. */
+/* Sticky bar (owner 2026-07-24 v2): filters split the top line 50/50, the
+   search takes its own full line, "Stock as of" sits under it. Full-bleed
+   (cancels .page's 16px inset) so it reads as a band. */
 .pBar {
   position: sticky;
   top: 0;
@@ -243,15 +243,20 @@
   border-bottom: 1px solid var(--color-hairline);
   margin: 0 -16px;
   padding: 10px 16px;
-  display: grid;
-  grid-template-columns: 42% 1fr;
-  gap: 6px 8px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-/* One class, both selects — identical height/font so the column reads even. */
+.pFilterPair {
+  display: flex;
+  gap: 8px;
+}
+
+/* One class, both selects — identical size, half the line each. */
 .pSelect {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 44px;
   padding: 0 8px;
   background: var(--color-white);
@@ -280,9 +285,9 @@
 }
 
 .pAsOf {
-  justify-self: end;
   font-family: var(--font-structure);
   font-size: 11px;
+  line-height: 14px;
   color: var(--color-locked);
 }
 
