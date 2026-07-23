@@ -50,12 +50,12 @@ function stockAtOrderPill(stock: number | null, qty: number): string | null {
 
 // GREEN live-availability tag on a line that was short AT ORDER TIME (owner
 // 2026-07-21): how many of the product are in the godown NOW (live stock_qty).
-// current ≥ ordered qty → "Now available"; 1..qty-1 → "{current} available";
-// 0/NULL → null (still nothing to fill). Gated at the call site to lines that
-// carry a red order-time pill and to not-yet-fulfilled orders.
+// current ≥ ordered qty → "Now available"; 1..qty-1 → "{current} available now"
+// (owner 2026-07-23); 0/NULL → null (still nothing to fill). Gated at the call
+// site to lines that carry a red order-time pill and to not-yet-fulfilled orders.
 function nowAvailableTag(current: number | null, qty: number): string | null {
   if (current == null || current <= 0) return null;
-  return current >= qty ? "Now available" : `${current} available`;
+  return current >= qty ? "Now available" : `${current} available now`;
 }
 
 // Statuses where the recovery tag is meaningful (order not yet shipped). Hidden
