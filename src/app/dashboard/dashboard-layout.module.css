@@ -7,9 +7,15 @@
    DOM order is [rail, mobileTop, mobileBottom, main] (nav renders a fragment),
    so flex `order` arranges the column: strip 0 · main 1 · bar 2. */
 .shell {
+  /* Pinned to the viewport (owner bug 2026-07-24): a plain 100dvh box can
+     momentarily exceed the VISIBLE screen (dvh ignores the on-screen
+     keyboard; URL-bar transitions; leftover page zoom) — then the whole box
+     scrolls as a unit and a finger on either ribbon slides it. fixed+inset:0
+     nails the box to the viewport so the document can never scroll. */
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
 }
 
 .main {
@@ -18,13 +24,14 @@
   min-width: 0;
   min-height: 0;
   overflow-y: auto; /* the only scroller on phone — sticky headers pin to it */
+  overscroll-behavior-y: contain; /* inner scroll never chains to the page */
 }
 
 @media (min-width: 768px) {
   /* Desktop: rail + window-scrolling main, exactly as before. */
   .shell {
+    position: static;
     flex-direction: row;
-    height: auto;
     min-height: 100vh;
   }
 
@@ -32,5 +39,6 @@
     order: 0;
     overflow-y: visible;
     min-height: auto;
+    overscroll-behavior-y: auto;
   }
 }
