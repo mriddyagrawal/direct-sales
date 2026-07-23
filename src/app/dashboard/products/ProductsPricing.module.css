@@ -232,8 +232,9 @@
   --pm-brand-offset: 36px;
 }
 
-/* Sticky bar: [Brand ▾][Search…] / [Stock ▾  ·  Stock as of …]. Full-bleed
-   (cancels .page's 16px inset) so it reads as a band, like the salesman bar. */
+/* Sticky bar — an EVEN 2-col grid (owner 2026-07-24): both selects stack in
+   the left column at identical size; search + the as-of line fill the right.
+   Full-bleed (cancels .page's 16px inset) so it reads as a band. */
 .pBar {
   position: sticky;
   top: 0;
@@ -242,20 +243,15 @@
   border-bottom: 1px solid var(--color-hairline);
   margin: 0 -16px;
   padding: 10px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 42% 1fr;
+  gap: 6px 8px;
+  align-items: center;
 }
 
-.pBarRow {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.pBrandSelect {
-  flex: 0 0 auto;
-  max-width: 42%;
+/* One class, both selects — identical height/font so the column reads even. */
+.pSelect {
+  width: 100%;
   min-height: 44px;
   padding: 0 8px;
   background: var(--color-white);
@@ -267,7 +263,6 @@
 }
 
 .pSearch {
-  flex: 1;
   min-width: 0;
   min-height: 44px;
   padding: 0 12px;
@@ -284,25 +279,8 @@
   border-color: var(--color-accent);
 }
 
-.pBarRow2 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.pStockSelect {
-  min-height: 32px;
-  padding: 0 8px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-ink);
-}
-
 .pAsOf {
+  justify-self: end;
   font-family: var(--font-structure);
   font-size: 11px;
   color: var(--color-locked);
@@ -519,11 +497,29 @@
   border-top: 2px solid var(--color-ink);
 }
 
-.chooserTitle {
+/* Header — identical grammar to ProductModal/ImportWizard (owner 2026-07-24:
+   the 3 popups share one type scale): 21px token heading + 16px muted ✕. */
+.chooserHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chooserHeading {
   font-family: var(--font-structure);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
   color: var(--color-ink);
+}
+
+.chooserClose {
+  background: none;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-locked);
+  cursor: pointer;
+  padding: 4px;
 }
 
 /* Equal option rows: icon + title + muted hint, left-aligned, hairline box.
@@ -586,7 +582,7 @@
   }
 
   .chooserPanel {
-    max-width: 420px;
+    max-width: 460px; /* = ProductModal — the popups read as one family */
     padding: 20px;
     border: 1px solid var(--color-hairline);
     border-top: 2px solid var(--color-ink);
