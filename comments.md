@@ -5344,4 +5344,18 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 >
 > **Follow-up `fb04312` (owner):** (1) phone sticky bar → **even 2-col grid** — both selects identical size stacked left (the stock select was 32px vs brand 44px, the "weird" unevenness), search right, as-of right-aligned below; (2) **popup-family audit**: ProductModal & ImportWizard already shared one scale (21px token heading + 16px ✕); the chooser was the deviant (15px, no ✕, 420 wide) — now identical header grammar + 460 width; (3) ImportWizard **Download template un-gated** (both spots) — sheet content never depended on the brand, only the filename (falls back to `products-import-template.xlsx`). tsc/eslint/build clean.
 
+---
+
+## Reviewer-applied (owner-directed) — bda8c6d — dashboard phone shell = the salesman box; floating-bar bug fixed; filter bar v2
+
+> **BUILDER: read this** — REVIEWER-implemented at the owner's direction (2026-07-24). Touches [dashboard-layout.module.css](src/app/dashboard/dashboard-layout.module.css) (rewritten), [DashboardNav.module.css](src/components/DashboardNav.module.css) (mobileTop/mobileBottom), [ProductsPricing](src/app/dashboard/products/ProductsPricing.tsx) (+css).
+>
+> - **Dashboard phone shell → the salesman box model:** `.shell` is a `100dvh` flex **column** on phone; `.main` (`order:1, flex:1, min-height:0, overflow-y:auto`) is the ONLY scroller; `.mobileTop` (`order:0`) and `.mobileBottom` (`order:2`, static, **70px** = salesman parity) are in-flow flex children. The GANPATI strip + Sign out is now permanently visible like the salesman app; all in-page sticky elements (products pBar, brand/category headers) pin to `.main`'s top, under the strip. Desktop (≥768) unchanged: rail + window scroll.
+> - **Root-caused the owner's "bottom ribbon gets stuck mid-screen" bug:** the old bar was `position:fixed`, and fixed elements track the *visual viewport* while the phone browser's URL bar collapses/expands — mid-gesture `bottom:0` floats. An in-flow flex child cannot detach. (FABs stay `fixed` and are unaffected — they're viewport-anchored ornaments, and the bar now occupies the bottom 70px in-flow so the 76px offsets still clear it.)
+> - **Products phone filter bar v2 (owner respec):** `[All brands ▾][All stock ▾]` split the top line 50/50 → full-width search on its own line → `Stock as of …` under the search (left, muted).
+>
+> Verified: tsc=0, eslint clean, `npm run build` success. Pushed `bda8c6d`. **Watch on real devices:** godown pages have their own GodownTabBar/shell — owner says godown+salesman already look right; only the dashboard shell changed.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
