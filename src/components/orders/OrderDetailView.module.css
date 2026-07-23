@@ -107,15 +107,16 @@
    EXACTLY like the Quick Order stock pill (owner 2026-07-17): a currentColor
    dot + colored text, no box/border, on its own line BELOW the item name.
    In-stock lines: nothing. */
-/* The stock flags line (below the item name): the red order-time snapshot pill
-   and — when the line was short at order time and the order isn't yet fulfilled
-   — the green "Now available" recovery tag beside it, one small gap apart. The
-   row owns the top margin + gap so each pill is a plain inline dot+text. */
+/* The stock flags under the item name: the red order-time snapshot pill and —
+   when the line was short at order time and the order isn't yet fulfilled — the
+   green live recovery tag. STACKED on their own lines (owner 2026-07-23) so the
+   "was short → what's here now" pair reads cleanly in the narrow ITEM cell
+   instead of one congested row. */
 .stockFlags {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   margin-top: 3px;
 }
 
