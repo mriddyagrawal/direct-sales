@@ -164,6 +164,19 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
   const storageKey = `ganpati:orders-filters:${pathname}`;
   const [orders, setOrders] = useState(initialOrders);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  // Re-seed whenever the SERVER hands us a fresh list (router.refresh(),
+  // revisit) — useState only reads its initializer once, so without this the
+  // list silently ignored new server payloads and only Realtime could ever
+  // update it (owner-reported staleness, 2026-07-24). Server is the truth;
+  // Realtime keeps layering on top. Render-phase adjust (React's sanctioned
+  // "state from props" pattern — not an effect, so no cascading-render lint).
+  const [seededFrom, setSeededFrom] = useState(initialOrders);
+  if (seededFrom !== initialOrders) {
+    setSeededFrom(initialOrders);
+    setOrders(initialOrders);
+  }
+  // Bumped to tear down + rebuild the Realtime channel after a failure.
+  const [rtNonce, setRtNonce] = useState(0);
   // Default active tab: the first chip when there's no "All" (godown Home), else "all".
   const [filters, dispatchFilter] = useReducer(filterReducer, chipTabs, (tabs): FilterState => ({
     query: "",
@@ -201,6 +214,8 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
 
   useEffect(() => {
     const supabase = createClient();
+    let hadFailure = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     // D8: a salesman's own self-cancelled order reads as "never happened" —
     // the page query excludes it, and this keeps Realtime from re-adding it.
@@ -252,14 +267,56 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
         { event: "UPDATE", schema: "public", table: "orders" },
         (payload) => void handleUpdate((payload.new as { id: string }).id),
       )
-      .subscribe();
+      .subscribe((status) => {
+        // The old bare subscribe() swallowed failures — an auth hiccup or a
+        // dropped socket (iOS suspends WebSockets whenever the PWA is
+        // backgrounded) meant NO live orders, silently, until a manual reload
+        // (owner-reported 2026-07-24). Now: log it, rebuild the channel after
+        // a short pause, and re-pull the list on recovery to fill the gap.
+        if (status === "SUBSCRIBED") {
+          if (hadFailure) {
+            hadFailure = false;
+            router.refresh(); // catch up on anything missed while dead
+          }
+          return;
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          hadFailure = true;
+          console.warn(`orders realtime: ${status} — resubscribing in 4s`);
+          if (retryTimer === null) {
+            retryTimer = setTimeout(() => setRtNonce((n) => n + 1), 4000);
+          }
+        }
+      });
 
     return () => {
+      if (retryTimer !== null) clearTimeout(retryTimer);
       supabase.removeChannel(channel);
     };
-    // isStaff/currentUserId are stable props — this resubscribes only if the
-    // role somehow changed under us (it can't; belt and suspenders for lint).
-  }, [isStaff, currentUserId]);
+    // isStaff/currentUserId are stable props; rtNonce forces a clean rebuild
+    // after a failed/closed channel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStaff, currentUserId, rtNonce]);
+
+  // The socket-free safety net (owner's dad, iPhone PWA): whenever the app
+  // comes back to the foreground (or the network returns), pull a fresh list
+  // straight from the server — live orders no longer depend on a WebSocket
+  // surviving iOS backgrounding. router.refresh() re-runs the server query;
+  // the re-seed effect above applies it to the list.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") router.refresh();
+    }
+    function onOnline() {
+      router.refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [router]);
 
   // Restore persisted filters ONCE on mount — in an effect, not the useState
   // initializer, so the first client render matches the server (defaults) and
