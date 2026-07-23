@@ -86,6 +86,8 @@ export function ProductsPricing({
   const filteredProducts = displayProducts.filter(
     (p) => matchesQuery(p) && (brandFilter === "all" || p.brand_id === brandFilter) && matchesStock(p),
   );
+  const filteredPriced = filteredProducts.filter((p) => p.price_paise !== null).length;
+  const isFiltered = filteredProducts.length !== products.length;
 
   // Brand-scoped existing categories drive the modal's typeahead + the
   // "speakers"→"Speakers" normalization (derived from the full catalog).
@@ -198,7 +200,9 @@ export function ProductsPricing({
       <div className={styles.titleRow}>
         <h1 className={styles.title}>Products</h1>
         <span className={styles.count}>
-          {products.length} products · {priced} priced
+          {isFiltered
+            ? `${filteredProducts.length} of ${products.length} products · ${filteredPriced} priced`
+            : `${products.length} products · ${priced} priced`}
         </span>
         {isAdmin && (
           <div className={styles.titleActions}>
