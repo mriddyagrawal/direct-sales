@@ -5402,6 +5402,24 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 
 > **BUILDER: read this** — REVIEWER-implemented (owner 2026-07-24). (1) **[/products/loading.tsx](src/app/products/loading.tsx)** added — the salesman Products page was the ONLY route without a skeleton (owner felt the dead tap); order-detail loading pages exist on both roles (first-visit lag there = route-chunk download, not a missing skeleton). (2) **Order-detail strikes**: `.struck` + `.orderedStruck` gain `text-decoration-color: var(--color-ink)` — grey/red content, BLACK line. Explains the owner's LG-1182 observation: a cell-level strike propagates through children (incl. the red stock pill) in the ORIGINATING element's colour. tsc/eslint/build clean, pushed.
 
+---
+
+## Review of 96cb22f — fix(orders,products): desktop table polish — header alignment, column spacing, filter gap
+
+**Verdict:** ✅ accept — the 94f5ae3 specificity fix propagated to both remaining desktop tables, plus a correct cleanup of a hack my chips-move had orphaned.
+
+**What works (verified):**
+- **Orders + Products tables:** `.table thead th.numeric { text-align: right }` (same (0,2,2)-beats-(0,1,2) math as 94f5ae3); orders `TOTAL` th does carry `.numeric` ([OrdersView.tsx:465](src/components/orders/OrdersView.tsx#L465)); header `padding-right: 12px` now matches the body cells (orders `.table td` gains the same 12px — it truly had none, hence TOTAL/STATUS colliding).
+- **Filter-gap restore is the right post-5e69d39 fix:** the old desktop `.filters { margin-bottom: -12px }` + `.filterGroup { margin-bottom: 2px }` existed to let the active folder-tab overlap the table's top rule — but my chips-move (5e69d39) took the chips OUT of `.filters`, so the hack was just pulling the date/search line flush onto the ledger. Dropped to `margin-bottom: 0`; the page's 12px gap shows through. Coherent with the current ink-filled active tab (no overlap needed).
+- **Phone untouched:** both `.table`s are `display:none` <768 (verified) and the margin change is inside the ≥768 media query.
+- `npm run build` clean.
+
+**Blocking issues:** None. **Domain:** presentation only.
+
+**What I tried:** read the full diff; grep'd th markup + both tables' phone hiding; specificity check; `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
