@@ -160,9 +160,9 @@ export function ProductsPricing({
           }
         }}
       >
-        {p.tally_name !== p.name && <p className={styles.mEyebrow}>{p.tally_name}</p>}
         <p className={styles.mName}>
           {p.name}
+          {p.tally_name !== p.name && <span className={styles.mTally}>{p.tally_name}</span>}
           {!p.active && <span className={styles.inactiveBadge}>INACTIVE</span>}
         </p>
         <div className={styles.mMeta}>

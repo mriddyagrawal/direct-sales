@@ -3,12 +3,22 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Guard: nothing on this page may widen the viewport (the zoomed-out,
+     buttons-off-screen phone bug). Wrapping above is the real fix; this
+     stops any future regression from re-breaking the page scale. */
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
+/* Wraps on phone: title + count share the first line, the action buttons drop
+   to their own row. Without the wrap the row's min-content width (~600px)
+   forced the whole page wider than the viewport — the browser zoomed out and
+   "+ Add product" hung off-screen. */
 .titleRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px 10px;
 }
 
 .title {
@@ -22,11 +32,14 @@
   font-family: var(--font-figures);
   font-size: 12px;
   color: var(--color-locked);
+  /* One clean line beside the title — never a wrapped tower. */
+  white-space: nowrap;
 }
 
 .titleActions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -55,9 +68,12 @@
   border-color: var(--color-accent);
 }
 
-/* Brand + stock filter selects — sit beside the search on desktop, wrap under
-   it on narrow screens. Same border/height voice as the search input. */
+/* Brand + stock filter selects — beside the search on desktop; on phone they
+   wrap below it and split the row 50/50 (flex-grow) instead of one hanging
+   half off-screen. Same border/height voice as the search input. */
 .filterSelect {
+  flex: 1 1 130px;
+  min-width: 0;
   min-height: 40px;
   padding: 0 10px;
   background: var(--color-white);
@@ -270,8 +286,8 @@
 .mRow {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 10px 0;
+  gap: 2px;
+  padding: 8px 0;
   border-bottom: 1px solid var(--color-hairline);
 }
 
@@ -279,27 +295,29 @@
   opacity: 0.55;
 }
 
-/* Tally/model eyebrow — only rendered when it differs from the display name. */
-.mEyebrow {
-  font-family: var(--font-figures);
-  font-size: 11px;
-  color: var(--color-locked);
-}
-
+/* Name line: bold display name, then the muted mono tally inline after it
+   (only when it differs) — inline flow so a long pair wraps naturally instead
+   of burning a fixed extra line per row. */
 .mName {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
   font-family: var(--font-structure);
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--color-ink);
+}
+
+.mTally {
+  margin-left: 6px;
+  font-family: var(--font-figures);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-locked);
 }
 
 /* State badge in the retailers voice (DEACTIVATED) — the row shows state; the
    activate/deactivate ACTION lives in the edit modal, like Retailers. */
 .inactiveBadge {
+  margin-left: 6px;
   padding: 2px 6px;
   background: var(--color-locked);
   color: var(--color-white);
@@ -307,6 +325,7 @@
   font-size: 9px;
   font-weight: 700;
   border-radius: var(--radius);
+  vertical-align: 1px;
 }
 
 /* Meta line: price left, stock right (the salesman two-line row layout). */
@@ -316,7 +335,7 @@
   justify-content: space-between;
   gap: 8px;
   font-family: var(--font-figures);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--color-ink);
 }
 
@@ -367,5 +386,11 @@
 
   .cards {
     display: none;
+  }
+
+  /* Desktop: selects size to content beside the search — the phone flex-grow
+     (50/50 second row) must not balloon them across a wide screen. */
+  .filterSelect {
+    flex: 0 0 auto;
   }
 }
