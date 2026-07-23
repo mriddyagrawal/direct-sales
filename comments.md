@@ -5420,6 +5420,20 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
+---
+
+## Review of 74113e6 — fix(filters): dropdown panel matches its trigger box width on desktop
+
+**Verdict:** ✅ accept — correct one-rule fix.
+
+**What works (verified):** `.popover` is `position:absolute` inside `.wrap` (the trigger-sized `inline-block`), so the new desktop-only `min-width:100%` resolves to exactly the trigger's width — the SALESMAN menu no longer shrink-wraps ~80px narrower than its 280px box. `min-width` (not `width`) preserves the date-range popover's freedom to grow wider. Mobile is doubly protected: media-scoped AND the phone popover's inline `mobileStyle` width would beat a class rule anyway. Shared shell → Orders + Deposits both fixed. Build clean.
+
+**Blocking issues:** None. **Domain:** presentation only.
+
+**What I tried:** read the diff; confirmed `.wrap`/`.popover` positioning context by grep; `npm run build`.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
