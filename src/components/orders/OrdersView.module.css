@@ -60,7 +60,17 @@
    no horizontal scroll. Labels may wrap to two lines inside their cell so the
    boxes stay narrow and uniform ("Pending approval" → "Pending" / "approval"). */
 @media (max-width: 767px) {
+  /* PINNED on phone (owner 2026-07-24): the status chips are the most-
+     switched control on a long list — they stick to the scroller's top while
+     everything else (title, dropdowns, search) scrolls away. Full-bleed
+     paper band so rows slide under it cleanly. */
   .filterTabs {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--color-paper);
+    margin: 0 -16px;
+    padding: 8px 16px;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
@@ -140,10 +150,9 @@
     width: 100%;
   }
 
-  /* Belt: nothing in the filter zone may cause a horizontal scroll. */
-  .filters {
-    overflow-x: hidden;
-  }
+  /* NOTE: the old `.filters { overflow-x: hidden }` belt is GONE — an
+     overflow ancestor silently kills position:sticky (the chips above), and
+     the real width containment is the minmax(0,1fr) grid tracks anyway. */
 }
 
 /* Folder-tab strip (S8 revamp commit 3). Inactive tabs are plain text — no
