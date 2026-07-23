@@ -216,6 +216,8 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
     const supabase = createClient();
     let hadFailure = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     // D8: a salesman's own self-cancelled order reads as "never happened" —
     // the page query excludes it, and this keeps Realtime from re-adding it.
@@ -255,43 +257,63 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       setOrders((prev) => prev.map((o) => (o.id === row.id ? row : o)));
     }
 
-    const channel = supabase
-      .channel("dashboard-orders")
-      .on(
+    // ROOT CAUSE (verified in realtime.subscription, 2026-07-24: every live
+    // orders subscription carried claims_role=anon): the channel joined BEFORE
+    // the user's JWT reached the socket, so RLS evaluated the listener as anon
+    // — which has no SELECT on orders — and Realtime delivered ZERO events,
+    // silently, on every platform. Attach the session token FIRST, then join;
+    // the auth listener keeps the socket authorized across token refreshes.
+    const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
+      supabase.realtime.setAuth(session?.access_token ?? null);
+    });
+
+    async function start() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled) return;
+      supabase.realtime.setAuth(session?.access_token ?? null);
+      channel = supabase
+        .channel("dashboard-orders")
+        .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
-        (payload) => void handleInsert((payload.new as { id: string }).id),
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "orders" },
-        (payload) => void handleUpdate((payload.new as { id: string }).id),
-      )
-      .subscribe((status) => {
+          (payload) => void handleInsert((payload.new as { id: string }).id),
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "orders" },
+          (payload) => void handleUpdate((payload.new as { id: string }).id),
+        )
+        .subscribe((status) => {
         // The old bare subscribe() swallowed failures — an auth hiccup or a
         // dropped socket (iOS suspends WebSockets whenever the PWA is
         // backgrounded) meant NO live orders, silently, until a manual reload
         // (owner-reported 2026-07-24). Now: log it, rebuild the channel after
         // a short pause, and re-pull the list on recovery to fill the gap.
-        if (status === "SUBSCRIBED") {
-          if (hadFailure) {
-            hadFailure = false;
-            router.refresh(); // catch up on anything missed while dead
+          if (status === "SUBSCRIBED") {
+            if (hadFailure) {
+              hadFailure = false;
+              router.refresh(); // catch up on anything missed while dead
+            }
+            return;
           }
-          return;
-        }
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          hadFailure = true;
-          console.warn(`orders realtime: ${status} — resubscribing in 4s`);
-          if (retryTimer === null) {
-            retryTimer = setTimeout(() => setRtNonce((n) => n + 1), 4000);
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            hadFailure = true;
+            console.warn(`orders realtime: ${status} — resubscribing in 4s`);
+            if (retryTimer === null) {
+              retryTimer = setTimeout(() => setRtNonce((n) => n + 1), 4000);
+            }
           }
-        }
-      });
+        });
+    }
+    void start();
 
     return () => {
+      cancelled = true;
+      authSub.subscription.unsubscribe();
       if (retryTimer !== null) clearTimeout(retryTimer);
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
     // isStaff/currentUserId are stable props; rtNonce forces a clean rebuild
     // after a failed/closed channel.
