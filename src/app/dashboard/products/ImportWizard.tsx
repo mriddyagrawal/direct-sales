@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { Glyph } from "@/components/ui/Glyph";
 import { formatRupees } from "@/lib/format";
 import { parsePricePaise } from "@/lib/price";
 import { normalizeCategory, effectiveTallyName } from "@/lib/catalog";
@@ -196,7 +198,7 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
         <div className={styles.header}>
           <h2 className={styles.heading}>Import products</h2>
           <button type="button" className={styles.closeX} onClick={onClose} aria-label="Close">
-            ✕
+            <Glyph icon={X} />
           </button>
         </div>
 
