@@ -12,7 +12,7 @@ export interface ProductRow {
   tally_name: string;
   stock_qty: number | null; // null = never synced from Tally
   stock_updated_at: string | null; // per-row "as of"
-  brands: { name: string } | null;
+  brands: { name: string; show_model: boolean } | null;
 }
 
 // Owner-added deliverable — pricing deferred to Supabase Studio in the
@@ -29,7 +29,7 @@ export default async function ProductsPage() {
   const [{ data }, { data: brandRows }, { data: profile }] = await Promise.all([
     supabase
       .from("products")
-      .select("id, brand_id, category, name, price_paise, active, tally_name, stock_qty, stock_updated_at, brands(name)")
+      .select("id, brand_id, category, name, price_paise, active, tally_name, stock_qty, stock_updated_at, brands(name, show_model)")
       .order("category")
       .order("name"),
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
