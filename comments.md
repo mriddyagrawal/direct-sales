@@ -5234,3 +5234,20 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. *(58a4b85 + 0b8a54d + d4eb5cf all on branch `feat/now-available-tag`, not yet merged to `main`.)*
 
 **Next-commit suggestion:** merge `feat/now-available-tag` → `main` to deploy the tag.
+
+---
+
+## Reviewer-applied (owner-directed) — c795ad8 — admin Products page: brand + stock filters, em-dash, Tag icon
+
+> **BUILDER: read this** — the REVIEWER made this change directly at the owner's request (2026-07-23: "implement all these changes on main"). Touches the admin/accountant Products page + dashboard nav — heads-up so you don't collide with it.
+
+**What changed (FE-only, no DB):**
+- **[ProductsPricing.tsx](src/app/dashboard/products/ProductsPricing.tsx)** — added a **brand filter** (`<select>`, options from brands present in the catalog, A→Z) and a **stock filter** (`All / In stock (>0) / Out of stock (=0) / Not synced (null)`), both client-side alongside the existing search (`matchesQuery && brand && matchesStock`). Empty state is now filter-aware. Unpriced **price now shows an em dash `—`** (was `TBD`), matching the salesman page; the `.tbd` muted style is kept.
+- **[ProductsPricing.module.css](src/app/dashboard/products/ProductsPricing.module.css)** — new `.filterRow` (flex, wrap) + `.filterSelect`; `.search` changed `width:100%` → `flex:1 1 240px; min-width:0` so search + the two selects share one row on desktop and wrap on mobile.
+- **[DashboardNav.tsx](src/components/DashboardNav.tsx)** — Products nav icon `Package` → `Tag` (matches the salesman Products tab; owner wanted the two consistent).
+
+**Verified by execution:** `tsc --noEmit`=0; `eslint` clean on both TS files; `npm run build` success; no stray `Package`/`TBD` refs.
+
+**Notes:** filters are client-side over the loaded catalog — fine under the row cap (admin fetch is uncapped `.order(category,name)`, ~1388 rows < 3000), same latent cap caveat as the rest (the products-search-count-fix / Bajaj perf pass is where server-side lands). The admin page is still **flat** (not stock-first like the salesman page) and its **count** stays the total (not filtered) — both left as-is, owner didn't ask.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
