@@ -5339,5 +5339,7 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 > Verified: tsc=0, eslint clean, `npm run build` success, no orphan class refs. Pushed `b636f67`.
 >
 > **Follow-up `c7c5d14` (owner screenshots):** the chooser now uses the **ProductModal responsive pattern** instead of BottomSheet — bottom sheet on phone, **centered 420px panel on desktop** (owner asked for center, like Add/Import). And `.titleActions` is **desktop-only** — the phone showed both the header `[Update stock][Add]` AND the FAB; now the FAB is the single phone entry point (Update stock desktop-only per owner). tsc/eslint/build clean.
+>
+> **Follow-up `4943732` (owner: "Add 1 product feels weird"):** the chooser's primary-CTA slab was the wrong grammar for a two-way question — both choices are now **equal option rows** (icon + title + muted hint): `⊕ New product — Enter one product by hand` / `▦ Import from Excel — Paste rows — adds new, updates existing`. "New product" matches the app's create voice (New Order / New deposit); the hint states the wizard's real upsert semantics. tsc/eslint/build clean.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
