@@ -397,24 +397,28 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
         <h1 className={styles.title}>{title ?? (isStaff ? "Orders" : "My orders")}</h1>
       </div>
 
+      {/* Chip-tabs: full set for staff/salesman; an explicit `tabs` set for the
+          godown Home; hidden on the godown's single-status routes (Dispatch),
+          whose bottom bar is the status nav. A DIRECT .page child, NOT inside
+          .filters: position:sticky can never leave its parent's box, so as a
+          .filters child the chips un-stuck as soon as the filter zone scrolled
+          past (owner repro 2026-07-24) — as a page-level sibling they pin for
+          the whole list. */}
+      {chipTabs.length > 0 && (
+        <div className={styles.filterTabs}>
+          {chipTabs.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`${styles.filterTab} ${status === s ? styles.filterTabActive : ""}`}
+              onClick={() => dispatchFilter({ type: "status", value: s })}
+            >
+              {STATUS_LABEL[s]} <span className={styles.tabCount}>{tabCounts[s]}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className={styles.filters}>
-        {/* Chip-tabs: full set for staff/salesman; an explicit `tabs` set for the
-            godown Home; hidden on the godown's single-status routes (Dispatch),
-            whose bottom bar is the status nav. */}
-        {chipTabs.length > 0 && (
-          <div className={styles.filterTabs}>
-            {chipTabs.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`${styles.filterTab} ${status === s ? styles.filterTabActive : ""}`}
-                onClick={() => dispatchFilter({ type: "status", value: s })}
-              >
-                {STATUS_LABEL[s]} <span className={styles.tabCount}>{tabCounts[s]}</span>
-              </button>
-            ))}
-          </div>
-        )}
         <div className={styles.filterGroup}>
           {/* SALESMAN/BRAND filters are staff-only — a salesman's rows are all
               his own (RLS). They share one explicit half-half row on mobile
