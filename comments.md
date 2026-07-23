@@ -5422,6 +5422,14 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 
 ---
 
+## Reviewer-applied (owner repro) — 37d546d — salesman shells pinned (ribbon-slide recurrence)
+
+> The dashboard-shell ribbon-slide bug (78030c2) reappeared on the SALESMAN pages, as predicted in that note ("pin it the same way if ever reported") — owner reported it 2026-07-24. Same fix applied to the three two-ribbon shells: `/` (home), `/products`, `/deposits` — `.page` → `position:fixed; inset:0` + `overscroll-behavior-y:contain` on their scrollers. DepositFlow (document-scroll flow page, no ribbon box) untouched. Build clean, pushed.
+>
+> **Realtime finding (owner: admin orders list didn't show a salesman's new order for ~1 min):** publication verified live (`orders` IS in `supabase_realtime`), subscription code correct + ungated — but `.subscribe()` ignores its status callback, so an auth failure / dropped channel is SILENT and delivers nothing, matching the report. Fix queued into the Slice B build (instrument status + retry); Slice B's refetch-on-every-visit also independently covers the gap.
+
+---
+
 ## Review of 74113e6 — fix(filters): dropdown panel matches its trigger box width on desktop
 
 **Verdict:** ✅ accept — correct one-rule fix.
