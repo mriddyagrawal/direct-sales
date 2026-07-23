@@ -46,6 +46,7 @@ export function ProductModal({
   const [displayName, setDisplayName] = useState(initial?.name ?? "");
   const [tallyName, setTallyName] = useState(initial?.tally_name ?? "");
   const [price, setPrice] = useState(initial?.price_paise != null ? String(initial.price_paise / 100) : "");
+  const [stock, setStock] = useState(initial?.stock_qty != null ? String(initial.stock_qty) : "");
   const [active, setActive] = useState(initial?.active ?? true);
 
   const [catOpen, setCatOpen] = useState(false);
@@ -53,7 +54,7 @@ export function ProductModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{ category?: string; displayName?: string; price?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ category?: string; displayName?: string; price?: string; stock?: string }>({});
   const catBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -84,6 +85,15 @@ export function ProductModal({
     const parsed = parsePricePaise(price);
     if (!parsed.ok) errs.price = parsed.error;
 
+    // Stock (owner 2026-07-24): blank = no stock data (null, the "not synced"
+    // state); else a whole number of units.
+    const stockTrim = stock.trim();
+    let stockQty: number | null = null;
+    if (stockTrim !== "") {
+      if (!/^\d+$/.test(stockTrim)) errs.stock = "Whole number of units, or blank.";
+      else stockQty = parseInt(stockTrim, 10);
+    }
+
     if (!brandId || Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
@@ -95,6 +105,14 @@ export function ProductModal({
     const pricePaise = parsed.ok ? parsed.paise : null;
     const normalizedCategory = normalizeCategory(category, brandCats);
     const tally = effectiveTallyName(tallyName, displayName);
+    // Stock columns ride along ONLY when the value actually changed (or, on
+    // Add, was provided) — an untouched field must not restamp
+    // stock_updated_at and fake a sync time. A manual change stamps "now" so
+    // every "as of" stays honest; clearing to blank nulls both.
+    const stockChanged = mode === "add" ? stockTrim !== "" : stockQty !== (initial?.stock_qty ?? null);
+    const stockFields = stockChanged
+      ? { stock_qty: stockQty, stock_updated_at: stockQty === null ? null : new Date().toISOString() }
+      : {};
     const supabase = createClient();
 
     let dbError;
@@ -111,14 +129,15 @@ export function ProductModal({
             tally_name: tally,
             price_paise: pricePaise,
             active,
+            ...stockFields,
           },
           { onConflict: "brand_id,tally_name" },
         ));
     } else {
       // Edit = UPDATE by id. Accountant may not touch name/category.
       const payload = nameLocked
-        ? { tally_name: tally, price_paise: pricePaise, active }
-        : { category: normalizedCategory, name: displayName.trim(), tally_name: tally, price_paise: pricePaise, active };
+        ? { tally_name: tally, price_paise: pricePaise, active, ...stockFields }
+        : { category: normalizedCategory, name: displayName.trim(), tally_name: tally, price_paise: pricePaise, active, ...stockFields };
       ({ error: dbError } = await supabase.from("products").update(payload).eq("id", initial!.id));
     }
 
@@ -256,6 +275,19 @@ export function ProductModal({
             placeholder="Blank = TBD"
             error={fieldErrors.price}
             onChange={(e) => setPrice(e.target.value)}
+          />
+
+          {/* Manual stock override (owner 2026-07-24). Note: the Tally sync
+              overwrites this on its next run for products whose tally_name
+              matches a Tally item — Tally stays the source of truth where it
+              exists; for items Tally doesn't carry, the manual value sticks. */}
+          <Field
+            label="Stock (units)"
+            value={stock}
+            inputMode="numeric"
+            placeholder="Blank = no stock data"
+            error={fieldErrors.stock}
+            onChange={(e) => setStock(e.target.value)}
           />
 
           <button type="button" className={styles.toggle} onClick={() => setActive((a) => !a)}>
