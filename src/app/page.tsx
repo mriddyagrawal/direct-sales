@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchOrdersList } from "@/lib/queries/orders";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { TopStrip } from "@/components/TopStrip";
-import { OrdersView, type OrderListRow, type BrandOption } from "@/components/orders/OrdersView";
+import { OrdersView, type BrandOption } from "@/components/orders/OrdersView";
 import styles from "./page.module.css";
 
 // Salesman home — the same shared OrdersView the staff dashboard renders
@@ -28,16 +29,10 @@ export default async function Home() {
     .maybeSingle();
 
   // brands feed the card/table brand label only — the BRAND filter itself is
-  // staff-gated inside OrdersView.
-  const [{ data: orderRows }, { data: brandRows }] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(
-        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)",
-      )
-      .or(`status.neq.cancelled,cancelled_by.neq.${user!.id}`)
-      .order("submitted_at", { ascending: false })
-      .limit(300),
+  // staff-gated inside OrdersView. The orders query (incl. the D8 self-cancel
+  // clause) lives in the shared builder — spec D12, never inline it here.
+  const [orderRows, { data: brandRows }] = await Promise.all([
+    fetchOrdersList(supabase, "salesman", user!.id),
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
   ]);
 
@@ -46,7 +41,7 @@ export default async function Home() {
       <TopStrip accountLabel={profile?.full_name ?? user?.email ?? ""} />
       <div className={styles.content}>
         <OrdersView
-          initialOrders={(orderRows ?? []) as unknown as OrderListRow[]}
+          initialOrders={orderRows}
           salesmen={[]}
           brands={(brandRows ?? []) as BrandOption[]}
           role="salesman"

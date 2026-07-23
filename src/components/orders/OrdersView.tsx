@@ -17,21 +17,10 @@ import { SalesmanFilter } from "./SalesmanFilter";
 import { BrandFilter } from "./BrandFilter";
 import styles from "./OrdersView.module.css";
 
-export interface OrderListRow {
-  id: string;
-  order_ref: string;
-  submitted_at: string;
-  total_paise: number;
-  status: string;
-  editable_until: string;
-  cancelled_by: string | null;
-  admin_comment: string | null;
-  salesman_id: string;
-  brand_id: string;
-  retailers: { name: string; verified: boolean } | null;
-  profiles: { full_name: string } | null;
-  brands: { name: string; code: string } | null;
-}
+// The row shape + list query live in the shared builder (spec D12); the type
+// is re-exported here so existing importers keep working.
+import type { OrderListRow } from "@/lib/queries/orders";
+export type { OrderListRow };
 
 export interface SalesmanOption {
   id: string;

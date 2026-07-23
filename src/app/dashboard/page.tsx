@@ -1,10 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  OrdersView,
-  type OrderListRow,
-  type SalesmanOption,
-  type BrandOption,
-} from "@/components/orders/OrdersView";
+import { fetchOrdersList } from "@/lib/queries/orders";
+import { OrdersView, type SalesmanOption, type BrandOption } from "@/components/orders/OrdersView";
 
 // Staff lens on the shared OrdersView (unification, 2026-07-10). No role/
 // ownership filter on purpose: orders_select_staff (RLS) is what makes
@@ -16,21 +12,17 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: orderRows }, { data: salesmenRows }, { data: brandRows }] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(
-        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)",
-      )
-      .order("submitted_at", { ascending: false })
-      .limit(300),
+  // Orders query via the shared builder (spec D12) — RLS (orders_select_staff)
+  // is still what makes staff see every order; the builder adds no scope filter.
+  const [orderRows, { data: salesmenRows }, { data: brandRows }] = await Promise.all([
+    fetchOrdersList(supabase, "staff", user!.id),
     supabase.from("profiles").select("id, full_name").eq("role", "salesman").order("full_name"),
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
   ]);
 
   return (
     <OrdersView
-      initialOrders={(orderRows ?? []) as unknown as OrderListRow[]}
+      initialOrders={orderRows}
       salesmen={(salesmenRows ?? []) as SalesmanOption[]}
       brands={(brandRows ?? []) as BrandOption[]}
       role="staff"
