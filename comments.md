@@ -5218,3 +5218,19 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. *(This + 58a4b85 live on branch `feat/now-available-tag`, not yet merged to `main`.)*
 
 **Next-commit suggestion:** merge `feat/now-available-tag` → `main` to deploy the tag; otherwise none.
+
+---
+
+## Review of d4eb5cf — feat(orders): stack the order-time + live stock pills on separate lines
+
+**Verdict:** ✅ accept — CSS-only, owner-directed layout tweak; no logic/gate/wording touched.
+
+**What changed:** `.stockFlags` (the wrapper below the item name holding the red order-time pill + green live tag) flips from a horizontal row (`flex-wrap: wrap; align-items: center; gap: 10px`) to a **vertical stack** (`flex-direction: column; align-items: flex-start; gap: 3px`), so the "was short → what's here now" pair reads as two tidy lines instead of one congested row in the narrow ITEM cell (worst on the partial case, e.g. `Partial stock · available 15` + `18 available now`). One CSS rule, one file. The `.stockAtOrderPill`/`.nowAvailablePill` dot+text styles and the whole render gate are unchanged.
+
+**Blocking issues:** None. **Domain:** presentation only — valid flexbox, no data/DB/gate/wording change; can't affect tsc/build.
+
+**What I tried:** read the diff — confirmed it's the single `.stockFlags` rule in OrderDetailView.module.css, values valid (`flex-direction: column`), and no `.tsx`/logic touched (TS identical to 0b8a54d, which built clean).
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. *(58a4b85 + 0b8a54d + d4eb5cf all on branch `feat/now-available-tag`, not yet merged to `main`.)*
+
+**Next-commit suggestion:** merge `feat/now-available-tag` → `main` to deploy the tag.
