@@ -54,20 +54,38 @@ export function ProductsPricing({
   const [importing, setImporting] = useState(false);
   const [stockImporting, setStockImporting] = useState(false);
   const [query, setQuery] = useState("");
+  const [brandFilter, setBrandFilter] = useState("all"); // "all" | brand_id
+  const [stockFilter, setStockFilter] = useState<"all" | "in" | "out" | "nosync">("all");
 
   const priced = products.filter((p) => p.price_paise !== null).length;
 
+  // Brand-filter options — brands actually present in the catalog, A→Z.
+  const brandOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const p of products) if (!byId.has(p.brand_id)) byId.set(p.brand_id, p.brands?.name ?? "—");
+    return [...byId.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [products]);
+
   const q = query.trim().toLowerCase();
-  const filteredProducts =
-    q === ""
-      ? displayProducts
-      : displayProducts.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            p.tally_name.toLowerCase().includes(q) ||
-            p.category.toLowerCase().includes(q) ||
-            (p.brands?.name ?? "").toLowerCase().includes(q),
-        );
+  const matchesQuery = (p: ProductRow) =>
+    q === "" ||
+    p.name.toLowerCase().includes(q) ||
+    p.tally_name.toLowerCase().includes(q) ||
+    p.category.toLowerCase().includes(q) ||
+    (p.brands?.name ?? "").toLowerCase().includes(q);
+  // Stock filter distinguishes confirmed-zero (=0) from never-synced (null) —
+  // "Not synced" surfaces the catalog rows Tally has never touched.
+  const matchesStock = (p: ProductRow) =>
+    stockFilter === "all"
+      ? true
+      : stockFilter === "in"
+        ? p.stock_qty != null && p.stock_qty > 0
+        : stockFilter === "out"
+          ? p.stock_qty === 0
+          : p.stock_qty === null; // "nosync"
+  const filteredProducts = displayProducts.filter(
+    (p) => matchesQuery(p) && (brandFilter === "all" || p.brand_id === brandFilter) && matchesStock(p),
+  );
 
   // Brand-scoped existing categories drive the modal's typeahead + the
   // "speakers"→"Speakers" normalization (derived from the full catalog).
@@ -129,7 +147,7 @@ export function ProductsPricing({
         <div className={styles.cardTop}>
           <span className={styles.cardName}>{p.name}</span>
           <span className={styles.mono}>
-            {p.price_paise === null ? <span className={styles.tbd}>TBD</span> : formatRupees(p.price_paise)}
+            {p.price_paise === null ? <span className={styles.tbd}>—</span> : formatRupees(p.price_paise)}
           </span>
         </div>
         {/* Brand + category now live in the sticky headers; show a Tally line
@@ -197,19 +215,47 @@ export function ProductsPricing({
         )}
       </div>
 
-      <input
-        className={styles.search}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search products — name, model, category or brand"
-      />
+      <div className={styles.filterRow}>
+        <input
+          className={styles.search}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search products — name, model, category or brand"
+        />
+        <select
+          className={styles.filterSelect}
+          value={brandFilter}
+          onChange={(e) => setBrandFilter(e.target.value)}
+          aria-label="Filter by brand"
+        >
+          <option value="all">All brands</option>
+          {brandOptions.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className={styles.filterSelect}
+          value={stockFilter}
+          onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "out" | "nosync")}
+          aria-label="Filter by stock"
+        >
+          <option value="all">All stock</option>
+          <option value="in">In stock</option>
+          <option value="out">Out of stock</option>
+          <option value="nosync">Not synced</option>
+        </select>
+      </div>
 
       {error && <p className={styles.error}>{error}</p>}
 
       {products.length === 0 ? (
         <p className={styles.empty}>No products in the catalog.</p>
       ) : filteredProducts.length === 0 ? (
-        <p className={styles.empty}>No products match &quot;{query}&quot;.</p>
+        <p className={styles.empty}>
+          {q === "" ? "No products match the current filters." : `No products match "${query}".`}
+        </p>
       ) : (
         <>
           <table className={styles.table}>
@@ -238,7 +284,7 @@ export function ProductsPricing({
                   <td className={styles.cellName}>{p.name}</td>
                   <td className={`${styles.mono} ${styles.cellMeta}`}>{p.tally_name}</td>
                   <td className={`${styles.mono} ${styles.numeric}`}>
-                    {p.price_paise === null ? <span className={styles.tbd}>TBD</span> : formatRupees(p.price_paise)}
+                    {p.price_paise === null ? <span className={styles.tbd}>—</span> : formatRupees(p.price_paise)}
                   </td>
                   <td
                     className={`${styles.mono} ${styles.numeric}`}
