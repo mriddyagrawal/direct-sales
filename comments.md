@@ -5202,3 +5202,19 @@ The dispatch stack was built locally (`25fb3f9 · d706a1b · f860450 · d2efb0e 
 **Open flags (cumulative):** No 🔴 open (㊸ CLOSED at 7db83ff). Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. **Queue clear:** Products page + Now-available tag both shipped & reviewed.
 
 **Next-commit suggestion:** none outstanding — Bajaj perf pass (brand-scope + server search + virtualization) is the next big rock when the owner greenlights the Bajaj re-import.
+
+---
+
+## Review of 0b8a54d — feat(orders): partial recovery tag reads "{n} available now" (owner 2026-07-23)
+
+**Verdict:** ✅ accept — trivial owner-directed wording tweak; logic identical, tsc/eslint clean.
+
+**What changed:** `nowAvailableTag`'s partial branch string `` `${current} available` `` → `` `${current} available now` `` (+ the matching comment). The full-recovery branch ("Now available", `current ≥ qty`), the `0/null → null` guard, and every gate (red-pill-present, `NOT_FULFILLED` statuses) are **byte-unchanged** — the earlier 12-case truth table still holds for logic (only the partial label text differs now). Single file, 4 lines.
+
+**Blocking issues:** None. **Domain:** display string only — no data/DB/gate change.
+
+**What I tried:** read the diff (one string literal + comment); `tsc --noEmit`=0; `eslint OrderDetailView.tsx` clean; confirmed the stat is one file / 4 lines.
+
+**Open flags (cumulative):** No 🔴. Carried 🟡 ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨. *(This + 58a4b85 live on branch `feat/now-available-tag`, not yet merged to `main`.)*
+
+**Next-commit suggestion:** merge `feat/now-available-tag` → `main` to deploy the tag; otherwise none.
