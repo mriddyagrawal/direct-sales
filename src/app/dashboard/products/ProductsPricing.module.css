@@ -3,11 +3,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* Guard: nothing on this page may widen the viewport (the zoomed-out,
-     buttons-off-screen phone bug). Wrapping above is the real fix; this
-     stops any future regression from re-breaking the page scale. */
+  /* NOTE: no overflow-x:hidden here — an overflow ancestor becomes the sticky
+     containing scrollport and silently kills the phone list's sticky headers
+     (learned 2026-07-24). The titleRow/filter wrapping is the overflow fix. */
   max-width: 100%;
-  overflow-x: hidden;
 }
 
 /* Wraps on phone: title + count share the first line, the action buttons drop
@@ -43,8 +42,10 @@
   gap: 8px;
 }
 
+/* Desktop-only filter row (search + brand + stock selects). The phone has its
+   own sticky bar inside .phone — same state, salesman-page layout. */
 .filterRow {
-  display: flex;
+  display: none;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
@@ -208,44 +209,128 @@
   color: var(--color-locked);
 }
 
-/* Mobile cards — desktop table has no room on a phone. Grouped under
-   Brand ▸ Category sticky headers (mobile nav is a fixed *bottom* bar, so
-   both tiers pin flush at the viewport top). */
-.cards {
+/* Desktop-only helpers. */
+.desktopOnly {
+  display: none;
+}
+
+/* ============ PHONE LIST (owner 2026-07-24) ============
+   The salesman Products page layout, mirrored: a sticky search+filters bar the
+   Brand▸Category headers pin under (offsets live-measured into --pm-search-h,
+   same ResizeObserver pattern as ProductsBrowse/QuickOrder). Hidden ≥768px. */
+.phone {
   display: block;
-  --pm-offset: 0px;
+  --pm-search-h: 100px; /* SSR/no-JS fallback; measured live on mount */
+  --pm-brand-offset: 0px;
 }
 
-/* Two-tier (≥2 brands): category headers pin below the brand header. Keep the
-   offset in sync with .mBrandHeader's rendered height. */
-.cardsTwoTier {
-  --pm-offset: 34px;
+/* Two-tier (≥2 brands): category headers pin below the brand header. Keep in
+   sync with .pBrandHeader's rendered height. */
+.phoneTwoTier {
+  --pm-brand-offset: 36px;
 }
 
-.mBrandHeader {
+/* Sticky bar: [Brand ▾][Search…] / [Stock ▾  ·  Stock as of …]. Full-bleed
+   (cancels .page's 16px inset) so it reads as a band, like the salesman bar. */
+.pBar {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: 10;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-hairline);
+  margin: 0 -16px;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pBarRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.pBrandSelect {
+  flex: 0 0 auto;
+  max-width: 42%;
+  min-height: 44px;
+  padding: 0 8px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.pSearch {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.pSearch:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.pBarRow2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pStockSelect {
+  min-height: 32px;
+  padding: 0 8px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.pAsOf {
+  font-family: var(--font-structure);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+/* Brand tier — heavier band above the category bars, muted count right. */
+.pBrandHeader {
+  position: sticky;
+  top: var(--pm-search-h);
+  z-index: 9;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
   background: var(--color-white);
   font-family: var(--font-structure);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
+  line-height: 18px;
   letter-spacing: 0.02em;
   color: var(--color-ink);
   border-bottom: 2px solid var(--color-ink);
-  /* Full-bleed: cancel .page's 16px inset so the band spans edge-to-edge. */
   margin: 0 -16px;
   padding: 8px 16px;
 }
 
-.mCatHeader {
+.pCatHeader {
   position: sticky;
-  top: var(--pm-offset);
-  z-index: 2;
+  top: calc(var(--pm-search-h) + var(--pm-brand-offset));
+  z-index: 8;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -261,9 +346,7 @@
   padding: 6px 16px 4px;
 }
 
-/* Muted count on the right of both sticky headers (matches the salesman
-   Products page + the desktop title count). */
-.mHeaderCount {
+.pHeaderCount {
   font-family: var(--font-figures);
   font-size: 11px;
   font-weight: 400;
@@ -272,13 +355,28 @@
   color: var(--color-locked);
 }
 
-/* One "Stock as of" line for the whole phone list (salesman-page pattern) —
-   the per-card "as of" echo is gone. */
-.mAsOf {
-  font-family: var(--font-figures);
-  font-size: 11px;
+.pEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 24px 0;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
   color: var(--color-locked);
-  padding: 2px 0 6px;
+}
+
+.pEmpty button {
+  min-height: 36px;
+  padding: 0 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+  cursor: pointer;
 }
 
 /* Phone rows (2026-07-23 redesign) — retailers/salesman list grammar instead
@@ -306,10 +404,10 @@
   color: var(--color-ink);
 }
 
-.mTally {
-  margin-left: 6px;
+/* Model prefix in the Quick Order name standard ("model・display"). */
+.mModelPrefix {
   font-family: var(--font-figures);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--color-locked);
 }
@@ -375,21 +473,62 @@
   color: var(--color-locked);
 }
 
+/* Phone FAB (admin) — the one Add entry point, above the fixed bottom tab bar
+   (60px). Same pill voice as the New Order / deposits FABs. */
+.pFab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  background: var(--color-accent);
+  color: var(--color-white);
+  border: none;
+  border-radius: 24px;
+  font-family: var(--font-structure);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Add-chooser sheet title. */
+.chooserTitle {
+  font-family: var(--font-structure);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
 @media (min-width: 768px) {
   .page {
     padding: 24px;
+  }
+
+  .filterRow {
+    display: flex;
+  }
+
+  .desktopOnly {
+    display: block;
   }
 
   .table {
     display: table;
   }
 
-  .cards {
+  .phone {
     display: none;
   }
 
-  /* Desktop: selects size to content beside the search — the phone flex-grow
-     (50/50 second row) must not balloon them across a wide screen. */
+  .pFab {
+    display: none;
+  }
+
+  /* Desktop: selects size to content beside the search. */
   .filterSelect {
     flex: 0 0 auto;
   }

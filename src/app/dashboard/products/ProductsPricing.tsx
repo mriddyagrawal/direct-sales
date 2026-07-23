@@ -1,10 +1,14 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { PackagePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { Glyph } from "@/components/ui/Glyph";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import { formatRupees, formatShortDate } from "@/lib/format";
+import { groupProductsStockFirst, brandGroupCount } from "@/lib/product-grouping";
 import { ProductModal, type BrandOption } from "./ProductModal";
 import { ImportWizard } from "./ImportWizard";
 import { StockImportWizard } from "./StockImportWizard";
@@ -53,9 +57,26 @@ export function ProductsPricing({
   const [modal, setModal] = useState<ModalState>(null);
   const [importing, setImporting] = useState(false);
   const [stockImporting, setStockImporting] = useState(false);
+  // The one Add entry point (owner 2026-07-24): "+ Add" button / phone FAB →
+  // a chooser sheet (Add 1 product / Import), then the familiar second step.
+  const [addChooser, setAddChooser] = useState(false);
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("all"); // "all" | brand_id
   const [stockFilter, setStockFilter] = useState<"all" | "in" | "out" | "nosync">("all");
+  // Phone sticky offsets — the salesman-page pattern: the search bar's live
+  // height feeds --pm-search-h so brand/category headers pin right below it.
+  const phoneRef = useRef<HTMLDivElement>(null);
+  const phoneBarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const bar = phoneBarRef.current;
+    const wrap = phoneRef.current;
+    if (!bar || !wrap) return;
+    const sync = () => wrap.style.setProperty("--pm-search-h", `${bar.offsetHeight}px`);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
 
   const priced = products.filter((p) => p.price_paise !== null).length;
 
@@ -101,30 +122,17 @@ export function ProductsPricing({
     return map;
   }, [products]);
 
-  // Mobile-only Brand ▸ Category grouping (desktop keeps the flat table).
-  // Brands alphabetical; categories in encounter order (products arrive
-  // ordered by category, then name).
-  const mobileGroups = useMemo(() => {
-    const byBrand = new Map<string, { brandName: string; cats: Map<string, ProductRow[]> }>();
-    for (const p of filteredProducts) {
-      let bg = byBrand.get(p.brand_id);
-      if (!bg) {
-        bg = { brandName: p.brands?.name ?? "—", cats: new Map() };
-        byBrand.set(p.brand_id, bg);
-      }
-      const cat = bg.cats.get(p.category) ?? [];
-      if (cat.length === 0) bg.cats.set(p.category, cat);
-      cat.push(p);
-    }
-    return [...byBrand.entries()]
-      .map(([brandId, bg]) => ({
-        brandId,
-        brandName: bg.brandName,
-        categories: [...bg.cats.entries()].map(([category, ps]) => ({ category, products: ps })),
-      }))
-      .sort((a, b) => a.brandName.localeCompare(b.brandName));
-  }, [filteredProducts]);
-  const multiBrandProducts = mobileGroups.length >= 2;
+  // Phone grouping (owner 2026-07-24): the SAME stock-first Brand▸Category
+  // structure as the salesman Products page, via the shared lib util — in-stock
+  // categories first, then "(out of stock)", everything A→Z. Desktop keeps the
+  // flat table. eslint disable mirrors `visible` in ProductsBrowse: the deps
+  // that matter are the filtered list itself.
+  const phoneGroups = useMemo(
+    () => groupProductsStockFirst(filteredProducts.map((p) => ({ ...p, brand_name: p.brands?.name ?? "—" }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayProducts, q, brandFilter, stockFilter],
+  );
+  const multiBrandProducts = phoneGroups.length >= 2;
 
   // Latest sync across the catalog — one "Stock as of" line on the phone list
   // (the salesman-page pattern) instead of a per-card "as of" echo.
@@ -139,13 +147,13 @@ export function ProductsPricing({
     router.refresh();
   }
 
-  // Phone row (2026-07-23 redesign) — the retailers/salesman list grammar
-  // replaces the bordered cards: flat hairline rows, tally eyebrow only when it
-  // differs, price left / stock pill right, INACTIVE badge instead of an inline
-  // toggle (activate/deactivate lives in the modal, like Retailers). The admin
-  // stock pill keeps the null distinction the salesman page doesn't need:
-  // >0 green "N in stock" · 0 red "out of stock" · null muted "not synced".
+  // Phone row (owner 2026-07-24) — the salesman Products row, plus the admin
+  // layer: tap-to-edit, INACTIVE badge, and the null-stock distinction the
+  // salesman page folds away (>0 green "N in stock" · 0 red "out of stock" ·
+  // null muted "not synced"). Name follows the Quick Order standard —
+  // "model・display" on show_model brands, plain name otherwise.
   function renderMobileRow(p: ProductRow) {
+    const showModel = p.brands?.show_model ?? false;
     return (
       <div
         key={p.id}
@@ -161,8 +169,15 @@ export function ProductsPricing({
         }}
       >
         <p className={styles.mName}>
-          {p.name}
-          {p.tally_name !== p.name && <span className={styles.mTally}>{p.tally_name}</span>}
+          {showModel && p.tally_name && p.tally_name !== p.name ? (
+            <>
+              <span className={styles.mModelPrefix}>{p.tally_name}</span>
+              {"・"}
+              {p.name}
+            </>
+          ) : (
+            p.name
+          )}
           {!p.active && <span className={styles.inactiveBadge}>INACTIVE</span>}
         </p>
         <div className={styles.mMeta}>
@@ -210,14 +225,15 @@ export function ProductsPricing({
         </span>
         {isAdmin && (
           <div className={styles.titleActions}>
+            {/* Update stock is DESKTOP-ONLY (owner 2026-07-24) — on phone the
+                .bat auto-push covers it and the FAB sheet stays two options. */}
             <Button variant="secondary" onClick={() => setStockImporting(true)}>
               Update stock
             </Button>
-            <Button variant="secondary" onClick={() => setImporting(true)}>
-              Import
-            </Button>
-            <Button variant="primary" onClick={() => setModal({ mode: "add" })}>
-              + Add product
+            {/* One Add entry point: chooser → Add 1 product / Import. */}
+            <Button variant="primary" onClick={() => setAddChooser(true)}>
+              <Glyph icon={PackagePlus} />
+              Add
             </Button>
           </div>
         )}
@@ -260,12 +276,16 @@ export function ProductsPricing({
 
       {products.length === 0 ? (
         <p className={styles.empty}>No products in the catalog.</p>
-      ) : filteredProducts.length === 0 ? (
-        <p className={styles.empty}>
-          {q === "" ? "No products match the current filters." : `No products match "${query}".`}
-        </p>
       ) : (
         <>
+          {/* Desktop no-match note (the phone list carries its own, inside the
+              sticky-bar block so the filters stay reachable). */}
+          {filteredProducts.length === 0 && (
+            <p className={`${styles.empty} ${styles.desktopOnly}`}>
+              {q === "" ? "No products match the current filters." : `No products match "${query}".`}
+            </p>
+          )}
+          {filteredProducts.length > 0 && (
           <table className={styles.table}>
             <thead>
               <tr>
@@ -317,32 +337,123 @@ export function ProductsPricing({
               ))}
             </tbody>
           </table>
+          )}
 
-          <div className={`${styles.cards} ${multiBrandProducts ? styles.cardsTwoTier : ""}`}>
-            {stockAsOf && <p className={styles.mAsOf}>Stock as of {formatShortDate(stockAsOf)}</p>}
-            {mobileGroups.map((bg) => (
-              <section key={bg.brandId}>
-                {multiBrandProducts && (
-                  <div className={styles.mBrandHeader}>
-                    <span>{bg.brandName}</span>
-                    <span className={styles.mHeaderCount}>
-                      {bg.categories.reduce((n, c) => n + c.products.length, 0)} products
-                    </span>
-                  </div>
-                )}
-                {bg.categories.map((c) => (
-                  <section key={c.category}>
-                    <div className={styles.mCatHeader}>
-                      <span>{c.category}</span>
-                      <span className={styles.mHeaderCount}>{c.products.length}</span>
+          {/* Phone list (owner 2026-07-24): the salesman Products layout — a
+              sticky search+filters bar the headers pin under, then stock-first
+              Brand▸Category groups. Always rendered (even on no-match) so the
+              filters stay reachable to clear. */}
+          <div
+            className={`${styles.phone} ${multiBrandProducts ? styles.phoneTwoTier : ""}`}
+            ref={phoneRef}
+          >
+            <div className={styles.pBar} ref={phoneBarRef}>
+              <div className={styles.pBarRow}>
+                <select
+                  className={styles.pBrandSelect}
+                  value={brandFilter}
+                  onChange={(e) => setBrandFilter(e.target.value)}
+                  aria-label="Brand"
+                >
+                  <option value="all">All brands</option>
+                  {brandOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className={styles.pSearch}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name, model, brand"
+                />
+              </div>
+              <div className={styles.pBarRow2}>
+                <select
+                  className={styles.pStockSelect}
+                  value={stockFilter}
+                  onChange={(e) => setStockFilter(e.target.value as "all" | "in" | "out" | "nosync")}
+                  aria-label="Stock"
+                >
+                  <option value="all">All stock</option>
+                  <option value="in">In stock</option>
+                  <option value="out">Out of stock</option>
+                  <option value="nosync">Not synced</option>
+                </select>
+                {stockAsOf && <span className={styles.pAsOf}>Stock as of {formatShortDate(stockAsOf)}</span>}
+              </div>
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <div className={styles.pEmpty}>
+                <p>{q === "" ? "No products match the current filters." : `No products match "${query}".`}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setBrandFilter("all");
+                    setStockFilter("all");
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              phoneGroups.map((bg) => (
+                <section key={bg.brandId}>
+                  {multiBrandProducts && (
+                    <div className={styles.pBrandHeader}>
+                      <span>{bg.brandName}</span>
+                      <span className={styles.pHeaderCount}>{brandGroupCount(bg)} products</span>
                     </div>
-                    {c.products.map(renderMobileRow)}
-                  </section>
-                ))}
-              </section>
-            ))}
+                  )}
+                  {bg.categories.map((c) => (
+                    <section key={`${c.category}__${c.outOfStock ? "out" : "in"}`}>
+                      <div className={styles.pCatHeader}>
+                        <span>{c.outOfStock ? `${c.category} (out of stock)` : c.category}</span>
+                        <span className={styles.pHeaderCount}>{c.products.length}</span>
+                      </div>
+                      {c.products.map(renderMobileRow)}
+                    </section>
+                  ))}
+                </section>
+              ))
+            )}
           </div>
         </>
+      )}
+
+      {/* Phone FAB (admin): the one Add entry point → the chooser sheet. */}
+      {isAdmin && (
+        <button type="button" className={styles.pFab} onClick={() => setAddChooser(true)}>
+          <Glyph icon={PackagePlus} />
+          Add
+        </button>
+      )}
+
+      {addChooser && (
+        <BottomSheet onClose={() => setAddChooser(false)}>
+          <p className={styles.chooserTitle}>Add products</p>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setAddChooser(false);
+              setModal({ mode: "add" });
+            }}
+          >
+            Add 1 product
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setAddChooser(false);
+              setImporting(true);
+            }}
+          >
+            Import from Excel
+          </Button>
+        </BottomSheet>
       )}
 
       {modal && (
