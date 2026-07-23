@@ -5396,6 +5396,12 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
+---
+
+## Reviewer-applied (owner-directed) — d796be9 — /products loading skeleton + black strike lines
+
+> **BUILDER: read this** — REVIEWER-implemented (owner 2026-07-24). (1) **[/products/loading.tsx](src/app/products/loading.tsx)** added — the salesman Products page was the ONLY route without a skeleton (owner felt the dead tap); order-detail loading pages exist on both roles (first-visit lag there = route-chunk download, not a missing skeleton). (2) **Order-detail strikes**: `.struck` + `.orderedStruck` gain `text-decoration-color: var(--color-ink)` — grey/red content, BLACK line. Explains the owner's LG-1182 observation: a cell-level strike propagates through children (incl. the red stock pill) in the ORIGINATING element's colour. tsc/eslint/build clean, pushed.
+
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
