@@ -120,8 +120,9 @@
   margin-top: 3px;
 }
 
-.stockAtOrderPill,
-.nowAvailablePill {
+/* One pill shape for both the frozen order-time snapshot and the live tag;
+   colour comes from a tone modifier so severity means the same on each. */
+.stockPill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -131,24 +132,26 @@
   line-height: 1;
 }
 
-/* Red = the immutable order-time snapshot (out/partial at order time). */
-.stockAtOrderPill {
-  color: var(--color-error);
-}
-
-/* Green = live godown stock now (the recovery readout). */
-.nowAvailablePill {
-  color: var(--color-processed);
-}
-
-.stockAtOrderPill::before,
-.nowAvailablePill::before {
+.stockPill::before {
   content: "";
   flex-shrink: 0;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: currentColor;
+}
+
+/* Traffic-light tones: red none · amber partial · green fully covered. */
+.toneOut {
+  color: var(--color-error);
+}
+
+.tonePartial {
+  color: var(--color-amber);
+}
+
+.toneFull {
+  color: var(--color-processed);
 }
 
 .totalRow {
