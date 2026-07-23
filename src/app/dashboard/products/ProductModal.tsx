@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Field } from "@/components/ui/Field";
+import { Glyph } from "@/components/ui/Glyph";
 import { Button } from "@/components/ui/Button";
 import { parsePricePaise } from "@/lib/price";
 import { normalizeCategory, effectiveTallyName } from "@/lib/catalog";
@@ -151,7 +153,7 @@ export function ProductModal({
         <div className={styles.header}>
           <h2 className={styles.heading}>{mode === "add" ? "Add product" : "Edit product"}</h2>
           <button type="button" className={styles.closeX} onClick={onClose} aria-label="Close">
-            ✕
+            <Glyph icon={X} />
           </button>
         </div>
 

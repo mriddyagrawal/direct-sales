@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileSpreadsheet, PackagePlus } from "lucide-react";
+import { FileSpreadsheet, PackagePlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -442,7 +442,7 @@ export function ProductsPricing({
             <div className={styles.chooserHeader}>
               <h2 className={styles.chooserHeading}>Add products</h2>
               <button type="button" className={styles.chooserClose} onClick={() => setAddChooser(false)} aria-label="Close">
-                ✕
+                <Glyph icon={X} />
               </button>
             </div>
             {/* Two EQUAL choices — option rows, not a primary CTA + secondary
