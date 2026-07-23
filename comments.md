@@ -5370,6 +5370,18 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 >
 > **Follow-up `1118bb3` (owner devtools screenshot: doubled spacing under the chips):** the band's 8px paddings stacked on `.page`'s 12px gap (~20px dead air). Band padding 8→6px + `margin-bottom: -8px` → net ~10px below the chips. Phone-only. **`ef87b6c`:** same trim above (symmetric `margin: -8px -16px`) — title→chips also nets ~10px.
 
+---
+
+## Reviewer-applied (owner-directed) — 000af39 — editable Stock in the product Add/Edit modal
+
+> **BUILDER: read this** — REVIEWER-implemented (owner ask 2026-07-24: "edit the stock as well… is this easy?"). [ProductModal.tsx](src/app/dashboard/products/ProductModal.tsx) gains a **Stock (units)** Field after Price, staff-editable (same tier as price — `products_staff_update` already covers the column; **no DB change**).
+>
+> Semantics: blank = null (the "not synced" state); else whole-number units. The `stock_qty`/`stock_updated_at` pair rides the save payload **only when the value changed** (or was provided on Add) — an untouched field can't restamp the sync time; a change stamps `now()`, a clear nulls both (keeps every "as of" honest). Rides both the Add upsert and the Edit UPDATE (accountant + admin branches).
+>
+> **Intended interaction with the Tally sync:** the importer overwrites manual stock on its next run for tally-matched products (Tally = source of truth where it exists); manual values stick for products Tally doesn't carry. Comment pinned at the field.
+>
+> Verified: tsc=0, eslint clean, build success. Pushed `000af39`.
+
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
