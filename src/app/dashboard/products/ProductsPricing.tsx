@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { PackagePlus } from "lucide-react";
+import { FileSpreadsheet, PackagePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -437,24 +437,36 @@ export function ProductsPricing({
         <div className={styles.chooserScrim} onClick={() => setAddChooser(false)}>
           <div className={styles.chooserPanel} onClick={(e) => e.stopPropagation()}>
             <p className={styles.chooserTitle}>Add products</p>
-            <Button
-              variant="primary"
+            {/* Two EQUAL choices — option rows, not a primary CTA + secondary
+                (a chooser has no "preferred" answer; the blue slab read wrong). */}
+            <button
+              type="button"
+              className={styles.chooserOption}
               onClick={() => {
                 setAddChooser(false);
                 setModal({ mode: "add" });
               }}
             >
-              Add 1 product
-            </Button>
-            <Button
-              variant="secondary"
+              <Glyph icon={PackagePlus} />
+              <span className={styles.chooserOptionText}>
+                <span className={styles.chooserOptionTitle}>New product</span>
+                <span className={styles.chooserOptionHint}>Enter one product by hand</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.chooserOption}
               onClick={() => {
                 setAddChooser(false);
                 setImporting(true);
               }}
             >
-              Import from Excel
-            </Button>
+              <Glyph icon={FileSpreadsheet} />
+              <span className={styles.chooserOptionText}>
+                <span className={styles.chooserOptionTitle}>Import from Excel</span>
+                <span className={styles.chooserOptionHint}>Paste rows — adds new, updates existing</span>
+              </span>
+            </button>
           </div>
         </div>
       )}
