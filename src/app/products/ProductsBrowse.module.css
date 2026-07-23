@@ -44,22 +44,35 @@
   -webkit-appearance: none;
 }
 
-.searchInput {
+/* Search box owns the chrome — magnifier + border (orders-page parity,
+   owner 2026-07-24); the input inside is naked. */
+.searchBox {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-height: 44px;
   padding: 0 12px;
   background: var(--color-paper);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius);
+  color: var(--color-locked);
+}
+
+.searchBox:focus-within {
+  border-color: var(--color-accent);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
   font-family: var(--font-structure);
   font-size: var(--text-body-size);
   color: var(--color-ink);
-}
-
-.searchInput:focus {
-  outline: none;
-  border-color: var(--color-accent);
 }
 
 .asOf {

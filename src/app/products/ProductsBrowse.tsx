@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Search } from "lucide-react";
+import { Glyph } from "@/components/ui/Glyph";
 import { formatRupees, formatShortDate } from "@/lib/format";
 import {
   groupProductsStockFirst,
@@ -139,12 +141,15 @@ export function ProductsBrowse({ products }: { products: ProductRow[] }) {
               ))}
             </select>
           )}
-          <input
-            className={styles.searchInput}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, brand or category"
-          />
+          <div className={styles.searchBox}>
+            <Glyph icon={Search} size={14} />
+            <input
+              className={styles.searchInput}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name, brand or category"
+            />
+          </div>
         </div>
         {stockAsOf && <span className={styles.asOf}>Stock as of {formatShortDate(stockAsOf)}</span>}
         {q !== "" && (

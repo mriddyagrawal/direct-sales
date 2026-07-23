@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileSpreadsheet, PackagePlus, X } from "lucide-react";
+import { FileSpreadsheet, PackagePlus, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -239,12 +239,15 @@ export function ProductsPricing({
       </div>
 
       <div className={styles.filterRow}>
-        <input
-          className={styles.search}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search products — name, model, category or brand"
-        />
+        <div className={styles.searchBox}>
+          <Glyph icon={Search} size={14} />
+          <input
+            className={styles.search}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search products — name, model, category or brand"
+          />
+        </div>
         <select
           className={styles.filterSelect}
           value={brandFilter}
@@ -376,12 +379,15 @@ export function ProductsPricing({
                   <option value="nosync">Not synced</option>
                 </select>
               </div>
-              <input
-                className={styles.pSearch}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name, model, brand"
-              />
+              <div className={styles.pSearchBox}>
+                <Glyph icon={Search} size={14} />
+                <input
+                  className={styles.pSearch}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name, model, brand"
+                />
+              </div>
               {stockAsOf && <span className={styles.pAsOf}>Stock as of {formatShortDate(stockAsOf)}</span>}
             </div>
 
