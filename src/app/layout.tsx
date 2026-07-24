@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { SwRegister } from "@/components/SwRegister";
+import { QueryProvider } from "@/components/QueryProvider";
+import { AuthCacheGuard } from "@/components/AuthCacheGuard";
 import "./globals.css";
 
 // Structure/labels/names typeface. next/font self-hosts + subsets + sets
@@ -35,7 +37,10 @@ export default function RootLayout({
     <html lang="en" className={`${spaceGrotesk.variable} ${jetBrainsMono.variable}`}>
       <body>
         <SwRegister />
-        {children}
+        <QueryProvider>
+          <AuthCacheGuard />
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

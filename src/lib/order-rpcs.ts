@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { getQueryClient } from "@/lib/query-client";
 import type { Database } from "@/lib/types/database.types";
 
 type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
@@ -67,6 +68,14 @@ async function callRpc<T>(fn: () => PromiseLike<{ data: T | null; error: RpcErro
     }
     throw new Error(result.error.message);
   }
+  // D7 (client-data-cache spec): every RPC in this file mutates `orders`, so
+  // ONE success hook here covers all of them — the ["orders"] cache prefix is
+  // invalidated and the actor's own lists correct without a manual reload
+  // (other devices converge via Realtime/focus-refetch). Fire-and-forget: the
+  // background refetch must never delay the caller's own success transition.
+  // These helpers only run in client components; on a stray server call
+  // getQueryClient() is a fresh empty client and this is a no-op.
+  void getQueryClient().invalidateQueries({ queryKey: ["orders"] });
   return result.data as T;
 }
 
