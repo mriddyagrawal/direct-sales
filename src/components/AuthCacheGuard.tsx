@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { recordNavigation } from "@/lib/nav-history";
+import { initPathname, recordNavigation } from "@/lib/nav-history";
 
 // D9 (client-data-cache spec): ANY transition to signed-out wipes the data
 // cache and hard-navigates to /login — button, refresh-token expiry, kicked
@@ -19,17 +19,18 @@ import { recordNavigation } from "@/lib/nav-history";
 export function AuthCacheGuard() {
   const queryClient = useQueryClient();
 
-  // Count in-app route changes (skipping the initial mount) so BackLink can
-  // tell "there is an in-app screen behind me" from "this page is the first
-  // thing this tab ever loaded" — see src/lib/nav-history.ts.
+  // Feed the in-app navigation sequence (see src/lib/nav-history.ts): the
+  // initial mount establishes "current" without inventing a previous; every
+  // later route change records the move so BackLink knows what's behind it.
   const pathname = usePathname();
   const firstPath = useRef(true);
   useEffect(() => {
     if (firstPath.current) {
       firstPath.current = false;
+      initPathname(pathname);
       return;
     }
-    recordNavigation();
+    recordNavigation(pathname);
   }, [pathname]);
 
   useEffect(() => {
