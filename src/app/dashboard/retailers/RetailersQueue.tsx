@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
 import { RetailerModal } from "./RetailerModal";
-import type { RetailerRow } from "./page";
 import styles from "./RetailersQueue.module.css";
 
 type FilterTab = "all" | "pending" | "verified" | "deactivated";
@@ -13,10 +15,18 @@ type FilterTab = "all" | "pending" | "verified" | "deactivated";
 // unverified shop verifies it (fixing the spelling IS the verification act).
 // Activate/deactivate lives inside the modal now, like Products.
 //
-// review flag ㉜(🅐): render straight from the `initialRetailers` prop, never
-// copied into useState — see the matching note in ProductsPricing.tsx.
-export function RetailersQueue({ initialRetailers: retailers }: { initialRetailers: RetailerRow[] }) {
+// review flag ㉜(🅐), cache edition: render straight from the QUERY CACHE
+// (["retailers"], seeded by the page's HydrationBoundary; the same cache
+// feeds the Quick Order picker) — see the matching note in
+// ProductsPricing.tsx. Post-save router.refresh() feeds this cache too.
+export function RetailersQueue() {
   const router = useRouter();
+  // Spec D10/D13: `?? []` keeps a painted ledger painted if a background
+  // refetch fails; never gate rendering on isError.
+  const { data: retailers = [] } = useQuery({
+    queryKey: ["retailers"],
+    queryFn: () => fetchRetailers(createClient()),
+  });
   // Default tab is ALL (owner call 2026-07-11) — pending-verification is one
   // tap away, not the landing view.
   const [tab, setTab] = useState<FilterTab>("all");

@@ -23,7 +23,11 @@ import {
   clearLastActiveRetailerId,
 } from "@/lib/cart";
 import { submitOrder, updateOrderItems } from "@/lib/order-rpcs";
-import type { ProductOption, RetailerOption, EditOrderData } from "./page";
+import { createClient } from "@/lib/supabase/client";
+import { fetchCatalog } from "@/lib/queries/catalog";
+import { fetchRetailers } from "@/lib/queries/retailers";
+import { useQuery } from "@tanstack/react-query";
+import type { EditOrderData } from "./page";
 
 type Step = "retailer" | "order" | "review" | "confirmation";
 
@@ -120,8 +124,6 @@ function flowReducer(state: FlowState, action: FlowAction): FlowState {
 }
 
 interface NewOrderFlowProps {
-  products: ProductOption[];
-  retailers: RetailerOption[];
   recentRetailerIds: string[];
   editOrder: EditOrderData | null;
   salesmanId: string;
@@ -139,8 +141,21 @@ interface NewOrderFlowProps {
   requiresReason: boolean;
 }
 
-export function NewOrderFlow({ products, retailers, recentRetailerIds, editOrder, salesmanId, detailBase, isAdmin, requiresReason }: NewOrderFlowProps) {
+export function NewOrderFlow({ recentRetailerIds, editOrder, salesmanId, detailBase, isAdmin, requiresReason }: NewOrderFlowProps) {
   const router = useRouter();
+  // Catalog + retailer picker off the query cache (spec D4/D10) — seeded by
+  // the page's HydrationBoundary, corrected on mount/focus/reconnect (D6).
+  // Price-safe: submit_order re-prices fixed brands server-side, so a stale
+  // picker price cannot produce a wrong order. The order-items SNAPSHOT in an
+  // edit stays a server prop (editOrder) — money reads fresh (D5).
+  const { data: products = [] } = useQuery({
+    queryKey: ["catalog"],
+    queryFn: () => fetchCatalog(createClient()),
+  });
+  const { data: retailers = [] } = useQuery({
+    queryKey: ["retailers"],
+    queryFn: () => fetchRetailers(createClient()),
+  });
   const isEdit = editOrder !== null;
   // Admin edit powers, scoped to the edit flow only.
   const canPriceAll = isAdmin && isEdit;
