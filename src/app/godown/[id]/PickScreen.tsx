@@ -149,7 +149,10 @@ export function PickScreen({
       : lines.map((l) => ({ order_item_id: l.id, picked_qty: picked[l.id] ?? 0 }));
     try {
       await submitPick(orderId, payload);
-      router.push(doneHref);
+      // replace, not push: the completed pick screen must VANISH from history
+      // — pushing left …detail → scan → detail, and back from the new detail
+      // returned to a spent scan screen (the owner's back-cycle, 2026-07-24).
+      router.replace(doneHref);
       router.refresh();
     } catch (error) {
       setSubmitting(false);
