@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { recordNavigation } from "@/lib/nav-history";
 
 // D9 (client-data-cache spec): ANY transition to signed-out wipes the data
 // cache and hard-navigates to /login — button, refresh-token expiry, kicked
@@ -16,6 +18,19 @@ import { createClient } from "@/lib/supabase/client";
 // auth and no post-sign-out screen can be resurrected.
 export function AuthCacheGuard() {
   const queryClient = useQueryClient();
+
+  // Count in-app route changes (skipping the initial mount) so BackLink can
+  // tell "there is an in-app screen behind me" from "this page is the first
+  // thing this tab ever loaded" — see src/lib/nav-history.ts.
+  const pathname = usePathname();
+  const firstPath = useRef(true);
+  useEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    recordNavigation();
+  }, [pathname]);
 
   useEffect(() => {
     const supabase = createClient();
