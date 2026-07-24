@@ -4,6 +4,8 @@ import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } fr
 import { useRouter } from "next/navigation";
 import { FileSpreadsheet, PackagePlus, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAdminProducts } from "@/lib/queries/products";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { formatRupees, formatShortDate } from "@/lib/format";
@@ -20,24 +22,23 @@ type ModalState = { mode: "add" } | { mode: "edit"; product: ProductRow } | null
 // figures, muted metadata, bold display name). Replaces the grouped
 // price-edit card list.
 //
-// review flag ㉜🅐: renders straight from the `initialProducts` prop, never
-// copied into useState — a post-write router.refresh() then delivers fresh
-// server data the table actually shows (a plain useState would read its
-// initializer once and ignore the refresh, leaving a stale row).
+// review flag ㉜🅐, cache edition: renders straight from the QUERY CACHE
+// (["products", "admin"], seeded by the page's HydrationBoundary), never
+// copied into useState — a post-write router.refresh() re-renders the page
+// and its fresh dehydrated payload feeds this same cache (spec D2/D7), so the
+// table shows fresh server data exactly as the prop version did.
 //
 // Editable surfaces: the inline ACTIVE toggle, plus the shared Add/Edit modal
 // — "+ Add product" (admin-only) and row-click to edit any row (accountant
 // edits price/tally/active; admin edits all fields).
-export function ProductsPricing({
-  initialProducts: products,
-  brands,
-  isAdmin,
-}: {
-  initialProducts: ProductRow[];
-  brands: BrandOption[];
-  isAdmin: boolean;
-}) {
+export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; isAdmin: boolean }) {
   const router = useRouter();
+  // Spec D10/D13: `?? []` keeps a painted ledger painted if a background
+  // refetch fails; never gate rendering on isError.
+  const { data: products = [] } = useQuery({
+    queryKey: ["products", "admin"],
+    queryFn: () => fetchAdminProducts(createClient()),
+  });
   // Optimistic active overlay so a row's toggle flips instantly instead of
   // waiting on router.refresh(). useOptimistic auto-reconciles to the server
   // prop once it updates (post-refresh, or after a modal edit changes active),

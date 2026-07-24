@@ -9,7 +9,9 @@ import {
   brandGroupCount,
   type StockCategoryGroup,
 } from "@/lib/product-grouping";
-import type { ProductRow } from "./page";
+import { createClient } from "@/lib/supabase/client";
+import { fetchBrowseProducts, type BrowseProductRow as ProductRow } from "@/lib/queries/products";
+import { useQuery } from "@tanstack/react-query";
 import styles from "./ProductsBrowse.module.css";
 
 function normalize(s: string): string {
@@ -25,7 +27,14 @@ function normalize(s: string): string {
 // the PostgREST row cap (752 now, cap 3000); the DB-side search/virtualization
 // for this page + Quick Order + staff products converges in the Bajaj perf
 // pass — not here.
-export function ProductsBrowse({ products }: { products: ProductRow[] }) {
+export function ProductsBrowse() {
+  // Spec D10/D13: render ONLY from the query cache — seeded by the server
+  // render (HydrationBoundary), corrected on mount/focus/reconnect (D6);
+  // `?? []` keeps a painted list painted if a background refetch fails.
+  const { data: products = [] } = useQuery({
+    queryKey: ["products", "browse"],
+    queryFn: () => fetchBrowseProducts(createClient()),
+  });
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("all"); // "all" | brand_id
   const pageRef = useRef<HTMLDivElement>(null);
