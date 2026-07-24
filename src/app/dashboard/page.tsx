@@ -1,4 +1,6 @@
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/server";
+import { getQueryClient } from "@/lib/query-client";
 import { fetchOrdersList } from "@/lib/queries/orders";
 import { OrdersView, type SalesmanOption, type BrandOption } from "@/components/orders/OrdersView";
 
@@ -13,20 +15,28 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   // Orders query via the shared builder (spec D12) — RLS (orders_select_staff)
-  // is still what makes staff see every order; the builder adds no scope filter.
-  const [orderRows, { data: salesmenRows }, { data: brandRows }] = await Promise.all([
-    fetchOrdersList(supabase, "staff", user!.id),
+  // is still what makes staff see every order; the builder adds no scope
+  // filter. Prefetch → dehydrate seeds the client cache (per-request query
+  // client, spec D2); OrdersView owns the data from there via useQuery.
+  const queryClient = getQueryClient();
+  const [, { data: salesmenRows }, { data: brandRows }] = await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: ["orders", "staff"],
+      queryFn: () => fetchOrdersList(supabase, "staff", user!.id),
+    }),
     supabase.from("profiles").select("id, full_name").eq("role", "salesman").order("full_name"),
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
   ]);
 
   return (
-    <OrdersView
-      initialOrders={orderRows}
-      salesmen={(salesmenRows ?? []) as SalesmanOption[]}
-      brands={(brandRows ?? []) as BrandOption[]}
-      role="staff"
-      currentUserId={user!.id}
-    />
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <OrdersView
+        scope="staff"
+        salesmen={(salesmenRows ?? []) as SalesmanOption[]}
+        brands={(brandRows ?? []) as BrandOption[]}
+        role="staff"
+        currentUserId={user!.id}
+      />
+    </HydrationBoundary>
   );
 }
