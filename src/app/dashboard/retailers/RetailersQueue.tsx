@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
 import { RetailerModal } from "./RetailerModal";
@@ -27,6 +27,7 @@ export function RetailersQueue() {
     queryKey: ["retailers"],
     queryFn: () => fetchRetailers(createClient()),
   });
+  const queryClient = useQueryClient();
   // Default tab is ALL (owner call 2026-07-11) — pending-verification is one
   // tap away, not the landing view.
   const [tab, setTab] = useState<FilterTab>("all");
@@ -140,6 +141,9 @@ export function RetailersQueue() {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
+            // D7: the same ["retailers"] cache feeds the Quick Order picker —
+            // a rename/verify reaches the salesman without a reload.
+            void queryClient.invalidateQueries({ queryKey: ["retailers"] });
             router.refresh();
           }}
         />

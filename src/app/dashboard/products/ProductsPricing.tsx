@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FileSpreadsheet, PackagePlus, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchAdminProducts } from "@/lib/queries/products";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { formatRupees, formatShortDate } from "@/lib/format";
@@ -39,6 +39,7 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
     queryKey: ["products", "admin"],
     queryFn: () => fetchAdminProducts(createClient()),
   });
+  const queryClient = useQueryClient();
   // Optimistic active overlay so a row's toggle flips instantly instead of
   // waiting on router.refresh(). useOptimistic auto-reconciles to the server
   // prop once it updates (post-refresh, or after a modal edit changes active),
@@ -142,8 +143,19 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
     return max;
   }, [products]);
 
+  // D7 (spec): every product write refreshes BOTH product caches — the admin
+  // ledger prefix (["products"]) and the Quick Order picker (["catalog"]) —
+  // so a price/stock/active change reaches the salesman's screens without a
+  // reload. router.refresh() stays alongside (it feeds the same cache via the
+  // page's dehydrated payload).
+  function invalidateProducts() {
+    void queryClient.invalidateQueries({ queryKey: ["products"] });
+    void queryClient.invalidateQueries({ queryKey: ["catalog"] });
+  }
+
   function closeAndRefresh() {
     setModal(null);
+    invalidateProducts();
     router.refresh();
   }
 
@@ -205,7 +217,10 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
       const supabase = createClient();
       const { error: updateError } = await supabase.from("products").update({ active: next }).eq("id", p.id);
       if (updateError) setError(updateError.message);
-      else router.refresh(); // reconciles the overlay to fresh server data
+      else {
+        invalidateProducts();
+        router.refresh(); // reconciles the overlay to fresh server data
+      }
       setBusy((prev) => {
         const s = new Set(prev);
         s.delete(p.id);
@@ -504,6 +519,7 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
           onClose={() => setImporting(false)}
           onDone={() => {
             setImporting(false);
+            invalidateProducts();
             router.refresh();
           }}
         />
@@ -514,6 +530,7 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
           onClose={() => setStockImporting(false)}
           onDone={() => {
             setStockImporting(false);
+            invalidateProducts();
             router.refresh();
           }}
         />

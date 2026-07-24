@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { getQueryClient } from "@/lib/query-client";
 import type { Database } from "@/lib/types/database.types";
 
 export type DepositRow = Database["public"]["Tables"]["deposits"]["Row"];
@@ -15,6 +16,10 @@ interface RpcErrorLike {
 async function callRpc<T>(fn: () => PromiseLike<{ data: T | null; error: RpcErrorLike | null }>): Promise<T> {
   const result = await fn();
   if (result.error) throw new Error(result.error.message);
+  // D7 (client-data-cache spec): every RPC in this file mutates `deposits` —
+  // one success hook invalidates the ["deposits"] cache prefix so the actor's
+  // ledger corrects without a manual reload (same pattern as order-rpcs).
+  void getQueryClient().invalidateQueries({ queryKey: ["deposits"] });
   return result.data as T;
 }
 
