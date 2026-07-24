@@ -259,7 +259,10 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
       if (cancelled) return;
       supabase.realtime.setAuth(session?.access_token ?? null);
       channel = supabase
-        .channel("dashboard-orders")
+        // Topic is a client-side label only (subscriptions key on the filter);
+        // named for what it serves — every role's orders list, not just the
+        // dashboard (REVIEWER cosmetic note, 2026-07-25).
+        .channel("orders-list")
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "orders" },

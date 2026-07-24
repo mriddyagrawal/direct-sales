@@ -5447,3 +5447,124 @@ This **reverses the recovery-only tag** (58a4b85, which is what's described one 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
 
 **Open flags (cumulative):** No 🔴. Carried 🟡 ㊹, ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨.
+
+## Review of 826263a — docs(specs): client-data-cache v4 — piecewise restructure
+
+**Verdict:** ✅ accept (docs — light review)
+
+Spec restructure only; the three-piece plan (P1 orders / P2 remaining lists + sweep / P3 conditional staleTimes) matches the owner call and the four adversarial rounds that preceded it. No decision reversals smuggled in; italic change-reasons preserve the audit trail. The build below followed this document faithfully.
+
+## Review of 0e60dc2 — feat(cache): P1c1 foundation — TanStack Query provider + D9 sign-out hardening
+
+**Verdict:** ✅ accept
+
+**Goal:** the Slice-B foundation: app-wide QueryClient plumbing + the D9 sign-out/auth-wipe hardening, no page conversions yet.
+
+**What works (verified):**
+- [query-client.ts](src/lib/query-client.ts) — **the one security-grade rule of this slice holds:** `isServer → new QueryClient()` per request; the singleton is browser-only. A server singleton would dehydrate one user's RLS rows into another's HTML; this cannot happen as written. D6 defaults exactly per spec (staleTime 7s dedupe, focus/reconnect via the library's managers, retry 1 with the D13 rationale).
+- [QueryProvider.tsx](src/components/QueryProvider.tsx) — render-call pattern (not useState) per the official App Router guidance, correctly reasoned; devtools dev-gated.
+- [AuthCacheGuard.tsx](src/components/AuthCacheGuard.tsx) — SIGNED_OUT ⇒ `queryClient.clear()` + hard `location.assign("/login")` (loop-guarded when already there); `pageshow.persisted ⇒ reload()` bfcache buster. Covers button, token-expiry, and kicked-session paths alike.
+- [SignOutButton.tsx](src/components/SignOutButton.tsx) — signOut-then-assign order per D9; busy-state double-tap guard.
+- Deps: @tanstack/react-query + devtools only. No DB changes anywhere in the slice (verified `git diff 74113e6..HEAD -- supabase/` = empty).
+
+**Blocking issues:** None.
+
+**What I tried:** `tsc --noEmit`, `eslint src --max-warnings=0`, `npm run build` at the P2 tip — all clean (validates the union of every commit below too).
+
+## Review of 1d642ec — feat(cache): P1c2a — shared orders builder; four list pages through it (D12)
+
+**Verdict:** ✅ accept
+
+**What works (verified):**
+- [orders.ts](src/lib/queries/orders.ts) — ONE parameterized builder, four scopes. **Parity check passed:** diffed the removed inline queries against the builder — salesman `.or(status.neq.cancelled,cancelled_by.neq.uid)` (D8), godown-home `.in(status, …)`, godown-dispatch `.eq(status,'billed')`, staff no filter, all four ending `.order(submitted_at desc).limit(300)` — byte-matched, filters chained before order/limit as the old pages did.
+- uid feeds ONLY the D8 clause; RLS remains the scope authority (staff/godown pass it unused) — exactly the RLS-parity posture acceptance #10 demands.
+- Throws on error (the queryFn contract D13 depends on); key contract `["orders", scope]` documented with the boundedness assumption pinned.
+
+**Blocking issues:** None.
+
+## Review of f730dfa — feat(cache): P1c2b — OrdersView onto the query cache; Realtime = invalidation signal (D10)
+
+**Verdict:** ✅ accept
+
+**What works (verified in [OrdersView.tsx](src/components/orders/OrdersView.tsx)):**
+- Renders ONLY from `useQuery(["orders", scope])` with `?? []` (D13 — a failed background refetch keeps the painted list; nothing gates on isError). The old `useState(initialOrders)` + render-phase re-seed are gone — the two-writers class is dead. The only remaining mentions of the old pattern are comments explaining its removal (grepped).
+- **The eba5311 Realtime lesson survived the rewrite:** `setAuth(session.access_token)` BEFORE `.subscribe()`, plus onAuthStateChange keeping the socket authorized across refreshes. This was my #1 regression fear for this commit; it held.
+- D10 invalidate-only: INSERT/UPDATE ⇒ `invalidateQueries(["orders"])` (all scopes; inactive refetch on next mount); the highlight-glow set is UI-only state. `cancelRefetch` default = the v3 convergence rule, correctly relied on.
+- Status-callback recovery kept (CHANNEL_ERROR/TIMED_OUT/CLOSED ⇒ 4s rebuild via rtNonce) **+ catch-up invalidate on first SUBSCRIBED after a failure** — the missed-events gap is closed.
+- The visibilitychange/online listeners are gone on purpose (focusManager/onlineManager own those triggers now — grep confirms zero remain repo-wide).
+- Bonus shipped here: per-route sessionStorage filter persistence with restore-validation against live props (a deactivated salesman or dead tab value falls back instead of stranding an empty list) and a write-guard so defaults can't clobber the bucket before restore. Hydration-safe (restore in effect, not initializer).
+- All four server pages: prefetchQuery → dehydrate → HydrationBoundary, keys aligned with the client (`["orders","staff"|"salesman"|"godown-home"|"godown-dispatch"]` — grepped all).
+
+**Blocking issues:** None.
+
+**Non-blocking:** channel topic is `"dashboard-orders"` for every surface — cosmetic misnomer now that salesman/godown share it; rename to `"orders"` whenever the file is next touched.
+
+## Review of b738e4f — feat(cache): P1c2c — order RPCs invalidate ["orders"] on success (D7)
+
+**Verdict:** ✅ accept
+
+One success hook in [order-rpcs.ts](src/lib/order-rpcs.ts) `callRpc` covers all ten order RPCs — fire-and-forget (`void`), never delays the caller, no-op on a stray server call (fresh empty client). Correctly placed AFTER the error throw, so failures don't invalidate. Order **detail** screens are not on the query cache (Piece scope) and their `router.refresh()` idiom is untouched — consistent, no stale-detail regression.
+
+## Review of e3697cc — docs(orders): fix stale doc-comment
+
+**Verdict:** ✅ accept — comment now matches the invalidate-only reality; exactly the kind of drift the log exists to catch.
+
+## Review of c21e391 + sync merges (77a5800, 6089381, 69f0af4, 0ec9c62)
+
+**Verdict:** ✅ accept
+
+P1 promote to main + four main→P2 syncs. No manual-resolution damage: the P2 tip (union of everything) compiles, lints, and builds clean; spot-checked stats for unexpected files — none.
+
+## Review of f4405a2 — feat(orders): back arrow on order detail = TRUE history-back
+
+**Verdict:** ✅ accept
+
+[BackLink.tsx](src/components/BackLink.tsx) upgrades to `router.back()` ONLY when the nav mirror says the previous screen IS the arrow's fallback; otherwise plain-Link semantics (one skeleton, guaranteed destination). Modified-click guard keeps new-tab behavior. [nav-history.ts](src/lib/nav-history.ts) module state is per-tab, reset on hard load — same lifetime as the router cache it fronts. Failure mode audited: mirror divergence only ever downgrades to the fallback Link, never a wrong back. Wired into OrderDetailView; mirror fed from AuthCacheGuard (already-mounted client singleton — no new layout component).
+
+## Review of 212a440 — feat(godown): pick-screen back arrow = TRUE back too
+
+**Verdict:** ✅ accept — same BackLink, `doneHref` stays the deep-link fallback. Trivial and correct.
+
+## Review of 3da7826 — fix(nav): kill the back-cycle
+
+**Verdict:** ✅ accept
+
+Two-part fix, both verified: completed pick now `router.replace(doneHref)` — the spent scan screen vanishes from history (the owner's detail‹scan‹detail ping-pong is structurally impossible); BackLink tightened to the leads-to-its-own-target rule.
+
+## Review of 38b9732 — fix(nav): popstate-aware history mirror
+
+**Verdict:** ✅ accept
+
+`flagPop` (popstate listener) + `recordNavigation` popping only when the destination matches `stack[-2]` — a real back pops the mirror, so multi-level back chains stay instant; anything unexpected (forward button) records as a push and merely degrades BackLink to its fallback. ~40 lines total, every edge biased to the safe side. This is the right amount of bespoke nav code.
+
+## Review of 3216b3d — feat(cache): P2c1 — deposits onto the query cache
+
+**Verdict:** ✅ accept
+
+[deposits.ts](src/lib/queries/deposits.ts) parity byte-matched against the removed inline queries (same select, created_at desc, staff 1000 / salesman 500 caps); RLS stays the scope authority. DepositsView renders from `useQuery(["deposits", scope]) ?? []` (D13); both pages prefetch→dehydrate.
+
+## Review of 4ea0f81 — feat(cache): P2c2 — products onto the query cache
+
+**Verdict:** ✅ accept
+
+Two shapes on purpose (admin ledger vs flattened browse) — both selects/orders byte-matched vs the removed page queries; the browse flattening moved INTO the builder so server seed and client refetch produce identical rows. ProductsBrowse renders cache-only; ProductsPricing's `useOptimistic` active-toggle overlay survives on the cache base (still reconciles from the server value).
+
+## Review of 2ba5aa3 — feat(cache): P2c3 — Quick Order catalog + retailers onto the cache
+
+**Verdict:** ✅ accept
+
+- [catalog.ts](src/lib/queries/catalog.ts): order(category, created_at) preserved; caching the picker is safe exactly as argued — fixed prices re-snapshot server-side at submit, manual prices are typed. 
+- [retailers.ts](src/lib/queries/retailers.ts): the ONE superset serving queue + picker — verified it ADDS fields only (old picker had no verified/active filter either; no new rows became pickable).
+- **The money-law check passed:** the `?edit=` order snapshot in [new-order/page.tsx](src/app/new-order/page.tsx) is still a per-request server fetch, NOT cached — snapshotPrices/names ride fresh props every time. The immutable-snapshot surface stays off the cache, exactly as D5 intended.
+
+**Non-blocking:** `["products","browse"]` and `["catalog"]` are two near-identical ~750-row payloads cached side by side. Harmless today; fold into the Bajaj perf pass (⑯-adjacent) rather than now.
+
+## Review of 6ac61d5 — feat(cache): P2c4 — D7 invalidation sweep
+
+**Verdict:** ✅ accept
+
+Cross-checked the D7 map against every mutation in the repo: order RPCs + submit_pick (P1c2c hook) · deposits create/update/void ([deposit-rpcs.ts](src/lib/deposit-rpcs.ts) hook, post-throw placement correct) · products modal save / ACTIVE toggle / catalog import / stock import — all four sites fire `["products"]` + `["catalog"]` · retailers modal save → `["retailers"]`. UsersAdmin correctly untouched (not a cached surface). `router.refresh()` kept alongside everywhere — feeds the same cache via dehydration; harmless duplication, pruning deferred as the builder's own ⑦ note says.
+
+**Open flags (cumulative):** 🟡 ㊹ traffic-light confirm (owner keep/revert) — still open; ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ carried. NEW (non-blocking): channel topic rename; browse/catalog payload dedupe → Bajaj perf pass.
+
+**Sweep summary (2026-07-25):** 15 commits, 13×✅ + 2 docs-✅, **zero blocking findings**. The two things I most expected this rewrite to break — the fresh-per-request server QueryClient (cross-user dehydration) and setAuth-before-subscribe (the Realtime deafness lesson) — both held. Still owed on the owner/live side, not code: two-device Realtime convergence eyeball + P2 owner test before merge; the accountant-session eyeball also remains open.

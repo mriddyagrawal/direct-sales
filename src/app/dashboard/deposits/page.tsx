@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { DepositsView, type DepositListRow } from "@/components/deposits/DepositsView";
-
-const DEPOSITS_SELECT =
-  "id, deposit_ref, amount_paise, method, note, created_at, editable_until, salesman_id, voided_at, void_reason, retailers(name), profiles!deposits_salesman_id_fkey(full_name)";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { getQueryClient } from "@/lib/query-client";
+import { fetchDepositsList } from "@/lib/queries/deposits";
+import { DepositsView } from "@/components/deposits/DepositsView";
 
 // Office deposits — end-of-day reconciliation (owner design 2026-07-19). RLS
 // gives staff every deposit; the view's hero is the chosen day's per-method +
@@ -20,17 +20,17 @@ export default async function DashboardDepositsPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
   if (profile?.role !== "admin" && profile?.role !== "accountant") redirect("/dashboard");
 
-  const { data: rows } = await supabase
-    .from("deposits")
-    .select(DEPOSITS_SELECT)
-    .order("created_at", { ascending: false })
-    .limit(1000);
+  // Deposits query via the shared builder (spec D12); prefetch → dehydrate
+  // seeds the client cache (per-request query client, spec D2).
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery({
+    queryKey: ["deposits", "staff"],
+    queryFn: () => fetchDepositsList(supabase, "staff"),
+  });
 
   return (
-    <DepositsView
-      deposits={(rows ?? []) as unknown as DepositListRow[]}
-      role="staff"
-      isAdmin={profile.role === "admin"}
-    />
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <DepositsView scope="staff" role="staff" isAdmin={profile.role === "admin"} />
+    </HydrationBoundary>
   );
 }

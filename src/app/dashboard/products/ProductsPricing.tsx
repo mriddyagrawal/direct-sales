@@ -4,6 +4,8 @@ import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } fr
 import { useRouter } from "next/navigation";
 import { FileSpreadsheet, PackagePlus, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAdminProducts } from "@/lib/queries/products";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { formatRupees, formatShortDate } from "@/lib/format";
@@ -20,24 +22,24 @@ type ModalState = { mode: "add" } | { mode: "edit"; product: ProductRow } | null
 // figures, muted metadata, bold display name). Replaces the grouped
 // price-edit card list.
 //
-// review flag ㉜🅐: renders straight from the `initialProducts` prop, never
-// copied into useState — a post-write router.refresh() then delivers fresh
-// server data the table actually shows (a plain useState would read its
-// initializer once and ignore the refresh, leaving a stale row).
+// review flag ㉜🅐, cache edition: renders straight from the QUERY CACHE
+// (["products", "admin"], seeded by the page's HydrationBoundary), never
+// copied into useState — a post-write router.refresh() re-renders the page
+// and its fresh dehydrated payload feeds this same cache (spec D2/D7), so the
+// table shows fresh server data exactly as the prop version did.
 //
 // Editable surfaces: the inline ACTIVE toggle, plus the shared Add/Edit modal
 // — "+ Add product" (admin-only) and row-click to edit any row (accountant
 // edits price/tally/active; admin edits all fields).
-export function ProductsPricing({
-  initialProducts: products,
-  brands,
-  isAdmin,
-}: {
-  initialProducts: ProductRow[];
-  brands: BrandOption[];
-  isAdmin: boolean;
-}) {
+export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; isAdmin: boolean }) {
   const router = useRouter();
+  // Spec D10/D13: `?? []` keeps a painted ledger painted if a background
+  // refetch fails; never gate rendering on isError.
+  const { data: products = [] } = useQuery({
+    queryKey: ["products", "admin"],
+    queryFn: () => fetchAdminProducts(createClient()),
+  });
+  const queryClient = useQueryClient();
   // Optimistic active overlay so a row's toggle flips instantly instead of
   // waiting on router.refresh(). useOptimistic auto-reconciles to the server
   // prop once it updates (post-refresh, or after a modal edit changes active),
@@ -141,8 +143,19 @@ export function ProductsPricing({
     return max;
   }, [products]);
 
+  // D7 (spec): every product write refreshes BOTH product caches — the admin
+  // ledger prefix (["products"]) and the Quick Order picker (["catalog"]) —
+  // so a price/stock/active change reaches the salesman's screens without a
+  // reload. router.refresh() stays alongside (it feeds the same cache via the
+  // page's dehydrated payload).
+  function invalidateProducts() {
+    void queryClient.invalidateQueries({ queryKey: ["products"] });
+    void queryClient.invalidateQueries({ queryKey: ["catalog"] });
+  }
+
   function closeAndRefresh() {
     setModal(null);
+    invalidateProducts();
     router.refresh();
   }
 
@@ -204,7 +217,10 @@ export function ProductsPricing({
       const supabase = createClient();
       const { error: updateError } = await supabase.from("products").update({ active: next }).eq("id", p.id);
       if (updateError) setError(updateError.message);
-      else router.refresh(); // reconciles the overlay to fresh server data
+      else {
+        invalidateProducts();
+        router.refresh(); // reconciles the overlay to fresh server data
+      }
       setBusy((prev) => {
         const s = new Set(prev);
         s.delete(p.id);
@@ -503,6 +519,7 @@ export function ProductsPricing({
           onClose={() => setImporting(false)}
           onDone={() => {
             setImporting(false);
+            invalidateProducts();
             router.refresh();
           }}
         />
@@ -513,6 +530,7 @@ export function ProductsPricing({
           onClose={() => setStockImporting(false)}
           onDone={() => {
             setStockImporting(false);
+            invalidateProducts();
             router.refresh();
           }}
         />
