@@ -134,8 +134,9 @@ interface OrdersViewProps {
 // which rows exist (staff see all salesmen, a salesman only himself), and the
 // role prop decides the extras: staff get the SALESMAN + BRAND filters and
 // the salesman column; the salesman gets neither (they're all him) and D8
-// self-cancel hiding. New rows arrive via Supabase Realtime (postgres_changes
-// on `orders`, RLS-scoped) within the 5s budget; updates patch in place.
+// self-cancel hiding. Realtime events (postgres_changes on `orders`,
+// RLS-scoped) invalidate the query cache and the list refetches through the
+// shared builder — see the channel effect below (spec D10).
 export function OrdersView({ scope, salesmen, brands, role, currentUserId, title, statusScope, tabs }: OrdersViewProps) {
   const isStaff = role === "staff";
   const isGodown = role === "godown";
