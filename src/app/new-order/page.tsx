@@ -1,27 +1,17 @@
 import { redirect } from "next/navigation";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/server";
+import { getQueryClient } from "@/lib/query-client";
+import { fetchCatalog, type CatalogProduct } from "@/lib/queries/catalog";
+import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
 import { NewOrderFlow } from "./NewOrderFlow";
 
-export interface ProductOption {
-  id: string;
-  category: string;
-  name: string;
-  tally_name: string; // model / Tally name; shown left of name when brand.show_model
-  price_paise: number | null; // null for manual-pricing (LG) products — no catalog price
-  brand_id: string;
-  brand_name: string;
-  pricing_mode: string; // 'fixed' | 'manual'
-  show_model: boolean; // brand flag — render "{tally_name}・{name}" when true
-  stock_qty: number | null; // godown stock from the last Tally sync; null = never synced
-  stock_updated_at: string | null; // "as of" for the stock figure
-}
-
-export interface RetailerOption {
-  id: string;
-  name: string;
-  area: string | null;
-  verified: boolean;
-}
+// Shapes + queries live in the shared builders (spec D12); re-exported so
+// existing importers (NewOrderFlow, QuickOrder, Review, PickRetailer …) keep
+// working. RetailerOption widened to the ["retailers"] superset row (D4b) —
+// consumers read a subset of its fields.
+export type ProductOption = CatalogProduct;
+export type RetailerOption = RetailerRow;
 
 export interface EditOrderData {
   id: string;
@@ -71,17 +61,13 @@ export default async function NewOrderPage({
   } = await supabase.auth.getUser();
 
   // Catalog = active AND priced only (RLS guarantees it, D2) — never render
-  // an unpriced/inactive product; no extra filter needed here, just the
-  // ordering the design spec wants (category groups, CSV order within them).
-  const [{ data: productRows }, { data: retailerRows }, { data: recentRows }, { data: profile }] = await Promise.all([
-    supabase
-      .from("products")
-      .select(
-        "id, category, name, tally_name, price_paise, brand_id, stock_qty, stock_updated_at, brands(name, pricing_mode, show_model)",
-      )
-      .order("category")
-      .order("created_at"),
-    supabase.from("retailers").select("id, name, area, verified").order("name"),
+  // an unpriced/inactive product. Catalog + retailers ride the query cache
+  // (prefetch → dehydrate below, spec D2); the recent-retailer chips and role
+  // stay plain server props (tiny, staleness-harmless).
+  const queryClient = getQueryClient();
+  const [, , { data: recentRows }, { data: profile }] = await Promise.all([
+    queryClient.prefetchQuery({ queryKey: ["catalog"], queryFn: () => fetchCatalog(supabase) }),
+    queryClient.prefetchQuery({ queryKey: ["retailers"], queryFn: () => fetchRetailers(supabase) }),
     supabase
       .from("orders")
       .select("retailer_id, submitted_at")
@@ -96,33 +82,6 @@ export default async function NewOrderPage({
   const isStaff = profile?.role === "admin" || profile?.role === "accountant";
   const isAdmin = profile?.role === "admin";
   const detailBase = isStaff ? "/dashboard/orders" : "/orders";
-
-  const products = (
-    (productRows ?? []) as unknown as Array<{
-      id: string;
-      category: string;
-      name: string;
-      tally_name: string;
-      price_paise: number | null;
-      brand_id: string;
-      stock_qty: number | null;
-      stock_updated_at: string | null;
-      brands: { name: string; pricing_mode: string; show_model: boolean } | null;
-    }>
-  ).map((r) => ({
-    id: r.id,
-    category: r.category,
-    name: r.name,
-    tally_name: r.tally_name,
-    price_paise: r.price_paise,
-    brand_id: r.brand_id,
-    brand_name: r.brands?.name ?? "",
-    pricing_mode: r.brands?.pricing_mode ?? "fixed",
-    show_model: r.brands?.show_model ?? false,
-    stock_qty: r.stock_qty,
-    stock_updated_at: r.stock_updated_at,
-  })) as ProductOption[];
-  const retailers = (retailerRows ?? []) as RetailerOption[];
 
   const seen = new Set<string>();
   const recentRetailerIds: string[] = [];
@@ -182,15 +141,15 @@ export default async function NewOrderPage({
   }
 
   return (
-    <NewOrderFlow
-      products={products}
-      retailers={retailers}
-      recentRetailerIds={recentRetailerIds}
-      editOrder={editOrder}
-      salesmanId={user!.id}
-      detailBase={detailBase}
-      isAdmin={isAdmin}
-      requiresReason={requiresReason}
-    />
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <NewOrderFlow
+        recentRetailerIds={recentRetailerIds}
+        editOrder={editOrder}
+        salesmanId={user!.id}
+        detailBase={detailBase}
+        isAdmin={isAdmin}
+        requiresReason={requiresReason}
+      />
+    </HydrationBoundary>
   );
 }
