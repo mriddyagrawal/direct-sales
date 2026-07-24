@@ -14,6 +14,7 @@ import { formatOrderTimestamp, formatOrderTime, formatHistoryDayHeader, formatRu
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
 import { cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder, stepBackOrder } from "@/lib/order-rpcs";
+import { BackLink } from "@/components/BackLink";
 import styles from "./OrderDetailView.module.css";
 
 interface OrderItemRow {
@@ -501,12 +502,14 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
 
   return (
     <div className={styles.page}>
-      {/* Back-eyebrow (spec §3): ‹ REF on the left, status chip on the right. */}
+      {/* Back-eyebrow (spec §3): ‹ REF on the left, status chip on the right.
+          A TRUE back (instant router-cache restore) with the role's list as
+          the no-history fallback — see BackLink. */}
       <div className={styles.backRow}>
-        <Link href={isStaff ? "/dashboard" : isGodown ? "/godown" : "/"} className={styles.breadcrumb}>
+        <BackLink fallback={isStaff ? "/dashboard" : isGodown ? "/godown" : "/"} className={styles.breadcrumb}>
           <Glyph icon={ChevronLeft} />
           <span className={styles.backRef}>{order.orderRef}</span>
-        </Link>
+        </BackLink>
         <StatusTag tone={statusTag.tone} label={statusTag.label} sublabel={statusTag.sublabel} />
       </div>
 
