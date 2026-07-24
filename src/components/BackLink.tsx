@@ -18,15 +18,17 @@ import { hasInAppHistory } from "@/lib/nav-history";
 interface BackLinkProps {
   fallback: string;
   className?: string;
+  "aria-label"?: string;
   children: React.ReactNode;
 }
 
-export function BackLink({ fallback, className, children }: BackLinkProps) {
+export function BackLink({ fallback, className, "aria-label": ariaLabel, children }: BackLinkProps) {
   const router = useRouter();
   return (
     <Link
       href={fallback}
       className={className}
+      aria-label={ariaLabel}
       onClick={(e) => {
         // Modified clicks (new tab, etc.) keep plain-link semantics.
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
