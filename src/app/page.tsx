@@ -1,7 +1,10 @@
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/server";
+import { getQueryClient } from "@/lib/query-client";
+import { fetchOrdersList } from "@/lib/queries/orders";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { TopStrip } from "@/components/TopStrip";
-import { OrdersView, type OrderListRow, type BrandOption } from "@/components/orders/OrdersView";
+import { OrdersView, type BrandOption } from "@/components/orders/OrdersView";
 import styles from "./page.module.css";
 
 // Salesman home — the same shared OrdersView the staff dashboard renders
@@ -28,16 +31,21 @@ export default async function Home() {
     .maybeSingle();
 
   // brands feed the card/table brand label only — the BRAND filter itself is
-  // staff-gated inside OrdersView.
-  const [{ data: orderRows }, { data: brandRows }] = await Promise.all([
-    supabase
-      .from("orders")
-      .select(
-        "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)",
-      )
-      .or(`status.neq.cancelled,cancelled_by.neq.${user!.id}`)
-      .order("submitted_at", { ascending: false })
-      .limit(300),
+  // staff-gated inside OrdersView. The orders query (incl. the D8 self-cancel
+  // clause) lives in the shared builder — spec D12, never inline it here.
+  //
+  // getQueryClient() is per-request on the server (spec D2's security rule);
+  // the prefetch seeds ["orders", scope] and dehydrate() hands it to the
+  // browser cache below — the client's first paint IS this payload, and the
+  // same builder serves its background refetches. prefetchQuery swallows a DB
+  // error (page still renders; the client queryFn retries within ~1s), which
+  // matches the old silent-empty behavior but self-heals.
+  const queryClient = getQueryClient();
+  const [, { data: brandRows }] = await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: ["orders", "salesman"],
+      queryFn: () => fetchOrdersList(supabase, "salesman", user!.id),
+    }),
     supabase.from("brands").select("id, name").eq("active", true).order("name"),
   ]);
 
@@ -45,13 +53,15 @@ export default async function Home() {
     <div className={styles.page}>
       <TopStrip accountLabel={profile?.full_name ?? user?.email ?? ""} />
       <div className={styles.content}>
-        <OrdersView
-          initialOrders={(orderRows ?? []) as unknown as OrderListRow[]}
-          salesmen={[]}
-          brands={(brandRows ?? []) as BrandOption[]}
-          role="salesman"
-          currentUserId={user!.id}
-        />
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <OrdersView
+            scope="salesman"
+            salesmen={[]}
+            brands={(brandRows ?? []) as BrandOption[]}
+            role="salesman"
+            currentUserId={user!.id}
+          />
+        </HydrationBoundary>
       </div>
 
       <BottomTabBar />

@@ -17,21 +17,11 @@ import { SalesmanFilter } from "./SalesmanFilter";
 import { BrandFilter } from "./BrandFilter";
 import styles from "./OrdersView.module.css";
 
-export interface OrderListRow {
-  id: string;
-  order_ref: string;
-  submitted_at: string;
-  total_paise: number;
-  status: string;
-  editable_until: string;
-  cancelled_by: string | null;
-  admin_comment: string | null;
-  salesman_id: string;
-  brand_id: string;
-  retailers: { name: string; verified: boolean } | null;
-  profiles: { full_name: string } | null;
-  brands: { name: string; code: string } | null;
-}
+// The row shape + list query live in the shared builder (spec D12); the type
+// is re-exported here so existing importers keep working.
+import { fetchOrdersList, type OrderListRow, type OrdersScope } from "@/lib/queries/orders";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+export type { OrderListRow };
 
 export interface SalesmanOption {
   id: string;
@@ -63,9 +53,6 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
   dispatched: "Dispatched",
   cancelled: "Cancelled",
 };
-
-const ORDERS_SELECT =
-  "id, order_ref, submitted_at, total_paise, status, editable_until, cancelled_by, admin_comment, salesman_id, brand_id, retailers(name, verified), profiles!orders_salesman_id_fkey(full_name), brands(name, code)";
 
 // Filter state persisted across a navigation away-and-back (open an order, hit
 // back — the tab/salesman/brand/date/search you had are still there). Kept in
@@ -123,7 +110,10 @@ function filterReducer(state: FilterState, action: FilterAction): FilterState {
 }
 
 interface OrdersViewProps {
-  initialOrders: OrderListRow[];
+  // Which shared-builder scope this surface renders — also the cache key
+  // (["orders", scope], spec D4). The server page prefetches the same scope
+  // into a HydrationBoundary; this component then owns it via useQuery.
+  scope: OrdersScope;
   salesmen: SalesmanOption[];
   brands: BrandOption[];
   role: "salesman" | "staff" | "godown";
@@ -144,9 +134,10 @@ interface OrdersViewProps {
 // which rows exist (staff see all salesmen, a salesman only himself), and the
 // role prop decides the extras: staff get the SALESMAN + BRAND filters and
 // the salesman column; the salesman gets neither (they're all him) and D8
-// self-cancel hiding. New rows arrive via Supabase Realtime (postgres_changes
-// on `orders`, RLS-scoped) within the 5s budget; updates patch in place.
-export function OrdersView({ initialOrders, salesmen, brands, role, currentUserId, title, statusScope, tabs }: OrdersViewProps) {
+// self-cancel hiding. Realtime events (postgres_changes on `orders`,
+// RLS-scoped) invalidate the query cache and the list refetches through the
+// shared builder — see the channel effect below (spec D10).
+export function OrdersView({ scope, salesmen, brands, role, currentUserId, title, statusScope, tabs }: OrdersViewProps) {
   const isStaff = role === "staff";
   const isGodown = role === "godown";
   const detailBase = isStaff ? "/dashboard/orders" : isGodown ? "/godown/orders" : "/orders";
@@ -162,19 +153,21 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
   // One persisted-filter bucket per list route (see PersistedFilters).
   const pathname = usePathname();
   const storageKey = `ganpati:orders-filters:${pathname}`;
-  const [orders, setOrders] = useState(initialOrders);
+  const queryClient = useQueryClient();
+  // THE list (spec D10): this component renders ONLY from the query cache —
+  // seeded by the server render (HydrationBoundary), corrected by background
+  // refetches (mount / focus / reconnect, D6 defaults) and by the Realtime
+  // invalidations below. The old useState(initialOrders) + render-phase
+  // re-seed are gone: two writers into two stores was the flicker/race class
+  // the spec kills; a router.refresh() now feeds this same cache via the
+  // page's dehydrated payload instead of props. D13: render from data
+  // presence (`?? []`) — a failed background refetch keeps the painted list;
+  // never gate rendering on isError.
+  const { data: orders = [] } = useQuery({
+    queryKey: ["orders", scope],
+    queryFn: () => fetchOrdersList(createClient(), scope, currentUserId),
+  });
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
-  // Re-seed whenever the SERVER hands us a fresh list (router.refresh(),
-  // revisit) — useState only reads its initializer once, so without this the
-  // list silently ignored new server payloads and only Realtime could ever
-  // update it (owner-reported staleness, 2026-07-24). Server is the truth;
-  // Realtime keeps layering on top. Render-phase adjust (React's sanctioned
-  // "state from props" pattern — not an effect, so no cascading-render lint).
-  const [seededFrom, setSeededFrom] = useState(initialOrders);
-  if (seededFrom !== initialOrders) {
-    setSeededFrom(initialOrders);
-    setOrders(initialOrders);
-  }
   // Bumped to tear down + rebuild the Realtime channel after a failure.
   const [rtNonce, setRtNonce] = useState(0);
   // Default active tab: the first chip when there's no "All" (godown Home), else "all".
@@ -219,42 +212,34 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    // D8: a salesman's own self-cancelled order reads as "never happened" —
-    // the page query excludes it, and this keeps Realtime from re-adding it.
-    function hiddenByD8(row: OrderListRow) {
-      return !isStaff && row.status === "cancelled" && row.cancelled_by === currentUserId;
-    }
+    // D10 (spec v4): Realtime is an INVALIDATION SIGNAL, not a data writer —
+    // every event marks ["orders"] stale (all scopes; inactive ones refetch on
+    // their next mount) and the active list refetches through the one shared
+    // builder, joins and D8 included. invalidateQueries' default cancelRefetch
+    // aborts a stale in-flight response and reissues, so an event landing
+    // mid-fetch can never be erased by an older snapshot — the v3 "convergence
+    // rule" is this library default. At this order volume a bounded 300-row
+    // refetch per event is noise; the old per-row fetch+patch into a second
+    // store was the flicker/race class the spec kills.
+    const invalidateOrders = () => void queryClient.invalidateQueries({ queryKey: ["orders"] });
 
-    async function handleInsert(orderId: string) {
-      const { data } = await supabase.from("orders").select(ORDERS_SELECT).eq("id", orderId).maybeSingle();
-      if (!data) return;
-      const row = data as unknown as OrderListRow;
-      if (hiddenByD8(row)) return;
-      setOrders((prev) => (prev.some((o) => o.id === row.id) ? prev : [row, ...prev]));
-      setNewIds((prev) => new Set(prev).add(row.id));
-      setTimeout(() => {
-        setNewIds((prev) => {
-          const next = new Set(prev);
-          next.delete(row.id);
-          return next;
-        });
-      }, 5000);
-    }
-
-    // Refetch (not patch-in-place) on UPDATE too — the raw payload lacks
-    // joined fields like retailers(name, verified), so e.g. a retailer
-    // verification wouldn't be reflected in the row until a manual refresh
-    // (review flag ㉚.3).
-    async function handleUpdate(orderId: string) {
-      const { data } = await supabase.from("orders").select(ORDERS_SELECT).eq("id", orderId).maybeSingle();
-      if (!data) return;
-      const row = data as unknown as OrderListRow;
-      if (hiddenByD8(row)) {
-        // Just self-cancelled from another tab/device — drop it from the list.
-        setOrders((prev) => prev.filter((o) => o.id !== row.id));
-        return;
+    function handleInsert(row: { id: string; status: string; cancelled_by: string | null }) {
+      // D8: a salesman's own self-cancel reads as "never happened" — the
+      // builder's or-clause already excludes it from every refetch; skipping
+      // the highlight just keeps a 5s glow off a row that won't render. The
+      // raw payload carries these columns (no joins needed for this check).
+      const hidden = !isStaff && row.status === "cancelled" && row.cancelled_by === currentUserId;
+      if (!hidden) {
+        setNewIds((prev) => new Set(prev).add(row.id));
+        setTimeout(() => {
+          setNewIds((prev) => {
+            const next = new Set(prev);
+            next.delete(row.id);
+            return next;
+          });
+        }, 5000);
       }
-      setOrders((prev) => prev.map((o) => (o.id === row.id ? row : o)));
+      invalidateOrders();
     }
 
     // ROOT CAUSE (verified in realtime.subscription, 2026-07-24: every live
@@ -276,14 +261,16 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       channel = supabase
         .channel("dashboard-orders")
         .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "orders" },
-          (payload) => void handleInsert((payload.new as { id: string }).id),
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "orders" },
+          (payload) => handleInsert(payload.new as { id: string; status: string; cancelled_by: string | null }),
         )
         .on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "orders" },
-          (payload) => void handleUpdate((payload.new as { id: string }).id),
+          // Joined fields (retailer name/verified …) ride the refetch, so an
+          // update is just an invalidation (was review flag ㉚.3's refetch).
+          () => invalidateOrders(),
         )
         .subscribe((status) => {
         // The old bare subscribe() swallowed failures — an auth hiccup or a
@@ -294,7 +281,7 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
           if (status === "SUBSCRIBED") {
             if (hadFailure) {
               hadFailure = false;
-              router.refresh(); // catch up on anything missed while dead
+              invalidateOrders(); // catch up on events missed while dead
             }
             return;
           }
@@ -315,30 +302,12 @@ export function OrdersView({ initialOrders, salesmen, brands, role, currentUserI
       if (retryTimer !== null) clearTimeout(retryTimer);
       if (channel) supabase.removeChannel(channel);
     };
-    // isStaff/currentUserId are stable props; rtNonce forces a clean rebuild
-    // after a failed/closed channel.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStaff, currentUserId, rtNonce]);
-
-  // The socket-free safety net (owner's dad, iPhone PWA): whenever the app
-  // comes back to the foreground (or the network returns), pull a fresh list
-  // straight from the server — live orders no longer depend on a WebSocket
-  // surviving iOS backgrounding. router.refresh() re-runs the server query;
-  // the re-seed effect above applies it to the list.
-  useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState === "visible") router.refresh();
-    }
-    function onOnline() {
-      router.refresh();
-    }
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("online", onOnline);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("online", onOnline);
-    };
-  }, [router]);
+    // isStaff/currentUserId/queryClient are stable; rtNonce forces a clean
+    // rebuild after a failed/closed channel. The old visibilitychange/online
+    // safety net is GONE on purpose (spec D6): TanStack's focusManager/
+    // onlineManager re-fetch this query on foreground/reconnect already —
+    // a second set of listeners would double-fetch and drift.
+  }, [isStaff, currentUserId, rtNonce, queryClient]);
 
   // Restore persisted filters ONCE on mount — in an effect, not the useState
   // initializer, so the first client render matches the server (defaults) and
