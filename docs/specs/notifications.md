@@ -68,6 +68,8 @@ Cap ~5 detail lines then `+N more`; expanded always ends with the ref. Money en-
 
 **Vibration:** platform default. Distinct money-buzz = parked v2 toggle.
 
+**Iconography (owner 2026-07-25): the notification always wears the app's real logo** (`assets/favicon.png` receipt-glyph), never a bespoke mark. iOS: automatic — web push always shows the installed PWA's manifest icon (note: iOS home icons can't be transparent; Apple flattens them). Android `icon`: the logo **with transparent background** (clean on light + dark shades). Android `badge` (status-bar glyph): a dedicated **96×96 white-on-transparent silhouette** of the receipt glyph — Android tints silhouettes, full-color turns to grey smudge. That silhouette is the only new icon asset the build needs.
+
 ## Copy catalog (collapsed lines)
 
 | Card | Title | Body L1 |
