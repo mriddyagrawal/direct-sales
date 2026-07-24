@@ -103,7 +103,7 @@ Role framings of one event stay distinct cards where the *job* differs (godown a
 
 **⚠️ The DB change (build-time approval):** `push_subscriptions` (id, user_id → profiles, endpoint unique, p256dh, auth, device_label, created_at, last_seen_at), RLS owner-only, + webhook config. Nothing else touches the DB.
 
-Client: `sw.js` (today a passthrough) gains `push`, `notificationclick` (focus-or-open at the deep link), clear-on-open (R6), Badging API. Enable-UX: one-time per-role prompt card after login + a persistent re-enable row (placement at build). Env: VAPID key pair (public → client, private → Edge Function secret). iOS prerequisite: installed PWA, iOS 16.4+, permission granted via user gesture.
+Client: `sw.js` (today a passthrough) gains `push`, `notificationclick` (focus-or-open at the deep link), clear-on-open (R6), Badging API. **Enable-UX (owner simplification, 2026-07-25): a state-aware BELL in the header ONLY** — TopStrip on the phone shells, dashboard header for staff. *(v1.1 had per-role soft-ask cards at value moments + dismissal cadence; owner cut them: at 4–5 known users, onboarding is verbal — "tap the bell, hit Allow" — and the cards' conversion machinery (dismissal tracking, re-show cadence, per-role copy) buys nothing. The bell keeps the load-bearing properties: the native one-shot dialog fires only on a deliberate tap (iOS gesture rule satisfied, prompt can't burn accidentally), and its states are: default → tap fires the system dialog; granted → bell quiet/hidden + silent subscription self-repair on every open; system-denied → tap opens a short "Settings → Notifications → Ganpati" instruction sheet, never a dead re-prompt. Accepted trade-off on record: nobody is prompted proactively — an untold user never enables.)* Env: VAPID key pair (public → client, private → Edge Function secret). iOS prerequisite: installed PWA, iOS 16.4+, permission granted via user gesture.
 
 ## Ops prerequisites (one-time, before commit 1)
 
@@ -115,7 +115,7 @@ Client: `sw.js` (today a passthrough) gains `push`, `notificationclick` (focus-o
 
 0. **The DB gate** — builder presents the exact `push_subscriptions` + webhook SQL; owner approves; applies as a migration. Nothing else lands first.
 1. **Walking skeleton** — Edge Function with the auth check + ONE hardcoded test push, proven end-to-end to the owner's actual iPhone before any matrix code exists. *Front-loads the entire iOS-quirk risk.*
-2. **Client side** — sw.js `push`/`notificationclick`/clear-on-open, the enable-notifications card, subscription storage.
+2. **Client side** — sw.js `push`/`notificationclick`/clear-on-open, the header bell (sole enable surface), subscription storage + self-repair.
 3. **The matrix** — recipients, copy catalog, second pages, TTL/tag/renotify/badge in the function.
 4. **Real-device acceptance pass** (list below).
 
