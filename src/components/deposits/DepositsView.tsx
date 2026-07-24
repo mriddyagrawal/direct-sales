@@ -11,26 +11,21 @@ import { SalesmanFilter } from "@/components/orders/SalesmanFilter";
 import { formatRupees, formatOrderTime, formatOrderTimestamp, formatHistoryDayHeader, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { voidDeposit } from "@/lib/deposit-rpcs";
+import { createClient } from "@/lib/supabase/client";
+import { fetchDepositsList, type DepositListRow, type DepositsScope } from "@/lib/queries/deposits";
+import { useQuery } from "@tanstack/react-query";
 import styles from "./DepositsView.module.css";
 
-// One row off the deposits query (retailer + salesman names embedded).
-export interface DepositListRow {
-  id: string;
-  deposit_ref: string;
-  amount_paise: number;
-  method: string;
-  note: string | null;
-  created_at: string;
-  editable_until: string;
-  salesman_id: string;
-  voided_at: string | null;
-  void_reason: string | null;
-  retailers: { name: string } | null;
-  profiles: { full_name: string } | null;
-}
+// The row shape + list query live in the shared builder (spec D12); the type
+// is re-exported here so existing importers keep working.
+export type { DepositListRow };
 
 interface DepositsViewProps {
-  deposits: DepositListRow[];
+  // Cache-key scope (["deposits", scope], spec D4) — the server page
+  // prefetches the same scope into a HydrationBoundary; this component then
+  // owns the data via useQuery. Matches `role` today, but stays a separate
+  // prop so the key contract is explicit at the call site.
+  scope: DepositsScope;
   role: "salesman" | "staff";
   isAdmin?: boolean;
 }
@@ -66,8 +61,18 @@ function MethodChip({ method }: { method: string }) {
 // ADMIN gets per-row Edit / Void (void = struck + kept + reasoned — nothing
 // is ever hard-deleted). Voided rows are struck + muted and excluded from
 // every total, both roles.
-export function DepositsView({ deposits, role, isAdmin = false }: DepositsViewProps) {
+export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps) {
   const router = useRouter();
+  // Spec D10/D13: render ONLY from the query cache — seeded by the server
+  // render, corrected by background refetches (mount/focus/reconnect, D6) and
+  // by mutation invalidations; `?? []` keeps a painted list painted if a
+  // background refetch fails (never gate rendering on isError). The post-void
+  // router.refresh() below keeps working: it re-renders the page and the
+  // fresh dehydrated payload feeds this same cache (spec D2/D7).
+  const { data: deposits = [] } = useQuery({
+    queryKey: ["deposits", scope],
+    queryFn: () => fetchDepositsList(createClient(), scope),
+  });
   const [tick] = useState(nowMs);
   const now = useMemo(() => new Date(tick), [tick]);
   const todayKey = istDateKey(now);

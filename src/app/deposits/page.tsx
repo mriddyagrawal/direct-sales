@@ -1,12 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { getQueryClient } from "@/lib/query-client";
+import { fetchDepositsList } from "@/lib/queries/deposits";
 import { TopStrip } from "@/components/TopStrip";
 import { BottomTabBar } from "@/components/BottomTabBar";
-import { DepositsView, type DepositListRow } from "@/components/deposits/DepositsView";
+import { DepositsView } from "@/components/deposits/DepositsView";
 import styles from "./deposits.module.css";
-
-const DEPOSITS_SELECT =
-  "id, deposit_ref, amount_paise, method, note, created_at, editable_until, salesman_id, voided_at, void_reason, retailers(name), profiles!deposits_salesman_id_fkey(full_name)";
 
 // Salesman deposits — his personal collection ledger (owner design
 // 2026-07-19): hero totals (Today · This week), his own day-grouped history
@@ -27,17 +27,22 @@ export default async function DepositsPage() {
     .maybeSingle();
   if (profile?.role === "admin" || profile?.role === "accountant") redirect("/dashboard/deposits");
 
-  const { data: rows } = await supabase
-    .from("deposits")
-    .select(DEPOSITS_SELECT)
-    .order("created_at", { ascending: false })
-    .limit(500);
+  // Deposits query via the shared builder (spec D12); prefetch → dehydrate
+  // seeds the client cache (per-request query client, spec D2) and
+  // DepositsView owns the data from there via useQuery.
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery({
+    queryKey: ["deposits", "salesman"],
+    queryFn: () => fetchDepositsList(supabase, "salesman"),
+  });
 
   return (
     <div className={styles.page}>
       <TopStrip accountLabel={profile?.full_name ?? user.email ?? ""} />
       <div className={styles.scroll}>
-        <DepositsView deposits={(rows ?? []) as unknown as DepositListRow[]} role="salesman" />
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <DepositsView scope="salesman" role="salesman" />
+        </HydrationBoundary>
       </div>
       <BottomTabBar />
     </div>
