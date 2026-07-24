@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Stepper } from "@/components/ui/Stepper";
@@ -186,9 +186,12 @@ export function PickScreen({
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Link href={doneHref} className={styles.back} aria-label="Back">
+        {/* TRUE back (instant router-cache restore) — doneHref stays the
+            no-history fallback (deep-linked scan URL). Same owner call as the
+            order-detail arrow, 2026-07-24. */}
+        <BackLink fallback={doneHref} className={styles.back} aria-label="Back">
           ‹
-        </Link>
+        </BackLink>
         <div className={styles.headInfo}>
           <span className={styles.ref}>{orderRef}</span>
           <span className={styles.retailer}>
