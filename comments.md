@@ -5568,3 +5568,64 @@ Cross-checked the D7 map against every mutation in the repo: order RPCs + submit
 **Open flags (cumulative):** 🟡 ㊹ traffic-light confirm (owner keep/revert) — still open; ㊷, ㉛, ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ carried. NEW (non-blocking): channel topic rename; browse/catalog payload dedupe → Bajaj perf pass.
 
 **Sweep summary (2026-07-25):** 15 commits, 13×✅ + 2 docs-✅, **zero blocking findings**. The two things I most expected this rewrite to break — the fresh-per-request server QueryClient (cross-user dehydration) and setAuth-before-subscribe (the Realtime deafness lesson) — both held. Still owed on the owner/live side, not code: two-device Realtime convergence eyeball + P2 owner test before merge; the accountant-session eyeball also remains open.
+
+## Review of ce64093 — docs(specs): notifications v1.2 — bell-only Enable-UX
+
+**Verdict:** ✅ accept (docs — light) — the owner call replacing the prompt-card idea with a single header bell; spec-internal, faithfully carried into the build below.
+
+## Review of 6318f03 — feat(notifs): push_subscriptions migration (APPLIED to prod)
+
+**Verdict:** ✅ accept
+
+The ONE approved DB object, exactly as specced: user FK cascade, `endpoint` unique, keys, device_label, timestamps, user index. **RLS: owner-only on all four verbs** (`user_id = auth.uid()`), Edge Function reads via service role by design. Verified LIVE: table + policies present; 6 real device rows enrolled (Vikram ×3 incl. iOS PWA + Mac, owner ×2 Android PWA, Nakul iOS PWA). Endpoint URLs are capability-bearing — owner-only RLS is the right protection and it holds.
+
+## Review of faf6593 — feat(notifs): client side — sw handlers, the bell, self-repair
+
+**Verdict:** ✅ accept
+
+- [sw.js](public/sw.js) — `push` (payload → showNotification with icon/badge/tag + **`renotify: !!tag`** so R3 survives Android tag-replacement) + setAppBadge/clearAppBadge; `notificationclick` closes, focuses an existing window and navigates, else opens (R7 tap-only). Passthrough fetch handler untouched — installability preserved.
+- [push.ts](src/lib/push.ts) — bell-gesture-only permission (iOS rule), VAPID key decode, upsert on unique endpoint, and a genuinely smart shared-device path: an endpoint owned by ANOTHER user can't be updated under RLS, so it unsubscribes at the browser and mints a fresh endpoint; the orphan self-prunes on first 404/410. `repairSubscription()` silently heals rotated subscriptions every open. **R6 clear-on-open implemented** (getNotifications+close+clearAppBadge).
+- [NotificationsBell.tsx](src/components/NotificationsBell.tsx) — clean 4-state machine; denied → Settings instruction sheet (the dialog can never legally re-fire); hydration-safe; mounted on all three shells.
+
+**Non-blocking:** R6 runs on mount, not on visibility-return — a PWA foregrounded from background keeps its shade until next cold open. Fine for v1; fold into the acceptance pass observation. iOS support for `WindowClient.navigate` is patchy — if acceptance shows tap landing on `/` instead of the deep link on iPhone, the fallback is close+openWindow(url) unconditionally.
+
+## Review of 2d3aa4c — feat(notifs): notify Edge Function walking skeleton DEPLOYED
+
+**Verdict:** ✅ accept — the spec's commit-1 discipline done right: auth check + one hardcoded push proven to real phones before any matrix code. Verified live: function ACTIVE (now v3), `verify_jwt off` as webhooks require, which makes the secret header the sole gate — see 4799022 for its verification.
+
+## Review of 6374994 — fix(notifs): exclude supabase/functions from Next tsconfig
+
+**Verdict:** ✅ accept — one-line exclude; Deno-typed files out of the Vercel compile. Local tsc/eslint/`npm run build` clean at tip; FE demonstrably deployed (six devices could only have enrolled through the live bell).
+
+## Review of 5201419 — feat(notifs): Block B webhooks APPLIED to prod
+
+**Verdict:** ✅ accept
+
+[Migration](supabase/migrations/20260725110452_notify_webhooks.sql): pg_net (async — the business INSERT never waits) + `notify_webhook()` SECURITY DEFINER w/ empty search_path + **exception-swallow so a notification can never break the write it rides on** + 3 AFTER INSERT triggers, with the **retailer storm guard at the trigger itself** (`WHEN new.verified = false` — bulk imports never even fire; stronger than the specced in-function guard).
+
+**The secret-handling question — resolved correctly:** the repo file carries a loud PLACEHOLDER; verified live that the prod function body holds a real 64-char value (probed `like`-pattern + length only — the value itself never left the DB). No password-grade material in git. Verified live: all 3 triggers armed, pg_net installed, recent `net._http_response` rows all 200.
+
+## Review of ebe97c9 — Merge feat/notifications → main
+
+**Verdict:** ✅ accept — clean promote; tip compiles/lints/builds.
+
+## Review of 4799022 — feat(notifs): THE MATRIX — notify v3
+
+**Verdict:** ⚠️ accept-with-followups
+
+**The security MUST holds:** reject-before-parse on `x-webhook-secret`, and `!WEBHOOK_SECRET` **fails closed** (unset secret ⇒ 403, never open). The logs even show one real 403 rejection early in v2's life — the gate demonstrably works — followed by unbroken 200s through v3.
+
+**Ground rules verified in code, line by line:** R1 actor-skip at the recipient loop (all events); R2 admin-cancel silent short-circuit before card-building (deposit voids correctly exempt); **R5 the salesman card goes ONLY to `ownSalesmanId`** — cross-salesman isolation structural, not incidental; stepped_back/unknown actions → empty map → silent. Dual edit actions (`items_changed` + `edited_after_lock`) both wired; `commented` → salesman + accountant with per-role URLs (owner ruling honored); deposit-void → admin + accountant + salesman (ruling honored); punched backorders ride `submitted` with the "· punched backorder" tail. TTL job/news split (builder sensibly extended job-TTL to the accountant's ready-to-bill card); tag = entity id; badge counts per role with per-event cache; 404/410 prune live; money en-IN from paise; webhook never bounced (catch-all 200 — a retry storm is worse than a lost push).
+
+**Blocking issues:** None.
+
+**Non-blocking followups (next touch of the function):**
+1. **⚠️ stock-flag fires on never-synced stock:** `(stock_at_order ?? 0) === 0` treats NULL (LG / not-yet-synced products) as out-of-stock — an LG order's New-order card would flag every line. Should be `stock_at_order === 0` (only known-zero flags).
+2. Bill-ready salesman card repeats the ref on both lines — cosmetic.
+3. `!==` secret compare isn't constant-time — academic at this threat model (64-char random over HTTPS); not worth machinery, noted for honesty.
+
+**What I tried:** read every migration/function/client file; tsc + eslint + build at tip (clean); live probes — prod `notify_webhook` secret is real (64 chars, no placeholder), 3 triggers armed, pg_net present, `push_subscriptions` RLS + 6 enrolled devices, edge function ACTIVE v3, `net._http_response` recent all-200, edge logs: 200s v2→v3 + one early 403 (gate proof), exec times 150ms–4s, zero 5xx.
+
+**Still owed (build-order commit 4, not code):** the real-device acceptance pass — iPhone long-press second page, clear-on-open behavior on iOS, live cross-salesman isolation spot-check, TTL-expiry check, and the deep-link tap on iOS (see faf6593 note).
+
+**Open flags (cumulative):** 🟡 ㊹ (traffic-light confirm) · ㊷ ㉛ ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ carried · browse/catalog payload dedupe → Bajaj pass · NEW: ㊺ stock-flag-on-null (notify fn, next touch) · ㊻ R6 on visibility-return + iOS navigate fallback (acceptance-dependent).
