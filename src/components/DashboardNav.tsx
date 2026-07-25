@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReceiptText, Store, Tag, Users, Wallet } from "lucide-react";
 import { SignOutButton } from "@/components/SignOutButton";
+import { NotificationsBell } from "@/components/NotificationsBell";
 import { Glyph } from "@/components/ui/Glyph";
 import styles from "./DashboardNav.module.css";
 
@@ -59,6 +60,7 @@ export function DashboardNav({ accountLabel, isAdmin = false }: DashboardNavProp
           ))}
         </div>
         <div className={styles.railAccount}>
+          <NotificationsBell />
           <span>{accountLabel}</span>
           <SignOutButton />
         </div>
@@ -70,7 +72,7 @@ export function DashboardNav({ accountLabel, isAdmin = false }: DashboardNavProp
           <span className={styles.brandName}>GANPATI ENTERPRISES</span>
         </div>
         <div className={styles.account}>
-          {accountLabel} · <SignOutButton />
+          <NotificationsBell /> {accountLabel} · <SignOutButton />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { SignOutButton } from "@/components/SignOutButton";
+import { NotificationsBell } from "@/components/NotificationsBell";
 import styles from "./TopStrip.module.css";
 
 // The brand + account header strip — same look as the dashboard's mobile top
@@ -13,7 +14,7 @@ export function TopStrip({ accountLabel }: { accountLabel: string }) {
         <span className={styles.brandName}>GANPATI ENTERPRISES</span>
       </div>
       <div className={styles.account}>
-        {accountLabel} · <SignOutButton />
+        <NotificationsBell /> {accountLabel} · <SignOutButton />
       </div>
     </header>
   );

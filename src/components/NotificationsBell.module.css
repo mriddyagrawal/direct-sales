@@ -1,0 +1,45 @@
+.bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.bell:disabled {
+  opacity: 0.5;
+}
+
+/* "You haven't decided yet" — a quiet accent dot, not a nag. */
+.dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.help {
+  padding: 16px 16px 24px;
+}
+
+.helpTitle {
+  font-family: var(--font-structure);
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.helpBody {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-locked);
+}
