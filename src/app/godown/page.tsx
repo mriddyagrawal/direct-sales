@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
+import { NotificationsBell } from "@/components/NotificationsBell";
 import { formatOrderTimestamp } from "@/lib/format";
 import { PreloadScanner } from "./PreloadScanner";
 import { GodownTabBar } from "@/components/GodownTabBar";
@@ -64,7 +65,7 @@ export default async function GodownQueuePage() {
       <header className={styles.header}>
         <span className={styles.brand}>GANPATI · GODOWN</span>
         <span className={styles.account}>
-          {profile?.full_name ?? ""} · <SignOutButton />
+          <NotificationsBell /> {profile?.full_name ?? ""} · <SignOutButton />
         </span>
       </header>
 
