@@ -15,6 +15,10 @@ tally-agent/agent_config.ini
 
 # Tally export artifacts — real shop names, balances and raw replies. Never commit.
 tally-agent/*.csv
+tally-agent/**/*.csv
+tally-agent/GanpatiSync/
+tally-agent/GanpatiCredit/
+tally-agent/GanpatiLedger/
 tally-agent/raw_*.xml
 tally-agent/probe_*.xml
 tally-agent/**/*.xml
