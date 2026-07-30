@@ -215,7 +215,12 @@ BAL_FIELDS = [
     # the same mistake cost the other session a whole debugging round on the
     # amount field, and I reintroduced it here. The raw column sits beside it so
     # a repeat failure is visible in the file instead of silently becoming 0.
-    ("balance", '$$StringFindAndReplace:($$NumValue:$ClosingBalance):"(-)":"-"'),
+    # Mirrors the statement's amount expression EXACTLY, so both halves of the
+    # pipeline use one rule: negative = debit = owed to us. Without the negation
+    # the report returns debit-POSITIVE, and every shop reconciles as an exact
+    # sign mirror (measured 2026-07-31 05:00: 348 mismatches, all mirrored).
+    ("balance", '$$StringFindAndReplace:(if $$IsDebit:$ClosingBalance then -$$NumValue:$ClosingBalance '
+                'else $$NumValue:$ClosingBalance):"(-)":"-"'),
     ("balance_raw", "$ClosingBalance"),
 ]
 
@@ -618,6 +623,12 @@ def main():
         total = len(ok) + len(bad)
         print("   reconciled : {:,} of {:,}{}".format(len(ok), total,
               "  ({:.1f}%)".format(100.0 * len(ok) / total) if total else ""))
+        mirrored = sum(1 for _, e, a in bad if abs(e + a) <= TOLERANCE and abs(e) > TOLERANCE)
+        if bad and mirrored >= max(3, len(bad) // 2):
+            print("   !! {:,} of {:,} mismatches are EXACT SIGN MIRRORS.".format(mirrored, len(bad)))
+            print("   !! That is one convention disagreeing with the other, not bad data:")
+            print("   !! the balances and the statement are describing the same movements")
+            print("   !! with opposite signs. Fix the expression, not the figures.")
         if bad:
             print("   MISMATCHED : {:,}   worst:".format(len(bad)))
             for n, e, a in sorted(bad, key=lambda t: -abs(t[1] - t[2]))[:8]:
