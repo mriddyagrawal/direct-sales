@@ -48,11 +48,13 @@ OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "GanpatiCredit")
 # Statement window, in months back from today. 2 = the last two months.
 WINDOW_MONTHS = 2
 
-# Which Tally group holds the shops. Matched loosely (case-insensitive,
-# "contains"), so "Sundry Debtors" also catches sub-groups like
-# "Sundry Debtors - Bilaspur". If this matches nothing, the script PRINTS every
-# group name it saw so you can tell us the right one.
-GROUP_FILTER = "Sundry Debtors"
+# The TOP group the shops live under. Everything BENEATH it counts too, however
+# deep — this company keeps shops in beat groups ("Appl Pali FRIDAY", "SARGAM
+# WHOLESALE WEDNUSDAY", ...) that sit under Sundry Debtors, so matching on a
+# ledger's immediate parent name finds the wrong 602 ledgers and misses ~all the
+# real shops. The script walks the group tree instead. Set to "" to take every
+# ledger in the company (slow, but nothing can be missed).
+ROOT_GROUP = "Sundry Debtors"
 
 # How long to wait for each step (seconds). Balances and vouchers make Tally do
 # real work — a big company can take minutes. The script tells you how long each
@@ -89,7 +91,15 @@ _ENV = """<ENVELOPE>
   </DESC></BODY>
 </ENVELOPE>"""
 
-# ---- STEP 0: probe. Names + groups only, NO balances -> Tally answers fast.
+# ---- STEP 0a: the group tree (name + parent). Small and instant; this is what
+# lets us tell "a shop, three groups deep under Sundry Debtors" from "some other
+# ledger that merely sits next to one".
+GROUPS_XML = _ENV.format(cid="GroupTree", frm=FROM_DATE, to=TO_DATE, coll="""
+      <COLLECTION NAME="GroupTree" ISMODIFY="No"><TYPE>Group</TYPE>
+        <NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD>
+      </COLLECTION>""")
+
+# ---- STEP 0b: probe. Names + groups only, NO balances -> Tally answers fast.
 # This is what turns "is it stuck?" into "Tally replied in 2s, 214 shops found".
 PROBE_XML = _ENV.format(cid="LedgerNames", frm=FROM_DATE, to=TO_DATE, coll="""
       <COLLECTION NAME="LedgerNames" ISMODIFY="No"><TYPE>Ledger</TYPE>
@@ -183,11 +193,31 @@ def _post_to_tally(request_xml, label, timeout):
         ticker.done()
 
 
+_BAD_REF = re.compile(r"&#(?:x([0-9a-fA-F]+)|(\d+));")
+
+
+def _strip_bad_ref(m):
+    """Drop a numeric character reference that XML 1.0 forbids, keeping the
+    legal ones (tab, newline, carriage return) untouched."""
+    code = int(m.group(1), 16) if m.group(1) else int(m.group(2))
+    if code in (0x09, 0x0A, 0x0D) or 0x20 <= code <= 0x10FFFF:
+        return m.group(0)
+    return " "
+
+
 def _sanitize_xml(raw_bytes):
-    """Tally often emits bytes that aren't valid XML (Windows-1252 chars and
-    stray control characters). Decode leniently and strip the illegal controls."""
+    """Tally emits things XML parsers reject, in two different ways:
+      1. raw control bytes (Windows-1252 leftovers, stray \x04)
+      2. ESCAPED control characters, e.g. `<PARENT>&#4; Primary</PARENT>` — seen
+         in the owner's real company file, and the reason a 1.1 MB reply failed
+         to parse at line 19498. A reference is still illegal even though the
+         bytes look innocent, so stripping raw bytes alone is not enough.
+    Illegal references become a space rather than nothing: names are our match
+    key, and silently gluing two words together would be worse than a gap (the
+    key collapses whitespace anyway)."""
     text = raw_bytes.decode("utf-8", errors="replace")
-    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
+    return _BAD_REF.sub(_strip_bad_ref, text)
 
 
 def _text(el, tag):
@@ -220,9 +250,41 @@ def _amount(raw):
     return value
 
 
-def _parse_ledgers(raw_bytes, want_balances):
-    """-> (rows, groups_seen). Filters to GROUP_FILTER; groups_seen is every
-    parent group encountered, so a wrong filter can be diagnosed instantly."""
+def _parse_groups(raw_bytes):
+    """-> {group name (lower): parent name (lower)} for every group in Tally."""
+    root = ET.fromstring(_sanitize_xml(raw_bytes))
+    tree = {}
+    for grp in root.iter("GROUP"):
+        name = _name_of(grp)
+        if name:
+            tree[name.strip().lower()] = _text(grp, "PARENT").strip().lower()
+    return tree
+
+
+def _family(tree, root_name):
+    """-> set of group names that ARE root_name or sit anywhere beneath it.
+    Walking upward per group (rather than downward from the root) keeps this
+    correct even when Tally returns the groups in no particular order."""
+    root_name = root_name.strip().lower()
+    if not root_name:
+        return None  # no filter: every ledger counts
+    family = set()
+    for grp in tree:
+        seen, cur = set(), grp
+        while cur and cur not in seen:      # `seen` guards a cyclic parent
+            seen.add(cur)
+            if cur == root_name:
+                family.add(grp)
+                break
+            cur = tree.get(cur)
+    family.add(root_name)
+    return family
+
+
+def _parse_ledgers(raw_bytes, want_balances, family=None):
+    """-> (rows, groups_seen). `family` = the set of acceptable group names
+    (from _family); None means take everything. groups_seen is every parent
+    group encountered, so a wrong root can be diagnosed instantly."""
     root = ET.fromstring(_sanitize_xml(raw_bytes))
     rows, groups = [], {}
     for led in root.iter("LEDGER"):
@@ -231,7 +293,7 @@ def _parse_ledgers(raw_bytes, want_balances):
             continue
         parent = _text(led, "PARENT")
         groups[parent] = groups.get(parent, 0) + 1
-        if GROUP_FILTER.lower() not in parent.lower():
+        if family is not None and parent.strip().lower() not in family:
             continue
         row = {"name": name, "group": parent}
         if want_balances:
@@ -294,43 +356,60 @@ def main():
     print("Ganpati - Tally credit export (READ-ONLY)")
     print("Window: {} to {}".format(FROM_DATE, TO_DATE))
     print("Saving to: {}\n".format(OUTPUT_DIR))
-    print("Step 1 of 3 - checking Tally is answering (names only, quick)")
+    print("Step 1 of 4 - reading the group tree")
+    raw_groups = _post_to_tally(GROUPS_XML, "groups", TIMEOUT_PROBE)
+    _dump(stamp, "groups", raw_groups)
+    tree = _parse_groups(raw_groups)
+    family = _family(tree, ROOT_GROUP)
+    print("   {:,} groups; {:,} of them are {!r} or beneath it\n".format(
+        len(tree), len(family) if family else len(tree), ROOT_GROUP or "(everything)"))
 
-    # ---- 0. probe: names + groups only. No balance maths, so this is fast. ----
+    print("Step 2 of 4 - checking Tally is answering (ledger names only, quick)")
     raw_probe = _post_to_tally(PROBE_XML, "probe", TIMEOUT_PROBE)
     _dump(stamp, "probe", raw_probe)
-    probe_rows, groups = _parse_ledgers(raw_probe, want_balances=False)
+    probe_rows, groups = _parse_ledgers(raw_probe, want_balances=False, family=family)
     total_ledgers = sum(groups.values())
-    print("   Tally answered: {:,} ledgers in the company, {:,} under {!r}\n".format(
-        total_ledgers, len(probe_rows), GROUP_FILTER))
+    print("   {:,} ledgers in the company; {:,} under {!r}\n".format(
+        total_ledgers, len(probe_rows), ROOT_GROUP or "(everything)"))
+
+    # Where the shops actually sit — printed every run, because a wrong root is
+    # invisible otherwise: it returns plenty of ledgers, just the wrong ones.
+    print("   Biggest ledger groups, and where each one hangs:")
+    for g, n in sorted(groups.items(), key=lambda kv: -kv[1])[:12]:
+        path, cur, seen = [], g.strip().lower(), set()
+        while cur and cur not in seen:
+            seen.add(cur)
+            path.append(cur)
+            cur = tree.get(cur)
+        inside = "IN " if (family is None or g.strip().lower() in family) else "   "
+        print("   {}{:>4}  {}".format(inside, n, " < ".join(path[:4]) or g))
+    print()
 
     if not probe_rows:
-        print("  No ledgers matched the group filter {!r}.".format(GROUP_FILTER))
-        print("  Groups Tally actually returned (name : ledger count):")
-        for g, n in sorted(groups.items(), key=lambda kv: -kv[1])[:25]:
-            print("    {:<40} {}".format(g or "(blank)", n))
-        print("\n  Edit GROUP_FILTER near the top of this file, or send this list over.")
+        print("  Nothing sits under {!r}.".format(ROOT_GROUP))
+        print("  Use the paths above to pick the right top group, set ROOT_GROUP at the")
+        print("  top of this file (or set it to \"\" to take every ledger), and re-run.")
         return
 
     # ---- 1. balances: try the group-scoped request first, fall back to all ----
-    print("Step 2 of 3 - fetching balances for {:,} shops".format(len(probe_rows)))
+    print("Step 3 of 4 - fetching balances for {:,} shops".format(len(probe_rows)))
     print("   (Tally computes each balance from its vouchers, so this is the slow part)")
     raw_bal = _post_to_tally(BALANCES_FAST_XML, "balances", TIMEOUT_BALANCES)
-    parties, _ = _parse_ledgers(raw_bal, want_balances=True)
+    parties, _ = _parse_ledgers(raw_bal, want_balances=True, family=family)
     if not parties:
         print("   Group-scoped request returned nothing on this Tally - retrying the")
         print("   whole-company way (slower, but works everywhere)")
         raw_bal = _post_to_tally(BALANCES_ALL_XML, "balances (fallback)", TIMEOUT_BALANCES)
-        parties, _ = _parse_ledgers(raw_bal, want_balances=True)
+        parties, _ = _parse_ledgers(raw_bal, want_balances=True, family=family)
     _dump(stamp, "balances", raw_bal)
     print("   Got balances for {:,} shops\n".format(len(parties)))
 
     # ---- 2. vouchers ---------------------------------------------------------
     entries, skipped = [], 0
     if BALANCES_ONLY:
-        print("Step 3 of 3 - SKIPPED (BALANCES_ONLY is True)\n")
+        print("Step 4 of 4 - SKIPPED (BALANCES_ONLY is True)\n")
     else:
-        print("Step 3 of 3 - fetching the statement ({} to {})".format(FROM_DATE, TO_DATE))
+        print("Step 4 of 4 - fetching the statement ({} to {})".format(FROM_DATE, TO_DATE))
         raw_vch = _post_to_tally(VOUCHERS_XML, "statement", TIMEOUT_VOUCHERS)
         _dump(stamp, "vouchers", raw_vch)
         entries, skipped = _parse_vouchers(raw_vch, [p["name"] for p in parties])

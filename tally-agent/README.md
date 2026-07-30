@@ -117,14 +117,20 @@ double-click a `.bat`. Nothing is uploaded anywhere — it writes files you look
 
    | Step | What it does | Typical |
    |------|--------------|---------|
-   | 1 of 3 | Probe — ledger names only, no maths | seconds |
-   | 2 of 3 | Balances for the shops | the slow one: Tally recomputes each balance from its vouchers |
-   | 3 of 3 | The statement (vouchers in the window) | depends on how busy those months were |
+   | 1 of 4 | Reads the group tree | instant |
+   | 2 of 4 | Probe — ledger names only, no maths | seconds |
+   | 3 of 4 | Balances for the shops | the slow one: Tally recomputes each balance from its vouchers |
+   | 4 of 4 | The statement (vouchers in the window) | depends on how busy those months were |
 
-   Step 2 asks only for the **Sundry Debtors** group. If that shape isn't supported
-   on your Tally it falls back automatically to a whole-company request, which is
-   slower but always works. Set **`BALANCES_ONLY = True`** at the top of the script
-   to skip step 3 for a quicker first run.
+   **Every run prints where the shops actually sit**, e.g.
+   `IN   24  appl pali friday < sundry debtors < primary`. Rows marked `IN` are
+   included. This matters: in this company the shops live in **beat groups**
+   (`Appl Pali FRIDAY`, `SARGAM WHOLESALE WEDNUSDAY`, …) *underneath* the top
+   group — matching on a ledger's immediate parent name finds the wrong ledgers
+   entirely. If nothing is marked `IN`, set **`ROOT_GROUP`** at the top of the
+   script to the right top group from those paths (or `""` to take every ledger).
+
+   Set **`BALANCES_ONLY = True`** to skip step 4 for a quicker first run.
 4. It prints a summary and writes files to **`Desktop\GanpatiCredit`**:
 
 | File | What it is |
