@@ -61,6 +61,18 @@ Both share one set-based `UPDATE`/upsert in a single pass with the same CTE shap
 - **Sign convention: positive = the retailer owes us; negative = advance held.** Tally's Dr/Cr suffix is normalized by the agent; the RPC takes a signed number.
 - Missing `credit_limit` leaves the existing value untouched (a balances-only feed never wipes limits).
 
+### D3b — Getting the data out of Tally (researched 2026-07-31)
+
+**This is a near-copy of the shipped stock extractor**, not new ground: `tally-agent/stock_export.py` already POSTs an `<TALLYREQUEST>Export</TALLYREQUEST>` Collection envelope to `http://localhost:9000`, parses it with stdlib, and writes a timestamped CSV. Credit swaps the collection from `StockItem` to **`Ledger`**, fetching `Name` + `ClosingBalance` (+ `CreditLimit` if maintained). The **read-only guarantee is inherited verbatim** — Export requests only; never `Import`/`Alter`/`Create`, not even commented out. One run can emit both files (stock + credit), which also answers "same cron or separate": **same script, two exports, one double-click.**
+
+Three calibration items that documentation cannot settle — they need one run against the real company file:
+
+1. **⚠️ Sign convention — the money trap.** A receivable is a debit and Tally's XML commonly returns it **negative** (integration write-ups state "amount owed is the negation"). Guessing wrong inverts every shop: debtors render as holding advances. **Verify against three shops eyeballed on Tally's own screen before the first real import**, then normalise in the agent so the RPC's contract (positive = owes us) holds.
+2. **Filter to Sundry Debtors.** An unfiltered Ledger collection returns banks, GST, expenses, capital — hundreds of rows that would land in `unmatched` and drown the cleanup worklist that list exists to be.
+3. **Credit limit is conditional.** Tally carries a per-ledger limit only if the office maintains it. If the export lacks it, the entire over-limit tier (red rows, the Over-limit tab, the approval banner) **degrades to balances-only** — that is the designed fallback, not a bug.
+
+**Aging stays v2 for a structural reason:** it is not the ledger balance but the `Bills` collection (bill-wise details + due dates), and it requires bill-wise accounting enabled per party.
+
 ## D4 — Freshness, and the two-sources-of-truth rule
 
 The app knows about collections Tally may not have booked yet. **Never merge the two numbers into one.** Display the arithmetic:
