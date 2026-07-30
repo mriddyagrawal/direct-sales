@@ -38,9 +38,18 @@ from datetime import date, datetime
 # -----------------------------------------------------------------------------
 TALLY_URL = "http://localhost:9000"
 
-# Leave "" to use whichever company is open. Set it once the name is known:
-# a wrong RDP session then exports the wrong book with NO error anywhere, and
-# every balance in the app silently becomes last year's.
+# The company to export. THIS MATTERS HERE: this machine has several companies,
+# and it has already happened that the stock sync was run with the wrong one in
+# front. For stock that fails harmlessly - the other company has none of the same
+# items, so nothing matches and nothing happens. For ledgers the same mistake is
+# far worse: another company's books export perfectly happily, reconcile with
+# themselves, and produce a plausible file of the wrong shops' money.
+#
+# Setting this does two things: it TARGETS the named company, and it makes the
+# run STOP if Tally serves anything else. Leave "" only if you accept that
+# whatever is open gets exported.
+#
+# To find the exact spelling, run with --companies and copy a line verbatim.
 COMPANY = ""
 
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "GanpatiSync")
@@ -488,7 +497,48 @@ def inr(n):
 # =============================================================================
 #  MAIN
 # =============================================================================
+ALL_COMPANIES_XML = ("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>"
+                     "<TYPE>Collection</TYPE><ID>Cmps</ID></HEADER><BODY><DESC>"
+                     "<STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>"
+                     "</STATICVARIABLES><TDL><TDLMESSAGE>"
+                     '<COLLECTION NAME="Cmps"><TYPE>Company</TYPE>'
+                     "<NATIVEMETHOD>Name</NATIVEMETHOD></COLLECTION>"
+                     "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
+
+
+def list_companies():
+    """Every company Tally currently has open, exact spelling, for COMPANY.
+
+    Deliberately omits the active-company FILTER the normal check uses, so this
+    shows ALL of them rather than just the one in front.
+    """
+    print("Companies Tally has open right now:\n")
+    try:
+        raw = post(ALL_COMPANIES_XML, "companies", TIMEOUT_QUICK)
+    except Exception as exc:
+        raise SystemExit("Could not ask Tally: {}\n  Is it open with the XML server on?"
+                         .format(exc))
+    names = [html.unescape(n).strip()
+             for n in re.findall(r"<NAME>(.*?)</NAME>", sanitize(raw), re.S)]
+    seen, uniq = set(), []
+    for n in names:
+        if n and n.lower() not in seen:
+            seen.add(n.lower())
+            uniq.append(n)
+    if not uniq:
+        raise SystemExit("Tally answered but named no companies. Is one loaded?")
+    for n in uniq:
+        print('    COMPANY = "{}"'.format(n))
+    print("\nCopy the line for the book you want into the top of this file.")
+    if len(uniq) > 1:
+        print("{} companies are open - which is exactly why this matters here."
+              .format(len(uniq)))
+
+
 def main():
+    if "--companies" in sys.argv:
+        list_companies()
+        return
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
     dump = lambda n, b: open(os.path.join(OUTPUT_DIR, "raw_{}_{}.xml".format(n, stamp)), "wb").write(b)
@@ -499,13 +549,42 @@ def main():
     print("Saving   : {}\n".format(OUTPUT_DIR))
 
     # -- 0. which company is Tally actually serving? --------------------------
+    # A wrong book here is the one failure that produces a perfectly valid file
+    # of the wrong money: it exports, it reconciles against itself, and nothing
+    # downstream can tell. So when COMPANY is set, a mismatch STOPS the run.
     try:
-        served = re.search(r"<NAME>(.*?)</NAME>", sanitize(post(COMPANY_XML, "company", TIMEOUT_QUICK)), re.S)
-        print("   Company: {}  [{}]\n".format(
-            html.unescape(served.group(1)).strip() if served else "unknown",
-            "pinned" if COMPANY else "whatever is open"))
+        served_m = re.search(r"<NAME>(.*?)</NAME>",
+                             sanitize(post(COMPANY_XML, "company", TIMEOUT_QUICK)), re.S)
+        served = html.unescape(served_m.group(1)).strip() if served_m else ""
+        print("   Company: {}  [{}]\n".format(served or "unknown",
+                                              "pinned" if COMPANY else "whatever is open"))
+        if COMPANY:
+            if not served:
+                raise SystemExit(
+                    "\nSTOPPING: asked for company {!r} but Tally did not say which company\n"
+                    "it served, so this cannot be verified. Nothing was written.\n"
+                    "  Is that company open in Tally?  Run with --companies to list them."
+                    .format(COMPANY))
+            if served.strip().lower() != COMPANY.strip().lower():
+                raise SystemExit(
+                    "\nSTOPPING: WRONG COMPANY. Nothing was written.\n"
+                    "  wanted : {}\n"
+                    "  served : {}\n"
+                    "Open the right company in Tally and run again. If the name has\n"
+                    "changed (a new book each April does this), run --companies and\n"
+                    "update COMPANY at the top of this file."
+                    .format(COMPANY, served))
+        elif served:
+            print("   NOTE: COMPANY is not set, so whatever is open gets exported.")
+            print("         This machine has several companies. To lock it, put the line")
+            print("         above into COMPANY at the top of this file.\n")
+    except SystemExit:
+        raise
     except Exception as exc:
         print("   Company: could not be read ({})\n".format(exc))
+        if COMPANY:
+            raise SystemExit("STOPPING: COMPANY is pinned but could not be verified. "
+                             "Nothing was written.")
 
     # -- 1. group tree --------------------------------------------------------
     print("Step 1/5  group tree")
