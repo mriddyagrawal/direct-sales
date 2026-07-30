@@ -69,6 +69,13 @@ DEFAULT_MONTHS_BACK = 2
 # this request shape - if you are hitting this, something is wrong.
 TIMEOUT = 300
 
+# Which company to export. "" = whatever is currently open in Tally, which is
+# fine on a single-company machine and a silent hazard on a multi-company one:
+# one wrong RDP session and you export the wrong book with no visible error.
+# Put the exact company name here to pin it. Either way the run PRINTS the
+# company it actually used, so a mistake is visible rather than inferred.
+COMPANY = ""
+
 # Skip cancelled and optional vouchers server-side (Tally never builds the row).
 EXCLUDE_CANCELLED = True
 EXCLUDE_OPTIONAL = True
@@ -86,10 +93,14 @@ ENTRY_SOURCES = ["AllLedgerEntries"]
 
 # -- the fields we ask for, in order. (csv column, TDL expression) -------------
 # Amount ships three ways: a signed number, the text Tally rendered, and Tally's
-# own dr/cr label. Derive Debit/Credit from the SIGN of the number (negative =
-# debit) - NOT from is_debit, which is only a label and disagrees on contra
-# entries such as a discount posted on the credit side. Proof: signed amounts sum
-# to exactly 0.00 on all 4,848 vouchers; using the label breaks 298 of them.
+# own dr/cr label. Derive Debit/Credit from the SIGN (negative = debit), NOT from
+# is_debit - it is only a label and disagrees on contra entries such as a discount
+# posted on the credit side; using it breaks 298 receipts here.
+#
+# is_debit is kept in the CSV precisely BECAUSE it can disagree. Where sign and
+# label differ, that row is the most interesting one in the file - a contra entry
+# - and two columns make those findable instead of accidental. The run prints how
+# many there were.
 FIELDS = [
     ("date",         '$$PyrlYYYYMMDDFormat:$Date:"-"'),
     ("voucher_type", "$VoucherTypeName"),
@@ -184,6 +195,7 @@ def build_request(collection_route, from_date, to_date, fields, extra_filters=No
         # instead of emitting an empty column, shifting every column after it.
         "<SVEXPORTFORMAT>XML (Data Interchange)</SVEXPORTFORMAT>"
         f"<SVFROMDATE>{from_date}</SVFROMDATE><SVTODATE>{to_date}</SVTODATE>"
+        + (f"<SVCURRENTCOMPANY>{_esc(COMPANY)}</SVCURRENTCOMPANY>" if COMPANY else "") +
         "</STATICVARIABLES><TDL><TDLMESSAGE>"
         '<REPORT NAME="GanpatiLedgerReport"><FORMS>MyForm</FORMS></REPORT>'
         '<FORM NAME="MyForm"><PARTS>MyPart01</PARTS></FORM>'
@@ -238,15 +250,31 @@ def to_number(numeric, raw):
     Returns None if neither column yields a number, so the caller can COUNT the
     failures rather than silently writing zeros.
 
-    Do not take abs() of this. Verified on 4,848 real vouchers: the signed values
-    sum to exactly 0.00 on every single one — Tally's own double-entry identity.
-    The sign is authoritative and `is_debit` is only a label, which genuinely
-    disagrees with it on contra entries: a discount on a receipt comes back as
-    is_debit=0 with an amount of -45, i.e. "a credit of minus 45", which is a
-    debit of 45 in effect. Trusting the label there breaks the voucher by twice
-    the discount, and 298 receipts in this company do exactly that.
+    Do not take abs() of this. The sign carries information the dr/cr label does
+    not: a discount on a receipt comes back as is_debit=0 with an amount of -45,
+    i.e. "a credit of minus 45", which is a debit of 45 in effect. Taking abs()
+    and trusting the label breaks such vouchers by twice the discount, and 298
+    receipts in this company do exactly that.
 
-    `raw` looks like "2,250.00" or "(-)45.00" — commas stripped, "(-)" honoured.
+    WHAT IS AND IS NOT PROVEN
+    -------------------------
+    Signed amounts sum to 0.00 on all 4,848 vouchers. That proves the extract is
+    COMPLETE and INTERNALLY CONSISTENT - no leg is missing or double-counted.
+    It does NOT prove the direction, because the zero-sum survives a global sign
+    flip: swap the meaning of negative and positive and every voucher still sums
+    to zero.
+
+    Direction rests on separate evidence: the credit export returned receivables
+    as negative and that was checked against Tally's own screen. Two independent
+    queries agreeing is decent, but it is corroboration, not proof.
+
+    The test that would settle it, still TO DO: for each ledger, sum the signed
+    amounts over the window and compare against (closing - opening) per shop from
+    credit_export.py's balances CSV. Agreement to the paisa would pin direction,
+    magnitude, completeness and window alignment in one shot. reconcile.py does
+    exactly this - run it once a real export exists.
+
+    `raw` looks like "2,250.00" or "(-)45.00" - commas stripped, "(-)" honoured.
     """
     if numeric:
         hit = _NUM.search(numeric.replace(",", ""))
@@ -275,6 +303,22 @@ def unescape(s):
     &amp; first would turn a literal '&amp;lt;' into '<'.
     """
     return html.unescape(s)
+
+
+def current_company():
+    """Name of the company Tally is actually serving. Printed on every run so a
+    wrong-company export is caught at the time, not in a reconciliation weeks on."""
+    xml = ('<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>'
+           '<TYPE>Collection</TYPE><ID>GanpatiCmp</ID></HEADER><BODY><DESC><TDL><TDLMESSAGE>'
+           '<COLLECTION NAME="GanpatiCmp"><TYPE>Company</TYPE><FETCH>Name</FETCH>'
+           '<FILTER>CmpActive</FILTER></COLLECTION>'
+           '<SYSTEM TYPE="Formulae" NAME="CmpActive">$$IsEqual:$Name:##SVCurrentCompany</SYSTEM>'
+           "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
+    try:
+        m = re.search(r"<NAME>(.*?)</NAME>", sanitize(post(xml, 60)), re.S | re.I)
+        return unescape(m.group(1)).strip() if m else None
+    except Exception:
+        return None
 
 
 def month_chunks(start, end, months):
@@ -455,10 +499,14 @@ def main():
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
     out_path = os.path.join(OUTPUT_DIR, f"ledger_entries_{stamp}.csv")
 
+    cmp_name = current_company()
+    print(f"Company: {cmp_name or '(could not read - check what Tally has open)'}"
+          f"{'   [pinned]' if COMPANY else '   [whatever is open]'}")
+
     chunks = month_chunks(start, end, CHUNK_MONTHS)
     print(f"{start} -> {end}   {len(chunks)} chunk(s) x {len(ENTRY_SOURCES)} source(s)\n")
 
-    total, seen, blank_amounts = 0, set(), 0
+    total, seen, blank_amounts, contra = 0, set(), 0, 0
     with open(out_path, "w", newline="", encoding="utf-8-sig") as fh:
         w = csv.writer(fh)
         w.writerow([c for c, _ in FIELDS] + ["debit", "credit", "source"])
@@ -511,6 +559,9 @@ def main():
                     # split on the SIGN, not on is_debit — see to_number()
                     dr = -amt if amt < 0 else ""
                     cr = amt if amt > 0 else ""
+                    # sign and label disagreeing = a contra entry; worth counting
+                    if (amt < 0) != (d["is_debit"] == "1"):
+                        contra += 1
                     w.writerow(list(r) + [dr, cr, src])
                     kept += 1
 
@@ -522,6 +573,10 @@ def main():
                       f"{len(raw)/1048576:.1f} MB  {time.time()-t0:.1f}s")
 
     print(f"\n{total} ledger entries -> {out_path}")
+    if contra:
+        print(f"{contra} row(s) where the sign and Tally's dr/cr label disagree "
+              f"(contra entries such as discounts).")
+        print("  Filter the CSV on those to see them: sign of `amount` vs `is_debit`.")
     if blank_amounts:
         print(f"WARNING: {blank_amounts} of {total} rows had NO readable amount in either")
         print("         the numeric or the raw column, and were written as 0.")
