@@ -1,177 +1,181 @@
-# Retailer credit & ledger — spec v1 (2026-07-30)
+# Retailer credit & ledger — spec v2 (2026-07-31)
 
-Bring each retailer's **outstanding balance** from Tally into the app (the way stock already arrives), show it where credit decisions actually get made, and give every retailer a **ledger page** — the retailer-side twin of the order detail page.
+Mirror each retailer's **Tally account** into the app: the outstanding balance, and the statement behind it. Show the balance where credit decisions happen, and give every retailer a **ledger page** — the retailer-side twin of the order detail page.
 
-**Status: DESIGN DRAFT — owner review pending. Nothing built. Contains DB changes (new tables + RPCs) that need explicit owner approval at build time (prod-caution rule).**
+**Status: DESIGN — owner-directed rewrite of v1 (2026-07-31). Nothing built. Contains DB changes (3 tables + RPCs) needing explicit owner approval at build time (prod-caution rule).**
 
-Doctrine that frames everything below: **Tally is the accounting truth; the app is an operational mirror.** The app never computes a receivable — it displays Tally's number, timestamped, plus its own collections shown separately.
+## Doctrine (owner, 2026-07-31) — this is what v2 changes
+
+**Tally is the only source of the retailer ledger. The app never contributes to it.**
+
+An app order is a capture, not a sale; an app deposit is a field record, not a receipt. Neither is true until the office punches it into Tally. So the ledger displays **only** what Tally returns, and the app's own orders and deposits are never added to, subtracted from, or reconciled against it.
+
+*This deletes v1's D4 entirely* — the "outstanding − collected-in-app = effective estimate" arithmetic, its `estimate` label and its staleness-hiding rules are gone. One source, one number, no asterisk.
 
 ## The data reality (verified live, 2026-07-30)
 
-| Fact | Consequence for this design |
+| Fact | Consequence |
 |---|---|
-| 622 retailers (599 active) | Bounded — a fetch-all + client filtering stays viable, like the other lists |
-| **`tally_ledger_name` is EMPTY on all 622 rows** | The match key must be `name`, with `tally_ledger_name` as an optional override (D2) |
-| **1 duplicate name** (`[shop redacted]` ×2) | An ambiguous key must update **nothing** — a naive match posts the same balance to two rows and double-counts money (D2) |
-| 80 retailers have orders; 8 deposits exist (2 retailers) | Ledger pages must look right when nearly empty — empty states are the common case, not the edge case |
-| Salesman RLS: **all active retailers**, but **own orders / own deposits only** | A salesman's ledger view is structurally partial — it must be labelled, or the page is staff-only (D7) |
-| Money is integer paise everywhere | Tally's rupee decimals convert server-side, with a strict parse (D3) |
+| 622 retailers (599 active) | Bounded; fetch-all + client filtering stays viable |
+| **`tally_ledger_name` empty on all 622** | Match on `name`, with `tally_ledger_name` as an override (D2) |
+| **1 duplicate name** (`[shop redacted]` ×2) | Ambiguous keys must update nothing — money would double-post (D2) |
+| 80 retailers have app orders; 8 app deposits exist | Irrelevant to the ledger now, by doctrine — but it means ledger pages are mostly sparse |
+| Money is integer paise everywhere | Tally's rupee decimals convert on the way in (D3) |
 
-## D1 — Storage: a separate `retailer_credit` table, not columns on `retailers`
+## D1 — Three tables
 
-*Why not columns: (a) `retailers` RLS hands every salesman every active row, so a column is visible to everyone with no way to restrict it — RLS is row-level, not column-level; a separate table makes salesman visibility a policy decision instead of a fact (D7). (b) The shared `["retailers"]` query feeds the Quick Order picker — putting money there pushes money into more caches for no reason. (c) A sync then never touches identity fields (name/verified/active), so a bad import can't damage the retailer record. (d) Room to grow: as-of, limit, aging buckets.*
+**Why the balance is stored, not computed.** Tally's closing balance covers the account's entire history. Our statement window (2 months) does not. A shop whose oldest unpaid bill predates the window would have `sum(entries) ≠ balance` — so **deriving the balance from the entries is structurally wrong**, and would be wrong *silently*. We store what Tally computes and use the entries for display only.
 
 ```
-retailer_credit
-  retailer_id        uuid  PK → retailers(id) on delete cascade
-  outstanding_paise  bigint      not null   -- signed: + = they owe us, − = advance
-  credit_limit_paise bigint      null       -- null = no limit known/set in Tally
-  as_of              timestamptz not null   -- the snapshot's own timestamp
-  source             text        not null   -- 'agent' | 'import'
-  updated_at         timestamptz not null
+retailer_credit                        -- one row per matched retailer
+  retailer_id        uuid PK → retailers(id) on delete cascade
+  outstanding_paise  bigint  not null  -- Tally closing balance; + = owes us, − = advance
+  opening_paise      bigint            -- balance at window start (feeds the D4 check)
+  credit_limit_paise bigint            -- null when Tally doesn't maintain one
+  window_from        date              -- statement window covered by the entries
+  window_to          date
+  reconciled         boolean           -- opening + entries == outstanding (D4)
+  as_of              timestamptz not null
+  source             text not null     -- 'agent' | 'import'
+
+retailer_ledger_entries                -- the statement lines, display only
+  id             bigserial PK
+  retailer_id    uuid not null → retailers(id) on delete cascade
+  entry_date     date   not null
+  voucher_type   text   not null       -- Sales / Receipt / Credit Note / Journal …
+  voucher_no     text                  -- bill / receipt number as Tally shows it
+  narration      text
+  debit_paise    bigint not null default 0
+  credit_paise   bigint not null default 0
+  index (retailer_id, entry_date desc)
+
+credit_sync_runs                       -- the match report / cleanup worklist
+  id, ran_at, source, actor,
+  matched int, unmatched_count int, ambiguous_count int, unreconciled_count int,
+  unmatched jsonb, ambiguous jsonb
 ```
 
-One row per retailer, replaced wholesale each sync. **Absolute balances, never deltas** — that's what makes a re-run idempotent.
+*No `updated_at` churn on entries: they are replaced wholesale, never edited (D3).*
 
-## D2 — Match key + the ambiguity rule
+## D2 — Match key + the ambiguity rule *(unchanged from v1)*
 
 Key = `lower(regexp_replace(btrim(coalesce(nullif(btrim(tally_ledger_name),''), name)), '\s+', ' ', 'g'))`, with a functional index mirroring `products_tally_lower_idx`.
 
-*Whitespace is collapsed, not just trimmed — measured 2026-07-30: **6 retailer names carry internal double spaces**, which would silently miss a Tally name spelled with single spaces. Collapsing fixes all six and adds **zero** new collisions (still exactly the one known pair). Punctuation is deliberately **not** stripped: today it would also add zero collisions, but it buys nothing and risks merging genuinely different shops later.*
+*Whitespace is collapsed, not just trimmed — measured: 6 retailer names carry internal double spaces, which would silently miss a Tally name spelled with single spaces. Collapsing fixes all six and adds zero collisions. Punctuation is deliberately not stripped.*
 
-*Reason: today every retailer's Tally identity IS its `name` (the column meant for it is empty). `tally_ledger_name` stays the escape hatch: once set on a row, it wins — so a shop can be renamed in the app without breaking the sync, and a Tally-side rename is fixed by filling one field instead of editing the shop's display name.*
+**Ambiguity rule:** a key matching more than one retailer updates **nothing** and is reported in an `ambiguous` bucket. *Verified 2026-07-30: `import_stock`'s `UPDATE … FROM` writes to every row sharing a key — for a quantity that's wrong, for money it double-posts. `UNIQUE (brand_id, tally_name)` is case-sensitive and cross-brand-blind; retailers have no name constraint at all and one live duplicate.*
 
-**Ambiguity rule (this is the money-safety rule):** if a payload key matches **more than one** retailer, update **neither**, and report the key in a third bucket, `ambiguous`. Retailers get this stricter contract; the one known duplicate today lands in the bucket on day one, which is exactly how it gets fixed.
+**Pre-sync cleanup (awaiting owner go):** Tally enforces unique ledger names, so all collisions are app-side. The one live collision is a ghost+real pair of the same shop — `[shop redacted]` from the 2026-07-07 bulk import (no area/phone, **0 orders**) and the 2026-07-23 field entry (area Dipka, phone [phone redacted], **1 order**). Deactivating the ghost orphans nothing.
 
-*Verified 2026-07-30 (not previously documented anywhere — established by execution, since the stock behaviour was only ever implied by its SQL): `import_stock`'s `UPDATE … FROM` join matches **every** row sharing the key, so a duplicate `tally_name` writes the same qty to all of them and reports them as N matched. `UNIQUE (brand_id, tally_name)` only blocks **exact** duplicates within a brand — it is case/whitespace-sensitive while the import key is `lower(btrim(...))`, and it does not constrain across brands at all. Live catalog today: **0 duplicate keys across ~1390 products**, so this is latent, not active. Because Tally's own item names are unique, a shared `tally_name` means one product is mismapped and would inherit a **phantom stock figure** — so `import_stock` should adopt this same ambiguity rule (report, update neither) as a small follow-up. Retailers have **no** name constraint at all and one live duplicate, which is why the rule is mandatory here from day one.*
+## D3 — Ingestion: one run, two pulls, wholesale replace
 
-**Pre-sync cleanup (identified 2026-07-30, awaiting owner go):** Tally enforces unique ledger names, so every collision is app-side. The single live collision is a **ghost + real pair of the same shop**: `[shop redacted]` exists twice — one row from the 2026-07-07 bulk import (no area, no phone, **0 orders, 0 deposits**) and one created 2026-07-23 with area Dipka, phone [phone redacted] and **1 order**. Deactivating the ghost row orphans nothing and clears the ambiguity before the first sync. One-row prod change → owner approval required.
+Each sync pulls **both** and applies them in one transaction per retailer:
 
-## D3 — Ingestion: two paths, mirroring stock exactly
+1. **Balances** — `Ledger` collection filtered to Sundry Debtors: name, closing balance, opening balance at `window_from`, credit limit if maintained.
+2. **Statement lines** — the vouchers for `window_from … window_to` per ledger.
+
+**Wholesale replace, never incremental:** every run deletes and rewrites the window's entries for each matched retailer. *This is what makes back-dated entries, edited vouchers and deleted vouchers self-heal. An incremental feed cannot see a deletion, and its error persists forever.*
 
 | Path | Function | Gate | Trigger |
 |---|---|---|---|
-| Manual | `import_credit(p_rows jsonb)` | `auth_profile_role() = 'admin'` | Excel/CSV wizard on the Retailers page (reuse the `StockImportWizard` shell verbatim) |
-| Automated | `import_credit_agent(p_secret, p_rows)` | sha256 vs `agent_config` row `name='credit_push'` — **its own secret, not stock's** | The existing VPS Tally agent, second report |
+| Manual | `import_credit(p_rows jsonb)` | `auth_profile_role() = 'admin'` | Import wizard on the Retailers page (reuse the `StockImportWizard` shell) |
+| Automated | `import_credit_agent(p_secret, p_rows)` | sha256 vs `agent_config` row `name='credit_push'` — **its own secret** | The VPS Tally agent, alongside stock |
 
-Both share one set-based `UPDATE`/upsert in a single pass with the same CTE shape as `import_stock` — *the 20260719194611 lesson: the per-row loop timed out at 2000 rows; set-based ran 18ms.* Both return `{matched, unmatched[], ambiguous[]}`.
+Both return `{matched, unmatched[], ambiguous[], unreconciled[]}`, and both write one `credit_sync_runs` row.
 
-**Payload row:** `{ ledger_name, outstanding, credit_limit? }` — amounts as **rupees** (what Tally exports), converted to paise server-side.
-- Accept `^-?[0-9]{1,12}(\.[0-9]{1,2})?$` after stripping commas; **anything else is rejected as a bad row, never coerced to 0** *(a silently-zeroed balance reads as "this shop is clear" — the most dangerous possible wrong answer here)*.
-- **Sign convention: positive = the retailer owes us; negative = advance held.** Tally's Dr/Cr suffix is normalized by the agent; the RPC takes a signed number.
-- Missing `credit_limit` leaves the existing value untouched (a balances-only feed never wipes limits).
+**Payload:** one object per ledger — `{ ledger_name, closing, opening, credit_limit?, window_from, window_to, entries: [{date, voucher_type, voucher_no, narration, debit, credit}] }`. Amounts arrive as **rupees**, converted to paise server-side: accept `^-?[0-9]{1,12}(\.[0-9]{1,2})?$` after stripping commas; **a bad amount rejects its row and is reported — never coerced to 0** *(a silently-zeroed balance reads as "this shop is clear", the most dangerous wrong answer available)*. Sign convention: **positive = the retailer owes us**; the agent normalizes Tally's Dr/Cr (see D3b trap 1).
+
+Set-based, single pass, same CTE shape as `import_stock` — *the 20260719194611 lesson: a per-row loop timed out at 2000 rows; set-based ran 18ms.*
 
 ### D3b — Getting the data out of Tally (researched 2026-07-31)
 
-**This is a near-copy of the shipped stock extractor**, not new ground: `tally-agent/stock_export.py` already POSTs an `<TALLYREQUEST>Export</TALLYREQUEST>` Collection envelope to `http://localhost:9000`, parses it with stdlib, and writes a timestamped CSV. Credit swaps the collection from `StockItem` to **`Ledger`**, fetching `Name` + `ClosingBalance` (+ `CreditLimit` if maintained). The **read-only guarantee is inherited verbatim** — Export requests only; never `Import`/`Alter`/`Create`, not even commented out. One run can emit both files (stock + credit), which also answers "same cron or separate": **same script, two exports, one double-click.**
+**A near-copy of the shipped stock extractor**, not new ground: `tally-agent/stock_export.py` already POSTs an `<TALLYREQUEST>Export</TALLYREQUEST>` Collection envelope to `http://localhost:9000`, parses with stdlib, writes a timestamped file. Credit swaps `StockItem` for **`Ledger`** plus a voucher pull over `SVFROMDATE`/`SVTODATE`. The **read-only guarantee is inherited verbatim** — Export only; never `Import`/`Alter`/`Create`, not even commented out. One run emits both stock and credit files: **one script, one double-click.**
 
-Three calibration items that documentation cannot settle — they need one run against the real company file:
+Three calibration items documentation cannot settle — they need one run against the real company file, **before** any app work is built:
 
-1. **⚠️ Sign convention — the money trap.** A receivable is a debit and Tally's XML commonly returns it **negative** (integration write-ups state "amount owed is the negation"). Guessing wrong inverts every shop: debtors render as holding advances. **Verify against three shops eyeballed on Tally's own screen before the first real import**, then normalise in the agent so the RPC's contract (positive = owes us) holds.
-2. **Filter to Sundry Debtors.** An unfiltered Ledger collection returns banks, GST, expenses, capital — hundreds of rows that would land in `unmatched` and drown the cleanup worklist that list exists to be.
-3. **Credit limit is conditional.** Tally carries a per-ledger limit only if the office maintains it. If the export lacks it, the entire over-limit tier (red rows, the Over-limit tab, the approval banner) **degrades to balances-only** — that is the designed fallback, not a bug.
+1. **⚠️ Sign convention — the money trap.** A receivable is a debit and Tally's XML commonly returns it **negative**; integration write-ups state "amount owed is the negation". Guess wrong and every debtor renders as holding an advance. **Verify three shops against Tally's own screen**, then normalize in the agent.
+2. **Filter to Sundry Debtors.** An unfiltered Ledger collection returns banks, GST, expenses, capital — hundreds of rows that would drown the unmatched worklist.
+3. **Credit limit is conditional.** Only present if the office maintains it. Absent → the whole over-limit tier (red rows, Over-limit tab, approval banner) **degrades to balances-only**. That is the designed fallback, not a bug.
 
-**Aging stays v2 for a structural reason:** it is not the ledger balance but the `Bills` collection (bill-wise details + due dates), and it requires bill-wise accounting enabled per party.
+**Aging stays v2+:** it needs the `Bills` collection (bill-wise details + due dates) and bill-wise accounting enabled per party — a different query with a different prerequisite.
 
-## D4 — Freshness, and the two-sources-of-truth rule
+## D4 — Reconciliation as a check, not a calculation *(replaces v1's D4 entirely)*
 
-The app knows about collections Tally may not have booked yet. **Never merge the two numbers into one.** Display the arithmetic:
+`opening_paise + Σ(debits − credits) == outstanding_paise` is verified per retailer at import and stored as `reconciled`.
 
-```
-Outstanding      ₹1,24,500     as of today 6:05 am
-Collected since  − ₹15,000     2 receipts in the app
-Effective        = ₹1,09,500   estimate
-```
+*The owner's baseline-plus-replay idea is right as a **validator** and dangerous as a **source**: as a source it silently reimplements an accounting engine (credit notes, journals, discounts, back-dated entries, deleted vouchers) and any miss corrupts the number permanently. As a check it costs nothing and catches an incomplete extract.*
 
-Rule: the "collected since" line counts **only non-voided deposits created after `as_of`**. It is self-correcting — once the office books those receipts in Tally, the next snapshot absorbs them and the line resets to zero. Voiding a deposit moves it back.
+- **Reconciles** → the statement provably explains the balance. Nothing shown.
+- **Doesn't reconcile** → the balance still displays (Tally computed it, it is right); the *statement* carries a quiet note: **"Some entries are older than this statement"** — which is the ordinary, expected case for a shop with a bill predating the window. `unreconciled_count` is reported in the sync run so a systemic extract failure is visible rather than mistaken for old bills.
 
-*Known limitation, stated rather than hidden: a receipt taken **before** the snapshot but not yet booked in Tally makes the outstanding read high. The app cannot detect that, which is exactly why the estimate is labelled and the authoritative number keeps its own line and timestamp.*
+## D5 — Where the balance appears
 
-**Staleness:** `as_of` older than 36 h → amber "stale" chip. Older than 7 days → red, and the effective line is **hidden** (too far gone to estimate honestly).
+1. **Retailer picker** (Quick Order + deposit flow) — the balance rides **every row**, as a muted second line under the shop name (owner call): `Sadar Bazar · ₹12,450 due`. Grey by default, **red only when over limit**. `₹0` → **"Clear"**; no credit data → **nothing at all** *(the two must not look identical — "known clear" and "unknown" are different facts)*; negative → **"₹5,000 advance"**. One **"Balances as of …"** line above the list, never per row.
+2. **Order detail** (both lenses) — a retailer band under the header: outstanding · limit · headroom, live, with its as-of, so the admin sees the shop's position on the way to Approve. Over-limit adds a banner naming the gap and what this order adds.
+3. **Orders list** — nothing per row (noise + a join per row). An "over limit" filter chip is a later candidate.
+4. **Retailers list** — Outstanding / Limit / Headroom columns (desktop), second line (phone), an **Over limit** tab, the book total in the header, and the **sync line** (`618 matched · 3 unmatched · 1 ambiguous`).
+5. **Retailer ledger page** — D6.
+6. **Analytics** — receivables total, top debtors, over-limit count. *Unlocks the "outstanding receivables" metric previously listed as impossible.*
 
-## D5 — Placement map (where credit shows up)
+## D6 — The retailer ledger page
 
-1. **Retailer picker** (Quick Order + deposit flow) — **the balance rides every row**, as a secondary muted line under the shop name (owner call 2026-07-30, overriding this spec's earlier "confirmation card only" recommendation — *the salesman standing in the shop is exactly who the number is for, and hiding it until commitment is one tap too late*). The row goes two-line, matching the Products page grammar:
+**Routes:** `/dashboard/retailers/[id]` (staff) and `/retailers/[id]` (salesman) — one component, a `role` prop, mirroring `OrderDetailView`'s twin-lens pattern.
 
-   ```
-   Sharma Electronics                    NEW
-   Sadar Bazar · ₹12,450 due
-   ```
+**Reachability:** the retailer name becomes a link wherever it already appears — order detail header, deposits rows, orders list retailer cell — plus row-click on the Retailers list (Edit moves into the page header). **No new salesman nav tab.**
 
-   - Second line uses the existing `--color-locked` @ 12px (today's `.retailerMeta` token) — thin and grey, **red only when over the credit limit**; nothing else is colourised.
-   - `₹0` renders **"Clear"**; a retailer with **no credit data at all renders nothing** — *the two states must not look identical: "we know they're clear" and "we know nothing" are different facts.*
-   - Negative balance renders **"₹5,000 advance"**.
-   - No per-row timestamp (noise ×622); one **"Balances as of …"** line sits above the list, and the chosen retailer's confirmation card still carries the full D4 arithmetic + the over-limit banner.
-   - Same treatment in the **deposit flow's** picker — arguably the highest-value placement, since that screen exists to collect the money.
-   - Plumbing: a separate `["retailer-credit"]` query merged client-side by `retailer_id`, **not** folded into the shared `["retailers"]` superset — keeps money on its own cache key (D1's reasoning) while still being one bounded fetch of ~622 rows.
-2. **Order detail** — a "Retailer" band under the header: outstanding · limit · headroom, **live (not snapshotted)** with its as-of, so the admin sees it immediately before Approve. *Live beats a snapshot here because the number informs a decision being made now; it is reference, not part of the order's money math, so the immutable-snapshot law doesn't apply. (Snapshotting `retailer_outstanding_at_order` for audit is a v2 option, not v1.)*
-3. **Orders list** — nothing per row (noise + a join per row). An "over limit" filter chip is a v2 candidate.
-4. **Retailers list** — Outstanding as a sortable desktop column / second line on phone rows, plus a new **"Over limit"** filter tab beside all/pending/verified/deactivated, and a "Last sync … · N matched · N unmatched" line (D8).
-5. **Retailer detail page** — the full ledger (D6).
-6. **Analytics** — receivables total, top debtors, over-limit count. *This is what unlocks the "outstanding receivables" item I previously listed as impossible in the analytics plan.*
-7. **Notifications** — v2 hook: an over-limit order could add a line to the admin's 🛒 card. Out of v1 scope.
+**Anatomy:**
+- **Header** — name, area, phone (tap-to-call), verified/inactive badges, Edit (staff).
+- **Balance** — outstanding, credit limit, headroom with a traffic light, `as of <time>`. One number, no arithmetic stack (D4 is gone).
+- **Statement** — the Tally lines: date · voucher type · number · debit · credit · **running balance**, newest first, over the synced window. This *is* the page's centre of gravity.
+- **Stat strip** — from the statement: billed in window, received in window, last invoice, last receipt.
+- **Open in the app** *(reviewer's call, easily cut)* — app orders **not yet billed**, and nothing else. *Rationale: a billed order already appears in the statement as an invoice, so repeating it would double-show the same sale; an unbilled one is the single thing Tally cannot know yet, which makes it additive rather than a competing version of the truth. Everything else app-side stays off this page per the doctrine.*
+- **Actions** — "New order" and "Record deposit", both prefilled.
+- **Empty states** — a shop with no Tally data reads **"not in the last sync"**, never ₹0.
 
-## D6 — The retailer detail page
+## D7 — Visibility: every salesman sees the balance *(owner, 2026-07-30)*
 
-**Routes:** `/dashboard/retailers/[id]` (staff) and `/retailers/[id]` (salesman lens) — one component, a `role` prop, mirroring the twin-lens `OrderDetailView` pattern.
+`retailer_credit` gets a SELECT policy for all active profiles, mirroring `retailers_select_salesman`. *Collection is the salesman's job; the number changes what he does in the shop.*
 
-**Reachability** (the owner's "how to route the display" question): the retailer name becomes a **link wherever it already appears** — order detail header, deposits rows, orders list retailer cell — plus row-click on the Retailers list. **No new salesman nav tab in v1** *(the phone tab bar is owner-final; the name link reaches the page from every screen a salesman already uses).*
+**Open:** the same question for `retailer_ledger_entries` — the statement exposes the shop's whole account, including business a given salesman had no part in. Default assumed: **same visibility as the balance** (if you can see what they owe, seeing why is not a further leak). Flagged for confirmation.
 
-Row-click on the Retailers list should open the **page**, with **Edit** in the page header opening the existing `RetailerModal`. *This diverges from the Products page's row-click-opens-modal grammar on purpose: a product's whole story is its modal, a retailer's is not.*
-
-**Anatomy (top to bottom):**
-- **Header** — name, area, phone (tap-to-call), verified / inactive badges, Edit (staff), "added by X on date".
-- **Money band** — the D4 arithmetic, credit limit, headroom with a traffic light (green / amber near limit / red over), staleness chip.
-- **Stat strip** — lifetime billed, order count, average order, last order (+ days ago), last deposit, total collected.
-- **Orders** — that retailer's orders with status chips, tap → order detail. Bounded query by `retailer_id`.
-- **Deposits** — date, amount, method, collected by, note, voided badge.
-- **Actions** — "New order for this retailer" and "Record deposit" (both prefilled deep links).
-- **Empty states** — the common case: 542 retailers have never ordered.
-
-## D7 — Visibility: **DECIDED — every salesman sees every retailer's outstanding** (owner, 2026-07-30)
-
-`retailer_credit` gets a SELECT policy for all active profiles, mirroring `retailers_select_salesman` (which already exposes every active retailer to every salesman). *Collection is the salesman's job; the number changes what he does in the shop.*
-
-Unchanged by this: the ledger page's **orders and deposits sections stay RLS-scoped** to the viewer — a salesman sees his own orders and his own collections, so those sections must be **labelled** ("your orders" / "your collections") or a partial history reads as the whole one. Balance = shared truth; history = your slice.
+*Note: the RLS-partial-history problem from v1 dissolves here — a Tally statement is the shop's real account, not one salesman's slice, so no "your orders / your collections" labelling is needed.*
 
 ## D8 — Sync audit
 
-`credit_sync_runs`: `id, ran_at, source, actor, matched, unmatched_count, ambiguous_count, unmatched jsonb, ambiguous jsonb`.
+`credit_sync_runs` surfaces on the Retailers page as **"Last sync 6:05 am · 618 matched · 3 unmatched · 1 ambiguous"**, unmatched downloadable. *That list is the worklist that reconciles 622 app names against Tally's ledger names — the same job the ~94 missing Tally products taught us to make visible instead of silent.*
 
-Surfaced on the Retailers page as **"Last sync 6:05 am · 618 matched · 3 unmatched · 1 ambiguous"**, with the unmatched list downloadable. *That list is the cleanup worklist that gradually reconciles 622 app names against Tally's ledger names — the same job the ~94 missing Tally products taught us to make visible instead of silent.*
+## D9 — Deliberately out of scope
 
-Per-retailer history (for an outstanding trend line) is **v2** — cheap to add later, pointless before the first sync exists.
+Aging buckets (needs the Bills collection + bill-wise accounting) · hard-blocking over-limit orders (v1 warns; a block needs a policy and an override path) · editing credit limits in-app (Tally owns them) · auto-matching app deposits to Tally receipts *(amount+date matching is exactly the guessing that produces confident wrong answers)* · interest/penalties · statement PDFs · payment reminders.
 
-## D9 — Deliberately out of scope for v1
+## Acceptance (by execution)
 
-Named so they're decisions, not oversights: **aging buckets** (0–30/31–60/61–90/90+ — needs Tally's bills-outstanding report; the single biggest v2 upgrade) · **hard-blocking over-limit orders** (v1 warns; a block needs an owner policy and an override path) · **editing credit limits in-app** (Tally owns them) · interest/overdue penalties · statement PDFs · WhatsApp reminders.
-
-## Acceptance (build-time, by execution)
-
-1. Real Tally file imports; matched/unmatched/**ambiguous** counts are truthful, and the duplicate name updates **neither** row.
-2. Same file twice → byte-identical state (idempotent).
-3. `"1,24,500.50"` → `12450050` paise exactly; a junk cell is rejected and reported, never zeroed.
-4. A negative balance renders as "₹X advance", not "−₹X owed".
-5. Agent path succeeds with the secret; a wrong secret returns unauthorized and leaks nothing.
-6. Two-account check: a salesman session shows exactly what D7 allows — no more.
-7. A deposit recorded after `as_of` moves the effective line by exactly that amount; voiding it moves it back.
-8. Stale chip appears at 36 h; the effective line disappears at 7 days.
-9. All 622 rows import well inside the statement timeout.
-10. The retailer page renders correctly for a zero-order retailer and for the heaviest one.
+1. Real Tally export imports; matched / unmatched / **ambiguous** / **unreconciled** counts are truthful; the duplicate name updates **neither** row.
+2. Same file twice → byte-identical state (idempotent), including entries (wholesale replace).
+3. A voucher **deleted** in Tally disappears from the app after the next sync; an **edited** one updates; a **back-dated** one lands in date order.
+4. `"1,24,500.50"` → `12450050` paise exactly; a junk amount is rejected and reported, never zeroed.
+5. Negative balance renders "₹X advance", not "−₹X owed"; sign verified against three shops on Tally's own screen.
+6. Agent path succeeds with the secret; wrong secret returns unauthorized and leaks nothing.
+7. A shop whose oldest bill predates the window shows the right balance and the "older entries" note — not a wrong total.
+8. Statement running balance ends exactly at the outstanding figure when reconciled.
+9. 622 retailers + ~2 months of vouchers import well inside the statement timeout.
+10. Ledger page renders for: a shop with no Tally data, a clear shop, an over-limit shop, and the heaviest account.
 
 ## Build order
 
-0. **DB gate** — owner approves `retailer_credit` + `credit_sync_runs` + 2 RPCs + index; applied as one migration.
-1. **Ingestion first, display second** — the admin wizard, so matching is proven against the real file before any UI depends on it.
-2. Agent path + secret (owner sets it on the VPS beside `stock_push`).
-3. Display: retailers list column + order detail band + picker warning.
-4. Retailer detail page (staff lens, then salesman lens).
-5. v2 hooks: analytics receivables, notification line, aging.
+0. **DB gate** — owner approves the 3 tables + RPCs + index as one migration.
+1. **Extractor first** — one real run against the real company file, settling sign, debtor filter, credit-limit availability and name hit-rate **before** any UI is built.
+2. Ingestion: admin wizard, proving matching against that real file.
+3. Agent path + secret (VPS, beside `stock_push`).
+4. Display: retailers list columns + picker rows + order detail band.
+5. Ledger page (staff lens, then salesman lens).
+6. Later: analytics receivables, notification hook, aging.
 
-## Open questions for the owner
+## Open questions
 
-1. Does Tally give a per-ledger **credit limit**, or only the balance? (Limit-dependent UI degrades gracefully to headroom-unknown. **This now also decides whether the picker's red-when-over-limit state can exist at all.**)
-2. Over-limit at approval: warn only, or require an explicit "approve anyway"?
-3. Retailers list row-click → the new page (recommended) or keep today's edit modal?
-4. Same VPS agent/cron as stock (one run, two reports) or a separate job?
-5. **What does the Tally export actually look like** — columns, headers, Dr/Cr, one file or a report? The parser gets shaped to the real file, not a guess.
+1. **Statement window** — 2 months as stated? (Longer = more history and a higher reconcile rate; the balance is correct either way.)
+2. Does Tally give a per-ledger **credit limit**? Decides whether the over-limit tier exists at all.
+3. Salesmen see the **full statement**, or balance-only? (D7)
+4. Keep the "**Open in the app**" section (unbilled orders only), or strip the page to pure Tally?
+5. Over-limit at approval: warn only, or require an explicit "approve anyway"?
+6. Retailers list row-click → the new page (recommended) or keep today's edit modal?
