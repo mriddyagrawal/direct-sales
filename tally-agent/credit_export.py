@@ -64,7 +64,12 @@ TIMEOUT_BALANCES = 600
 TIMEOUT_VOUCHERS = 900
 
 # Set True to skip the statement pull and only fetch balances (a fast first run).
+# Balances alone answer the calibration questions, and take seconds.
 BALANCES_ONLY = False
+
+# The statement is the expensive half. If it is slow, shorten this FIRST — it is
+# the single biggest lever, since Tally walks every voucher in the range.
+STATEMENT_MONTHS = WINDOW_MONTHS
 # -----------------------------------------------------------------------------
 
 
@@ -124,7 +129,20 @@ BALANCES_ALL_XML = _ENV.format(cid="PartyBalances", frm=FROM_DATE, to=TO_DATE, c
       </COLLECTION>""")
 
 # ---- STEP 2: the vouchers in the window.
+# LIGHT first: <FETCH> names the exact fields wanted, including just two columns
+# out of the ledger-entry list. The old request used NATIVEMETHOD
+# AllLedgerEntries, which makes Tally serialise every voucher whole — inventory
+# lines, tax lines, bill allocations and all. On the owner's company that never
+# returned a single byte in 3 minutes, while balances for 2,977 shops took 0.5s.
 VOUCHERS_XML = _ENV.format(cid="PartyVouchers", frm=FROM_DATE, to=TO_DATE, coll="""
+      <COLLECTION NAME="PartyVouchers" ISMODIFY="No"><TYPE>Voucher</TYPE>
+        <FETCH>Date, VoucherTypeName, VoucherNumber, PartyLedgerName, Narration</FETCH>
+        <FETCH>LedgerEntries.LedgerName, LedgerEntries.Amount</FETCH>
+        <FETCH>AllLedgerEntries.LedgerName, AllLedgerEntries.Amount</FETCH>
+      </COLLECTION>""")
+
+# HEAVY fallback: only tried if the light one comes back with no usable entries.
+VOUCHERS_FULL_XML = _ENV.format(cid="PartyVouchers", frm=FROM_DATE, to=TO_DATE, coll="""
       <COLLECTION NAME="PartyVouchers" ISMODIFY="No"><TYPE>Voucher</TYPE>
         <NATIVEMETHOD>Date</NATIVEMETHOD><NATIVEMETHOD>VoucherTypeName</NATIVEMETHOD>
         <NATIVEMETHOD>VoucherNumber</NATIVEMETHOD><NATIVEMETHOD>PartyLedgerName</NATIVEMETHOD>
@@ -410,9 +428,14 @@ def main():
         print("Step 4 of 4 - SKIPPED (BALANCES_ONLY is True)\n")
     else:
         print("Step 4 of 4 - fetching the statement ({} to {})".format(FROM_DATE, TO_DATE))
+        print("   (asking for named fields only; the whole-voucher form is the fallback)")
         raw_vch = _post_to_tally(VOUCHERS_XML, "statement", TIMEOUT_VOUCHERS)
-        _dump(stamp, "vouchers", raw_vch)
         entries, skipped = _parse_vouchers(raw_vch, [p["name"] for p in parties])
+        if not entries:
+            print("   Nothing usable came back - retrying the whole-voucher way (slower)")
+            raw_vch = _post_to_tally(VOUCHERS_FULL_XML, "statement (full)", TIMEOUT_VOUCHERS)
+            entries, skipped = _parse_vouchers(raw_vch, [p["name"] for p in parties])
+        _dump(stamp, "vouchers", raw_vch)
         print("   Got {:,} statement lines\n".format(len(entries)))
 
     # ---- 3. write the CSVs ---------------------------------------------------
