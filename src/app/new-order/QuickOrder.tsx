@@ -267,13 +267,15 @@ export function QuickOrder({
             {/* Godown stock from the last Tally sync: green in-stock+count /
                 red out-of-stock — two states only; NULL (never synced) counts
                 as out of stock (owner 2026-07-17). Out-of-stock never BLOCKS
-                the sale (the backorder flow handles it) — the red pill +
-                "will backorder" IS the warning. */}
+                the sale (the backorder flow handles it) — the red pill alone
+                is the warning; the "will backorder" tail was dropped as
+                redundant (owner 2026-07-31), leaving the pill + the "as of"
+                date. NOTE: a never-synced product has no stock_updated_at, so
+                its row shows the bare pill with no date qualifier. */}
             <span className={styles.stockLine}>
               <span className={`${styles.stockPill} ${stockCount > 0 ? styles.stockIn : styles.stockOut}`}>
                 {stockCount > 0 ? `In stock · ${stockCount}` : "Out of stock"}
               </span>
-              {stockCount === 0 && <span className={styles.willBackorder}>will backorder</span>}
               {p.stock_updated_at && (
                 <span className={styles.stockAsOf}>as of {formatShortDate(p.stock_updated_at)}</span>
               )}

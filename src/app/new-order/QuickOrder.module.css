@@ -376,7 +376,6 @@
   color: var(--color-error);
 }
 
-.willBackorder,
 .stockAsOf {
   font-family: var(--font-structure);
   font-size: 11px;
