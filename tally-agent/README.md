@@ -136,7 +136,7 @@ double-click a `.bat`. Nothing is uploaded anywhere — it writes files you look
 
 | File | What it is |
 |------|------------|
-| `credit_balances_<date>_<time>.csv` | One row per shop: closing + opening balance |
+| `credit_balances_<date>_<time>.csv` | One row per shop: closing, opening, and the movement between them |
 | `credit_entries_<date>_<time>.csv` | The statement — one row per bill/receipt/note |
 | `raw_balances_<date>_<time>.xml` | Exactly what Tally replied (for diagnosing) |
 | `raw_vouchers_<date>_<time>.xml` | Same, for the vouchers |
@@ -154,6 +154,10 @@ uncertain thing checkable at a glance:
 - **Did the right ledgers come through?** If the group filter matches nothing,
   the script prints every group name it saw. Send that list over and we set it.
 - **How many shops matched?** Compare the party count against what you expect.
+- **Did anything move?** The run prints how many shops changed between the two
+  dates. If it reports that opening equals closing on *every* ledger, Tally is
+  ignoring the as-at date and the movement column is meaningless — the warning
+  says so rather than letting a column of zeros pass as data.
 
 Once those three answers are known, the sign is fixed **once, centrally**, and
 the app side gets built on top.

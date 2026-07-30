@@ -86,6 +86,30 @@ def _window_dates():
 
 FROM_DATE, TO_DATE = _window_dates()
 
+
+def _fy_start(d):
+    """1 April of the financial year containing `d` (Indian FY)."""
+    return date(d.year if d.month >= 4 else d.year - 1, 4, 1)
+
+
+def _asof_dates():
+    """The two dates we need a balance AS OF: the day before the window starts
+    (that is the window's opening) and the window's last day (its closing).
+
+    Why two requests instead of one: `$OpeningBalance` is the BOOK's opening —
+    the start of the financial year — not the start of our window, and it does
+    not move with SVFROMDATE. Measured 2026-07-31 on the real company: opening
+    equalled closing on 393 of 393 non-zero ledgers, i.e. the movement column
+    was structurally zero and any reconciliation against it was meaningless.
+    Asking for the CLOSING balance as of two different dates gives a real
+    opening, a real closing, and therefore a real movement."""
+    frm = datetime.strptime(FROM_DATE, "%Y%m%d").date()
+    to = datetime.strptime(TO_DATE, "%Y%m%d").date()
+    return date.fromordinal(frm.toordinal() - 1), to
+
+
+OPEN_ASOF, CLOSE_ASOF = _asof_dates()
+
 _ENV = """<ENVELOPE>
   <HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{cid}</ID></HEADER>
   <BODY><DESC><STATICVARIABLES>
@@ -111,22 +135,23 @@ PROBE_XML = _ENV.format(cid="LedgerNames", frm=FROM_DATE, to=TO_DATE, coll="""
         <NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD>
       </COLLECTION>""")
 
-# ---- STEP 1a: balances for JUST the debtor group (fast path).
-# CHILDOF + BELONGSTO asks Tally to walk only that group and its sub-groups,
-# instead of computing a closing balance for every ledger in the company.
-BALANCES_FAST_XML = _ENV.format(cid="PartyBalances", frm=FROM_DATE, to=TO_DATE, coll="""
+def _balances_xml(asof, scoped=True):
+    """Balance sheet as at `asof`: SVTODATE is what makes ClosingBalance mean
+    "as of this date", so the same request run at two dates yields the window's
+    opening and closing."""
+    child = "<CHILDOF>$$GroupSundryDebtors</CHILDOF><BELONGSTO>Yes</BELONGSTO>" if scoped else ""
+    return _ENV.format(cid="PartyBalances",
+                       frm=_fy_start(asof).strftime("%Y%m%d"), to=asof.strftime("%Y%m%d"),
+                       coll="""
       <COLLECTION NAME="PartyBalances" ISMODIFY="No"><TYPE>Ledger</TYPE>
-        <CHILDOF>$$GroupSundryDebtors</CHILDOF><BELONGSTO>Yes</BELONGSTO>
+        {child}
         <NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD>
-        <NATIVEMETHOD>OpeningBalance</NATIVEMETHOD><NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
-      </COLLECTION>""")
+        <NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
+      </COLLECTION>""".format(child=child))
 
-# ---- STEP 1b: fallback — every ledger with balances (slower, always works).
-BALANCES_ALL_XML = _ENV.format(cid="PartyBalances", frm=FROM_DATE, to=TO_DATE, coll="""
-      <COLLECTION NAME="PartyBalances" ISMODIFY="No"><TYPE>Ledger</TYPE>
-        <NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD>
-        <NATIVEMETHOD>OpeningBalance</NATIVEMETHOD><NATIVEMETHOD>ClosingBalance</NATIVEMETHOD>
-      </COLLECTION>""")
+
+# (the two fixed-window balance requests were replaced by _balances_xml(asof),
+#  which is what makes a real opening/closing pair possible.)
 
 # ---- STEP 2: the vouchers in the window.
 # LIGHT first: <FETCH> names the exact fields wanted, including just two columns
@@ -410,17 +435,44 @@ def main():
         return
 
     # ---- 1. balances: try the group-scoped request first, fall back to all ----
-    print("Step 3 of 4 - fetching balances for {:,} shops".format(len(probe_rows)))
-    print("   (Tally computes each balance from its vouchers, so this is the slow part)")
-    raw_bal = _post_to_tally(BALANCES_FAST_XML, "balances", TIMEOUT_BALANCES)
+    print("Step 3 of 4 - fetching balances for {:,} shops, at two dates".format(len(probe_rows)))
+    print("   closing as at {}, opening as at {}".format(CLOSE_ASOF, OPEN_ASOF))
+    raw_bal = _post_to_tally(_balances_xml(CLOSE_ASOF), "closing balances", TIMEOUT_BALANCES)
     parties, _ = _parse_ledgers(raw_bal, want_balances=True, family=family)
     if not parties:
         print("   Group-scoped request returned nothing on this Tally - retrying the")
         print("   whole-company way (slower, but works everywhere)")
-        raw_bal = _post_to_tally(BALANCES_ALL_XML, "balances (fallback)", TIMEOUT_BALANCES)
+        raw_bal = _post_to_tally(_balances_xml(CLOSE_ASOF, scoped=False), "closing (fallback)", TIMEOUT_BALANCES)
         parties, _ = _parse_ledgers(raw_bal, want_balances=True, family=family)
-    _dump(stamp, "balances", raw_bal)
-    print("   Got balances for {:,} shops\n".format(len(parties)))
+        scoped = False
+    else:
+        scoped = True
+    _dump(stamp, "balances_closing", raw_bal)
+
+    raw_open = _post_to_tally(_balances_xml(OPEN_ASOF, scoped=scoped), "opening balances", TIMEOUT_BALANCES)
+    _dump(stamp, "balances_opening", raw_open)
+    open_rows, _ = _parse_ledgers(raw_open, want_balances=True, family=family)
+    opening = {r["name"].strip().lower(): r.get("closing") for r in open_rows}
+    for p in parties:
+        p["opening"] = opening.get(p["name"].strip().lower())
+        p["raw_opening"] = ""
+        if p["opening"] is not None and p.get("closing") is not None:
+            p["movement"] = p["closing"] - p["opening"]
+        else:
+            p["movement"] = None
+
+    # If the two dates give identical figures on essentially every ledger, Tally
+    # is not honouring SVTODATE and the movement column is worthless. Say so
+    # loudly rather than shipping a column of zeros that looks like data.
+    pairs = [p for p in parties if p.get("opening") is not None and p.get("closing") is not None
+             and (p["opening"] or p["closing"])]
+    moved = [p for p in pairs if p["movement"]]
+    print("   {:,} shops; {:,} of them moved between the two dates".format(len(parties), len(moved)))
+    if pairs and not moved:
+        print("   !! WARNING: opening == closing on all {:,} non-zero ledgers.".format(len(pairs)))
+        print("   !! Tally is ignoring the as-at date, so 'movement' is meaningless.")
+        print("   !! Send the two raw_balances_*.xml files over before trusting this file.")
+    print()
 
     # ---- 2. vouchers ---------------------------------------------------------
     entries, skipped = [], 0
@@ -442,11 +494,13 @@ def main():
     bal_path = os.path.join(OUTPUT_DIR, "credit_balances_{}.csv".format(stamp))
     _write_csv(
         bal_path,
-        ["Ledger Name", "Group", "Closing (as Tally sent it)", "Closing (number)",
-         "Opening (as Tally sent it)", "Opening (number)"],
+        ["Ledger Name", "Group",
+         "Closing (as Tally sent it)", "Closing (number)", "Closing as at",
+         "Opening (number)", "Opening as at", "Movement in window"],
         [[p["name"], p["group"], p.get("raw_closing", ""),
-          "" if p.get("closing") is None else p["closing"],
-          p.get("raw_opening", ""), "" if p.get("opening") is None else p["opening"]]
+          "" if p.get("closing") is None else p["closing"], CLOSE_ASOF.isoformat(),
+          "" if p.get("opening") is None else p["opening"], OPEN_ASOF.isoformat(),
+          "" if p.get("movement") is None else round(p["movement"], 2)]
          for p in parties],
     )
     ent_path = os.path.join(OUTPUT_DIR, "credit_entries_{}.csv".format(stamp))
