@@ -17,7 +17,7 @@
 #  READ-ONLY, structurally: only TALLYREQUEST=Export is ever built. No Import,
 #  no Alter, no Create, no <IMPORTDATA>, no <TALLYMESSAGE> payload — anywhere.
 #
-#  Python 3, standard library only. Double-click run-tally-sync.bat.
+#  Python 3, standard library only. Double-click run-ledger-sync.bat.
 # =============================================================================
 
 import csv

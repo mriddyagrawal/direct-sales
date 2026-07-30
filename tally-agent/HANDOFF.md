@@ -26,7 +26,7 @@ Independent confirmations, none of which the script can fake:
 
 ## What changed
 
-**New: `tally_sync.py`** — one file replacing the two-script flow, because the
+**New: `ledger_sync.py`** — one file replacing the two-script flow, because the
 reconciliation only means anything when both halves come from the *same* run.
 Five steps: company → groups → shop list → balances at two dates → statement →
 **reconcile**. It ends with one of three verdicts and refuses to bless data it
@@ -39,7 +39,7 @@ cannot check:
 
 **Superseded, not deleted:** `credit_export.py` (its balances use the date-blind
 collection engine), `ledger_statement_export.py` (its request shape lives on
-inside `tally_sync.py`), and `reconcile.py` (the comparison is now inline).
+inside `ledger_sync.py`), and `reconcile.py` (the comparison is now inline).
 
 ## Bugs found tonight, in order
 
@@ -86,7 +86,7 @@ inside `tally_sync.py`), and `reconcile.py` (the comparison is now inline).
    silent failure mode in the pipeline**: a wrong RDP session exports last year's
    book with no error anywhere.
 2. **Opening balances** — no third query needed, and no reuse of `credit_export.py`
-   either: `tally_sync.py` gets a real opening from the report engine at the
+   either: `ledger_sync.py` gets a real opening from the report engine at the
    window's start date.
 3. **Real run cost** — balances 0.6 s, statement 12.9 s over three monthly chunks,
    whole run under 20 s. Your ~3 MB estimate was close: 3.4 MB.
