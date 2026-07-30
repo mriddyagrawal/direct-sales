@@ -46,7 +46,7 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 # -----------------------------------------------------------------------------
 #  CONFIG
@@ -275,62 +275,46 @@ def probe(frm=None, to=None):
             '<TDL><TDLMESSAGE><COLLECTION NAME="GanpatiProbe" ISMODIFY="No">'
             '<TYPE>Voucher</TYPE><FETCH>Date,VoucherTypeName,VoucherNumber</FETCH>'
             "</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
+    print("  1. Collection/Voucher      asking Tally...", end="", flush=True)
     try:
+        t0 = time.time()
         raw = post(coll, 120)
         n = len(re.findall(r"<VOUCHER\b", sanitize(raw), re.I))
-        print(f"  1. Collection/Voucher      {n:>6} vouchers  {len(raw):,} bytes  -> {keep('1_collection', raw)}")
+        print(f"\r  1. Collection/Voucher      {n:>6} vouchers  {len(raw):,} bytes  "
+              f"{time.time()-t0:.1f}s  -> {keep('1_collection', raw)}")
         if not n:
             print("     ^ Tally sees no vouchers in this range at all. Wrong company loaded,")
             print("       or the range is genuinely empty. Nothing below can work until this does.")
     except Exception as e:
-        print(f"  1. Collection/Voucher      FAILED {e}")
-
-    # --- 1b. which sub-collection actually HOLDS the ledger entries? ---------
-    # Decisive, and cheap because it is a 7-day window: fetch both names and
-    # count what comes back. Whichever tag appears is the one to explode.
-    wk = datetime.strptime(to, "%Y%m%d").date() - timedelta(days=7)
-    coll2 = coll.replace(f"<SVFROMDATE>{frm}</SVFROMDATE>",
-                         f"<SVFROMDATE>{wk.strftime('%Y%m%d')}</SVFROMDATE>") \
-                .replace("<FETCH>Date,VoucherTypeName,VoucherNumber</FETCH>",
-                         "<FETCH>AllLedgerEntries,LedgerEntries</FETCH>")
-    try:
-        raw = post(coll2, 180)
-        txt = sanitize(raw)
-        a = len(re.findall(r"<ALLLEDGERENTRIES\.LIST", txt, re.I))
-        b = len(re.findall(r"<LEDGERENTRIES\.LIST", txt, re.I)) - a
-        print(f"  1b. entries in last 7 days AllLedgerEntries={a}  LedgerEntries={max(b,0)}"
-              f"   -> {keep('1b_subcollections', raw)}")
-        if a or b > 0:
-            winner = "AllLedgerEntries" if a >= max(b, 0) else "LedgerEntries"
-            print(f"      set ENTRY_SOURCES = [\"{winner}\"] to halve the work")
-        else:
-            print("      neither tag present — open the file above and look for the")
-            print("      element that wraps the ledger name and amount.")
-    except Exception as e:
-        print(f"  1b. sub-collection check   FAILED {e}")
+        print(f"\r  1. Collection/Voucher      FAILED {e}")
 
     # --- 2. REPORT wrapper, no explode ---------------------------------------
     flat = [("date", '$$PyrlYYYYMMDDFormat:$Date:"-"'), ("vtype", "$VoucherTypeName"),
             ("vno", "$VoucherNumber")]
+    print("  2. Report/Voucher          asking Tally...", end="", flush=True)
     try:
+        t0 = time.time()
         raw = post(build_request("Voucher", frm, to, flat), 120)
         rows = parse(raw, flat)
-        print(f"  2. Report/Voucher          {len(rows):>6} rows      {len(raw):,} bytes  -> {keep('2_report', raw)}")
+        print(f"\r  2. Report/Voucher          {len(rows):>6} rows      {len(raw):,} bytes  "
+              f"{time.time()-t0:.1f}s  -> {keep('2_report', raw)}")
         if rows:
             print(f"     sample: {rows[0]}")
         elif len(raw) > 200:
             print(f"     ^ bytes came back but no <F01> tags — open the file above; the")
             print(f"       tag names in it tell us what to parse.")
     except Exception as e:
-        print(f"  2. Report/Voucher          FAILED {e}")
+        print(f"\r  2. Report/Voucher          FAILED {e}")
 
     # --- 3. the real thing: explode into ledger entries ----------------------
     for src in ENTRY_SOURCES:
+        print(f"  3. Report/{src:16s} asking Tally...", end="", flush=True)
         try:
+            t0 = time.time()
             raw = post(build_request(f"Voucher.{src}", frm, to, FIELDS), 120)
             rows = parse(raw, FIELDS)
-            print(f"  3. Report/{src:16s} {len(rows):>6} rows      {len(raw):,} bytes  "
-                  f"-> {keep('3_' + src, raw)}")
+            print(f"\r  3. Report/{src:16s} {len(rows):>6} rows      {len(raw):,} bytes  "
+                  f"{time.time()-t0:.1f}s  -> {keep('3_' + src, raw)}")
             if rows:
                 print(f"     sample: {rows[0][:6]}")
             elif len(raw) > 200:
@@ -339,7 +323,7 @@ def probe(frm=None, to=None):
                 tags = sorted(set(re.findall(r"<([A-Za-z0-9_.]+)[ >/]", sanitize(raw)[:200000])))
                 print(f"     no <F01> rows. Tags Tally sent: {', '.join(tags[:12])}")
         except Exception as e:
-            print(f"  3. Report/{src:16s} FAILED {e}")
+            print(f"\r  3. Report/{src:16s} FAILED {e}")
 
 
     # Time of entry was probed on 31-Jul-2026 against this company: all eight
