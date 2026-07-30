@@ -2,7 +2,7 @@
 
 Mirror each retailer's **Tally account** into the app: the outstanding balance, and the statement behind it. Show the balance where credit decisions happen, and give every retailer a **ledger page** — the retailer-side twin of the order detail page.
 
-**Status: DESIGN — owner-directed rewrite of v1 (2026-07-31). Nothing built. Contains DB changes (3 tables + RPCs) needing explicit owner approval at build time (prod-caution rule).**
+**Status: DESIGN v2.1 — extractor BUILT (`tally-agent/credit_export.py`), awaiting the calibration run. No app/DB work started; contains DB changes (3 tables + RPCs) needing explicit owner approval at build time (prod-caution rule).**
 
 ## Doctrine (owner, 2026-07-31) — this is what v2 changes
 
@@ -31,7 +31,6 @@ retailer_credit                        -- one row per matched retailer
   retailer_id        uuid PK → retailers(id) on delete cascade
   outstanding_paise  bigint  not null  -- Tally closing balance; + = owes us, − = advance
   opening_paise      bigint            -- balance at window start (feeds the D4 check)
-  credit_limit_paise bigint            -- null when Tally doesn't maintain one
   window_from        date              -- statement window covered by the entries
   window_to          date
   reconciled         boolean           -- opening + entries == outstanding (D4)
@@ -71,7 +70,7 @@ Key = `lower(regexp_replace(btrim(coalesce(nullif(btrim(tally_ledger_name),''), 
 
 Each sync pulls **both** and applies them in one transaction per retailer:
 
-1. **Balances** — `Ledger` collection filtered to Sundry Debtors: name, closing balance, opening balance at `window_from`, credit limit if maintained.
+1. **Balances** — `Ledger` collection filtered to Sundry Debtors: name, parent group, closing balance, opening balance at `window_from`.
 2. **Statement lines** — the vouchers for `window_from … window_to` per ledger.
 
 **Wholesale replace, never incremental:** every run deletes and rewrites the window's entries for each matched retailer. *This is what makes back-dated entries, edited vouchers and deleted vouchers self-heal. An incremental feed cannot see a deletion, and its error persists forever.*
@@ -83,7 +82,7 @@ Each sync pulls **both** and applies them in one transaction per retailer:
 
 Both return `{matched, unmatched[], ambiguous[], unreconciled[]}`, and both write one `credit_sync_runs` row.
 
-**Payload:** one object per ledger — `{ ledger_name, closing, opening, credit_limit?, window_from, window_to, entries: [{date, voucher_type, voucher_no, narration, debit, credit}] }`. Amounts arrive as **rupees**, converted to paise server-side: accept `^-?[0-9]{1,12}(\.[0-9]{1,2})?$` after stripping commas; **a bad amount rejects its row and is reported — never coerced to 0** *(a silently-zeroed balance reads as "this shop is clear", the most dangerous wrong answer available)*. Sign convention: **positive = the retailer owes us**; the agent normalizes Tally's Dr/Cr (see D3b trap 1).
+**Payload:** one object per ledger — `{ ledger_name, closing, opening, window_from, window_to, entries: [{date, voucher_type, voucher_no, narration, debit, credit}] }`. Amounts arrive as **rupees**, converted to paise server-side: accept `^-?[0-9]{1,12}(\.[0-9]{1,2})?$` after stripping commas; **a bad amount rejects its row and is reported — never coerced to 0** *(a silently-zeroed balance reads as "this shop is clear", the most dangerous wrong answer available)*. Sign convention: **positive = the retailer owes us**; the agent normalizes Tally's Dr/Cr (see D3b trap 1).
 
 Set-based, single pass, same CTE shape as `import_stock` — *the 20260719194611 lesson: a per-row loop timed out at 2000 rows; set-based ran 18ms.*
 
@@ -95,7 +94,7 @@ Three calibration items documentation cannot settle — they need one run agains
 
 1. **⚠️ Sign convention — the money trap.** A receivable is a debit and Tally's XML commonly returns it **negative**; integration write-ups state "amount owed is the negation". Guess wrong and every debtor renders as holding an advance. **Verify three shops against Tally's own screen**, then normalize in the agent.
 2. **Filter to Sundry Debtors.** An unfiltered Ledger collection returns banks, GST, expenses, capital — hundreds of rows that would drown the unmatched worklist.
-3. **Credit limit is conditional.** Only present if the office maintains it. Absent → the whole over-limit tier (red rows, Over-limit tab, approval banner) **degrades to balances-only**. That is the designed fallback, not a bug.
+3. ~~Credit limit~~ — **dropped entirely (owner, 2026-07-31).** Not extracted, not stored, not displayed. *Consequence, accepted: there is no over-limit tier at all — no red rows, no "Over limit" filter tab, no headroom column, no approval banner. Credit is reported, never policed. The screens get quieter and the collections signal becomes **days since last receipt** rather than a limit breach.*
 
 **Aging stays v2+:** it needs the `Bills` collection (bill-wise details + due dates) and bill-wise accounting enabled per party — a different query with a different prerequisite.
 
@@ -110,12 +109,12 @@ Three calibration items documentation cannot settle — they need one run agains
 
 ## D5 — Where the balance appears
 
-1. **Retailer picker** (Quick Order + deposit flow) — the balance rides **every row**, as a muted second line under the shop name (owner call): `Sadar Bazar · ₹12,450 due`. Grey by default, **red only when over limit**. `₹0` → **"Clear"**; no credit data → **nothing at all** *(the two must not look identical — "known clear" and "unknown" are different facts)*; negative → **"₹5,000 advance"**. One **"Balances as of …"** line above the list, never per row.
-2. **Order detail** (both lenses) — a retailer band under the header: outstanding · limit · headroom, live, with its as-of, so the admin sees the shop's position on the way to Approve. Over-limit adds a banner naming the gap and what this order adds.
+1. **Retailer picker** (Quick Order + deposit flow) — the balance rides **every row**, as a muted second line under the shop name (owner call): `Sadar Bazar · ₹12,450 due`. Grey throughout — no red state (no limits, D3b). `₹0` → **"Clear"**; no credit data → **nothing at all** *(the two must not look identical — "known clear" and "unknown" are different facts)*; negative → **"₹5,000 advance"**. One **"Balances as of …"** line above the list, never per row.
+2. **Order detail** (both lenses) — a retailer band under the header: outstanding, its as-of, and **days since the last receipt**, live, so the admin sees the shop's position on the way to Approve. *A big balance on a paying shop is business; the same balance on a silent shop is exposure — with limits gone, recency is the signal that carries that difference.*
 3. **Orders list** — nothing per row (noise + a join per row). An "over limit" filter chip is a later candidate.
-4. **Retailers list** — Outstanding / Limit / Headroom columns (desktop), second line (phone), an **Over limit** tab, the book total in the header, and the **sync line** (`618 matched · 3 unmatched · 1 ambiguous`).
+4. **Retailers list** — Outstanding + **last bill / last receipt** columns (desktop), second line (phone), the book total in the header, and the **sync line** (`618 matched · 3 unmatched · 1 ambiguous`).
 5. **Retailer ledger page** — D6.
-6. **Analytics** — receivables total, top debtors, over-limit count. *Unlocks the "outstanding receivables" metric previously listed as impossible.*
+6. **Analytics** — receivables total, top debtors, oldest-unpaid. *Unlocks the "outstanding receivables" metric previously listed as impossible.*
 
 ## D6 — The retailer ledger page
 
@@ -125,7 +124,7 @@ Three calibration items documentation cannot settle — they need one run agains
 
 **Anatomy:**
 - **Header** — name, area, phone (tap-to-call), verified/inactive badges, Edit (staff).
-- **Balance** — outstanding, credit limit, headroom with a traffic light, `as of <time>`. One number, no arithmetic stack (D4 is gone).
+- **Balance** — outstanding and `as of <time>`. One number, no arithmetic stack (D4 is gone), no limit (D3b).
 - **Statement** — the Tally lines: date · voucher type · number · debit · credit · **running balance**, newest first, over the synced window. This *is* the page's centre of gravity.
 - **Stat strip** — from the statement: billed in window, received in window, last invoice, last receipt.
 - **Open in the app** *(reviewer's call, easily cut)* — app orders **not yet billed**, and nothing else. *Rationale: a billed order already appears in the statement as an invoice, so repeating it would double-show the same sale; an unbilled one is the single thing Tally cannot know yet, which makes it additive rather than a competing version of the truth. Everything else app-side stays off this page per the doctrine.*
@@ -146,7 +145,7 @@ Three calibration items documentation cannot settle — they need one run agains
 
 ## D9 — Deliberately out of scope
 
-Aging buckets (needs the Bills collection + bill-wise accounting) · hard-blocking over-limit orders (v1 warns; a block needs a policy and an override path) · editing credit limits in-app (Tally owns them) · auto-matching app deposits to Tally receipts *(amount+date matching is exactly the guessing that produces confident wrong answers)* · interest/penalties · statement PDFs · payment reminders.
+Aging buckets (needs the Bills collection + bill-wise accounting) · **anything limit-based** (dropped, D3b) · auto-matching app deposits to Tally receipts *(amount+date matching is exactly the guessing that produces confident wrong answers)* · interest/penalties · statement PDFs · payment reminders.
 
 ## Acceptance (by execution)
 
@@ -174,8 +173,6 @@ Aging buckets (needs the Bills collection + bill-wise accounting) · hard-blocki
 ## Open questions
 
 1. **Statement window** — 2 months as stated? (Longer = more history and a higher reconcile rate; the balance is correct either way.)
-2. Does Tally give a per-ledger **credit limit**? Decides whether the over-limit tier exists at all.
-3. Salesmen see the **full statement**, or balance-only? (D7)
-4. Keep the "**Open in the app**" section (unbilled orders only), or strip the page to pure Tally?
-5. Over-limit at approval: warn only, or require an explicit "approve anyway"?
-6. Retailers list row-click → the new page (recommended) or keep today's edit modal?
+2. Salesmen see the **full statement**, or balance-only? (D7)
+3. Keep the "**Open in the app**" section (unbilled orders only), or strip the page to pure Tally?
+4. Retailers list row-click → the new page (recommended) or keep today's edit modal?
