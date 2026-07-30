@@ -111,7 +111,7 @@ Three calibration items documentation cannot settle — they need one run agains
 
 1. **Retailer picker** (Quick Order + deposit flow) — the balance rides **every row**, as a muted second line under the shop name (owner call): `Sadar Bazar · ₹12,450 due`. Grey throughout — no red state (no limits, D3b). `₹0` → **"Clear"**; no credit data → **nothing at all** *(the two must not look identical — "known clear" and "unknown" are different facts)*; negative → **"₹5,000 advance"**. One **"Balances as of …"** line above the list, never per row.
 2. **Order detail** (both lenses) — a retailer band under the header: outstanding, its as-of, and **days since the last receipt**, live, so the admin sees the shop's position on the way to Approve. *A big balance on a paying shop is business; the same balance on a silent shop is exposure — with limits gone, recency is the signal that carries that difference.*
-3. **Orders list** — nothing per row (noise + a join per row). An "over limit" filter chip is a later candidate.
+3. **Orders list** — nothing per row (noise + a join per row).
 4. **Retailers list** — Outstanding + **last bill / last receipt** columns (desktop), second line (phone), the book total in the header, and the **sync line** (`618 matched · 3 unmatched · 1 ambiguous`).
 5. **Retailer ledger page** — D6.
 6. **Analytics** — receivables total, top debtors, oldest-unpaid. *Unlocks the "outstanding receivables" metric previously listed as impossible.*
