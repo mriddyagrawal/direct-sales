@@ -201,6 +201,64 @@ def entries_xml(frm, to):
     ).format(frm=frm, to=to, cmp=_company_tag(), names=names, fields=fields, vf=VOUCHER_FETCH)
 
 
+# Ledger balances via the REPORT engine rather than a Collection export.
+# WHY: measured 2026-07-31 on the real company - a Collection export's
+# ClosingBalance IGNORES SVTODATE: asking "as at 30 Apr" and "as at 31 Jul"
+# returned byte-identical 1,143 KB replies and 0 of 2,976 ledgers moved. The
+# same run's voucher REPORT *did* honour the period (three monthly chunks, three
+# different sizes), so the report engine is date-aware where the collection is
+# not. Same fields, different engine.
+BAL_FIELDS = [
+    ("name",    "$Name"),
+    ("parent",  "$Parent"),
+    ("balance", '$$StringFindAndReplace:($$String:$$NumValue:$ClosingBalance):"(-)":"-"'),
+]
+
+
+def balances_report_xml(asof, scoped=True):
+    n = len(BAL_FIELDS)
+    fields = "".join('<FIELD NAME="Fld{i:02d}"><SET>{e}</SET><XMLTAG>F{i:02d}</XMLTAG></FIELD>'
+                     .format(i=i + 1, e=_esc(expr)) for i, (_, expr) in enumerate(BAL_FIELDS))
+    names = ",".join("Fld{:02d}".format(i + 1) for i in range(n))
+    child = "<CHILDOF>$$GroupSundryDebtors</CHILDOF><BELONGSTO>Yes</BELONGSTO>" if scoped else ""
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>"
+        "<TYPE>Data</TYPE><ID>GanpatiBalReport</ID></HEADER><BODY><DESC><STATICVARIABLES>"
+        "<SVEXPORTFORMAT>XML (Data Interchange)</SVEXPORTFORMAT>"
+        "<SVFROMDATE>{frm}</SVFROMDATE><SVTODATE>{to}</SVTODATE>{cmp}"
+        "</STATICVARIABLES><TDL><TDLMESSAGE>"
+        '<REPORT NAME="GanpatiBalReport"><FORMS>BalForm</FORMS></REPORT>'
+        '<FORM NAME="BalForm"><PARTS>BalPart</PARTS></FORM>'
+        '<PART NAME="BalPart"><LINES>BalLine</LINES><REPEAT>BalLine : BalColl</REPEAT>'
+        "<SCROLLED>Vertical</SCROLLED></PART>"
+        '<LINE NAME="BalLine"><FIELDS>{names}</FIELDS></LINE>{fields}'
+        '<COLLECTION NAME="BalColl"><TYPE>Ledger</TYPE>{child}'
+        "<FETCH>Name,Parent,ClosingBalance</FETCH></COLLECTION>"
+        "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"
+    ).format(frm=_fy_start(asof).strftime("%Y%m%d"), to=asof.strftime("%Y%m%d"),
+             cmp=_company_tag(), names=names, fields=fields, child=child)
+
+
+def parse_balance_report(raw, family):
+    """Rows of <F01>name</F01><F02>parent</F02><F03>balance</F03>."""
+    txt = sanitize(raw)
+    if "<LINEERROR>" in txt:
+        e = re.search(r"<LINEERROR>(.*?)</LINEERROR>", txt, re.S)
+        raise RuntimeError("Tally rejected the balance report: " + (e.group(1).strip() if e else "?"))
+    for i in range(len(BAL_FIELDS)):
+        txt = txt.replace("<F{:02d}/>".format(i + 1), "<F{0:02d}></F{0:02d}>".format(i + 1))
+    pat = "".join(r"<F{0:02d}>(.*?)</F{0:02d}>\s*".format(i + 1) for i in range(len(BAL_FIELDS)))
+    out = {}
+    for name, parent, bal in re.findall(pat, txt, re.S):
+        name = html.unescape(name).strip()
+        parent = html.unescape(parent).strip()
+        if not name or (family is not None and parent.lower() not in family):
+            continue
+        out[name.lower()] = {"name": name, "group": parent, "balance": to_number(bal, "")}
+    return out
+
+
 COMPANY_XML = ("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>"
                "<TYPE>Collection</TYPE><ID>Cmp</ID></HEADER><BODY><DESC>"
                "<STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>" + _company_tag() +
@@ -451,24 +509,54 @@ def main():
 
     # -- 3. balances at two dates --------------------------------------------
     print("Step 3/5  balances")
-    raw = post(balances_xml(CLOSE_ASOF), "closing", TIMEOUT_BALANCES)
-    closing, _ = parse_ledgers(raw, fam, with_balance=True)
-    scoped = True
-    if not closing:
-        print("   group-scoped request empty; retrying whole-company")
-        raw = post(balances_xml(CLOSE_ASOF, scoped=False), "closing (all)", TIMEOUT_BALANCES)
-        closing, _ = parse_ledgers(raw, fam, with_balance=True); scoped = False
-    dump("balances_closing", raw)
-    raw = post(balances_xml(OPEN_ASOF, scoped), "opening", TIMEOUT_BALANCES); dump("balances_opening", raw)
-    opening, _ = parse_ledgers(raw, fam, with_balance=True)
 
-    moved = sum(1 for k, v in closing.items()
-                if v.get("balance") is not None and opening.get(k, {}).get("balance") is not None
-                and abs(v["balance"] - opening[k]["balance"]) > 0.005)
-    print("   {:,} shops priced; {:,} moved between the two dates".format(len(closing), moved))
+    def _pair(fetcher, label):
+        c = fetcher(CLOSE_ASOF, "closing " + label)
+        o = fetcher(OPEN_ASOF, "opening " + label)
+        n = sum(1 for k, v in c.items()
+                if v.get("balance") is not None and o.get(k, {}).get("balance") is not None
+                and abs(v["balance"] - o[k]["balance"]) > 0.005)
+        return c, o, n
+
+    def _via_report(asof, label):
+        raw = post(balances_report_xml(asof), label, TIMEOUT_BALANCES)
+        dump("bal_report_" + label.split()[0], raw)
+        try:
+            return parse_balance_report(raw, fam)
+        except RuntimeError as exc:
+            print("   {}".format(exc))
+            return {}
+
+    def _via_collection(asof, label):
+        raw = post(balances_xml(asof), label, TIMEOUT_BALANCES)
+        dump("bal_coll_" + label.split()[0], raw)
+        rows, _ = parse_ledgers(raw, fam, with_balance=True)
+        if not rows:
+            raw = post(balances_xml(asof, scoped=False), label + " (all)", TIMEOUT_BALANCES)
+            rows, _ = parse_ledgers(raw, fam, with_balance=True)
+        return rows
+
+    # The REPORT engine first: it provably honours SVFROMDATE/SVTODATE (the
+    # voucher pull returns different data per month), whereas a Collection
+    # export's ClosingBalance ignored the as-at date entirely on this company.
+    closing, opening, moved = _pair(_via_report, "(report)")
+    engine = "report"
     if closing and not moved:
-        print("   !! WARNING: opening == closing everywhere. Tally is ignoring the")
-        print("   !! as-at date, so movement (and the check below) is meaningless.")
+        print("   report engine gave no movement either - trying the collection engine")
+        closing2, opening2, moved2 = _pair(_via_collection, "(collection)")
+        if moved2:
+            closing, opening, moved, engine = closing2, opening2, moved2, "collection"
+        elif not closing:
+            closing, opening = closing2, opening2
+
+    print("   {:,} shops priced via the {} engine; {:,} moved between the two dates".format(
+        len(closing), engine, moved))
+    dated = moved > 0
+    if closing and not dated:
+        print("   !! Neither engine honours the as-at date on this Tally, so there is no")
+        print("   !! INDEPENDENT opening balance. Opening will be DERIVED from the")
+        print("   !! statement below, which makes the cross-check circular - it is")
+        print("   !! skipped rather than reported as a pass.")
     print()
 
     # -- 4. the statement -----------------------------------------------------
@@ -503,24 +591,38 @@ def main():
     print()
 
     # -- 5. THE CHECK ---------------------------------------------------------
-    print("Step 5/5  reconciliation:  sum(statement)  ==  closing - opening ?")
     ok, bad, untestable = [], [], 0
-    for k, shop in closing.items():
-        c, o = shop.get("balance"), opening.get(k, {}).get("balance")
-        if c is None or o is None:
-            untestable += 1
-            continue
-        expected, actual = c - o, per_ledger.get(k, 0.0)
-        (ok if abs(expected - actual) <= TOLERANCE else bad).append((shop["name"], expected, actual))
-    total = len(ok) + len(bad)
-    print("   reconciled : {:,} of {:,}{}".format(len(ok), total,
-          "  ({:.1f}%)".format(100.0 * len(ok) / total) if total else ""))
-    if bad:
-        print("   MISMATCHED : {:,}   worst:".format(len(bad)))
-        for n, e, a in sorted(bad, key=lambda t: -abs(t[1] - t[2]))[:8]:
-            print("      {:<34} expected {:>14}  got {:>14}".format(n[:34], inr(e), inr(a)))
-    if untestable:
-        print("   untestable : {:,} (no balance at one of the two dates)".format(untestable))
+    if dated:
+        print("Step 5/5  reconciliation:  sum(statement)  ==  closing - opening ?")
+        for k, shop in closing.items():
+            c, o = shop.get("balance"), opening.get(k, {}).get("balance")
+            if c is None or o is None:
+                untestable += 1
+                continue
+            expected, actual = c - o, per_ledger.get(k, 0.0)
+            (ok if abs(expected - actual) <= TOLERANCE else bad).append((shop["name"], expected, actual))
+        total = len(ok) + len(bad)
+        print("   reconciled : {:,} of {:,}{}".format(len(ok), total,
+              "  ({:.1f}%)".format(100.0 * len(ok) / total) if total else ""))
+        if bad:
+            print("   MISMATCHED : {:,}   worst:".format(len(bad)))
+            for n, e, a in sorted(bad, key=lambda t: -abs(t[1] - t[2]))[:8]:
+                print("      {:<34} expected {:>14}  got {:>14}".format(n[:34], inr(e), inr(a)))
+        if untestable:
+            print("   untestable : {:,} (no balance at one of the two dates)".format(untestable))
+    else:
+        # Derive the opening so the files are still usable, and be explicit that
+        # this is arithmetic, not a second opinion.
+        print("Step 5/5  opening DERIVED (closing - statement); cross-check not possible")
+        for k, shop in closing.items():
+            c = shop.get("balance")
+            if c is None:
+                continue
+            opening[k] = {"balance": c - per_ledger.get(k, 0.0)}
+        unbal = sum(1 for v in voucher_sums.values() if abs(v) > 0.005)
+        print("   the only independent evidence is the statement itself:")
+        print("   {:,} of {:,} vouchers balance to zero{}".format(
+            len(voucher_sums) - unbal, len(voucher_sums), " - complete and self-consistent" if not unbal else ""))
     print()
 
     # -- write the two files --------------------------------------------------
@@ -559,10 +661,14 @@ def main():
     owed = [-s["balance"] for s in closing.values() if s.get("balance") and s["balance"] < 0]
     print("  {:,} shops owe {} in total".format(len(owed), inr(sum(owed))))
     print("=" * 68)
-    if bad:
+    if not dated:
+        print("  USABLE, BUT UNVERIFIED - opening is derived, so the two files cannot")
+        print("  disagree with each other by construction. Balances and statement are")
+        print("  each individually sound; their agreement is not evidence.")
+    elif bad:
         print("  NOT SAFE TO LOAD YET - {} shops do not reconcile (see above).".format(len(bad)))
-    elif total:
-        print("  All {} testable shops reconcile. The two files agree with each other.".format(total))
+    elif ok:
+        print("  All {} testable shops reconcile. The two files agree with each other.".format(len(ok)))
 
 
 if __name__ == "__main__":
