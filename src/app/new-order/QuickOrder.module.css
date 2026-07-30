@@ -166,6 +166,17 @@
   margin-top: 0;
 }
 
+/* The order's own lines, pinned above the catalog (owner 2026-07-26). Same
+   structural shape as a category header — so it inherits the sticky mechanics,
+   full-bleed insets and z-index instead of re-litigating them — set apart by a
+   light accent wash (a shade under the in-cart row blue) and a solid accent
+   rule in place of the hairline. */
+.pinnedHeader {
+  background: #eff6ff;
+  border-bottom: 2px solid var(--color-accent);
+  font-weight: 700;
+}
+
 .productRow {
   display: flex;
   align-items: center;
