@@ -5629,3 +5629,57 @@ The ONE approved DB object, exactly as specced: user FK cascade, `endpoint` uniq
 **Still owed (build-order commit 4, not code):** the real-device acceptance pass — iPhone long-press second page, clear-on-open behavior on iOS, live cross-salesman isolation spot-check, TTL-expiry check, and the deep-link tap on iOS (see faf6593 note).
 
 **Open flags (cumulative):** 🟡 ㊹ (traffic-light confirm) · ㊷ ㉛ ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ carried · browse/catalog payload dedupe → Bajaj pass · NEW: ㊺ stock-flag-on-null (notify fn, next touch) · ㊻ R6 on visibility-return + iOS navigate fallback (acceptance-dependent).
+
+## Review of 970dbf3 — feat(new-order): pin the order's own lines to the top of the item picker
+
+**Verdict:** ✅ accept
+
+**Goal:** editing an order (or resuming a draft) opened on an A–Z catalog with the order's own lines scattered through it; they now render first under an "In this order" header, already expanded.
+
+**What works (verified):**
+- [QuickOrder.tsx](src/app/new-order/QuickOrder.tsx) — `pinnedIds` is a **mount-fixed** `useState` initializer, not a live derivation. That's the right call and the reasoning in the commit message is sound: a live set would re-sort a row out from under the finger that just tapped `+`. `expandedIds` now seeds from the same set — one source of truth instead of two parallel `Object.keys(items)` walks.
+- `visible` **excludes** pinned ids, so the browse list and the pinned block partition the catalog. I proved the invariants with a Node harness replicating the filter logic — 16/16 assertions pass: pinned ∩ visible = ∅ (no product renders twice), pinned ∪ visible = everything in scope (so the "N of M products" meta stays honest), pinned obeys the same search + brand-lock scope as browse, pinned sorts A→Z, and a qty→0 line stays pinned.
+- **The empty-state bug this closes is real and was worth fixing:** a search matching *only* an order line previously rendered "No products match" directly above the matching row (`visible.length === 0` alone). Harness CASE 2 confirms the new `visible.length === 0 && pinnedProducts.length === 0` gate suppresses it and the meta reads "1 of 4".
+- **Fresh create is genuinely untouched** — empty cart ⇒ empty pinned set ⇒ the old screen exactly (harness CASE 5). The claim in the commit message holds.
+- **No double-render against the `unavailable` block:** `unavailable` is built from cart ids **not** in `catalogIds` ([QuickOrder.tsx:176](src/app/new-order/QuickOrder.tsx#L176)) while `pinnedProducts` filters ids that **are** in `products` — disjoint by construction, so every cart line appears exactly once.
+- `.pinnedHeader` reuses `.categoryHeader` for the sticky/full-bleed/z-index mechanics rather than re-deriving them — the right instinct given how much sticky pain this repo has already paid for.
+- tsc + eslint + `npm run build` clean at the tip.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+1. An order whose product has since gone inactive/unpriced now has its lines **split across two headers** — the live ones under "In this order", the dead one under the `unavailable` block further down. Conceptually both are "in this order". Cosmetic; worth a thought only if an owner trips on it.
+2. `.pinnedHeader { background: #eff6ff }` is a **raw hex** two lines above a `var(--color-accent)` — minor drift from the file's own token convention. A `--color-accent-wash` token would keep dark-mode/theming honest later.
+
+## Review of 4897842 — Merge feat/edit-order-pinned-lines
+
+**Verdict:** ✅ accept — clean promote, no resolution damage; tip builds.
+
+## Review of aed4c07 — perf(orders): prefetch the order detail route so the skeleton paints on tap
+
+**Verdict:** ⚠️ accept-with-followups (nothing blocking; the followups are verification + a request-volume watch)
+
+**Goal:** tapping an order sat on the list for the ~300 ms server round-trip with no skeleton, because rows navigated by `router.push` and Next therefore never prefetched them.
+
+**What works (verified):**
+- Phone card `<button onClick={router.push}>` → real `<Link href>`; `Link` is imported ([OrdersView.tsx:5](src/components/orders/OrdersView.tsx#L5)). Next prefetches the detail route's **loading boundary** as a card enters the viewport, so the tap paints the existing skeleton immediately. For a dynamic route only that boundary is prefetched — the order's data is not, which is exactly what we want given the money-screen rules.
+- **Nested-interactive check passed:** grepped the card's children — eyebrow/status/main/meta/admin-note are all non-interactive elements, so the anchor wraps legal content. The a11y gain is real too: long-press, open-in-new-tab and middle-click come back, and screen readers announce a link rather than a button.
+- Desktop `<tr>` correctly does **not** become an anchor (HTML forbids it) and instead warms the route on the `onMouseEnter` it already had for the keyboard cursor — no new event surface, and Next dedupes repeat prefetches of the same href.
+- **The BackLink/nav-mirror interaction is safe, as claimed:** `<Link>` navigates via the same `history.pushState` path as `router.push`, so `AuthCacheGuard`'s pathname-driven mirror records identically and `previousPathname()` still decides true-back correctly. Nothing in the back-cycle fix keys on *how* the navigation was triggered.
+- `.card` gains `color: inherit` + `text-decoration: none` — right, since it's an `<a>` now.
+- tsc + eslint + `npm run build` clean.
+- **Commit-message hygiene: exemplary.** The builder self-corrected a wrong claim from an earlier draft (a save-data/slow-connection guard that does not exist in the docs) *inside the message*, and stated plainly that this is unverified in a browser. That is precisely the standard this log exists to enforce.
+
+**Blocking issues:** None.
+
+**Non-blocking followups (flags ㊼, ㊽):**
+1. **㊼ — Not verified in a browser, and cannot be locally: Next prefetching is production-only.** Neither the builder nor I can prove the felt behaviour on localhost. This needs one eyeball on the deployed build: tap a row on the phone and confirm the skeleton paints instantly rather than after ~300 ms.
+2. **㊽ — Viewport prefetch fans out per row.** The list is capped at 300 orders, so scrolling the whole thing can spend up to ~300 small requests, with no documented save-data guard. Harmless at today's volumes on wifi; worth watching for a salesman on a weak rural connection. The builder already named the remedy (`prefetch={false}` + manual `router.prefetch` on `pointerdown`, mirroring the desktop hover-intent model) — no action now, just don't lose the note.
+
+## Review of b4e8724 — Merge feat/orders-row-prefetch
+
+**Verdict:** ✅ accept — clean promote; tip compiles, lints and builds.
+
+*(3ddd665 — the ANALYTICS AGENT prompt — is my own planner-side commit, not builder code; not self-reviewed.)*
+
+**Open flags (cumulative):** 🟡 ㊹ traffic-light confirm · ㊺ notify's ⚠️ stock flag fires on NULL stock_at_order (LG cards over-flag; one-char fix, MCP now reconnected so it's unblocked) · ㊻ R6 clear-on-open runs on mount only + iOS `WindowClient.navigate` fallback · **NEW ㊼ prefetch unverified on prod** · **NEW ㊽ per-row prefetch fan-out on long lists** · ㊷ ㉛ ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ carried · browse/catalog payload dedupe → Bajaj perf pass. Still owed: notifications real-device acceptance pass (build-order commit 4).
