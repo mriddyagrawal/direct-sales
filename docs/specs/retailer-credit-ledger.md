@@ -22,6 +22,20 @@ An app order is a capture, not a sale; an app deposit is a field record, not a r
 | 80 retailers have app orders; 8 app deposits exist | Irrelevant to the ledger now, by doctrine — but it means ledger pages are mostly sparse |
 | Money is integer paise everywhere | Tally's rupee decimals convert on the way in (D3) |
 
+**Calibration run completed 2026-07-31** — the extractor ran against the real company and settled every open assumption:
+
+| Measured | Result |
+|---|---|
+| Tally ledgers / under the Sundry Debtors tree | 3,561 / **2,976** (shops sit in ~140 beat sub-groups, up to 4 levels deep) |
+| App retailers matching a Tally ledger | **592 of 598 (99.0%)** on the normalised key — the match design holds |
+| The 6 non-matches | 2 test fixtures + **4 spelling variants whose Tally counterpart was found** (`[shop redacted]`→`[shop redacted]`, `… (Rm)`→`… (Rm) NET`, `[SHOP REDACTED]`→`[SHOP REDACTED] LG`, `[shop redacted]`→`[shop redacted]`) — zero shops genuinely absent |
+| **Sign convention** | **CONFIRMED: a receivable exports NEGATIVE.** Flip on the way in. Owner verified two ledgers against Tally's screen |
+| Balances for 2,976 ledgers | **0.5 s** — the daily sync is effectively free |
+| Coverage of the app's shops | 249 owe ₹[amount redacted] · 35 hold advances · 305 exactly zero · 2 no figure |
+| Share of the whole debtors book | ~⅔ (₹1.17 cr of ₹1.77 cr); the rest is non-shop ledgers |
+
+Full per-shop listing for the owner: [tally-retailer-balances-2026-07-31.md](../tally-retailer-balances-2026-07-31.md).
+
 ## D1 — Three tables
 
 **Why the balance is stored, not computed.** Tally's closing balance covers the account's entire history. Our statement window (2 months) does not. A shop whose oldest unpaid bill predates the window would have `sum(entries) ≠ balance` — so **deriving the balance from the entries is structurally wrong**, and would be wrong *silently*. We store what Tally computes and use the entries for display only.
@@ -64,7 +78,9 @@ Key = `lower(regexp_replace(btrim(coalesce(nullif(btrim(tally_ledger_name),''), 
 
 **Ambiguity rule:** a key matching more than one retailer updates **nothing** and is reported in an `ambiguous` bucket. *Verified 2026-07-30: `import_stock`'s `UPDATE … FROM` writes to every row sharing a key — for a quantity that's wrong, for money it double-posts. `UNIQUE (brand_id, tally_name)` is case-sensitive and cross-brand-blind; retailers have no name constraint at all and one live duplicate.*
 
-**Pre-sync cleanup (awaiting owner go):** Tally enforces unique ledger names, so all collisions are app-side. The one live collision is a ghost+real pair of the same shop — `[shop redacted]` from the 2026-07-07 bulk import (no area/phone, **0 orders**) and the 2026-07-23 field entry (area Dipka, phone [phone redacted], **1 order**). Deactivating the ghost orphans nothing.
+**⚠️ Correction (measured 2026-07-31): Tally's ledger-name uniqueness is CASE-SENSITIVE**, so collisions are *not* only app-side as v1 claimed. The real export contains `[shop redacted]` (RETAIL DEBTORS, owes ₹[amount redacted]) *and* `[SHOP REDACTED]` (Sundry Debtors, no balance) — one app shop, two ledgers. The ambiguity rule therefore protects against duplicates on **both** sides, and it earns its place from day one rather than hypothetically.
+
+**Pre-sync cleanup (awaiting owner go):** The one live collision is a ghost+real pair of the same shop — `[shop redacted]` from the 2026-07-07 bulk import (no area/phone, **0 orders**) and the 2026-07-23 field entry (area Dipka, phone [phone redacted], **1 order**). Deactivating the ghost orphans nothing.
 
 ## D3 — Ingestion: one run, two pulls, wholesale replace
 
