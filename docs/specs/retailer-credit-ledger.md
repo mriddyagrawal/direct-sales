@@ -79,7 +79,19 @@ Rule: the "collected since" line counts **only non-voided deposits created after
 
 ## D5 — Placement map (where credit shows up)
 
-1. **Retailer picker** (Quick Order + deposit flow) — *not* a balance on all 622 rows (that turns a picker into a debt list and needs a join on every keystroke). Instead: once a retailer is chosen, the confirmation card carries the money band, and **over-limit raises a warning banner at the moment of commitment**.
+1. **Retailer picker** (Quick Order + deposit flow) — **the balance rides every row**, as a secondary muted line under the shop name (owner call 2026-07-30, overriding this spec's earlier "confirmation card only" recommendation — *the salesman standing in the shop is exactly who the number is for, and hiding it until commitment is one tap too late*). The row goes two-line, matching the Products page grammar:
+
+   ```
+   Sharma Electronics                    NEW
+   Sadar Bazar · ₹12,450 due
+   ```
+
+   - Second line uses the existing `--color-locked` @ 12px (today's `.retailerMeta` token) — thin and grey, **red only when over the credit limit**; nothing else is colourised.
+   - `₹0` renders **"Clear"**; a retailer with **no credit data at all renders nothing** — *the two states must not look identical: "we know they're clear" and "we know nothing" are different facts.*
+   - Negative balance renders **"₹5,000 advance"**.
+   - No per-row timestamp (noise ×622); one **"Balances as of …"** line sits above the list, and the chosen retailer's confirmation card still carries the full D4 arithmetic + the over-limit banner.
+   - Same treatment in the **deposit flow's** picker — arguably the highest-value placement, since that screen exists to collect the money.
+   - Plumbing: a separate `["retailer-credit"]` query merged client-side by `retailer_id`, **not** folded into the shared `["retailers"]` superset — keeps money on its own cache key (D1's reasoning) while still being one bounded fetch of ~622 rows.
 2. **Order detail** — a "Retailer" band under the header: outstanding · limit · headroom, **live (not snapshotted)** with its as-of, so the admin sees it immediately before Approve. *Live beats a snapshot here because the number informs a decision being made now; it is reference, not part of the order's money math, so the immutable-snapshot law doesn't apply. (Snapshotting `retailer_outstanding_at_order` for audit is a v2 option, not v1.)*
 3. **Orders list** — nothing per row (noise + a join per row). An "over limit" filter chip is a v2 candidate.
 4. **Retailers list** — Outstanding as a sortable desktop column / second line on phone rows, plus a new **"Over limit"** filter tab beside all/pending/verified/deactivated, and a "Last sync … · N matched · N unmatched" line (D8).
@@ -104,12 +116,11 @@ Row-click on the Retailers list should open the **page**, with **Edit** in the p
 - **Actions** — "New order for this retailer" and "Record deposit" (both prefilled deep links).
 - **Empty states** — the common case: 542 retailers have never ordered.
 
-## D7 — Visibility (⚠️ owner decision)
+## D7 — Visibility: **DECIDED — every salesman sees every retailer's outstanding** (owner, 2026-07-30)
 
-- **Option A (recommended):** salesmen see outstanding — collection is their job and the number changes what they do in the shop. The orders/deposits sections stay RLS-scoped to their own rows and are **labelled** "your orders" / "your collections" so a partial history is never mistaken for the whole one.
-- **Option B:** outstanding is staff-only; the salesman's page shows contact + his own history.
+`retailer_credit` gets a SELECT policy for all active profiles, mirroring `retailers_select_salesman` (which already exposes every active retailer to every salesman). *Collection is the salesman's job; the number changes what he does in the shop.*
 
-*Either way D1's separate table is what makes the choice implementable — and reversible.*
+Unchanged by this: the ledger page's **orders and deposits sections stay RLS-scoped** to the viewer — a salesman sees his own orders and his own collections, so those sections must be **labelled** ("your orders" / "your collections") or a partial history reads as the whole one. Balance = shared truth; history = your slice.
 
 ## D8 — Sync audit
 
@@ -147,9 +158,8 @@ Named so they're decisions, not oversights: **aging buckets** (0–30/31–60/61
 
 ## Open questions for the owner
 
-1. Does Tally give a per-ledger **credit limit**, or only the balance? (Limit-dependent UI degrades gracefully to headroom-unknown.)
-2. **D7**: salesmen see outstanding (A) or staff-only (B)?
-3. Over-limit at approval: warn only, or require an explicit "approve anyway"?
-4. Retailers list row-click → the new page (recommended) or keep today's edit modal?
-5. Same VPS agent/cron as stock (one run, two reports) or a separate job?
-6. **What does the Tally export actually look like** — columns, headers, Dr/Cr, one file or a report? The parser gets shaped to the real file, not a guess.
+1. Does Tally give a per-ledger **credit limit**, or only the balance? (Limit-dependent UI degrades gracefully to headroom-unknown. **This now also decides whether the picker's red-when-over-limit state can exist at all.**)
+2. Over-limit at approval: warn only, or require an explicit "approve anyway"?
+3. Retailers list row-click → the new page (recommended) or keep today's edit modal?
+4. Same VPS agent/cron as stock (one run, two reports) or a separate job?
+5. **What does the Tally export actually look like** — columns, headers, Dr/Cr, one file or a report? The parser gets shaped to the real file, not a guess.
