@@ -35,13 +35,17 @@ One row per retailer, replaced wholesale each sync. **Absolute balances, never d
 
 ## D2 — Match key + the ambiguity rule
 
-Key = `lower(btrim(coalesce(nullif(btrim(tally_ledger_name),''), name)))`, with a functional index mirroring `products_tally_lower_idx`.
+Key = `lower(regexp_replace(btrim(coalesce(nullif(btrim(tally_ledger_name),''), name)), '\s+', ' ', 'g'))`, with a functional index mirroring `products_tally_lower_idx`.
+
+*Whitespace is collapsed, not just trimmed — measured 2026-07-30: **6 retailer names carry internal double spaces**, which would silently miss a Tally name spelled with single spaces. Collapsing fixes all six and adds **zero** new collisions (still exactly the one known pair). Punctuation is deliberately **not** stripped: today it would also add zero collisions, but it buys nothing and risks merging genuinely different shops later.*
 
 *Reason: today every retailer's Tally identity IS its `name` (the column meant for it is empty). `tally_ledger_name` stays the escape hatch: once set on a row, it wins — so a shop can be renamed in the app without breaking the sync, and a Tally-side rename is fixed by filling one field instead of editing the shop's display name.*
 
 **Ambiguity rule (this is the money-safety rule):** if a payload key matches **more than one** retailer, update **neither**, and report the key in a third bucket, `ambiguous`. Retailers get this stricter contract; the one known duplicate today lands in the bucket on day one, which is exactly how it gets fixed.
 
 *Verified 2026-07-30 (not previously documented anywhere — established by execution, since the stock behaviour was only ever implied by its SQL): `import_stock`'s `UPDATE … FROM` join matches **every** row sharing the key, so a duplicate `tally_name` writes the same qty to all of them and reports them as N matched. `UNIQUE (brand_id, tally_name)` only blocks **exact** duplicates within a brand — it is case/whitespace-sensitive while the import key is `lower(btrim(...))`, and it does not constrain across brands at all. Live catalog today: **0 duplicate keys across ~1390 products**, so this is latent, not active. Because Tally's own item names are unique, a shared `tally_name` means one product is mismapped and would inherit a **phantom stock figure** — so `import_stock` should adopt this same ambiguity rule (report, update neither) as a small follow-up. Retailers have **no** name constraint at all and one live duplicate, which is why the rule is mandatory here from day one.*
+
+**Pre-sync cleanup (identified 2026-07-30, awaiting owner go):** Tally enforces unique ledger names, so every collision is app-side. The single live collision is a **ghost + real pair of the same shop**: `[shop redacted]` exists twice — one row from the 2026-07-07 bulk import (no area, no phone, **0 orders, 0 deposits**) and one created 2026-07-23 with area Dipka, phone [phone redacted] and **1 order**. Deactivating the ghost row orphans nothing and clears the ambiguity before the first sync. One-row prod change → owner approval required.
 
 ## D3 — Ingestion: two paths, mirroring stock exactly
 
