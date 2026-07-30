@@ -211,7 +211,12 @@ def entries_xml(frm, to):
 BAL_FIELDS = [
     ("name",    "$Name"),
     ("parent",  "$Parent"),
-    ("balance", '$$StringFindAndReplace:($$String:$$NumValue:$ClosingBalance):"(-)":"-"'),
+    # NO $$String: wrapper. $$String:$$NumValue:... evaluates to NOTHING in TDL -
+    # the same mistake cost the other session a whole debugging round on the
+    # amount field, and I reintroduced it here. The raw column sits beside it so
+    # a repeat failure is visible in the file instead of silently becoming 0.
+    ("balance", '$$StringFindAndReplace:($$NumValue:$ClosingBalance):"(-)":"-"'),
+    ("balance_raw", "$ClosingBalance"),
 ]
 
 
@@ -250,12 +255,21 @@ def parse_balance_report(raw, family):
         txt = txt.replace("<F{:02d}/>".format(i + 1), "<F{0:02d}></F{0:02d}>".format(i + 1))
     pat = "".join(r"<F{0:02d}>(.*?)</F{0:02d}>\s*".format(i + 1) for i in range(len(BAL_FIELDS)))
     out = {}
-    for name, parent, bal in re.findall(pat, txt, re.S):
+    empties = 0
+    for name, parent, bal, bal_raw in re.findall(pat, txt, re.S):
         name = html.unescape(name).strip()
         parent = html.unescape(parent).strip()
         if not name or (family is not None and parent.lower() not in family):
             continue
-        out[name.lower()] = {"name": name, "group": parent, "balance": to_number(bal, "")}
+        val = to_number(bal, html.unescape(bal_raw))
+        if val is None:
+            empties += 1
+        out[name.lower()] = {"name": name, "group": parent, "balance": val}
+    if out and empties == len(out):
+        # every balance unreadable means the field expression is wrong, not that
+        # the shops are all square. Say so instead of returning a page of zeros.
+        raise RuntimeError("balance report gave {} rows but NO readable balances "
+                           "- field expression is wrong".format(len(out)))
     return out
 
 
