@@ -69,12 +69,21 @@ export function QuickOrder({
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("all"); // "all" | brand_id
   const [keypadProductId, setKeypadProductId] = useState<string | null>(null);
-  // Per-row collapse state (a Set, NOT an accordion — several rows open at
-  // once). Seeded ONCE from in-cart lines so drafts/in-cart lines show their
-  // controls without a tap.
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+  // The lines this screen OPENED with — decided once at mount and never again
+  // while you're on it (owner 2026-07-26). They render pinned at the top so an
+  // edit doesn't begin with a scroll-hunt through the whole catalog.
+  // Deliberately NOT live: a live set would yank a row out from under the
+  // finger that just tapped + on it. Leaving for Review unmounts this screen,
+  // so returning re-decides the set from the cart as it stands then.
+  // Ordinary screen state — nothing written to the device, nothing persisted.
+  // (NOT the money "snapshot" sense of order_items/snapshotPrices.)
+  const [pinnedIds] = useState<Set<string>>(
     () => new Set(Object.keys(items).filter((id) => (items[id] ?? 0) > 0)),
   );
+  // Per-row collapse state (a Set, NOT an accordion — several rows open at
+  // once). Seeded from the same pinned set, so in-cart lines show their
+  // controls without a tap.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(pinnedIds));
   // Local text buffer for manual price inputs (keeps "45." mid-type); the
   // committed paise value lives in the parent cart via onChangePrice.
   const [priceText, setPriceText] = useState<Record<string, string>>({});
@@ -129,12 +138,28 @@ export function QuickOrder({
     normalize(p.category).includes(q) ||
     normalize(p.brand_name).includes(q) ||
     normalize(p.tally_name).includes(q);
+  const inBrowseScope = (p: ProductOption) =>
+    matchesSearch(p) && (effectiveBrand === null || p.brand_id === effectiveBrand);
+  // The browse list EXCLUDES pinned lines, so every product renders exactly
+  // once and the category counts below stay honest (a category whose only
+  // items are pinned simply doesn't appear).
   const visible = useMemo(
-    () => products.filter((p) => matchesSearch(p) && (effectiveBrand === null || p.brand_id === effectiveBrand)),
+    () => products.filter((p) => !pinnedIds.has(p.id) && inBrowseScope(p)),
     // matchesSearch depends only on `q` (listed); effectiveBrand carries the
-    // brand-filter/cart-lock scope.
+    // brand-filter/cart-lock scope; pinnedIds is fixed for this screen's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [products, q, effectiveBrand],
+    [products, q, effectiveBrand, pinnedIds],
+  );
+  // Pinned lines obey the SAME search/brand scope as the browse list — a
+  // search that hides everything must hide these too, or the "N of M" count
+  // would contradict the screen. A→Z like every other group.
+  const pinnedProducts = useMemo(
+    () =>
+      products
+        .filter((p) => pinnedIds.has(p.id) && inBrowseScope(p))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, q, effectiveBrand, pinnedIds],
   );
 
   // Stock-first grouping (shared util, byte-identical to b5e446f).
@@ -327,7 +352,7 @@ export function QuickOrder({
         </div>
         {q !== "" && (
           <span className={styles.resultMeta}>
-            {visible.length} of {products.length} products
+            {visible.length + pinnedProducts.length} of {products.length} products
           </span>
         )}
         {multiBrand && locked && (
@@ -336,6 +361,17 @@ export function QuickOrder({
       </div>
 
       <div className={`${styles.list} ${showBrandTier ? styles.listTwoTier : ""}`}>
+        {/* The order's own lines, first — already expanded (see pinnedIds), so
+            an edit opens with its items and their controls in view. */}
+        {pinnedProducts.length > 0 && (
+          <section>
+            <div className={`${styles.categoryHeader} ${styles.pinnedHeader}`}>
+              <span>In this order</span>
+              <span>{pinnedProducts.length}</span>
+            </div>
+            {pinnedProducts.map(renderProduct)}
+          </section>
+        )}
         {unavailable.length > 0 && (
           <section>
             <div className={styles.categoryHeader}>
@@ -357,7 +393,7 @@ export function QuickOrder({
             ))}
           </section>
         )}
-        {visible.length === 0 ? (
+        {visible.length === 0 && pinnedProducts.length === 0 ? (
           <div className={styles.empty}>
             <p>No products match &quot;{query}&quot;.</p>
             <p>Check the spelling, or try a shorter word.</p>
