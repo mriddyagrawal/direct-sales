@@ -112,7 +112,20 @@ double-click a `.bat`. Nothing is uploaded anywhere — it writes files you look
 
 1. RDP into the VPS. Open TallyPrime and load the company (as usual).
 2. Double-click **`run-credit-export.bat`**.
-3. It prints a summary and writes four files to **`Desktop\GanpatiCredit`**:
+3. It runs in three steps and shows a live counter for each — seconds elapsed and
+   KB received — so you can always tell it's working rather than stuck:
+
+   | Step | What it does | Typical |
+   |------|--------------|---------|
+   | 1 of 3 | Probe — ledger names only, no maths | seconds |
+   | 2 of 3 | Balances for the shops | the slow one: Tally recomputes each balance from its vouchers |
+   | 3 of 3 | The statement (vouchers in the window) | depends on how busy those months were |
+
+   Step 2 asks only for the **Sundry Debtors** group. If that shape isn't supported
+   on your Tally it falls back automatically to a whole-company request, which is
+   slower but always works. Set **`BALANCES_ONLY = True`** at the top of the script
+   to skip step 3 for a quicker first run.
+4. It prints a summary and writes files to **`Desktop\GanpatiCredit`**:
 
 | File | What it is |
 |------|------------|
@@ -120,6 +133,7 @@ double-click a `.bat`. Nothing is uploaded anywhere — it writes files you look
 | `credit_entries_<date>_<time>.csv` | The statement — one row per bill/receipt/note |
 | `raw_balances_<date>_<time>.xml` | Exactly what Tally replied (for diagnosing) |
 | `raw_vouchers_<date>_<time>.xml` | Same, for the vouchers |
+| `raw_probe_<date>_<time>.xml` | Same, for the quick first check |
 
 ## The first run is a calibration — please check it
 
@@ -143,12 +157,18 @@ the app side gets built on top.
 |---------|---------|---------|
 | `WINDOW_MONTHS` | `2` | How far back the statement goes |
 | `GROUP_FILTER` | `Sundry Debtors` | Which Tally group holds the shops (loose match, catches sub-groups) |
-| `TIMEOUT_SECONDS` | `120` | Vouchers take longer than stock — raise it if the company is large |
+| `TIMEOUT_BALANCES` | `600` | Step 2 budget — raise it for a large company |
+| `TIMEOUT_VOUCHERS` | `900` | Step 3 budget |
+| `BALANCES_ONLY` | `False` | `True` = skip the statement, balances only (fast first run) |
 
 ## If something goes wrong
 
-- **"Could not reach Tally"** — Tally isn't open, the company isn't loaded, or
-  the XML server (port 9000) is off. Same fix as the stock export.
+- **It looks frozen** — check the live counter. If seconds are climbing, Tally is
+  working; balances on a big company genuinely take minutes. If it times out, raise
+  the timeouts or set `BALANCES_ONLY = True`.
+- **"Tally did not answer in time"** — Tally isn't open, the company isn't loaded,
+  the XML server (port 9000) is off, or the company is big enough to need a longer
+  timeout. Same first checks as the stock export.
 - **"No ledgers matched"** — the group name differs; the printed list has the answer.
 - **Anything else** — the raw XML files are still written. Send them over and the
   parser gets fixed against your actual data rather than a guess.
