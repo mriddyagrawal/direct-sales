@@ -12,3 +12,9 @@ next-env.d.ts
 
 # Tally agent local config — holds the stock-push secret; never commit it.
 tally-agent/agent_config.ini
+
+# Tally export artifacts — real shop names, balances and raw replies. Never commit.
+tally-agent/*.csv
+tally-agent/raw_*.xml
+tally-agent/probe_*.xml
+tally-agent/ledger_state.txt
