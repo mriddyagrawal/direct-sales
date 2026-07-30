@@ -32,7 +32,6 @@
 #  From a command line, if you ever want to:
 #     python ledger_statement_export.py                        last 2 months
 #     python ledger_statement_export.py 2026-04-01 2027-03-31  explicit range
-#     python ledger_statement_export.py --since-last           incremental
 #     python ledger_statement_export.py --probe                capability check
 #  With arguments, or when output is redirected, the menu and the closing pause
 #  are both skipped — so this stays usable from a scheduled task.
@@ -47,7 +46,7 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 # -----------------------------------------------------------------------------
 #  CONFIG
@@ -81,15 +80,6 @@ EXCLUDE_OPTIONAL = True
 # to see which actually carry rows for you, then narrow it if you like.
 ENTRY_SOURCES = ["AllLedgerEntries", "LedgerEntries"]
 
-# Written next to this script; holds the last AlterID seen, for --since-last.
-#
-# CAUTION on --since-last: AlterID rises when a voucher is created or edited,
-# but a DELETED voucher simply stops existing — there is no tombstone and no
-# AlterID bump to find. An incremental pull can therefore never learn that a
-# voucher went away. Treat --since-last as a speed-up for ad-hoc exports only.
-# Anything that feeds the app must re-pull the whole window and replace it, so
-# that deletions disappear there too.
-STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ledger_state.txt")
 # -----------------------------------------------------------------------------
 
 
@@ -113,6 +103,12 @@ FIELDS = [
 
 # Voucher-level fields worth pre-loading so Tally does not re-resolve them per
 # ledger entry. Keep this list tight - every name here is work.
+#
+# The sub-collection being exploded (AllLedgerEntries / LedgerEntries) is APPENDED
+# to this list at request time, and that is not optional: a PART can only REPEAT
+# over a sub-collection that was FETCHed. Leave it out and Tally answers happily
+# with the right number of empty lines and zero ledger entries - which is exactly
+# what the first run of this script did.
 VOUCHER_FETCH = "Date,VoucherTypeName,VoucherNumber,PartyLedgerName,Narration,Guid,AlterID"
 
 
@@ -129,7 +125,11 @@ def build_request(collection_route, from_date, to_date, fields, extra_filters=No
     """
     routes = collection_route.split(".")
     target = routes.pop(0)
+    sub_collections = list(routes)          # e.g. ["AllLedgerEntries"]
     routes.insert(0, "MyCollection")
+
+    # every level we intend to walk into must be fetched, or it comes back empty
+    fetch = ",".join([VOUCHER_FETCH] + sub_collections)
 
     parts, lines = "", ""
     for i, route in enumerate(routes):
@@ -178,7 +178,7 @@ def build_request(collection_route, from_date, to_date, fields, extra_filters=No
         '<FORM NAME="MyForm"><PARTS>MyPart01</PARTS></FORM>'
         f"{parts}{lines}{field_xml}"
         f'<COLLECTION NAME="MyCollection"><TYPE>{target}</TYPE>'
-        f"<FETCH>{VOUCHER_FETCH}</FETCH>{filter_ref}</COLLECTION>{filter_def}"
+        f"<FETCH>{fetch}</FETCH>{filter_ref}</COLLECTION>{filter_def}"
         "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"
     )
 
@@ -243,18 +243,6 @@ def month_chunks(start, end, months):
     return out
 
 
-def current_alter_id():
-    """Company's highest voucher AlterID — the watermark for incremental pulls."""
-    xml = ('<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>'
-           '<TYPE>Collection</TYPE><ID>GanpatiAlt</ID></HEADER><BODY><DESC><TDL><TDLMESSAGE>'
-           '<COLLECTION NAME="GanpatiAlt"><TYPE>Company</TYPE>'
-           '<COMPUTE>IsActive : $$IsEqual:$Name:##SVCurrentCompany</COMPUTE>'
-           '<FETCH>AltVchId,AltMstId</FETCH></COLLECTION>'
-           "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
-    m = re.search(r"<ALTVCHID>(\d+)</ALTVCHID>", sanitize(post(xml, 60)), re.I)
-    return int(m.group(1)) if m else None
-
-
 def probe(frm=None, to=None):
     """Escalating ladder: find the exact rung where it stops working.
 
@@ -297,6 +285,30 @@ def probe(frm=None, to=None):
     except Exception as e:
         print(f"  1. Collection/Voucher      FAILED {e}")
 
+    # --- 1b. which sub-collection actually HOLDS the ledger entries? ---------
+    # Decisive, and cheap because it is a 7-day window: fetch both names and
+    # count what comes back. Whichever tag appears is the one to explode.
+    wk = datetime.strptime(to, "%Y%m%d").date() - timedelta(days=7)
+    coll2 = coll.replace(f"<SVFROMDATE>{frm}</SVFROMDATE>",
+                         f"<SVFROMDATE>{wk.strftime('%Y%m%d')}</SVFROMDATE>") \
+                .replace("<FETCH>Date,VoucherTypeName,VoucherNumber</FETCH>",
+                         "<FETCH>AllLedgerEntries,LedgerEntries</FETCH>")
+    try:
+        raw = post(coll2, 180)
+        txt = sanitize(raw)
+        a = len(re.findall(r"<ALLLEDGERENTRIES\.LIST", txt, re.I))
+        b = len(re.findall(r"<LEDGERENTRIES\.LIST", txt, re.I)) - a
+        print(f"  1b. entries in last 7 days AllLedgerEntries={a}  LedgerEntries={max(b,0)}"
+              f"   -> {keep('1b_subcollections', raw)}")
+        if a or b > 0:
+            winner = "AllLedgerEntries" if a >= max(b, 0) else "LedgerEntries"
+            print(f"      set ENTRY_SOURCES = [\"{winner}\"] to halve the work")
+        else:
+            print("      neither tag present — open the file above and look for the")
+            print("      element that wraps the ledger name and amount.")
+    except Exception as e:
+        print(f"  1b. sub-collection check   FAILED {e}")
+
     # --- 2. REPORT wrapper, no explode ---------------------------------------
     flat = [("date", '$$PyrlYYYYMMDDFormat:$Date:"-"'), ("vtype", "$VoucherTypeName"),
             ("vno", "$VoucherNumber")]
@@ -321,25 +333,20 @@ def probe(frm=None, to=None):
                   f"-> {keep('3_' + src, raw)}")
             if rows:
                 print(f"     sample: {rows[0][:6]}")
+            elif len(raw) > 200:
+                # bytes but no rows: show which tags Tally did emit, so the next
+                # step is obvious instead of another round trip
+                tags = sorted(set(re.findall(r"<([A-Za-z0-9_.]+)[ >/]", sanitize(raw)[:200000])))
+                print(f"     no <F01> rows. Tags Tally sent: {', '.join(tags[:12])}")
         except Exception as e:
             print(f"  3. Report/{src:16s} FAILED {e}")
 
-    print("\n  AlterID watermark:", current_alter_id())
 
-    # Time-of-entry is NOT a standard voucher field. It exists only if Edit Log
-    # / Tally Audit is switched on, and the name differs by version - so try
-    # each candidate and let Tally tell us.
-    print("\n  Looking for a time-of-entry field (none is standard):")
-    for expr in ["$EnteredBy", "$AuditEntry", "$BasicVoucherTime", "$VoucherTime",
-                 "$EnteredTime", "$LogDateTime", "$AlteredOn", "$$VchEntryTime"]:
-        test = [("date", '$$PyrlYYYYMMDDFormat:$Date:"-"'), ("probe", expr)]
-        try:
-            rows = parse(post(build_request("Voucher", frm, to, test), 60), test)
-            filled = sum(1 for r in rows if r[1])
-            flag = "HAS VALUES" if filled else "exists, always empty"
-            print(f"    {expr:20s} {flag}  ({filled}/{len(rows)} rows)")
-        except Exception:
-            print(f"    {expr:20s} not available")
+    # Time of entry was probed on 31-Jul-2026 against this company: all eight
+    # candidate fields came back empty on all 4,862 vouchers - including a
+    # deliberately nonsense one, which shows Tally returns an empty field rather
+    # than an error for a name it does not know. Conclusion: this company stores
+    # a voucher DATE and no time. Dropped rather than left misleading.
 
 
 def hold():
@@ -413,16 +420,6 @@ def main():
             y, m = y - 1, m + 12
         start = date(y, m, 1)
 
-    extra = []
-    if "--since-last" in flags and os.path.exists(STATE_FILE):
-        last = open(STATE_FILE).read().strip()
-        if last.isdigit():
-            extra.append(f"$AlterID > {last}")
-            print(f"Incremental: only vouchers created or edited since AlterID {last}")
-            print("  NOTE: deleted vouchers cannot appear in an incremental pull —")
-            print("        do a full-window run before trusting this as complete.")
-
-    watermark = current_alter_id()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
     out_path = os.path.join(OUTPUT_DIR, f"ledger_entries_{stamp}.csv")
@@ -438,7 +435,7 @@ def main():
             for src in ENTRY_SOURCES:
                 t0 = time.time()
                 try:
-                    raw = post(build_request(f"Voucher.{src}", frm, to, FIELDS, extra))
+                    raw = post(build_request(f"Voucher.{src}", frm, to, FIELDS))
                 except (urllib.error.URLError, OSError) as e:
                     print(f"  {frm}-{to} {src:18s} UNREACHABLE {e}")
                     continue
@@ -492,13 +489,7 @@ def main():
                 print(f"  {frm}-{to} {src:18s} {kept:>6} rows  "
                       f"{len(raw)/1048576:.1f} MB  {time.time()-t0:.1f}s")
 
-    if watermark:
-        with open(STATE_FILE, "w") as fh:
-            fh.write(str(watermark))
-
     print(f"\n{total} ledger entries -> {out_path}")
-    if watermark:
-        print(f"AlterID watermark saved ({watermark}) — next run can use --since-last")
 
 
 if __name__ == "__main__":
