@@ -2,7 +2,7 @@
 
 Mirror each retailer's **Tally account** into the app: the outstanding balance, and the statement behind it. Show the balance where credit decisions happen, and give every retailer a **ledger page** — the retailer-side twin of the order detail page.
 
-**Status: DESIGN v2.1 — extractor BUILT (`tally-agent/credit_export.py`), awaiting the calibration run. No app/DB work started; contains DB changes (3 tables + RPCs) needing explicit owner approval at build time (prod-caution rule).**
+**Status: DESIGN v2.2 — extraction PROVEN END TO END 2026-07-31 (`tally-agent/tally_sync.py`); app-side build not started. No app/DB work started; contains DB changes (3 tables + RPCs) needing explicit owner approval at build time (prod-caution rule).**
 
 ## Doctrine (owner, 2026-07-31) — this is what v2 changes
 
@@ -35,6 +35,21 @@ An app order is a capture, not a sale; an app deposit is a field record, not a r
 | Share of the whole debtors book | ~⅔ (₹1.17 cr of ₹1.77 cr); the rest is non-shop ledgers |
 
 Full per-shop listing for the owner: [tally-retailer-balances-2026-07-31.md](../tally-retailer-balances-2026-07-31.md).
+
+### Extraction proven end to end (2026-07-31 05:05, `tally_sync.py`)
+
+| Check | Result |
+|---|---|
+| **Reconciliation** — per shop, `sum(statement legs)` vs `closing − opening` | **2,976 of 2,976 (100%)** |
+| Statement completeness — vouchers summing to zero | **4,848 of 4,848** |
+| Independent cross-check vs the app's own billed orders | 18 of 20 matched on (shop, bill no) to the rupee; **all 18 debit the shop** |
+| `[shop redacted]` vs Tally's own screen | ₹[amount redacted] owed — **exact**, via a different code path |
+| Book total, two independent runs | ₹[amount redacted] across 323 shops — identical |
+| Cost | balances 0.6 s · statement 12.9 s · whole run **under 20 s** |
+
+**Sign convention, settled four ways:** receivables export negative · sales legs debit the shop on every matched invoice · the discount leg proves the sign outranks the `is_debit` label · and once both halves used one dialect, everything reconciled. *The pipeline's single rule: **negative = debit = owed to us**, flipped once at the CSV boundary so `outstanding` is positive when a shop owes.*
+
+**Two traps worth carrying into the app build:** a Collection export's `ClosingBalance` **ignores `SVTODATE`** (byte-identical replies at two dates) — only the REPORT engine is period-aware; and `$$String:$$NumValue:…` silently evaluates to **nothing**, which reads as "every shop is square" rather than as an error.
 
 ## D1 — Three tables
 
