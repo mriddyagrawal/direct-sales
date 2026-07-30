@@ -86,8 +86,10 @@ libraries to install.
 
 | File | What it is |
 |------|------------|
-| `run-stock-export.bat` | Double-click this to run the export. |
+| `run-stock-export.bat` | Double-click this to run the **stock** export. |
 | `stock_export.py` | The actual script (Python). Edit the two config lines at the top only if needed. |
+| `run-credit-export.bat` | Double-click this to run the **retailer credit** export (see below). |
+| `credit_export.py` | The credit script. Config block at the top: window length, group name. |
 | `sample-stock.csv` | An example of what the output looks like (`Tally Name,Stock`). |
 | `agent_config.example.ini` | Template for one-click auto-submit — copy to `agent_config.ini` and add the secret. |
 | `agent_config.ini` | *Your* auto-submit config (you create it; holds the secret). Not committed to git. |
@@ -96,3 +98,57 @@ libraries to install.
 The output CSV is always two columns — **`Tally Name,Stock`** — matched to
 products in the app by their **Tally name**. Names that don't match any product
 are reported after upload so the catalog can be fixed; they are never created.
+
+
+---
+
+# Ganpati — Tally retailer credit export
+
+Pulls what each shop **owes**, and the bills/receipts behind it, out of Tally.
+Same rules as the stock export: **read-only**, Python 3, standard library only,
+double-click a `.bat`. Nothing is uploaded anywhere — it writes files you look at.
+
+## Every time
+
+1. RDP into the VPS. Open TallyPrime and load the company (as usual).
+2. Double-click **`run-credit-export.bat`**.
+3. It prints a summary and writes four files to **`Desktop\GanpatiCredit`**:
+
+| File | What it is |
+|------|------------|
+| `credit_balances_<date>_<time>.csv` | One row per shop: closing + opening balance |
+| `credit_entries_<date>_<time>.csv` | The statement — one row per bill/receipt/note |
+| `raw_balances_<date>_<time>.xml` | Exactly what Tally replied (for diagnosing) |
+| `raw_vouchers_<date>_<time>.xml` | Same, for the vouchers |
+
+## The first run is a calibration — please check it
+
+The balances CSV keeps **two columns per amount**: the text exactly as Tally sent
+it, and the number read out of it. That is deliberate — it makes the one genuinely
+uncertain thing checkable at a glance:
+
+- **Does a shop that OWES money show a minus sign?** Tally often exports a
+  receivable as a negative number. The console prints the three biggest balances
+  for exactly this comparison — open Tally's own outstanding report next to it.
+- **Did the right ledgers come through?** If the group filter matches nothing,
+  the script prints every group name it saw. Send that list over and we set it.
+- **How many shops matched?** Compare the party count against what you expect.
+
+Once those three answers are known, the sign is fixed **once, centrally**, and
+the app side gets built on top.
+
+## Config (top of `credit_export.py`)
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `WINDOW_MONTHS` | `2` | How far back the statement goes |
+| `GROUP_FILTER` | `Sundry Debtors` | Which Tally group holds the shops (loose match, catches sub-groups) |
+| `TIMEOUT_SECONDS` | `120` | Vouchers take longer than stock — raise it if the company is large |
+
+## If something goes wrong
+
+- **"Could not reach Tally"** — Tally isn't open, the company isn't loaded, or
+  the XML server (port 9000) is off. Same fix as the stock export.
+- **"No ledgers matched"** — the group name differs; the printed list has the answer.
+- **Anything else** — the raw XML files are still written. Send them over and the
+  parser gets fixed against your actual data rather than a guess.
