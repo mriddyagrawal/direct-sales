@@ -531,7 +531,15 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
                     key={order.id}
                     className={rowClasses}
                     onClick={() => router.push(`${detailBase}/${order.id}`)}
-                    onMouseEnter={() => setSelectedIndex(index)}
+                    // A <tr> can't be an anchor (HTML forbids wrapping a row),
+                    // so the desktop table keeps click-handling and warms the
+                    // route on hover instead — by the time the click lands the
+                    // loading boundary is in hand and the skeleton paints at
+                    // once. Next dedupes repeated prefetches of the same href.
+                    onMouseEnter={() => {
+                      setSelectedIndex(index);
+                      router.prefetch(`${detailBase}/${order.id}`);
+                    }}
                   >
                     <td className={styles.mono}>{order.order_ref}</td>
                     <td className={`${styles.mono} ${styles.cellMeta}`}>{formatOrderTimestamp(order.submitted_at, now)}</td>
@@ -564,11 +572,23 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
                    no brand: the ref eyebrow already carries the brand code).
                    pending_approval = amber left edge ("needs a human");
                    cancelled = struck amount. */
-                <button
+                /* A real <Link>, not a click-handler (owner 2026-07-26): Next
+                   prefetches the detail route's LOADING BOUNDARY as the card
+                   scrolls into view, so the tap paints the skeleton instantly
+                   instead of sitting on this screen for the ~300ms the server
+                   round-trip takes. For a dynamic route ONLY that boundary is
+                   prefetched — never the order's data.
+                   Two facts worth keeping straight (docs-verified 2026-07-26):
+                   prefetching is PRODUCTION-ONLY, so none of this shows on the
+                   dev server; and it fires per card entering the viewport,
+                   so scrolling a long list spends one small request per row —
+                   there is no documented save-data/slow-connection guard.
+                   Being a link also restores long-press/open-in-new-tab and
+                   makes screen readers announce it correctly. */
+                <Link
                   key={order.id}
-                  type="button"
+                  href={`${detailBase}/${order.id}`}
                   className={`${styles.card} ${order.status === "pending_approval" ? styles.cardPending : ""} ${newIds.has(order.id) ? styles.rowNew : ""}`}
-                  onClick={() => router.push(`${detailBase}/${order.id}`)}
                 >
                   <div className={styles.cardEyebrow}>
                     <span className={styles.cardRef}>{order.order_ref}</span>
@@ -594,7 +614,7 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
                   {order.admin_comment && order.status === "pending_approval" && (
                     <div className={styles.cardAdminNote}>⚠ {order.admin_comment}</div>
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>
