@@ -73,27 +73,38 @@ TIMEOUT = 300
 EXCLUDE_CANCELLED = True
 EXCLUDE_OPTIONAL = True
 
-# Which sub-collection holds the ledger entries. Tally puts accounting-only
-# vouchers (receipt/payment/journal) under LEDGERENTRIES and invoice-mode ones
-# (sales/purchase with items) under ALLLEDGERENTRIES - and which one a given
-# company uses varies. BOTH is correct and costs one extra pass; run --probe
-# to see which actually carry rows for you, then narrow it if you like.
-ENTRY_SOURCES = ["AllLedgerEntries", "LedgerEntries"]
+# Which sub-collection holds the ledger entries. Settled empirically on this
+# company (31-Jul-2026): both return the same 4,848 vouchers, but AllLedgerEntries
+# carries 15,545 legs against LedgerEntries' 13,631 - and only AllLedgerEntries
+# balances. Every one of its 4,848 vouchers sums to 0.00; LedgerEntries fails on
+# 1,914 because it omits the tax legs. So: one source, proven complete, half the
+# work. Add "LedgerEntries" back only if a future company proves it is needed.
+ENTRY_SOURCES = ["AllLedgerEntries"]
 
 # -----------------------------------------------------------------------------
 
 
 # -- the fields we ask for, in order. (csv column, TDL expression) -------------
-# Amount is emitted as BOTH a signed number and an explicit dr/cr flag on
-# purpose: Tally's internal sign convention for debit is a thing people get
-# wrong constantly, and $$IsDebit is unambiguous. Derive Debit/Credit columns
-# from the flag, never from the sign.
+# Amount ships three ways: a signed number, the text Tally rendered, and Tally's
+# own dr/cr label. Derive Debit/Credit from the SIGN of the number (negative =
+# debit) - NOT from is_debit, which is only a label and disagrees on contra
+# entries such as a discount posted on the credit side. Proof: signed amounts sum
+# to exactly 0.00 on all 4,848 vouchers; using the label breaks 298 of them.
 FIELDS = [
     ("date",         '$$PyrlYYYYMMDDFormat:$Date:"-"'),
     ("voucher_type", "$VoucherTypeName"),
     ("voucher_no",   "$VoucherNumber"),
     ("ledger",       "$LedgerName"),
-    ("amount",       '$$StringFindAndReplace:($$String:$$NumValue:$Amount):"(-)":"-"'),
+    # Numeric amount. This exact expression is the one tally-database-loader uses
+    # in production; an earlier attempt that wrapped $$NumValue in $$String came
+    # back EMPTY on all 15,545 rows, so do not "simplify" it.
+    ("amount",       '$$StringFindAndReplace:(if $$IsDebit:$Amount then -$$NumValue:$Amount '
+                     'else $$NumValue:$Amount):"(-)":"-"'),
+    # Belt and braces: $Amount as Tally renders it ("43,623.00 Dr" or similar).
+    # Same idea as credit_export.py keeping the raw text beside the parsed number
+    # - if the numeric field ever comes back empty again, the money is still here
+    # and the CSV is still usable.
+    ("amount_raw",   "$Amount"),
     ("is_debit",     "if $$IsDebit:$Amount then 1 else 0"),
     ("party",        "$PartyLedgerName"),
     ("narration",    "$Narration"),
@@ -217,6 +228,42 @@ def parse(raw, fields):
     for i in range(n):
         text = text.replace(f"<F{i+1:02d}/>", f"<F{i+1:02d}></F{i+1:02d}>")
     return [tuple(unescape(g).strip() for g in m) for m in re.findall(pattern, text, re.S)]
+
+
+_NUM = re.compile(r"-?[\d,]*\.?\d+")
+
+
+def to_number(numeric, raw):
+    """SIGNED rupee value of a line: negative = debit, positive = credit.
+    Returns None if neither column yields a number, so the caller can COUNT the
+    failures rather than silently writing zeros.
+
+    Do not take abs() of this. Verified on 4,848 real vouchers: the signed values
+    sum to exactly 0.00 on every single one — Tally's own double-entry identity.
+    The sign is authoritative and `is_debit` is only a label, which genuinely
+    disagrees with it on contra entries: a discount on a receipt comes back as
+    is_debit=0 with an amount of -45, i.e. "a credit of minus 45", which is a
+    debit of 45 in effect. Trusting the label there breaks the voucher by twice
+    the discount, and 298 receipts in this company do exactly that.
+
+    `raw` looks like "2,250.00" or "(-)45.00" — commas stripped, "(-)" honoured.
+    """
+    if numeric:
+        hit = _NUM.search(numeric.replace(",", ""))
+        if hit:
+            try:
+                return float(hit.group(0))
+            except ValueError:
+                pass
+    if raw:
+        neg = "(-)" in raw or raw.strip().startswith("-")
+        hit = _NUM.search(raw.replace(",", "").replace("(-)", ""))
+        if hit:
+            try:
+                return -abs(float(hit.group(0))) if neg else abs(float(hit.group(0)))
+            except ValueError:
+                pass
+    return None
 
 
 def unescape(s):
@@ -411,7 +458,7 @@ def main():
     chunks = month_chunks(start, end, CHUNK_MONTHS)
     print(f"{start} -> {end}   {len(chunks)} chunk(s) x {len(ENTRY_SOURCES)} source(s)\n")
 
-    total, seen = 0, set()
+    total, seen, blank_amounts = 0, set(), 0
     with open(out_path, "w", newline="", encoding="utf-8-sig") as fh:
         w = csv.writer(fh)
         w.writerow([c for c, _ in FIELDS] + ["debit", "credit", "source"])
@@ -457,12 +504,13 @@ def main():
                     if d["guid"] in seen:
                         continue
                     mine.add(d["guid"])
-                    try:
-                        amt = abs(float(d["amount"] or 0))
-                    except ValueError:
+                    amt = to_number(d["amount"], d["amount_raw"])
+                    if amt is None:
+                        blank_amounts += 1
                         amt = 0.0
-                    dr = amt if d["is_debit"] == "1" else ""
-                    cr = "" if d["is_debit"] == "1" else amt
+                    # split on the SIGN, not on is_debit — see to_number()
+                    dr = -amt if amt < 0 else ""
+                    cr = amt if amt > 0 else ""
                     w.writerow(list(r) + [dr, cr, src])
                     kept += 1
 
@@ -474,6 +522,10 @@ def main():
                       f"{len(raw)/1048576:.1f} MB  {time.time()-t0:.1f}s")
 
     print(f"\n{total} ledger entries -> {out_path}")
+    if blank_amounts:
+        print(f"WARNING: {blank_amounts} of {total} rows had NO readable amount in either")
+        print("         the numeric or the raw column, and were written as 0.")
+        print("         Do not use this file for money until that is understood.")
 
 
 if __name__ == "__main__":
