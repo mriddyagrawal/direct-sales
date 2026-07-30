@@ -90,6 +90,7 @@ libraries to install.
 | `stock_export.py` | The actual script (Python). Edit the two config lines at the top only if needed. |
 | `run-credit-export.bat` | Double-click this to run the **retailer credit** export (see below). |
 | `credit_export.py` | The credit script. Config block at the top: window length, group name. |
+| `ledger_statement_export.py` | **Double-click this one directly** for the **ledger statement** export (see below). No `.bat` needed. |
 | `sample-stock.csv` | An example of what the output looks like (`Tally Name,Stock`). |
 | `agent_config.example.ini` | Template for one-click auto-submit — copy to `agent_config.ini` and add the secret. |
 | `agent_config.ini` | *Your* auto-submit config (you create it; holds the secret). Not committed to git. |
@@ -178,3 +179,70 @@ the app side gets built on top.
 - **"No ledgers matched"** — the group name differs; the printed list has the answer.
 - **Anything else** — the raw XML files are still written. Send them over and the
   parser gets fixed against your actual data rather than a guess.
+
+---
+
+# Ganpati — Tally ledger statement export
+
+One row per **ledger entry** for every voucher in a date range — the columns of
+Tally's own Ledger Vouchers screen (date, ledger, voucher type, voucher number,
+debit, credit), for **every ledger at once**. Same rules as the others:
+**read-only**, Python 3, standard library only.
+
+## Every time
+
+1. RDP into the VPS. Open TallyPrime and load the company.
+2. **Double-click `ledger_statement_export.py`.** No `.bat`, no terminal — it
+   shows a menu and the window stays open at the end so you can read the result.
+
+   ```
+   1   Check the connection      (do this first, takes seconds)
+   2   Export the last 2 months
+   3   Export a date range you choose
+   4   Quit
+   ```
+
+3. Files land in **`Desktop\GanpatiLedger`**.
+
+**Run option 1 before the first real export.** It answers two things we don't yet
+know about this company: which of Tally's two ledger-entry collections actually
+holds the rows, and whether a time-of-entry field exists at all (there is no
+standard one — it depends on whether Edit Log is switched on).
+
+## Output
+
+`ledger_entries_<date>_<time>.csv` — one row per ledger entry:
+
+| Column | Notes |
+|---|---|
+| `date`, `voucher_type`, `voucher_no` | from the voucher |
+| `ledger` | the ledger this leg hits — "Particulars" on the Tally screen |
+| `amount`, `is_debit` | signed number **plus** an explicit Dr/Cr flag |
+| `debit`, `credit` | derived from `is_debit`, never from the sign |
+| `party`, `narration`, `guid`, `alter_id` | context and keys |
+
+Every raw reply is kept as `raw_<source>_<yyyymmdd>.xml` — if a number ever looks
+wrong, that file is the evidence.
+
+**Why two amount columns?** Tally's internal sign convention for debits catches
+everyone out, so the script asks Tally directly (`$$IsDebit`) rather than
+guessing from the sign. Trust `debit`/`credit`; treat `amount` as the raw value.
+
+## Config (top of `ledger_statement_export.py`)
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `DEFAULT_MONTHS_BACK` | `2` | Window when you pick "last 2 months" |
+| `CHUNK_MONTHS` | `1` | Months per request to Tally |
+| `ENTRY_SOURCES` | both | Narrow to one after running option 1 |
+| `EXCLUDE_CANCELLED` / `EXCLUDE_OPTIONAL` | `True` | Filtered inside Tally |
+
+## If something goes wrong
+
+- **A step shows `0 rows`** — the script prints how many bytes Tally actually
+  sent and the start of the reply, and saves the whole thing. Run option 1: it
+  tries three progressively more complex requests and tells you which one first
+  comes back empty. That pinpoints the problem exactly.
+- **"Could not reach Tally"** — same first checks as the other two exports.
+- **Statement doesn't tie to Tally's screen** — this exports *transactions only*,
+  with **no opening balance**. Ask and it can be added.

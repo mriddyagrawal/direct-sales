@@ -26,11 +26,16 @@
 #
 #  Requirements: Python 3, standard library only.
 #
-#  Usage:
+#  HOW TO RUN IT: just double-click this file. It puts up a small menu, and the
+#  window stays open at the end so you can read the result. No terminal needed.
+#
+#  From a command line, if you ever want to:
 #     python ledger_statement_export.py                        last 2 months
 #     python ledger_statement_export.py 2026-04-01 2027-03-31  explicit range
 #     python ledger_statement_export.py --since-last           incremental
 #     python ledger_statement_export.py --probe                capability check
+#  With arguments, or when output is redirected, the menu and the closing pause
+#  are both skipped — so this stays usable from a scheduled task.
 # =============================================================================
 
 import csv
@@ -337,9 +342,58 @@ def probe(frm=None, to=None):
             print(f"    {expr:20s} not available")
 
 
+def hold():
+    """Double-clicked, the console closes the instant this returns and you never
+    see the result. Wait for a keypress. Skipped when output is redirected, so
+    scheduling it still works unattended."""
+    if sys.stdin and sys.stdin.isatty():
+        try:
+            input("\nDone — press Enter to close this window.")
+        except (EOFError, KeyboardInterrupt):
+            pass
+
+
+def menu():
+    """Shown when the file is double-clicked (started with no arguments).
+    Returns (args, flags) exactly as the command line would have supplied."""
+    print("=" * 62)
+    print("  Ganpati — Tally ledger statement export")
+    print("=" * 62)
+    print("\n  Make sure TallyPrime is open with the company loaded.\n")
+    print("   1   Check the connection      (do this first, takes seconds)")
+    print("   2   Export the last 2 months")
+    print("   3   Export a date range you choose")
+    print("   4   Quit\n")
+
+    while True:
+        choice = input("  Type 1, 2, 3 or 4 then press Enter: ").strip()
+        if choice == "1":
+            return [], {"--probe"}
+        if choice == "2":
+            return [], set()
+        if choice == "3":
+            while True:
+                a = input("  From date (YYYY-MM-DD): ").strip()
+                b = input("  To date   (YYYY-MM-DD): ").strip()
+                try:
+                    datetime.strptime(a, "%Y-%m-%d")
+                    datetime.strptime(b, "%Y-%m-%d")
+                    return [a, b], set()
+                except ValueError:
+                    print("  Dates must look like 2026-05-01. Try again.\n")
+        if choice == "4":
+            sys.exit(0)
+        print("  Please type 1, 2, 3 or 4.\n")
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = {a for a in sys.argv[1:] if a.startswith("--")}
+
+    # no arguments at all = someone double-clicked the file
+    if not sys.argv[1:] and sys.stdin and sys.stdin.isatty():
+        args, flags = menu()
+        print()
 
     if "--probe" in flags:
         if len(args) >= 2:
@@ -450,6 +504,17 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except SystemExit:
+        raise                      # chose Quit — close straight away
     except urllib.error.URLError as e:
-        sys.exit(f"Could not reach Tally at {TALLY_URL} — is it open with the "
-                 f"company loaded, and the XML server on port 9000? ({e})")
+        print(f"\nCould not reach Tally at {TALLY_URL}.")
+        print("  Check: TallyPrime is open, the company is loaded, and the XML")
+        print("  server is on (F1 > Settings > Connectivity, port 9000).")
+        print(f"  Technical detail: {e}")
+        hold()
+    except Exception as e:
+        print(f"\nSomething went wrong: {e}")
+        print("  The raw replies in the output folder show what Tally actually sent.")
+        hold()
+    else:
+        hold()
