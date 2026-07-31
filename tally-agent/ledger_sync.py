@@ -20,8 +20,10 @@
 #  Python 3, standard library only. Double-click run-ledger-sync.bat.
 # =============================================================================
 
+import configparser
 import csv
 import html
+import json
 import os
 import re
 import socket
@@ -67,6 +69,12 @@ ROOT_GROUP = "Sundry Debtors"
 # One request per month keeps each reply small; Tally builds the whole answer in
 # memory and dies somewhere north of ~512 MB.
 CHUNK_MONTHS = 1
+
+# Auto-submit: if agent_config.ini sits next to this script with a
+# ledger_push_secret, a reconciled run ALSO pushes straight into the app. Without
+# it the run just writes the payload file for a manual upload. This only ever
+# posts to OUR app — the Tally side stays strictly read-only.
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_config.ini")
 
 TIMEOUT_QUICK = 60      # groups, names, company
 TIMEOUT_BALANCES = 600
@@ -483,6 +491,37 @@ def month_chunks(start, end, months):
     return out
 
 
+def _load_push_config():
+    """-> {url, anon, secret} or None. Same [app] section the stock agent uses;
+    only the secret differs, so one config file serves both."""
+    if not os.path.exists(CONFIG_PATH):
+        return None
+    try:
+        cp = configparser.ConfigParser()
+        cp.read(CONFIG_PATH, encoding="utf-8")
+        sec = cp["app"]
+        url = sec.get("supabase_url", "").strip().rstrip("/")
+        anon = sec.get("anon_key", "").strip()
+        secret = sec.get("ledger_push_secret", "").strip()
+    except Exception:
+        return None
+    if not (url and anon and secret) or secret.startswith("PASTE"):
+        return None
+    return {"url": url, "anon": anon, "secret": secret}
+
+
+def _push(payload, cfg):
+    """POST the payload to import_ledger_agent. Raises on transport/HTTP error
+    so the caller can fall back to telling the operator to upload by hand."""
+    body = json.dumps({"p_secret": cfg["secret"], "p_payload": payload}).encode("utf-8")
+    req = urllib.request.Request(
+        cfg["url"] + "/rest/v1/rpc/import_ledger_agent", data=body,
+        headers={"Content-Type": "application/json", "apikey": cfg["anon"],
+                 "Authorization": "Bearer " + cfg["anon"]}, method="POST")
+    with urllib.request.urlopen(req, timeout=300) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def inr(n):
     neg, n = n < 0, abs(int(round(n)))
     s = str(n)
@@ -824,6 +863,40 @@ def main():
             w.writerow([r["ledger"], r["date"], r["voucher_type"], r["voucher_no"],
                         round(-amt, 2) if amt < 0 else "", round(amt, 2) if amt > 0 else "", round(amt, 2)])
 
+    # ---- the payload the app eats ------------------------------------------
+    # One file: shops with their entries nested, plus the window, the as-of and
+    # the reconciliation verdict. The verdict travels WITH the data because the
+    # import RPC refuses any payload that did not reconcile — the guarantee is
+    # enforced at the database, not merely printed here.
+    by_ledger = {}
+    for r in kept:
+        amt = r["amount_signed"]
+        by_ledger.setdefault(r["ledger"].strip().lower(), []).append({
+            "date": r["date"], "type": r["voucher_type"], "no": r["voucher_no"],
+            "debit":  "{:.2f}".format(-amt) if amt < 0 else "",
+            "credit": "{:.2f}".format(amt) if amt > 0 else "",
+        })
+    payload = {
+        "window_from": WIN_FROM.isoformat(), "window_to": WIN_TO.isoformat(),
+        "as_of": datetime.now().astimezone().isoformat(),
+        "reconciled": bool(dated and not bad),
+        "company": COMPANY or "",
+        "shops": [{
+            "ledger": shop["name"],
+            # POSITIVE means the shop owes us. Tally sends a receivable as a
+            # negative (debit) balance, so the flip happens HERE, once, and
+            # everything downstream can stop thinking about it.
+            # `or 0.0` kills negative zero: a shop that is square must read
+            # "0.00", never "-0.00".
+            "outstanding": ("" if shop.get("balance") is None
+                            else "{:.2f}".format(-shop["balance"] or 0.0)),
+            "entries": by_ledger.get(k, []),
+        } for k, shop in sorted(closing.items())],
+    }
+    pay_path = os.path.join(OUTPUT_DIR, "ledger_payload_{}.json".format(stamp))
+    with open(pay_path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False)
+
     print("=" * 68)
     print("  balances  -> {}   ({:,} shops)".format(os.path.basename(bal_path), len(closing)))
     print("  statement -> {}   ({:,} lines)".format(os.path.basename(ent_path), len(kept)))
@@ -838,6 +911,33 @@ def main():
         print("  NOT SAFE TO LOAD YET - {} shops do not reconcile (see above).".format(len(bad)))
     elif ok:
         print("  All {} testable shops reconcile. The two files agree with each other.".format(len(ok)))
+
+    # ---- send it -------------------------------------------------------------
+    print()
+    cfg = _load_push_config()
+    if not payload["reconciled"]:
+        print("  NOT SENDING to the app: this run did not reconcile, and the import")
+        print("  RPC would refuse it anyway. Fix the export before loading it.")
+    elif not cfg:
+        print("  payload    -> {}   ({:,} KB)".format(
+            os.path.basename(pay_path), os.path.getsize(pay_path) // 1024))
+        print("  Not sending automatically (no ledger_push_secret in agent_config.ini).")
+        print("  Upload that one file in the app: Retailers -> Import from Tally.")
+    else:
+        try:
+            res = _push(payload, cfg)
+            res = res[0] if isinstance(res, list) and res else res
+            print("  SENT to the app:  {:,} shops updated, {:,} statement lines".format(
+                res.get("matched", 0), res.get("entries_written", 0)))
+            if res.get("unmatched_count"):
+                print("                    {:,} Tally ledgers matched no shop".format(
+                    res["unmatched_count"]))
+            for a in (res.get("ambiguous") or [])[:5]:
+                print("                    ambiguous, skipped: {}".format(a))
+        except Exception as exc:
+            print("  COULD NOT SEND: {}".format(exc))
+            print("  The payload is still saved at {} - upload it by hand.".format(
+                os.path.basename(pay_path)))
 
 
 if __name__ == "__main__":
