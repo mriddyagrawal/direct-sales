@@ -2,7 +2,7 @@
 
 Mirror each retailer's **Tally account** into the app: the outstanding balance, and the statement behind it. Show the balance where credit decisions happen, and give every retailer a **ledger page** — the retailer-side twin of the order detail page.
 
-**Status: DESIGN v2.2 — extraction PROVEN END TO END 2026-07-31 (`tally-agent/tally_sync.py`); app-side build not started. No app/DB work started; contains DB changes (3 tables + RPCs) needing explicit owner approval at build time (prod-caution rule).**
+**Status: DESIGN v2.2 — extraction PROVEN END TO END 2026-07-31 (`tally-agent/ledger_sync.py`); app-side build not started. No app/DB work started; contains DB changes (3 tables + RPCs) needing explicit owner approval at build time (prod-caution rule).**
 
 ## Doctrine (owner, 2026-07-31) — this is what v2 changes
 
@@ -36,7 +36,7 @@ An app order is a capture, not a sale; an app deposit is a field record, not a r
 
 Full per-shop listing for the owner: [tally-retailer-balances-2026-07-31.md](../tally-retailer-balances-2026-07-31.md).
 
-### Extraction proven end to end (2026-07-31 05:05, `tally_sync.py`)
+### Extraction proven end to end (2026-07-31 05:05, `ledger_sync.py`)
 
 | Check | Result |
 |---|---|
@@ -51,39 +51,41 @@ Full per-shop listing for the owner: [tally-retailer-balances-2026-07-31.md](../
 
 **Two traps worth carrying into the app build:** a Collection export's `ClosingBalance` **ignores `SVTODATE`** (byte-identical replies at two dates) — only the REPORT engine is period-aware; and `$$String:$$NumValue:…` silently evaluates to **nothing**, which reads as "every shop is square" rather than as an error.
 
-## D1 — Three tables
+## D1 — One new table, two new columns *(reduced 2026-07-31 after owner pushback)*
 
-**Why the balance is stored, not computed.** Tally's closing balance covers the account's entire history. Our statement window (2 months) does not. A shop whose oldest unpaid bill predates the window would have `sum(entries) ≠ balance` — so **deriving the balance from the entries is structurally wrong**, and would be wrong *silently*. We store what Tally computes and use the entries for display only.
+*v2 proposed three tables. The owner asked why, and most of it did not survive the question — it was structure collecting data nobody would read.*
 
-```
-retailer_credit                        -- one row per matched retailer
-  retailer_id        uuid PK → retailers(id) on delete cascade
-  outstanding_paise  bigint  not null  -- Tally closing balance; + = owes us, − = advance
-  opening_paise      bigint            -- balance at window start (feeds the D4 check)
-  window_from        date              -- statement window covered by the entries
-  window_to          date
-  reconciled         boolean           -- opening + entries == outstanding (D4)
-  as_of              timestamptz not null
-  source             text not null     -- 'agent' | 'import'
+```sql
+alter table public.retailers
+  add column outstanding_paise bigint,      -- POSITIVE = owes us; NULL = not in the last sync
+  add column balance_as_of     timestamptz;
 
-retailer_ledger_entries                -- the statement lines, display only
-  id             bigserial PK
-  retailer_id    uuid not null → retailers(id) on delete cascade
-  entry_date     date   not null
-  voucher_type   text   not null       -- Sales / Receipt / Credit Note / Journal …
-  voucher_no     text                  -- bill / receipt number as Tally shows it
-  narration      text
-  debit_paise    bigint not null default 0
-  credit_paise   bigint not null default 0
-  index (retailer_id, entry_date desc)
-
-credit_sync_runs                       -- the match report / cleanup worklist
-  id, ran_at, source, actor,
-  matched int, unmatched_count int, ambiguous_count int, unreconciled_count int,
-  unmatched jsonb, ambiguous jsonb
+create table public.retailer_ledger_entries (
+  id           bigserial primary key,
+  retailer_id  uuid not null references public.retailers(id) on delete cascade,
+  entry_date   date not null,
+  voucher_type text not null,
+  voucher_no   text,
+  debit_paise  bigint not null default 0,
+  credit_paise bigint not null default 0
+);
+create index on public.retailer_ledger_entries (retailer_id, entry_date desc);
 ```
 
-*No `updated_at` churn on entries: they are replaced wholesale, never edited (D3).*
+**What was cut, and why** — each of these existed for a reason that turned out not to hold:
+
+| Dropped | Why it isn't needed |
+|---|---|
+| `retailer_credit` as its own table | Its main justification was hiding money from salesmen. The owner decided salesmen *should* see it, which killed the argument — and the picker already fetches `retailers`, so the balance now arrives with no join |
+| `credit_sync_runs` | Its job is the unmatched worklist, which you only act on **at import time** — the wizard's result screen shows it there, with a download. A wrong-company guard is stronger as a **confirmation step in the wizard** than as a log nobody reads |
+| `opening_paise` | The statement's running balance walks **backwards** from closing; opening only ever fed the reconciliation, which now happens in `ledger_sync.py` before the file reaches the app |
+| `reconciled` per shop | Enforced at the door instead: **the wizard refuses a payload that did not reconcile 100%**. Per-row flags are for when partial trust is acceptable; here it is not |
+| `window_from` / `window_to` | `min/max(entry_date)` gives it for display; the replace range arrives in the payload at import time and nothing needs to remember it |
+| `tally_group` (the beat) | Nothing in the app reads beats, and it arrives in every export anyway — storing it was collecting data because it was there |
+
+**The one column worth defending:** `balance_as_of`. Without it a three-week-old balance is indistinguishable from a fresh one, and `NULL` stops meaning "never synced" as opposed to "synced and genuinely zero".
+
+**Accepted cost of putting the balance on `retailers`:** godown sees balances too (their RLS grants active retailers), and the sync becomes an `UPDATE` on an identity table — so the RPC must set exactly those two columns and nothing else. That is code discipline where a side table gave a structural guarantee.
 
 ## D2 — Match key + the ambiguity rule *(unchanged from v1)*
 
@@ -166,7 +168,7 @@ Three calibration items documentation cannot settle — they need one run agains
 
 `retailer_credit` gets a SELECT policy for all active profiles, mirroring `retailers_select_salesman`. *Collection is the salesman's job; the number changes what he does in the shop.*
 
-**Open:** the same question for `retailer_ledger_entries` — the statement exposes the shop's whole account, including business a given salesman had no part in. Default assumed: **same visibility as the balance** (if you can see what they owe, seeing why is not a further leak). Flagged for confirmation.
+**DECIDED 2026-07-31: salesmen see the statement too**, exactly as admin and accountant do. So `retailer_ledger_entries` gets a SELECT policy for every active profile, matching the balance. *One rule for the whole feature: if you can see what a shop owes, you can see why.*
 
 *Note: the RLS-partial-history problem from v1 dissolves here — a Tally statement is the shop's real account, not one salesman's slice, so no "your orders / your collections" labelling is needed.*
 
