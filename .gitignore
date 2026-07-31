@@ -13,8 +13,33 @@ next-env.d.ts
 # Tally agent local config — holds the stock-push secret; never commit it.
 tally-agent/agent_config.ini
 
+# Tally export artifacts — real shop names, balances and raw replies. Never commit.
+tally-agent/*.csv
+tally-agent/**/*.csv
+tally-agent/GanpatiSync/
+tally-agent/GanpatiCredit/
+tally-agent/GanpatiLedger/
+tally-agent/raw_*.xml
+tally-agent/probe_*.xml
+tally-agent/**/*.xml
+tally-agent/NewOutput/
+tally-agent/ledger_state.txt
+
 # Local analysis workspace — exploratory scripts, generated reports, and a
 # read-only dump of production under analysis/data (real retailer names, prices
 # and staff names). Never belongs in the repo. Ignored on main so every branch
 # inherits it and no session can sweep it in with `git add -A`.
 analysis/
+
+# Working data pulled out of Tally or the app: shop names, item names, stock
+# levels, name-matching worksheets. This repo is PUBLIC, so nothing derived from
+# the real book belongs in it. The one exception is the supplier price list,
+# which is already tracked and carries no customer data.
+data/
+!data/ZebronicsPriceList.csv
+
+# Real customer data kept locally only — never tracked. The balances list is
+# the one printed for the owner to confirm with his father; Retailers.csv is a
+# one-off import artifact. Both name real shops and were purged from history.
+/Retailers.csv
+docs/tally-retailer-balances-*.md
