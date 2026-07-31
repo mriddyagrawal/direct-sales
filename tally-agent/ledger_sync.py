@@ -45,11 +45,14 @@ TALLY_URL = "http://localhost:9000"
 # far worse: another company's books export perfectly happily, reconcile with
 # themselves, and produce a plausible file of the wrong shops' money.
 #
-# Setting this does two things: it TARGETS the named company, and it makes the
-# run STOP if Tally serves anything else. Leave "" only if you accept that
-# whatever is open gets exported.
+# Setting this TARGETS the named book via SVCURRENTCOMPANY, and STOPS the run if
+# Tally reports serving a different one. Note that this build of Tally does not
+# always report the served name; when it cannot, the run says so plainly and
+# relies on targeting plus the empty-result checks rather than pretending to have
+# verified something. Leave "" only if you accept that whatever is open is used.
 #
-# To find the exact spelling, run with --companies and copy a line verbatim.
+# For the exact spelling: double-click list-companies.bat, or just read it off
+# Tally's own Gateway screen and paste it here — that always works.
 COMPANY = ""
 
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "GanpatiSync")
@@ -497,41 +500,96 @@ def inr(n):
 # =============================================================================
 #  MAIN
 # =============================================================================
-ALL_COMPANIES_XML = ("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>"
-                     "<TYPE>Collection</TYPE><ID>Cmps</ID></HEADER><BODY><DESC>"
-                     "<STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>"
-                     "</STATICVARIABLES><TDL><TDLMESSAGE>"
-                     '<COLLECTION NAME="Cmps"><TYPE>Company</TYPE>'
-                     "<NATIVEMETHOD>Name</NATIVEMETHOD></COLLECTION>"
-                     "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
+# Listing companies is its own small problem: the obvious Collection of TYPE
+# Company came back 1 KB with no <NAME> in it on the real machine, which is the
+# silent-empty failure again - "I could not read this", not "there are none".
+# So try several formulations and report which one actually answered, rather
+# than trusting any single one.
+def _cmp_req(body, fmt="$$SysName:XML"):
+    return ("<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>"
+            "<TYPE>Collection</TYPE><ID>Cmps</ID></HEADER><BODY><DESC>"
+            "<STATICVARIABLES><SVEXPORTFORMAT>" + fmt + "</SVEXPORTFORMAT>"
+            "</STATICVARIABLES><TDL><TDLMESSAGE>" + body +
+            "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>")
+
+
+COMPANY_VARIANTS = [
+    ("collection + FETCH",
+     _cmp_req('<COLLECTION NAME="Cmps"><TYPE>Company</TYPE><FETCH>Name</FETCH></COLLECTION>')),
+    ("collection + NATIVEMETHOD",
+     _cmp_req('<COLLECTION NAME="Cmps"><TYPE>Company</TYPE>'
+              "<NATIVEMETHOD>Name</NATIVEMETHOD></COLLECTION>")),
+    ("built-in List of Companies",
+     "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>"
+     "<TYPE>Collection</TYPE><ID>List of Companies</ID></HEADER><BODY><DESC>"
+     "<STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>"
+     "</STATICVARIABLES></DESC></BODY></ENVELOPE>"),
+    # the REPORT engine - the one that turned out to be period-aware when the
+    # collection engine was not, so worth trying when a collection comes back bare
+    ("report engine",
+     "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST>"
+     "<TYPE>Data</TYPE><ID>CmpRep</ID></HEADER><BODY><DESC>"
+     "<STATICVARIABLES><SVEXPORTFORMAT>XML (Data Interchange)</SVEXPORTFORMAT>"
+     "</STATICVARIABLES><TDL><TDLMESSAGE>"
+     '<REPORT NAME="CmpRep"><FORMS>F</FORMS></REPORT><FORM NAME="F"><PARTS>P</PARTS></FORM>'
+     '<PART NAME="P"><LINES>L</LINES><REPEAT>L : C</REPEAT><SCROLLED>Vertical</SCROLLED></PART>'
+     '<LINE NAME="L"><FIELDS>Fld</FIELDS></LINE>'
+     '<FIELD NAME="Fld"><SET>$Name</SET><XMLTAG>F01</XMLTAG></FIELD>'
+     '<COLLECTION NAME="C"><TYPE>Company</TYPE><FETCH>Name</FETCH></COLLECTION>'
+     "</TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"),
+]
 
 
 def list_companies():
-    """Every company Tally currently has open, exact spelling, for COMPANY.
+    """Every company Tally has open, exact spelling, ready to paste into COMPANY."""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    print("Asking Tally which companies are open...\n")
 
-    Deliberately omits the active-company FILTER the normal check uses, so this
-    shows ALL of them rather than just the one in front.
-    """
-    print("Companies Tally has open right now:\n")
-    try:
-        raw = post(ALL_COMPANIES_XML, "companies", TIMEOUT_QUICK)
-    except Exception as exc:
-        raise SystemExit("Could not ask Tally: {}\n  Is it open with the XML server on?"
-                         .format(exc))
-    names = [html.unescape(n).strip()
-             for n in re.findall(r"<NAME>(.*?)</NAME>", sanitize(raw), re.S)]
+    found, diagnostics = [], []
+    for label, xml in COMPANY_VARIANTS:
+        try:
+            raw = post(xml, label, TIMEOUT_QUICK)
+        except Exception as exc:
+            diagnostics.append((label, 0, "request failed: {}".format(exc)))
+            continue
+        path = os.path.join(OUTPUT_DIR, "raw_companies_{}_{}.xml".format(
+            re.sub(r"[^a-z0-9]+", "_", label.lower()), stamp))
+        with open(path, "wb") as fh:
+            fh.write(raw)
+        text = sanitize(raw)
+        names = [html.unescape(n).strip()
+                 for n in re.findall(r"<(?:NAME|F01)>(.*?)</(?:NAME|F01)>", text, re.S)]
+        names = [n for n in names if n]
+        if names:
+            found = names
+            diagnostics.append((label, len(raw), "{} name(s)".format(len(names))))
+            break
+        tags = sorted(set(re.findall(r"<([A-Za-z0-9_.]+)[ >/]", text)))[:8]
+        diagnostics.append((label, len(raw), "no names; tags: " + (", ".join(tags) or "none")))
+
+    for label, size, note in diagnostics:
+        print("   {:28} {:>7,} bytes   {}".format(label, size, note))
+
+    if not found:
+        print("\nCould not read a company name by any of those routes.")
+        print("Raw replies are saved in {} - the tags above say what Tally did send."
+              .format(OUTPUT_DIR))
+        print("\nThis does NOT mean no company is open. It means the request shape is")
+        print("wrong for this Tally build. Meanwhile COMPANY can still be set by hand:")
+        print("copy the name from Tally's own title bar / Gateway screen, exactly.")
+        return
+
     seen, uniq = set(), []
-    for n in names:
-        if n and n.lower() not in seen:
+    for n in found:
+        if n.lower() not in seen:
             seen.add(n.lower())
             uniq.append(n)
-    if not uniq:
-        raise SystemExit("Tally answered but named no companies. Is one loaded?")
+    print("\nPaste ONE of these into the top of ledger_sync.py:\n")
     for n in uniq:
         print('    COMPANY = "{}"'.format(n))
-    print("\nCopy the line for the book you want into the top of this file.")
     if len(uniq) > 1:
-        print("{} companies are open - which is exactly why this matters here."
+        print("\n{} companies are open - which is exactly why pinning matters here."
               .format(len(uniq)))
 
 
@@ -560,12 +618,19 @@ def main():
                                               "pinned" if COMPANY else "whatever is open"))
         if COMPANY:
             if not served:
-                raise SystemExit(
-                    "\nSTOPPING: asked for company {!r} but Tally did not say which company\n"
-                    "it served, so this cannot be verified. Nothing was written.\n"
-                    "  Is that company open in Tally?  Run with --companies to list them."
-                    .format(COMPANY))
-            if served.strip().lower() != COMPANY.strip().lower():
+                # This Tally build does not report the served company name at all
+                # (measured: the company request answers 1 KB with no <NAME>).
+                # Stopping here would block every run, so do not. SVCURRENTCOMPANY
+                # still TARGETS the right book, and if that book is not loaded the
+                # export comes back empty — which the step checks below already
+                # refuse to bless. Say plainly which protection is and is not
+                # in force rather than implying a check that did not happen.
+                print("   NOTE: targeting {!r} via SVCURRENTCOMPANY, but this Tally\n"
+                      "         build does not report which company it served, so that\n"
+                      "         cannot be confirmed. If the wrong book is open the export\n"
+                      "         comes back empty and the steps below will refuse it.\n"
+                      .format(COMPANY))
+            elif served.strip().lower() != COMPANY.strip().lower():
                 raise SystemExit(
                     "\nSTOPPING: WRONG COMPANY. Nothing was written.\n"
                     "  wanted : {}\n"
@@ -583,8 +648,8 @@ def main():
     except Exception as exc:
         print("   Company: could not be read ({})\n".format(exc))
         if COMPANY:
-            raise SystemExit("STOPPING: COMPANY is pinned but could not be verified. "
-                             "Nothing was written.")
+            print("   NOTE: still targeting {!r} via SVCURRENTCOMPANY; the wrong book\n"
+                  "         would come back empty and be refused below.\n".format(COMPANY))
 
     # -- 1. group tree --------------------------------------------------------
     print("Step 1/5  group tree")
