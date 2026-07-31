@@ -16,12 +16,17 @@ export interface RetailerRow {
   phone: string | null;
   verified: boolean;
   active: boolean;
+  // The name the nightly Tally sync matches on (`_apply_ledger` keys on THIS
+  // column only — never on `name`, so a shop rename can't re-point real money
+  // at the wrong ledger). Nullable in the DB; a row with it empty syncs
+  // nothing, which is why both retailer cards now write it.
+  tally_ledger_name: string | null;
 }
 
 export async function fetchRetailers(supabase: SupabaseClient<Database>): Promise<RetailerRow[]> {
   const { data, error } = await supabase
     .from("retailers")
-    .select("id, name, area, phone, verified, active")
+    .select("id, name, area, phone, verified, active, tally_ledger_name")
     .order("name", { ascending: true });
   if (error) throw error;
   return (data ?? []) as RetailerRow[];

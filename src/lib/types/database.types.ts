@@ -566,14 +566,54 @@ export type Database = {
           },
         ]
       }
+      retailer_ledger_entries: {
+        Row: {
+          credit_paise: number
+          debit_paise: number
+          entry_date: string
+          id: number
+          retailer_id: string
+          voucher_no: string | null
+          voucher_type: string
+        }
+        Insert: {
+          credit_paise?: number
+          debit_paise?: number
+          entry_date: string
+          id?: number
+          retailer_id: string
+          voucher_no?: string | null
+          voucher_type: string
+        }
+        Update: {
+          credit_paise?: number
+          debit_paise?: number
+          entry_date?: string
+          id?: number
+          retailer_id?: string
+          voucher_no?: string | null
+          voucher_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_ledger_entries_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       retailers: {
         Row: {
           active: boolean
           area: string | null
+          balance_as_of: string | null
           created_at: string
           created_by: string | null
           id: string
           name: string
+          outstanding_paise: number | null
           phone: string | null
           tally_ledger_name: string | null
           verified: boolean
@@ -581,10 +621,12 @@ export type Database = {
         Insert: {
           active?: boolean
           area?: string | null
+          balance_as_of?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           name: string
+          outstanding_paise?: number | null
           phone?: string | null
           tally_ledger_name?: string | null
           verified?: boolean
@@ -592,10 +634,12 @@ export type Database = {
         Update: {
           active?: boolean
           area?: string | null
+          balance_as_of?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           name?: string
+          outstanding_paise?: number | null
           phone?: string | null
           tally_ledger_name?: string | null
           verified?: boolean
