@@ -30,3 +30,16 @@ tally-agent/ledger_state.txt
 # and staff names). Never belongs in the repo. Ignored on main so every branch
 # inherits it and no session can sweep it in with `git add -A`.
 analysis/
+
+# Working data pulled out of Tally or the app: shop names, item names, stock
+# levels, name-matching worksheets. This repo is PUBLIC, so nothing derived from
+# the real book belongs in it. The one exception is the supplier price list,
+# which is already tracked and carries no customer data.
+data/
+!data/ZebronicsPriceList.csv
+
+# Real customer data kept locally only — never tracked. The balances list is
+# the one printed for the owner to confirm with his father; Retailers.csv is a
+# one-off import artifact. Both name real shops and were purged from history.
+/Retailers.csv
+docs/tally-retailer-balances-*.md

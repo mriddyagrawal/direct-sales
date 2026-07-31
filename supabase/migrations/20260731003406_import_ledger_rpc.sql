@@ -38,9 +38,10 @@ begin
   from public.retailers where active;
 
   -- Ambiguity from EITHER side: two app shops sharing a name, or two Tally
-  -- ledgers normalising the same (Tally's uniqueness is case-sensitive, so
-  -- '[shop redacted]' and '[SHOP REDACTED]' both exist in this company). Writing one
-  -- balance to two shops counts the same money twice, so neither is written.
+  -- ledgers normalising the same (Tally's uniqueness is case-sensitive, so one
+  -- shop's name in title case and in full caps are two ledgers in this very
+  -- company). Writing one balance to two shops counts the same money twice, so
+  -- neither is written.
   create temp table _amb on commit drop as
   select k from _r  group by k having count(*) > 1
   union

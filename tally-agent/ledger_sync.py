@@ -40,24 +40,53 @@ from datetime import date, datetime
 # -----------------------------------------------------------------------------
 TALLY_URL = "http://localhost:9000"
 
-# The company to export. THIS MATTERS HERE: this machine has several companies,
-# and it has already happened that the stock sync was run with the wrong one in
-# front. For stock that fails harmlessly - the other company has none of the same
-# items, so nothing matches and nothing happens. For ledgers the same mistake is
-# far worse: another company's books export perfectly happily, reconcile with
+# The company to export. THIS MATTERS HERE, and it has already gone wrong twice.
+#
+# The VPS runs several Windows sessions, each with its own Tally. Ports are NOT
+# per-session on Windows: there is one 127.0.0.1:9000 on the box, and whichever
+# tally.exe binds it first owns it. The others fail to bind and say nothing. So
+# "the Tally in front of me" and "the Tally this script reaches" are different
+# questions, and on 2026-07-31 they had different answers: this script exported
+# a 246-ledger book from another session while the real 3,562-ledger book sat
+# open on screen. It reconciled against itself and pushed.
+#
+# For stock a wrong book fails harmlessly - the other company has none of the
+# same items, so nothing matches and nothing happens. For ledgers it is far
+# worse: another company's books export perfectly happily, reconcile with
 # themselves, and produce a plausible file of the wrong shops' money.
 #
-# Setting this TARGETS the named book via SVCURRENTCOMPANY, and STOPS the run if
-# Tally reports serving a different one. Note that this build of Tally does not
-# always report the served name; when it cannot, the run says so plainly and
-# relies on targeting plus the empty-result checks rather than pretending to have
-# verified something. Leave "" only if you accept that whatever is open is used.
+# Setting this TARGETS the named book via SVCURRENTCOMPANY, so it no longer
+# matters WHICH Tally answers - only that the one that answers has this book
+# loaded. If it does not, the export comes back empty and the steps below refuse
+# it. And if Tally does report a name, a mismatch STOPS the run.
+#
+# Case does not matter here, but nothing else does. Measured 2026-07-31:
+# "GANPATI ENTERPRISES" and "GANPATi Enterprises" both reached the real book;
+# "GANPATI Enterprise" (one character short) and "GANPATITODAY" both reached
+# nothing at all. So a name that will not resolve returns an EMPTY export - it
+# never quietly falls back to whatever company happens to be selected. That is
+# the property the whole design rests on, and it is why a stale name after a
+# year-end rename fails loudly instead of exporting the wrong book.
 #
 # For the exact spelling: double-click list-companies.bat, or just read it off
 # Tally's own Gateway screen and paste it here — that always works.
-COMPANY = ""
+COMPANY = "GANPATI ENTERPRISES"
 
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "GanpatiSync")
+
+# NOTE on identity, for whoever wonders why there is no second check here.
+#
+# A list of known shop names used to sit at this spot, as insurance against
+# SVCURRENTCOMPANY being silently ignored. It was removed once that possibility
+# was measured shut (see the four tests recorded at the COMPANY comparison
+# below): a name that will not resolve returns an EMPTY export, never another
+# company's data. The insurance covered a hole that does not exist.
+#
+# What it never covered, and what is still open: a STALE book. Restore a March
+# backup into a company with the right name and everything here passes - the
+# name resolves, the shops are all present, the export reconciles with itself.
+# Names cannot detect that; only freshness can. If that ever needs closing, the
+# check is the newest voucher date in the statement, not a roll-call of shops.
 
 # Window: this many whole months back, starting at the 1st of that month.
 WINDOW_MONTHS = 2
@@ -669,14 +698,41 @@ def main():
                       "         cannot be confirmed. If the wrong book is open the export\n"
                       "         comes back empty and the steps below will refuse it.\n"
                       .format(COMPANY))
-            elif served.strip().lower() != COMPANY.strip().lower():
+            elif served.lower() != COMPANY.lower():
+                # Case-insensitive, and that is MEASURED rather than assumed.
+                # Tested against this Tally on 2026-07-31:
+                #   "GANPATI ENTERPRISES"  -> the real book, 3,562 ledgers
+                #   "GANPATi Enterprises"  -> the same book, 3,562 ledgers
+                #   "GANPATI Enterprise"   -> nothing (one character short)
+                #   "GANPATITODAY"         -> nothing at all, every step zero
+                # So the rule is a case-insensitive match on the WHOLE name.
+                # Tally does not prefix-match - "GANPATI Enterprise" is an exact
+                # prefix of the real name and still resolved to nothing - and it
+                # does NOT fall back to whatever company is currently selected
+                # when the name will not resolve. A stale name therefore fails
+                # loudly and empty, which is what makes the year-end rename safe.
+                #
+                # This check was briefly written byte-exact, reasoning that Tally
+                # matches names literally. That is true of LEDGERS - this very
+                # book holds one shop in title case and the same name in full
+                # caps as two separate ledgers - and it was generalised to
+                # companies without evidence. The test above shows companies do
+                # not behave that way.
+                #
+                # Matching more strictly than Tally itself protects a distinction
+                # that cannot exist on Tally's side, and costs a false stop.
+                # Whitespace is left significant: untested, so not assumed away.
+                # Both names print quoted so an invisible difference is visible.
                 raise SystemExit(
                     "\nSTOPPING: WRONG COMPANY. Nothing was written.\n"
-                    "  wanted : {}\n"
-                    "  served : {}\n"
-                    "Open the right company in Tally and run again. If the name has\n"
-                    "changed (a new book each April does this), run --companies and\n"
-                    "update COMPANY at the top of this file."
+                    "  wanted : {!r}\n"
+                    "  served : {!r}\n"
+                    "Names are compared exactly. If those two look identical, the\n"
+                    "difference is whitespace or case - copy the served name above\n"
+                    "into COMPANY verbatim.\n"
+                    "Otherwise open the right company in Tally and run again. If the\n"
+                    "name has changed (a new book each April does this), run\n"
+                    "--companies and update COMPANY at the top of this file."
                     .format(COMPANY, served))
         elif served:
             print("   NOTE: COMPANY is not set, so whatever is open gets exported.")

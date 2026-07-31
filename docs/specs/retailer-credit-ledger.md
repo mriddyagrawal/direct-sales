@@ -18,7 +18,7 @@ An app order is a capture, not a sale; an app deposit is a field record, not a r
 |---|---|
 | 622 retailers (599 active) | Bounded; fetch-all + client filtering stays viable |
 | **`tally_ledger_name` empty on all 622** | Match on `name`, with `tally_ledger_name` as an override (D2) |
-| **1 duplicate name** (`[shop redacted]` ×2) | Ambiguous keys must update nothing — money would double-post (D2) |
+| **1 duplicate name** (one shop entered twice) | Ambiguous keys must update nothing — money would double-post (D2) |
 | 80 retailers have app orders; 8 app deposits exist | Irrelevant to the ledger now, by doctrine — but it means ledger pages are mostly sparse |
 | Money is integer paise everywhere | Tally's rupee decimals convert on the way in (D3) |
 
@@ -28,13 +28,13 @@ An app order is a capture, not a sale; an app deposit is a field record, not a r
 |---|---|
 | Tally ledgers / under the Sundry Debtors tree | 3,561 / **2,976** (shops sit in ~140 beat sub-groups, up to 4 levels deep) |
 | App retailers matching a Tally ledger | **592 of 598 (99.0%)** on the normalised key — the match design holds |
-| The 6 non-matches | 2 test fixtures + **4 spelling variants whose Tally counterpart was found** (`[shop redacted]`→`[shop redacted]`, `… (Rm)`→`… (Rm) NET`, `[SHOP REDACTED]`→`[SHOP REDACTED] LG`, `[shop redacted]`→`[shop redacted]`) — zero shops genuinely absent |
+| The 6 non-matches | 2 test fixtures + **4 spelling variants whose Tally counterpart was found** — one transposed letter, two brand/channel suffixes (`… NET`, `… LG`), one abbreviation — zero shops genuinely absent |
 | **Sign convention** | **CONFIRMED: a receivable exports NEGATIVE.** Flip on the way in. Owner verified two ledgers against Tally's screen |
 | Balances for 2,976 ledgers | **0.5 s** — the daily sync is effectively free |
-| Coverage of the app's shops | 249 owe ₹[amount redacted] · 35 hold advances · 305 exactly zero · 2 no figure |
-| Share of the whole debtors book | ~⅔ (₹1.17 cr of ₹1.77 cr); the rest is non-shop ledgers |
+| Coverage of the app's shops | 249 owe · 35 hold advances · 305 exactly zero · 2 no figure |
+| Share of the whole debtors book | ~⅔ by value; the rest is non-shop ledgers |
 
-Full per-shop listing for the owner: [tally-retailer-balances-2026-07-31.md](../tally-retailer-balances-2026-07-31.md).
+A full per-shop listing was generated for the owner to confirm with the office. It names real customers and their balances, so it is kept **outside this repo** (gitignored) — see `.gitignore`.
 
 ### Extraction proven end to end (2026-07-31 05:05, `ledger_sync.py`)
 
@@ -43,8 +43,8 @@ Full per-shop listing for the owner: [tally-retailer-balances-2026-07-31.md](../
 | **Reconciliation** — per shop, `sum(statement legs)` vs `closing − opening` | **2,976 of 2,976 (100%)** |
 | Statement completeness — vouchers summing to zero | **4,848 of 4,848** |
 | Independent cross-check vs the app's own billed orders | 18 of 20 matched on (shop, bill no) to the rupee; **all 18 debit the shop** |
-| `[shop redacted]` vs Tally's own screen | ₹[amount redacted] owed — **exact**, via a different code path |
-| Book total, two independent runs | ₹[amount redacted] across 323 shops — identical |
+| One large shop vs Tally's own on-screen figure | **exact to the rupee**, via a different code path |
+| Book total, two independent runs | identical — same total, same 323 shops |
 | Cost | balances 0.6 s · statement 12.9 s · whole run **under 20 s** |
 
 **Sign convention, settled four ways:** receivables export negative · sales legs debit the shop on every matched invoice · the discount leg proves the sign outranks the `is_debit` label · and once both halves used one dialect, everything reconciled. *The pipeline's single rule: **negative = debit = owed to us**, flipped once at the CSV boundary so `outstanding` is positive when a shop owes.*
@@ -95,9 +95,9 @@ Key = `lower(regexp_replace(btrim(coalesce(nullif(btrim(tally_ledger_name),''), 
 
 **Ambiguity rule:** a key matching more than one retailer updates **nothing** and is reported in an `ambiguous` bucket. *Verified 2026-07-30: `import_stock`'s `UPDATE … FROM` writes to every row sharing a key — for a quantity that's wrong, for money it double-posts. `UNIQUE (brand_id, tally_name)` is case-sensitive and cross-brand-blind; retailers have no name constraint at all and one live duplicate.*
 
-**⚠️ Correction (measured 2026-07-31): Tally's ledger-name uniqueness is CASE-SENSITIVE**, so collisions are *not* only app-side as v1 claimed. The real export contains `[shop redacted]` (RETAIL DEBTORS, owes ₹[amount redacted]) *and* `[SHOP REDACTED]` (Sundry Debtors, no balance) — one app shop, two ledgers. The ambiguity rule therefore protects against duplicates on **both** sides, and it earns its place from day one rather than hypothetically.
+**⚠️ Correction (measured 2026-07-31): Tally's ledger-name uniqueness is CASE-SENSITIVE**, so collisions are *not* only app-side as v1 claimed. The real export contains one shop spelled in title case under RETAIL DEBTORS *with* a balance, and the same name in full caps under Sundry Debtors with none — one app shop, two ledgers, distinguished only by capitalisation. The ambiguity rule therefore protects against duplicates on **both** sides, and it earns its place from day one rather than hypothetically.
 
-**Pre-sync cleanup (awaiting owner go):** The one live collision is a ghost+real pair of the same shop — `[shop redacted]` from the 2026-07-07 bulk import (no area/phone, **0 orders**) and the 2026-07-23 field entry (area Dipka, phone [phone redacted], **1 order**). Deactivating the ghost orphans nothing.
+**Pre-sync cleanup — DONE 2026-08-01.** The one live collision was a ghost+real pair of the same shop: a bulk-import row from 2026-07-07 carrying no area, no phone and **0 orders**, alongside a 2026-07-23 field entry with both contact details and **1 order**. The ghost was deleted after verifying it referenced nothing in `orders`, `deposits` or `retailer_ledger_entries`; the real row kept everything. A unique index on the normalised name now makes the collision unrepeatable.
 
 ## D3 — Ingestion: one run, two pulls, wholesale replace
 
@@ -142,7 +142,7 @@ Three calibration items documentation cannot settle — they need one run agains
 
 ## D5 — Where the balance appears
 
-1. **Retailer picker** (Quick Order + deposit flow) — the balance rides **every row**, as a muted second line under the shop name (owner call): `Sadar Bazar · ₹12,450 due`. Grey throughout — no red state (no limits, D3b). `₹0` → **"Clear"**; no credit data → **nothing at all** *(the two must not look identical — "known clear" and "unknown" are different facts)*; negative → **"₹5,000 advance"**. One **"Balances as of …"** line above the list, never per row.
+1. **Retailer picker** (Quick Order + deposit flow) — the balance rides **every row**, as a muted second line under the shop name (owner call): `Example Traders · ₹12,450 due`. Grey throughout — no red state (no limits, D3b). `₹0` → **"Clear"**; no credit data → **nothing at all** *(the two must not look identical — "known clear" and "unknown" are different facts)*; negative → **"₹5,000 advance"**. One **"Balances as of …"** line above the list, never per row.
 2. **Order detail** (both lenses) — a retailer band under the header: outstanding, its as-of, and **days since the last receipt**, live, so the admin sees the shop's position on the way to Approve. *A big balance on a paying shop is business; the same balance on a silent shop is exposure — with limits gone, recency is the signal that carries that difference.*
 3. **Orders list** — nothing per row (noise + a join per row).
 4. **Retailers list** — Outstanding + **last bill / last receipt** columns (desktop), second line (phone), the book total in the header, and the **sync line** (`618 matched · 3 unmatched · 1 ambiguous`).

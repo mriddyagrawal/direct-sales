@@ -6,22 +6,25 @@ changed on top of it, what got proven, and what is still yours.
 
 ## Outcome
 
+> Amounts and shop names are redacted throughout — this repo is public and the
+> figures belong to the distributor's customers. Counts are real.
+
 **The extraction is proven end to end.** Final run, 05:05:
 
 ```
 Step 3/5  balances    2,976 shops priced via the report engine; 370 moved
 Step 4/5  statement   15,545 legs · 4,848 vouchers, 0 of which fail to balance
 Step 5/5  reconciled  2,976 of 2,976  (100.0%)
-            323 shops owe Rs [amount redacted] in total
+            323 shops owe Rs [redacted] in total
 ```
 
 Independent confirmations, none of which the script can fake:
 
 | Check | Result |
 |---|---|
-| `[shop redacted]` vs Tally's own screen | ₹[amount redacted] owed — exact, via a different code path |
+| One large shop vs Tally's own on-screen figure | exact to the rupee, via a different code path |
 | App's own billed orders vs the statement | 18 of 20 matched on (shop, bill no) to the rupee; **all 18 debit the shop** |
-| Book total across two runs on different engines | ₹[amount redacted] / 323 shops — identical |
+| Book total across two runs on different engines | identical — same total, same 323 shops |
 | Whole run | under 20 seconds |
 
 ## What changed
