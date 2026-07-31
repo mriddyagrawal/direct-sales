@@ -7,8 +7,46 @@
 
 .titleRow {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
+}
+
+/* One Add entry point per form factor (Products pattern): the inline button on
+   desktop, the FAB on the phone — never both, or the phone shows it twice. */
+.addDesktop {
+  display: none;
+}
+
+.pFab {
+  position: fixed;
+  right: 16px;
+  /* Clears the dashboard's mobile bottom nav + the home indicator. */
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  background: var(--color-accent);
+  color: var(--color-white);
+  border: none;
+  border-radius: 24px;
+  font-family: var(--font-structure);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .addDesktop {
+    display: block;
+  }
+
+  .pFab {
+    display: none;
+  }
 }
 
 .title {

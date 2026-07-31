@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Store } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Glyph } from "@/components/ui/Glyph";
 import { createClient } from "@/lib/supabase/client";
 import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
 import { RetailerModal } from "./RetailerModal";
@@ -32,6 +35,10 @@ export function RetailersQueue() {
   // tap away, not the landing view.
   const [tab, setTab] = useState<FilterTab>("all");
   const [editing, setEditing] = useState<RetailerRow | null>(null);
+  // Office ADD (owner 2026-08-01) — until now the only way to create a shop
+  // anywhere was the salesman's quick-add mid-order, so every new shop was
+  // named by someone with no access to Tally. Same modal, no `retailer` prop.
+  const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
 
   const counts = {
@@ -60,6 +67,14 @@ export function RetailersQueue() {
     <div className={styles.page}>
       <div className={styles.titleRow}>
         <h1 className={styles.title}>Retailers</h1>
+        {/* Desktop entry point; the phone gets the FAB below (Products
+            pattern). No import counterpart — shops are added one at a time. */}
+        <div className={styles.addDesktop}>
+          <Button variant="primary" onClick={() => setAdding(true)}>
+            <Glyph icon={Store} />
+            Add
+          </Button>
+        </div>
       </div>
 
       <div className={styles.filterTabs}>
@@ -133,6 +148,23 @@ export function RetailersQueue() {
             );
           })}
         </div>
+      )}
+
+      {/* Phone FAB — the same entry point as the desktop button. */}
+      <button type="button" className={styles.pFab} onClick={() => setAdding(true)}>
+        <Glyph icon={Store} />
+        Add
+      </button>
+
+      {adding && (
+        <RetailerModal
+          onClose={() => setAdding(false)}
+          onSaved={() => {
+            setAdding(false);
+            void queryClient.invalidateQueries({ queryKey: ["retailers"] });
+            router.refresh();
+          }}
+        />
       )}
 
       {editing && (
