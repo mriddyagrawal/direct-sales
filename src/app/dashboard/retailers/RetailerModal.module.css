@@ -89,6 +89,21 @@
   color: var(--color-amber);
 }
 
+/* Neutral instruction (what a blank Tally field does) — NOT amber: .helper's
+   amber is for "pay attention to this", and instructions aren't that. */
+.hint {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+/* A duplicate the database will refuse — stronger than a hint. */
+.warning {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-error);
+}
+
 @media (min-width: 768px) {
   .scrim {
     align-items: center;
