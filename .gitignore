@@ -12,3 +12,9 @@ next-env.d.ts
 
 # Tally agent local config — holds the stock-push secret; never commit it.
 tally-agent/agent_config.ini
+
+# Local analysis workspace — exploratory scripts, generated reports, and a
+# read-only dump of production under analysis/data (real retailer names, prices
+# and staff names). Never belongs in the repo. Ignored on main so every branch
+# inherits it and no session can sweep it in with `git add -A`.
+analysis/
