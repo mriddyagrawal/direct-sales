@@ -247,6 +247,14 @@ export function RetailersQueue() {
             {filtered.map((r) => {
               const needsVerification = r.active && !r.verified;
               const isDeactivated = !r.active;
+              // Rendered only when there is something real to say. It used to
+              // fall back to "No area/phone on file", which 604 of 623 shops
+              // showed — a string on 97% of cards is texture, not information,
+              // and the eye skipped it 604 times to find the 19 that matter.
+              // Now a second line MEANS the shop has contact details.
+              // Same rule RetailerList applies to its own line 2, so the three
+              // retailer surfaces read the same way.
+              const meta = [r.area, r.phone].filter(Boolean).join(" · ");
               return (
                 <Link
                   key={r.id}
@@ -260,9 +268,7 @@ export function RetailersQueue() {
                       {isNotSynced(r) && <span className={styles.notSyncedBadge}>NOT SYNCED</span>}
                       {isDeactivated && <span className={styles.deactivatedBadge}>DEACTIVATED</span>}
                     </p>
-                    <p className={styles.rowMeta}>
-                      {[r.area, r.phone].filter(Boolean).join(" · ") || "No area/phone on file"}
-                    </p>
+                    {meta && <p className={styles.rowMeta}>{meta}</p>}
                   </div>
                   {/* Right edge of the card, opposite the name — the same
                       place the Orders card puts its amount, so the two lists
