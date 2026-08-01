@@ -5993,3 +5993,38 @@ Both `.numeric` scopings earn their keep here for the first time: `<th className
 **Open flags (cumulative):** new 🟡 55. 🟡 ㊿ open (owner-accepted). 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
 
 **Next-commit suggestion:** ImportWizard (step 4) — the smallest remaining copy, and the only one inside a modal rather than a page.
+
+---
+
+## Review of 9f8192c — fix(import-wizard): scope .mono/.numeric/.cellName — NOT migrated to the shared grammar
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 4 as amended — fix ImportWizard's specificity bugs in place rather than migrating it, on the grounds the builder raised and the owner accepted.
+
+**What works:** `.table td.mono`, `.table thead th.numeric, .table td.numeric` (grouped), `.table td.cellName`. CSS only — 25 insertions, 3 deletions, **no markup changed**, as claimed. `tsc` and `eslint src` both exit 0, verified independently.
+
+The grouped `.numeric` selector implements the finding I added to the amended spec: the **header** case was the actively-broken one, because `.table thead th` sets `text-align: left` at (0,1,2) and outranks a bare class, so ROW and PRICE headers had been sitting left-aligned over right-aligned numbers. The commit says exactly that and does not overstate the cell case, which worked by luck.
+
+**I checked the one thing that could have gone wrong here.** Scoping `.cellName` to `.table td.cellName` narrows it from (0,1,0) to (0,1,2) — if that class were used anywhere that is not a `td` inside `.table`, it would silently stop applying. All six call sites (`ImportWizard.tsx:283,288,295,304,305,306`) are `<th>`/`<td>` between lines 280 and 313, inside `<table className={styles.table}>`. Safe.
+
+**I also checked for classes they might have missed** — every class used inside that table, not just the three they touched. Three others are unscoped and all three survive, for three different reasons:
+
+- `.reason` and `.statusTag` sit on `<span>`s inside cells. A rule on the element beats a value **inherited** from the parent `td`, so they never competed with `.table td` at all. (Same mechanism that keeps StatusTag pills mono in the page tables.)
+- `.errorRow td` is (0,1,1) — **equal** to `.table td`, not higher — so it wins only because it sits at line 254 against line 211. Source order, not specificity.
+
+Nothing was left dead.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **56 `.errorRow td` wins on source order alone.** It ties `.table td` on specificity and is only correct because it appears later in the file. Moving it above the `.table` block — a plausible tidy-up — would silently turn error rows back to full ink and cost the row its muted treatment. Same family as 54: a rule that works today for a reason nobody wrote down. One extra class (`.table tbody tr.errorRow td`) or a comment would pin it.
+
+**Domain / correctness checks:** Money math — the PRICE column and its header both change presentation only; values untouched. No markup, no data path, no RLS surface.
+
+**What I tried:** Read the full diff; enumerated every `styles.*` class used between the `<table>` tags and classified each as scoped / bare-but-safe / bare-and-dead; traced all six scoped call sites to confirm they are `th`/`td` inside the table; compared line numbers of `.errorRow td` (254) against `.table td` (211) to determine which wins; `tsc --noEmit` (0), `eslint src` (0); confirmed only the CSS file changed.
+
+**Open flags (cumulative):** new 🟡 56. 🟡 55, 🟡 ㊿ open. 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
+
+**Next-commit suggestion:** Orders (step 5) — the last of the four copies, and the loudest pixel change in the run: its refs, timestamps and totals all gain their mono face at once.
