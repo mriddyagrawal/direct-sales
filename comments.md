@@ -7521,3 +7521,44 @@ Worth a deliberate decision rather than drift. Note the middle option: a list ro
 **What I tried:** Read the full diff; located the Dr./Cr. formatting and confirmed it is order-detail-only, then checked what the other three surfaces render (the basis of 🟡 74); queried prod for `max`/`min` `outstanding_paise` and matched both against the commit's worked examples; scripted the dead-CSS check in both directions (8 deleted → 0 refs; all remaining refs resolve); traced both `tallyBillNo` occurrences to confirm one render site; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 74. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (**half closed** — detail page done, lists unchanged), 🟡 72, 🟡 73.
+
+---
+
+## Review of dedf766 — style(orders): group the hero, quiet the balance's date, drop the empty notes block
+
+**Verdict:** ✅ — no issues, and the CSS technique is the right one for a reason this log has a standing flag about.
+
+**Phase / commit goal:** Owner review of the rendered screen — three of five recommendations taken, two declined and said so.
+
+### The grouping is done the order-independent way
+
+The seam between THE SHOP and THIS ORDER is carried by adjacent-sibling selectors:
+
+```css
+.heroBalance + .heroMeta,
+.heroBalance + .byline { margin-top: 5px; }
+```
+
+Specificity is **(0,2,0)** against a bare `.byline`'s **(0,1,0)**, so it wins **regardless of source order**. That is exactly the property 🟡 56 exists because `.errorRow td` lacks — that rule ties `.table td` and is correct only because it happens to appear later in the file. Same problem, and here it is solved properly rather than by luck. Worth stating plainly since the two sit in the same codebase.
+
+It is in fact belt-and-braces: `.byline`'s old `margin-top: 2px` was **removed**, so there is no competing declaration left to beat. Verified — `.byline` now declares only font, size and colour, and `.heroMeta` declares no margin either, exactly as the commit claims.
+
+**The arithmetic reconciles.** The message says an 8px seam; the CSS declares `margin-top: 5px`. Both are right — `.hero` is `gap: 3px`, so 3 + 5 = 8. The commit describes the visible seam and the rule declares the increment.
+
+**Choosing sibling selectors over a wrapper div is the correct call and the reason given is sound:** every line in the second group is conditional — the balance is hidden on godown, the meta line needs an area/phone/salesman, the bill number only exists once billed. A wrapper would have had to be conditionally rendered on the OR of its children to avoid contributing a stray gap. With siblings, whichever line lands first takes the seam and an absent group leaves no seam to mark.
+
+### The empty notes block
+
+`{order.notes.trim().length > 0 && (…)}` — so a note still renders when there is one, and a **whitespace-only** note hides too, which `order.notes ||` would not have caught. Same rule the retailer cards took two commits earlier, and the same justification: a labelled section whose entire content is "there is nothing here" is furniture, and its *appearance* is the more useful signal.
+
+Checked before hiding, per the message: this view never edits notes — the Quick Order flow owns that, and the other `.notesLabel`/`.notesInput` uses are the bill-number, dispatch-remark and cancel-reason sheets. So nothing is lost but the placeholder.
+
+**The balance line's date** drops from 11px to the same 13px, with weight and colour doing the separating instead of size + a dot + colour. Three devices for one job reduced to one. The owner's call and the better one — at a single size the line reads as a sentence rather than a figure with a footnote.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the balance's rendering is untouched; only its type size and the date's treatment change. **RLS / state machine / snapshots** — untouched. **Mobile** — the hero is the above-the-fold block on a phone, which is what the grouping is for; the conditional-line reasoning matters most there, where every absent line would otherwise leave a gap.
+
+**What I tried:** Read the diff; computed the specificity of both sibling rules against the bare `.byline` and confirmed `.byline` no longer declares a margin at all (so the rule does not even need to win); confirmed `.heroMeta` declares no margin; reconciled the stated 8px seam against `.hero`'s `gap: 3px` plus the declared 5px; read the notes guard and confirmed `.trim()` covers whitespace-only notes; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
