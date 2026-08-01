@@ -216,15 +216,37 @@
   padding: 0 10px;
 }
 
-.mono {
+/* This preview table deliberately does NOT use the shared table grammar
+   (src/components/ui/table.module.css) — same reasoning that excluded
+   Deposits: no top rule, no zebra, no fixed row height, padding-sized headers.
+   It is a wide, nowrap, horizontally-scrolled grid inside a modal, and the
+   shared grammar is `display: none` until 768px, which would hide this preview
+   on phone entirely (the wizard is a phone surface — see the max-width: 767px
+   block below). Owner call 2026-08-01, option (a): fix the specificity bugs
+   here in place instead of migrating.
+
+   Both selectors below must be scoped, for the same reason they are in the
+   shared file: a bare class (0,1,0) loses to `.table td` / `.table thead th`
+   (0,1,1 / 0,1,2). */
+
+/* Was a bare `.mono` and therefore dead — `.table td` sets font-family, so the
+   ROW, TALLY NAME and PRICE cells have been rendering in Space Grotesk. */
+.table td.mono {
   font-family: var(--font-figures);
 }
 
-.numeric {
+/* Cells worked before (`.table td` sets no text-align) but were one property
+   away from silently breaking. The HEADERS did not work: `.table thead th`
+   sets text-align: left and outranked the bare class, so ROW and PRICE have
+   been left-aligned over right-aligned numbers. */
+.table thead th.numeric,
+.table td.numeric {
   text-align: right;
 }
 
-.cellName {
+/* Works today (`.table td` sets no font-weight) but scoped alongside the
+   others so the whole set follows one rule. */
+.table td.cellName {
   font-weight: 600;
 }
 
