@@ -7,7 +7,9 @@ import type { OrderDetailData } from "./OrderDetailView";
 
 export const ORDER_DETAIL_SELECT =
   "id, order_ref, status, notes, admin_comment, total_paise, submitted_at, editable_until, processed_at, tally_bill_no, cancelled_at, cancelled_by, approved_at, approved_by, picked_at, dispatched_at, dispatched_by, dispatch_note, salesman_id, parent_order_id, " +
-  "retailers(name, area, phone, verified), " +
+  // `id` is here so the hero name can LINK to the shop (2026-08-01). It was
+  // name-only before, which is why the link could not simply be written.
+  "retailers(id, name, area, phone, verified), " +
   "salesman:profiles!orders_salesman_id_fkey(full_name), " +
   "processed_by_profile:profiles!orders_processed_by_fkey(full_name), " +
   "cancelled_by_profile:profiles!orders_cancelled_by_fkey(full_name), " +
@@ -78,7 +80,7 @@ export interface OrderDetailQueryRow {
   salesman_id: string;
   parent_order_id: string | null;
   parent_order: { order_ref: string } | null;
-  retailers: { name: string; area: string | null; phone: string | null; verified: boolean } | null;
+  retailers: { id: string; name: string; area: string | null; phone: string | null; verified: boolean } | null;
   salesman: { full_name: string } | null;
   processed_by_profile: { full_name: string } | null;
   cancelled_by_profile: { full_name: string } | null;
@@ -115,6 +117,10 @@ export function toOrderDetailProps(row: OrderDetailQueryRow): {
       parentOrderRef: row.parent_order?.order_ref ?? null,
       salesmanName: row.salesman?.full_name ?? "Unknown",
       processedByName: row.processed_by_profile?.full_name ?? null,
+      // Null only if the embed came back empty — a deleted or RLS-invisible
+      // shop. The name falls back to "Unknown retailer" in that case, and a
+      // null id is what stops the view linking a name that goes nowhere.
+      retailerId: row.retailers?.id ?? null,
       retailerName: row.retailers?.name ?? "Unknown retailer",
       retailerArea: row.retailers?.area ?? null,
       retailerPhone: row.retailers?.phone ?? null,

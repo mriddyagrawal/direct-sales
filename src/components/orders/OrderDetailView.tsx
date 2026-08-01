@@ -110,6 +110,9 @@ export interface OrderDetailData {
   parentOrderRef: string | null;
   salesmanName: string;
   processedByName: string | null;
+  // Null when the retailers embed resolved to nothing; the hero name then
+  // stays plain text rather than linking somewhere that does not exist.
+  retailerId: string | null;
   retailerName: string;
   retailerArea: string | null;
   retailerPhone: string | null;
@@ -308,6 +311,13 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   // return the ref as a link so it's tappable, mirroring the "Backorder of"
   // header link. Returns null for every non-linkable event (plain describeEvent).
   const detailBase = isStaff ? "/dashboard/orders" : isGodown ? "/godown/orders" : "/orders";
+  // The shop behind this order, per lens — same idiom as detailBase above.
+  // GODOWN GETS NO LINK: it can read active retailers (retailers_select_godown)
+  // but there is no godown retailer page, so its hero name stays plain text
+  // rather than pointing at a route that does not exist.
+  const retailerBase = isStaff ? "/dashboard/retailers" : isGodown ? null : "/retailers";
+  const retailerHref =
+    retailerBase && order.retailerId ? `${retailerBase}/${order.retailerId}` : null;
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
     const d = (e.details ?? {}) as Record<string, unknown>;
@@ -518,7 +528,16 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           timeline byline. */}
       <div className={styles.hero}>
         <p className={styles.heroRetailer}>
-          {order.retailerName}
+          {/* The headline is the way into the shop (owner 2026-08-01). Only
+              the NAME is the link — the NEW badge stays a sibling, so the
+              flex row is unchanged. */}
+          {retailerHref ? (
+            <Link href={retailerHref} className={styles.heroRetailerLink}>
+              {order.retailerName}
+            </Link>
+          ) : (
+            order.retailerName
+          )}
           {!order.retailerVerified && <span className={styles.newBadge}>NEW</span>}
         </p>
         {(() => {

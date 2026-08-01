@@ -471,6 +471,26 @@
   gap: 8px;
 }
 
+/* The hero name links to the shop (2026-08-01). It keeps the headline's ink
+   and weight — it is the headline first and a link second — so the whole
+   affordance rides on the underline.
+
+   That underline is PERSISTENT, not hover-only: the phone has no hover, and a
+   tappable headline with no visible cue is a link nobody ever finds. Same
+   reason .parentLink above is underlined; only the colour differs, because
+   that one points at another order and this one IS the heading. Hairline
+   underline so it reads as a quiet affordance, accent on hover. */
+.heroRetailerLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-hairline);
+  text-underline-offset: 4px;
+}
+
+.heroRetailerLink:hover {
+  text-decoration-color: var(--color-accent);
+}
+
 .heroMeta {
   font-family: var(--font-structure);
   font-size: 13px;
