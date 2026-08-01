@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { nowMs } from "@/lib/cart";
 import { DepositFlow, type EditDepositData } from "./DepositFlow";
 import type { RetailerOption } from "@/app/new-order/page";
+import { RETAILER_SELECT } from "@/lib/queries/retailers";
 
 // New / Edit deposit (owner design 2026-07-19): a tiny flow — retailer →
 // amount → method (+ optional note) → save. Shared by the salesman (his
@@ -28,7 +29,13 @@ export default async function NewDepositPage({
   const returnTo = role === "admin" || role === "accountant" ? "/dashboard/deposits" : "/deposits";
 
   const [{ data: retailerRows }, { data: recentRows }] = await Promise.all([
-    supabase.from("retailers").select("id, name, area, verified").order("name"),
+    // RETAILER_SELECT, never a hand-typed list: this page casts the result to
+    // RetailerOption, so a column missing from the select is a LIE the compiler
+    // cannot catch. It was "id, name, area, verified" and the picker's row now
+    // reads outstanding_paise — which arrived as undefined, failed the
+    // `=== null` test, and rendered "₹NaN" in red on all 623 rows, on the screen
+    // used to record money just collected. (REVIEWER, blocking, 2026-08-01.)
+    supabase.from("retailers").select(RETAILER_SELECT).order("name"),
     // Recent = the shops he's collected from lately (deposit history, not orders).
     supabase.from("deposits").select("retailer_id, created_at").order("created_at", { ascending: false }).limit(30),
   ]);
