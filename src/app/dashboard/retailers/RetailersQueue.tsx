@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { createClient } from "@/lib/supabase/client";
 import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
-import { formatRupees } from "@/lib/format";
+import { readBalance } from "@/lib/balance";
 import Link from "next/link";
 import { RetailerModal } from "./RetailerModal";
 import fab from "@/components/ui/fab.module.css";
@@ -22,22 +22,19 @@ type FilterTab = "all" | "pending" | "notSynced" | "verified" | "deactivated";
 // signal that means "missed"; 0 is a real, square balance.
 const isNotSynced = (r: RetailerRow) => r.active && r.outstanding_paise === null;
 
-// ONE definition of how a balance reads, so the table and the phone cards can
-// never disagree. POSITIVE means the shop owes us (set by the nightly sync).
+// The reading itself now lives in lib/balance.ts, shared with the salesman's
+// picker row and Retailers tab — this page was the FIRST surface, not the only
+// one, and its old comment's "ONE definition" claim only stayed true by moving.
+// What stays here is the mapping from the shared state to THIS stylesheet's
+// classes, which is all that was ever page-specific: a CSS-module class is a
+// hashed name scoped to its own file and means nothing anywhere else.
 //
-// Owner 2026-08-01: red when they owe, green when they don't, an em dash when
-// we don't know. Note this is a BINARY state test, not a threshold — colour
-// never depends on HOW much is owed, so it does not reintroduce the
-// credit-limit tiers that were deliberately dropped on 2026-07-31.
-//
-// NULL is "not in the last sync" and must NEVER render as ₹0 — 0 is a real,
-// square balance and gets the green ₹0. Hence the dash, uncoloured: red or
-// green would both be claims we cannot make about an unsynced shop.
+// Owner 2026-08-01: red when they owe, green when they don't (including ₹0 and
+// credit), an uncoloured em dash when we don't know.
 function outstanding(r: RetailerRow): { text: string; cls: string } {
-  if (r.outstanding_paise === null) return { text: "—", cls: styles.amtNone };
-  // ≤ 0 = nothing to chase: square, or in credit because they paid ahead.
-  if (r.outstanding_paise <= 0) return { text: formatRupees(r.outstanding_paise), cls: styles.amtClear };
-  return { text: formatRupees(r.outstanding_paise), cls: styles.amtOwed };
+  const { state, text } = readBalance(r.outstanding_paise);
+  const cls = state === "unknown" ? styles.amtNone : state === "clear" ? styles.amtClear : styles.amtOwed;
+  return { text, cls };
 }
 
 // S11 — the retailers ledger. Desktop renders the shared table grammar; phone
