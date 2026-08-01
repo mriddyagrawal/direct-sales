@@ -22,5 +22,5 @@ export default async function RetailerDetailPage({ params }: { params: Promise<{
 
   if (!data) notFound();
 
-  return <RetailerDetail retailer={data as RetailerRow} />;
+  return <RetailerDetail retailer={data as RetailerRow} role="staff" />;
 }

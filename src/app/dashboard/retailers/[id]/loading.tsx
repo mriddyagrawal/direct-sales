@@ -22,7 +22,9 @@ export default function Loading() {
   return (
     <div className={styles.page}>
       <div className={styles.backRow}>
-        <Skeleton width={120} height={13} />
+        {/* Sized for the real label, which is now the bare word "Back"
+            (‹ Back), not the old "‹ Retailers". */}
+        <Skeleton width={48} height={13} />
       </div>
       <div className={styles.headRow}>
         <Skeleton width="min(340px, 70%)" height={26} />

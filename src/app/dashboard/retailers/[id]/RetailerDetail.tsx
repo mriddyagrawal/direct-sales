@@ -17,24 +17,53 @@ import styles from "./RetailerDetail.module.css";
 // reached from exactly two deliberate places — Add on the queue, Edit here —
 // rather than from an accidental row tap. One editor means one copy of the
 // save rules (blank ledger name -> shop name, rename safety, duplicate guard).
-export function RetailerDetail({ retailer }: { retailer: RetailerRow }) {
+//
+// ONE component, two lenses (spec retailer-detail-salesman-lens, step 1) —
+// exactly as OrderDetailView serves salesman/staff/godown off one `role` prop.
+// The lens is NOT a security boundary: RLS is. A salesman reading an inactive
+// shop gets no row (retailers_select_salesman is `active` only) and the route
+// 404s on its own. What `role` decides is what's WORTH showing.
+export function RetailerDetail({
+  retailer,
+  role,
+}: {
+  retailer: RetailerRow;
+  role: "salesman" | "staff";
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const isStaff = role === "staff";
 
   const rows: { label: string; value: string }[] = [
     { label: "Area", value: retailer.area || "—" },
     { label: "Phone", value: retailer.phone || "—" },
-    // Editor-only elsewhere (it is 596-of-599 identical to the name, so it is
-    // noise in the LIST) — but this IS the editing surface, so it shows.
-    { label: "Tally ledger name", value: retailer.tally_ledger_name || "— not linked —" },
+    // Editor-only (it is 596-of-599 identical to the name, so it is noise
+    // anywhere it isn't being edited). Staff can edit here, so it shows; the
+    // salesman lens has no editing, so it has nothing to serve.
+    ...(isStaff
+      ? [{ label: "Tally ledger name", value: retailer.tally_ledger_name || "— not linked —" }]
+      : []),
   ];
 
   return (
     <div className={styles.page}>
       <div className={styles.backRow}>
-        <BackLink fallback="/dashboard/retailers" className={styles.breadcrumb}>
-          ‹ Retailers
+        {/* CONTEXTUAL back, and the label is why that is sound: reduced to the
+            bare word "Back", the arrow promises no particular screen, so
+            "return to where you came from" cannot break a promise. The
+            deciding journey is the admin's — approve an order → open the shop
+            to check it is creditworthy → return to THAT order. A hierarchical
+            back would dump them on the retailers list every time.
+            `href` stays the lens default so SSR, cmd-click and no-JS still
+            land somewhere real; the salesman has no retailers list, so his is
+            the salesman home. */}
+        <BackLink
+          contextual
+          fallback={isStaff ? "/dashboard/retailers" : "/"}
+          className={styles.breadcrumb}
+        >
+          ‹ Back
         </BackLink>
         {/* Tones match the queue's badges: amber NEW, accent NOT SYNCED, grey
             DEACTIVATED — same signal, same colour, two surfaces. */}
@@ -49,10 +78,16 @@ export function RetailerDetail({ retailer }: { retailer: RetailerRow }) {
 
       <div className={styles.headRow}>
         <h1 className={styles.title}>{retailer.name}</h1>
-        <Button variant="secondary" onClick={() => setEditing(true)}>
-          <Glyph icon={Pencil} />
-          Edit
-        </Button>
+        {/* Staff-only, and NOT because the salesman's write is unsafe — RLS
+            already refuses it (retailers_staff_update is accountant/admin).
+            An affordance that can only ever produce a raw RLS error is worse
+            than no affordance. (Closes flag 59.) */}
+        {isStaff && (
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            <Glyph icon={Pencil} />
+            Edit
+          </Button>
+        )}
       </div>
 
       <dl className={styles.facts}>
