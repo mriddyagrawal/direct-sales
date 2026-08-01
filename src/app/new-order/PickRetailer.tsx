@@ -5,6 +5,7 @@ import { FlowHeader } from "@/components/ui/FlowHeader";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
+import { findNameClash, mapRetailerSaveError, resolveTallyLedgerName } from "@/lib/retailer-identity";
 import type { RetailerOption } from "./page";
 import styles from "./PickRetailer.module.css";
 
@@ -30,6 +31,7 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
   const [phone, setPhone] = useState("");
+  const [tallyName, setTallyName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +52,11 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
     onSelect({ id: r.id, name: r.name, area: r.area });
   }
 
+  // Live duplicate check against the same list the search reads, normalised
+  // exactly as the DB's unique index is (shared norm()) — so what we flag here
+  // is precisely what Postgres would refuse.
+  const quickAddClash = findNameClash(name, retailers);
+
   async function submitQuickAdd() {
     if (!name.trim()) {
       setError("Enter the shop name");
@@ -64,6 +71,9 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
         name: name.trim(),
         area: area.trim() || null,
         phone: phone.trim() || null,
+        // Blank -> the shop name, never null: _apply_ledger matches on this
+        // column only, so a null row would never sync a balance.
+        tally_ledger_name: resolveTallyLedgerName(tallyName, name),
         verified: false,
         created_by: salesmanId,
       })
@@ -71,7 +81,7 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
       .single();
     setSubmitting(false);
     if (insertError || !data) {
-      setError(insertError?.message ?? "Could not add the shop.");
+      setError(insertError ? mapRetailerSaveError(insertError.message) : "Could not add the shop.");
       return;
     }
     onSelect({ id: data.id, name: data.name, area: data.area });
@@ -87,6 +97,31 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
             <Field label="Area" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Area" />
             <Field label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" />
           </div>
+          {/* The salesman searched and missed it — so don't just warn, hand him
+              the shop. One tap takes the same path as picking it from the list,
+              which prevents the duplicate instead of scolding him for it. */}
+          {quickAddClash && (
+            <div className={styles.clash}>
+              <p className={styles.clashText}>
+                <strong>{quickAddClash.name}</strong>
+                {quickAddClash.area ? ` · ${quickAddClash.area}` : ""} is already on the list.
+              </p>
+              <Button variant="secondary" onClick={() => select(quickAddClash)}>
+                Use this shop instead
+              </Button>
+            </div>
+          )}
+
+          {/* Optional and secondary: a salesman in the field has no reason to
+              know Tally ledger names, and must never be blocked by this. */}
+          <Field
+            label="Tally ledger name (optional)"
+            value={tallyName}
+            onChange={(e) => setTallyName(e.target.value)}
+            placeholder={name.trim() || "Same as the shop name"}
+          />
+          <p className={styles.note}>Leave blank and the shop name is used.</p>
+
           <p className={styles.note}>
             Saved as NEW — pending verification. Order now; the office cleans up the record later.
           </p>

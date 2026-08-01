@@ -100,3 +100,22 @@
   font-size: 12px;
   color: var(--color-error);
 }
+
+/* "This shop already exists" — a card, not a scolding: the shop it found plus
+   a one-tap way to use it. Amber (attention) rather than red (failure); the
+   salesman hasn't done anything wrong yet. */
+.clash {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-amber);
+  border-radius: var(--radius);
+}
+
+.clashText {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  color: var(--color-ink);
+}
