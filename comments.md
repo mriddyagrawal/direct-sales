@@ -7121,3 +7121,138 @@ Verified: the string survives only inside the explanatory comment, no render pat
 
 The standing rule still holds for everything else — the REVIEWER does not edit
 BUILDER code unless the owner directs it, as they did here.
+
+---
+
+## Review of 14b024c — style(retailers): drop the row's 48px floor — sized by content instead
+
+**Verdict:** ❌ — **not for what this commit changed**, which is correct and well
+diagnosed, but because tracing its own "three screens" claim uncovered a live
+`₹NaN` regression introduced two commits earlier in `eaa4ea0` (which I passed).
+
+### First, the change itself is right, and the diagnosis is the good part
+
+The owner reported three things — rows too tall, one- and two-line rows nearly
+identical, name and amount looking top-aligned — and the commit correctly
+identifies them as **one cause**, not three preferences.
+
+`min-height: 48px` with `align-items: baseline` is the culprit. Baseline-aligned
+flex items are positioned as a group and that group sits flush to the cross-axis
+start, so a one-line row whose content is ~37px had no way to fill a 48px box:
+content at the top, ~11px of dead space beneath. That is exactly the
+"top-aligned" appearance, and it also squeezed one-line (48px) against two-line
+(54px) — the six pixels that read as "almost no difference".
+
+**I passed `align-items: baseline` in the `eaa4ea0` review and called it better
+than the `flex-start` I had specified.** It *was* better in isolation. What I did
+not do was consider it against the `min-height` sitting three lines above it. The
+owner found the result by looking at it.
+
+Numbers verified by computation, not taken on trust: `--text-body-size: 13px`,
+`.row` padding `10px 4px`, so one line ≈ 10 + ~17 + 10 = **37px** and two lines ≈
+10 + 17 + 2 + ~15 + 10 = **54px**. Both match the message.
+
+### 🟡 71 — the touch target, and the stated remedy does not reach it
+
+37px is below `--touch-target-min` (48px), which every other tappable thing in
+this app respects. The commit is honest about this and names it an accepted
+owner call; the row is full-width so only the vertical target shrinks. The
+failure mode is worth stating plainly: **a mis-tap here picks the wrong SHOP for
+an order or a deposit.**
+
+The commit names the right knob — padding, not `min-height`, since `min-height`
+reintroduces the dead space — but **its arithmetic falls short**: it suggests
+13px padding for "~43px", and 43px is still under 48. To actually reach the floor
+the padding needs to be **~15.5px** (15.5 + 17 + 15.5 ≈ 48), which would also
+keep the one/two-line difference visible (48 vs ~64) because padding scales both
+rows equally.
+
+So the trade is real rather than a missed solution — the owner asked for shorter
+rows and 48px is the accessibility floor — but if mis-taps ever appear, the
+number to reach for is 15–16px, not 13px.
+
+### ❌ BLOCKING — the deposits retailer picker renders `₹NaN` in red on every row
+
+The commit's claim that three screens share `RetailerList` is **correct**, and I
+was wrong to doubt it: I grepped for `<RetailerList` call sites, found one, and
+nearly filed the claim as drift. `DepositFlow.tsx:132` renders `PickRetailer`
+directly, so deposits reaches `RetailerList` transitively. Tracing that is what
+found this.
+
+**The deposits flow runs its own retailer query and it is missing the column:**
+
+```
+deposits/new/page.tsx:31   .select("id, name, area, verified")
+deposits/new/page.tsx:86   retailers={(retailerRows ?? []) as RetailerOption[]}
+```
+
+`RetailerOption = RetailerRow`, which declares `outstanding_paise: number | null`
+— so the **`as` cast tells TypeScript a column is there that the query never
+fetched.** At runtime it is `undefined`, and `undefined === null` is false, so
+`readBalance` falls through to the `owed` arm and formats `undefined`. Proven by
+execution:
+
+```
+deposits row  -> {"state":"owed","text":"₹NaN"}
+null (normal) -> {"state":"unknown","text":"—"}
+0    (normal) -> {"state":"clear","text":"₹0"}
+```
+
+Every row of the deposit flow's shop step shows **`₹NaN` in red** — 623 rows
+claiming an unreadable debt, on the screen a salesman uses to record money he has
+just collected.
+
+**Introduced by `eaa4ea0`, not by this commit** — the moment `RetailerList`
+started reading `outstanding_paise`, the one caller that did not fetch it broke.
+I passed `eaa4ea0` and missed it, because I checked direct `<RetailerList`
+renderers rather than everything that transitively mounts it. Contained only
+because the branch is unpushed.
+
+**The fix is one line**, and it is the exact thing `RETAILER_SELECT` was
+extracted for in `b5df8c2`, whose own message predicted this: *"It was about to
+be hand-typed a third time, which is how one lens quietly ends up missing a
+column."*
+
+```
+deposits/new/page.tsx:31
+  .select("id, name, area, verified")  ->  .select(RETAILER_SELECT)
+```
+
+**Also drop the `as RetailerOption[]` cast** if it can be dropped, or the next
+missing column will hide the same way. The cast is what turned a type error into
+a runtime `NaN`.
+
+Worth checking the same way: `PickRetailer`'s quick-add insert also does
+`.select("id, name, area, verified")`. That path calls `onSelect` immediately
+rather than rendering a row, so it does not produce a visible `NaN` today — but
+it is the same shape of hole.
+
+### One more thing this commit carries that its message does not mention
+
+`14b024c` also contains the `OrderDetailView.tsx` waitLine removal. **That is my
+doing, not the BUILDER's:** the REVIEWER made that edit at the owner's request,
+ran `tsc`/`eslint`/`build` before committing, and in that window this commit's
+whole-working-tree add swept it up. Recorded so it is not read as an unrelated
+change smuggled into a style commit. The REVIEWER's own commit message has been
+amended to match what it actually contains.
+
+**Blocking issues:** the `₹NaN` regression above. One line, and it must land
+before this branch is pushed.
+
+**Non-blocking suggestions:** 🟡 71 above.
+
+**Domain / correctness checks:** **Money** — the blocking issue *is* a money
+display defect: a fabricated amount rendered as fact. **Mobile** — the only
+surface for all three affected screens. **RLS / state machine** — untouched.
+
+**What I tried:** Verified the row-height arithmetic from `--text-body-size` and
+`.row`'s padding (37/54, matching); computed the padding actually needed to reach
+48px (~15.5px, versus the 13px the message suggests); traced every renderer of
+`RetailerList` including transitive ones (`DepositFlow:132` → `PickRetailer` →
+`RetailerList`); read the deposits retailer query and its cast; **executed
+`readBalance` against a deposits-shaped row and captured the `₹NaN`**; confirmed
+the `OrderDetailView` change appears exactly once and `.waitLine` is still used;
+`tsc --noEmit` 0 and `eslint src` 0 — neither catches this, which is the point.
+
+**Open flags (cumulative):** New: 🟡 71. Still open: 🟡 56, 🟡 64 (owner
+deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
