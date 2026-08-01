@@ -5,24 +5,34 @@
   gap: 12px;
 }
 
+/* Same shape as Products' titleRow: wrap, baseline, and the action group
+   pushed right by its OWN auto margin rather than the parent's space-between.
+   The auto margin is what survives a third child — Products has a count
+   between the title and its buttons, and space-between would strand it in the
+   middle of the row. */
 .titleRow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 10px;
 }
 
 /* One Add entry point per form factor (Products pattern): the inline button on
    desktop, the FAB on the phone — never both, or the phone shows it twice. */
 .addDesktop {
+  margin-left: auto;
   display: none;
 }
 
 .pFab {
   position: fixed;
   right: 16px;
-  /* Clears the dashboard's mobile bottom nav + the home indicator. */
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  /* 70px bottom bar + 16px breathing room, matching the Orders FAB (the
+     owner-final phone layout, so it is the reference). The 76px this and
+     Products carried was a fossil of the office bar's old 60px height —
+     DashboardNav raised it to 70px for salesman-bar parity and the FAB offsets
+     were never updated, leaving both sitting 10px low. */
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   display: flex;
   align-items: center;
@@ -37,9 +47,16 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
 }
 
 @media (min-width: 768px) {
+  /* House rule: 16px on the phone, 24px on desktop (Orders/Products/Users all
+     do this; this page and Deposits had simply never got the override). */
+  .page {
+    padding: 24px;
+  }
+
   .addDesktop {
     display: block;
   }

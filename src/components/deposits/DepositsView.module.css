@@ -10,10 +10,23 @@
   padding-bottom: 96px; /* room for the FAB */
 }
 
+/* House rule: 16px on the phone, 24px on desktop. The bottom stays 96px —
+   unlike Products/Retailers this page keeps its FAB on desktop, so the last
+   row still needs clearance to sit above it. */
+@media (min-width: 768px) {
+  .wrap {
+    padding: 24px;
+    padding-bottom: 96px;
+  }
+}
+
 .title {
   font-family: var(--font-structure);
-  font-size: 20px;
-  font-weight: 700;
+  /* The tokens Orders/Products/Retailers/Users all use. This page had them
+     hardcoded at 20px/700 — a pixel off everywhere else, and outside the type
+     scale, so a future token change would have skipped it. */
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
   color: var(--color-ink);
 }
 
@@ -433,12 +446,18 @@
   color: var(--color-white);
   border-radius: 24px;
   font-family: var(--font-structure);
-  font-size: var(--text-body-size);
+  /* 14px + the lift, matching the Orders FAB — this one had drifted to the
+     13px body token and carried no shadow. */
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
+  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
 }
 
-@media (min-width: 1024px) {
+/* 768px, not 1024px: Orders moves its FAB to the desktop corner at the same
+   breakpoint every other layout switches on, and there was no reason for this
+   one to wait an extra 256px (owner 2026-08-01). */
+@media (min-width: 768px) {
   .fab {
     right: 32px;
     bottom: 32px;
