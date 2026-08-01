@@ -6082,3 +6082,45 @@ The flag-57 pin does the job it needs to do — it names the exact tempting dele
 **Open flags (cumulative):** 🟡 57 ✅ CLOSED. 🟡 55, 🟡 56, 🟡 ㊿ open — all three are documentation/latent-fragility notes, none gating. 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
 
 **Process note:** second time in this run a flag has been closed in the very next commit (53 at fed0523, 57 here), and once the builder stopped mid-step to contest a spec instruction that measurement showed was wrong (step 4). The loop is doing what it is for.
+
+---
+
+## Review of ce69eed — feat(retailers): desktop table + phone cards + /dashboard/retailers/[id] detail route
+
+**Verdict:** ⚠️ accept-with-followups
+
+**Phase / commit goal:** Step 6 — the first step with new markup and a new route: Retailers gets a desktop table on the shared grammar, keeps its phone cards, and rows navigate to a real detail page with the edit action relocated there.
+
+**What works:**
+
+- **The navigation pattern is the specced one, not Orders'.** A real `<Link>` in the name cell (`RetailersQueue.tsx:170`) with `.rowLink::after { inset: 0 }` stretching it, and `.linkRow` carrying `position: relative`. No click handler, no `onMouseEnter`, no state — so this page cannot develop the re-render trail Orders had.
+- **Phone cards preserved and upgraded.** Layout untouched (owner-final); they are now a real `<Link>` (`:193`) instead of a div, so they prefetch on scroll like Orders' cards and gain long-press / new-tab.
+- **`tally_ledger_name` appears in the list exactly 0 times**, and does appear on the detail page. That is the owner's editor-only rule implemented precisely.
+- **The route is real and handles absence correctly**: async `params` (Next 16), server client, `.maybeSingle()` → `notFound()`. Links resolve, and a missing row 404s rather than throwing.
+- **The modal decision is the deliberate one the spec asked for.** `RetailerModal` is kept as the single editor, now reached from exactly two intentional places — Add on the queue (`:88`, `:217`) and Edit on the detail page — with `setEditing` gone from the queue entirely (verified: 0 occurrences). One editor means one copy of the save rules; retiring it would have duplicated the blank-ledger-name resolution, rename safety and duplicate guard.
+- Badges move from inline-after-the-name into a STATUS column, so names left-align instead of starting at a different x per row. `tsc` and `eslint src` exit 0.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **58 `position: relative` is on the `<tr>`, which is the historically unreliable half of the stretched-link pattern.** `.linkRow` is applied at `:167` to the row, not a cell. Where an engine does not establish a containing block on a table row, `inset: 0` resolves against the nearest positioned ancestor *above* it and the invisible overlay escapes the row — swallowing clicks across a much larger area, which fails silently and looks like "the page stopped responding in one region". Blink and Gecko handle rows fine; WebKit was the long-standing holdout.
+
+  **I cannot verify this — it needs a browser, and I do not have one.** Scope is limited: the table is `display: none` below 768px, so the exposure is desktop Safari and iPad, not the salesmen's phones. **One manual check in Safari settles it.** If it misbehaves, the fix is to move `position: relative` onto the `<td>` and accept a name-cell-only target, or put an anchor in every cell.
+
+- 🟡 **59 A salesman can reach the new page and will be shown an Edit button that cannot work — pre-existing, not caused here.** `src/app/dashboard/layout.tsx` reads the profile only to style the nav (`isAdmin` for `DashboardNav`); it never redirects, so `/dashboard/**` has no route-level role gate at all. Live policies:
+
+  - `retailers_select_salesman` — a salesman may read **active** retailers, so the detail page renders for them.
+  - `retailers_staff_update` — UPDATE is accountant/admin only, so their save is **refused by the database**.
+
+  The data boundary therefore holds: read is scoped, write is rejected. What they get is a raw RLS error instead of a friendly one. Not introduced by this commit — the same salesman could already open the queue and the same modal — but this adds one more surface where it shows, and the balance/statement task will add a much more sensitive one to this same page. Worth a role gate in the dashboard layout before that lands.
+
+  One thing composes correctly here, apparently by accident: an **inactive** retailer returns null under the salesman policy, so `maybeSingle()` → `notFound()` 404s it rather than revealing that it exists.
+
+**Domain / correctness checks:** **RLS/auth** — checked against live `pg_policies` rather than by reading the app: read scoped by role, update staff-only, verified above. **Money math** — no amounts rendered yet; `outstanding_paise` is selected but only `isNotSynced` consumes it. **Mobile-first** — phone cards' layout provably unchanged, only the wrapper element differs. **Immutable snapshots / state machine** — untouched.
+
+**What I tried:** Read all five changed files; traced `.linkRow`/`.rowLink` to the element each lands on; read `page.tsx` for the params/fetch/404 path; queried live `pg_policies` for `retailers` to establish what a salesman can actually read and write; grepped the queue for `tally_ledger_name` (0) and `setEditing` (0); confirmed the modal's two remaining entry points; `tsc --noEmit` (0), `eslint src` (0). **Not verified:** the stretched link in a real browser — flag 58 exists precisely because I cannot.
+
+**Open flags (cumulative):** new 🟡 58, 🟡 59. 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+**Next-commit suggestion:** step 7 (FAB consolidation) — but 58 wants a Safari click first, since it is the only thing in this run that could be functionally broken rather than visually off.
