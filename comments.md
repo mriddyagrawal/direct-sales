@@ -7686,3 +7686,56 @@ It existed only because a two-line back corner broke the 24px assumption behind 
 **What I tried:** Read the diff; confirmed `Dr` is concatenated into the coloured 600 span rather than the grey 400 one, and checked both classes' declared weights — the basis of the legibility claim; re-checked the absolute-value branch and the ₹0 fall-through survive the reorder; confirmed the change is still confined to `OrderDetailView` and has not reached `lib/balance.ts`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## MERGED TO MAIN AND PUSHED — f87c9d5, 2026-08-02
+
+Not a review. Marking the boundary between "reviewed on a branch" and "live",
+because everything above this line was verified while nothing could reach a user
+and everything below it cannot make that assumption.
+
+`feat/table-standardisation` merged to `main` as `f87c9d5` and pushed —
+`origin/main` and local `main` both at `f87c9d5`, 0 unpushed commits. Vercel
+deploys production from `main`, so this batch is live.
+
+**Verified at the boundary:**
+
+- **Review coverage is complete.** Every BUILDER commit in the merge range has a
+  `## Review of <sha>` block. The only commit without one is `52f9425`, which is
+  the REVIEWER's own amended `comments.md` commit.
+- **`main` builds:** `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+- Nothing from the branch was left behind — `main..feat/table-standardisation`
+  is empty.
+
+**What shipped:** the shared table grammar across Users/Products/ImportWizard/
+Orders, the FAB consolidation, retailer detail plus the salesman lens and its
+route, the shared `RetailerList` and balance rule, the salesman Retailers tab,
+and the order-detail balance line.
+
+**What no one has seen rendered.** Reviewing this run was done by execution —
+`tsc`, `eslint`, `npm run build`, prod SQL probes, and a 1,025-input harness on
+`readBalance` — but a build passing is not a screen looking right, and several
+things here were only ever checked that way:
+
+1. **Next's route prefetch is a no-op in dev.** Every loading boundary added in
+   this run — `/retailers`, `/retailers/[id]`, the shared `RetailerDetailSkeleton`
+   — has only ever been exercised without the behaviour it exists for. Prod is
+   the first place it is real.
+2. **The 37px picker row** is below the 48px `--touch-target-min` every other
+   tappable thing respects (owner-accepted). A mis-tap there picks the **wrong
+   shop** for an order or a deposit. If it is going to bite, it bites in the
+   field, not in a build.
+3. **🟡 74 is now live on both sides of its own inconsistency**: a shop in credit
+   reads `₹45,000 Cr` on order detail and `-₹45,000` in the queue, the picker and
+   the Retailers tab.
+4. **The `₹NaN` class of bug.** The deposits picker rendered `₹NaN` in red on
+   every row for two commits and through one of this reviewer's own ✅ reviews,
+   because a shared component started reading a column one caller never fetched.
+   It was caught and fixed (`f6dc8e5`), and every cast now sits on
+   `RETAILER_SELECT` — but the lesson stands: the failure was invisible to
+   `tsc`, to `eslint`, and to a build, and only a render or a runtime probe
+   showed it.
+
+**Open at the merge:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed),
+🟡 72, 🟡 73, 🟡 74. None blocking; all owner decisions rather than builder work.
