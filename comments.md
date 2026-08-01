@@ -7373,3 +7373,49 @@ Flagged only so it lives somewhere tracked rather than solely in a CSS comment. 
 **What I tried:** Read the route, the browse component, the loading boundary and the tab bar in full; confirmed the `href` branch has a real caller and that `npm run build` registers both `/retailers` and `/retailers/[id]`; checked the tab order and icon against `DashboardNav`'s `Store`; grepped the route for `BackLink` and confirmed the single hit is a comment; verified the fallback change; diffed `tab-shell.module.css` against all three existing copies including deposits' `.scroll` naming; compared the skeleton's inline layout values against `RetailersBrowse.module.css`; scripted used-vs-defined class checks on both new files; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 72. Still open: 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
+
+---
+
+## 🟡 64 CLOSED — REVIEWER-authored at owner request (2026-08-01)
+
+Not a review. Recording that `OrderDetailView` changed again without a BUILDER
+commit — `5287b5f`, the trailing chevron on the hero shop name — so it is not
+read as drift.
+
+**The flag was:** `8beade3` removed the hero link's underline (owner: it made the
+headline look marked-up), leaving `color: inherit; text-decoration: none` with
+the only cue on `:hover`. A phone has no hover, so the name was pixel-identical
+to plain text and the link was discoverable only by accident.
+
+**The fix keeps both things the owner wanted.** A chevron cues "this goes
+somewhere" without touching the type, so the headline stays a headline. It also
+satisfies the app's own glyph rule — *"the glyph NEVER carries meaning alone; it
+always sits beside its text label"* — because the shop name is its label.
+
+Owner chose the surface and direction from three options: **order detail,
+trailing**. The alternative considered and rejected was chevrons on the list
+rows, which would have had to be LEADING (the balance owns the right edge there)
+and would have added a left inset to all 623 rows to cue something the whole row
+already does.
+
+**Two details that are load-bearing rather than decorative:**
+
+- The chevron is **grey**, not ink. Lucide strokes with `currentColor` and the
+  link sets `color: inherit`, so left alone it renders full ink and weighs as
+  much as the headline — reintroducing the marked-up look the underline was
+  removed for. It takes the accent on hover through its own rule, since having
+  its own colour means it does not inherit the link's.
+- It is **inside** the `<Link>`, so it is part of the tap target rather than a
+  decoration beside it.
+
+**Godown is deliberately unchanged:** `retailerBase` is null for that lens, so it
+renders the plain-text branch and gets no chevron. There is no godown retailer
+page for it to point at, and a cue promising navigation that does not exist is
+worse than no cue.
+
+Verified: `.heroRetailerLink` has one call site, so the blast radius is a single
+element; the NEW badge remains a flex sibling so the hero row's geometry is
+untouched; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open after this:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending
+a conversation), 🟡 72.
