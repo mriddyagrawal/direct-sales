@@ -162,8 +162,22 @@ from flag 63.
 **8. `RetailerDetail`'s salesman back fallback changes `/` → `/retailers`.**
 `RetailerDetail.tsx:69` reads `fallback={isStaff ? "/dashboard/retailers" : "/"}`
 and the `/` is there **only because the salesman had no retailers list**. That
-premise dies with this spec. Back stays contextual; only the cold-load fallback
-moves.
+premise dies with this spec.
+
+**Be precise about what this does and does not change.** Back is already
+`contextual` (shipped in `28a9303`), so it returns to `previousPathname()` — the
+fallback is used **only on a cold load**, when the nav mirror is empty. So:
+
+| how he got there | where back goes | via |
+|---|---|---|
+| tapped a row on `/retailers` | the retailers list | the mirror |
+| tapped the shop name on order detail | that order | the mirror |
+| opened the link cold, e.g. from WhatsApp | `/retailers` (was `/`) | **the fallback** |
+
+The first two already work and are unaffected by this change — that "back goes
+wherever I came from" behaviour is exactly what `contextual` bought. Only the
+third row moves, and `/retailers` is the better landing because it is the list
+that contains the shop he was looking at.
 
 **9. Search is unchanged** — it matches name + area, as the picker already does.
 The area simply renders in a different place.
@@ -191,6 +205,21 @@ shrink, the seam is in the wrong place.
 under `["retailers"]`, `TopStrip` + `BottomTabBar`, `HydrationBoundary`, client
 list component. Add the `Store` tab to `BottomTabBar` in position 3. Apply
 decision 8.
+
+**`/retailers` is a TAB HOME, so it has NO back arrow** — `TopStrip` above,
+`BottomTabBar` below, exactly like `/products` and `/` (owner 2026-08-01, and
+confirmed against both: neither renders a `BackLink`). The three shells in play
+are genuinely different and must not be blurred:
+
+| screen | reached by | shell |
+|---|---|---|
+| `/retailers` (list) | tapping the tab | `TopStrip` + `BottomTabBar`, **no back** |
+| picker (`PickRetailer`) | New Order → step 1 of a flow | `FlowHeader` with back, **no tab bar** |
+| `/retailers/[id]` (detail) | a row, or the shop name on order detail | contextual `BackLink`, no tab bar |
+
+The picker keeps its back and stays tab-bar-free because it sits *inside* the
+new-order flow — leaving the flow is what its back means. The list is a
+destination, not a step, so there is nothing behind it to go back to.
 
 ---
 
