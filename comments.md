@@ -5963,3 +5963,33 @@ The comment it leaves behind is better than the fix: it records that this was a 
 **Open flags (cumulative):** 🔴 53 ✅ CLOSED. 🟡 54 ✅ CLOSED. 🟡 ㊿ open (owner-accepted). 51 folded into step 7.
 
 **Note on where these blocks live:** my review commits are landing on `feat/table-standardisation`, not `main` — the builder and I share one working tree, so `git commit` follows whatever they have checked out. Making that **deliberate** from here: reviews of this branch's work belong with the branch and arrive on `main` when it merges. It avoids a cherry-pick that would collide on `comments.md` at merge time.
+
+---
+
+## Review of 4bc21e9 — refactor(products): adopt the shared table grammar
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 3 — Products imports `table.module.css`; its own `.table*`, `.numeric`, `.cellMeta`/`.cellName` and row-hover rules go. Two of four copies gone.
+
+**What works:** Zero `.table` rules left in the page module, import at `ProductsPricing.tsx:17`, `tsc` and `eslint src` both exit 0 (verified independently, not taken from the self-review).
+
+I checked the thing most likely to go wrong in a migration like this — **a page-specific value deleted along with the shared ones**. It didn't happen: every deleted declaration is pure grammar (`width: 100%`, the header block, zebra, `td` typography, `cellMeta`/`cellName`), all of it covered by the shared file. No column widths, no `white-space`, no Products-only tweaks went with it.
+
+The `.clickable` handling looked wrong in the diff and isn't. The rule is **byte-identical before and after**; what changed is who uses it. Before, one page-local `.clickable` served both the phone card (a div) and the desktop row. Now the desktop row takes `table.clickable` — which resolves to `.table tbody tr.clickable`, scoped so it can only reach a row — and the phone card keeps the page-local one. The classes look duplicated and are not: different elements, and the scoped selector provably cannot reach a div. The commit says exactly this and is right.
+
+Both `.numeric` scopings earn their keep here for the first time: `<th className={table.numeric}>` (`:311,316,317`) hits `.table thead th.numeric`, and `<td className={table.mono + table.numeric + table.cellMeta}>` (`:328`) hits all three `.table td.x` rules. On Users, `.numeric` was unused — this is the first page where step 1's specificity fix is load-bearing.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **55 Commit-message nit: "render in JetBrains Mono *again*".** They don't render in mono again — they render in mono **for the first time**. Products paired `.table td { font-family: structure }` with a bare `.mono` for as long as the current history shows, so the desktop table's figures have never been mono. Trivial, but this log's whole value is that a future reader can trust it, and "again" implies a regression was fixed rather than a bug that had always been there.
+
+**Domain / correctness checks:** Money math — the PRICE column is one of the cells gaining its mono face; values themselves untouched, presentation only. RLS / state machine / snapshots — untouched.
+
+**What I tried:** `tsc --noEmit` (0), `eslint src` (0); `grep -c '^\.table'` on the page module → 0; enumerated every deleted CSS declaration and matched each against the shared file; diffed `.clickable` between `5503d59` and `4bc21e9` (identical) and traced both call sites; confirmed `table.numeric` is used on both `th` and `td` and that the shared file scopes both.
+
+**Open flags (cumulative):** new 🟡 55. 🟡 ㊿ open (owner-accepted). 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
+
+**Next-commit suggestion:** ImportWizard (step 4) — the smallest remaining copy, and the only one inside a modal rather than a page.
