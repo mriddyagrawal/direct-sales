@@ -153,42 +153,37 @@
   }
 }
 
-/* The anchor lives in the NAME cell and its ::after covers THAT CELL — not the
-   whole row.
+/* ⚠️ NO absolutely-positioned overlay here, deliberately. Read this before
+   reintroducing a "stretched link".
 
-   It used to stretch over the row, with `position: relative` on the <tr>.
-   Safari broke it (REVIEWER flag 58, reproduced 2026-08-01): WebKit does not
-   make a <tr> a containing block, and nothing above it is positioned either
-   (.shell is `position: fixed` on phone but `static` at desktop), so every
-   overlay resolved against the INITIAL containing block instead — a single
-   viewport-sized box at the top of the document. All ~599 stacked there, the
-   last in DOM order swallowed every click in that region, and the real rows
-   beneath it never saw hover.
+   REVIEWER flag 58, reproduced twice in desktop Safari on 2026-08-01. The
+   pattern was `.rowLink::after { position: absolute; inset: 0 }` anchored to a
+   `position: relative` ancestor. WebKit does not establish a containing block
+   for `position: relative` on table elements — NOT on a <tr>, and NOT on a
+   <td> either; the second attempt moved it one element down and failed
+   identically. With nothing else positioned above it (.shell is
+   `position: fixed` on phone but `static` at desktop), all ~599 overlays
+   resolved against the INITIAL containing block: one viewport-sized box at the
+   top of the document. They stacked there, the last row in DOM order swallowed
+   every click in that region, and the real rows underneath never saw hover.
 
-   ⚠️ Do NOT restore the row stretch by giving a wrapper `position: relative`.
-   The overlays would just escape to that box instead — the same bug in a
-   smaller rectangle, which would look fixed on a short list and stay broken on
-   a long one. A <td> is the largest box that positions reliably here.
+   The lesson is not "pick a different ancestor" — Blink and Gecko position all
+   of these fine, so any element you choose will test clean in Chrome and fail
+   in Safari. Do not guess at an ancestor a third time. The fix is to have no
+   overlay at all:
 
-   The rest of the row is covered by an onClick on the <tr> (see the JSX). That
-   handler is safe: no onMouseEnter, no state, so it cannot reproduce the Orders
-   hover trail, which came from setSelectedIndex firing on hover.
+     - the NAME cell's anchor is `display: block`, so it fills the cell and is
+       a normal click target with no positioning involved;
+     - the REST of the row is an onClick on the <tr> (see the JSX).
 
-   Anything interactive added to the NAME cell later needs `position: relative`
-   to sit above this overlay. */
-.nameCell {
-  position: relative;
-}
-
+   Between them the whole row responds, and nothing depends on how an engine
+   treats `position` on table internals. The handler is safe: no onMouseEnter
+   and no state, so it cannot reproduce the Orders hover trail, which came from
+   setSelectedIndex firing on hover. */
 .rowLink {
+  display: block;
   color: inherit;
   text-decoration: none;
-}
-
-.rowLink::after {
-  content: "";
-  position: absolute;
-  inset: 0;
 }
 
 /* Phone card. It is an <a> now (was a div+onClick) — kill the UA link styling;

@@ -194,7 +194,7 @@ export function RetailersQueue() {
                     router.push(`/dashboard/retailers/${r.id}`);
                   }}
                 >
-                  <td className={`${table.cellName} ${styles.nameCell}`}>
+                  <td className={table.cellName}>
                     <Link href={`/dashboard/retailers/${r.id}`} className={styles.rowLink}>
                       {r.name}
                     </Link>
