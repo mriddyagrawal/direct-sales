@@ -6626,3 +6626,93 @@ It will flip straight back the next time anyone runs `npm run dev`, which is why
 **What I tried:** `git show --stat` + full diff on all seven files; enumerated every `back.*` usage across the five importing files against `back.module.css`'s definitions; grepped `src/` for the three deleted class names (none survive); read the final `.heroRetailerLink` rule to confirm the affordance is genuinely gone rather than merely softened; checked `--text-name-size`, `--text-name-weight`, `--touch-target-min` in `globals.css`; grepped `globals.css` for any `line-height` (there is none — the basis of 🟡 66); recomputed the `-10px` derivation by hand (the basis of 🟡 65); `npm run build` (clean, and its route manifest confirms `/retailers/[id]` does not exist yet).
 
 **Open flags (cumulative):** New: 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67. Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 + 🟡 61 (steps 2–3 outstanding), 🟡 62.
+
+---
+
+## Review of b5df8c2 — feat(retailers): the salesman route — src/app/retailers/[id]
+
+**Verdict:** ✅ — the one thing I said I would watch for is absent, deliberately, and the reasoning is written down.
+
+**Phase / commit goal:** Step 2 of the salesman-lens spec — the route step 4's link already pointed at.
+
+### The thing I was watching for
+
+I said when this spec was handed over that the tell would be a hand-written role check in the route file, and that finding one meant the spec had been misread. **There is none.** The route is:
+
+```
+params → server client → RETAILER_SELECT → .eq("id", id) → maybeSingle() → notFound()
+```
+
+…and a comment saying why nothing more is there: *"THE URL IS NOT THE SECURITY BOUNDARY — RLS is… Writing a guard here would imply the route is what protects the data; it is not."*
+
+That is correct, and it is correct for the verified reason: `retailers_select_salesman` is `active`-only (checked in prod earlier this session), so a deactivated shop — or any id he has no business reading — returns no row and 404s on its own. Identical to how the salesman order route has always worked.
+
+**🟡 59 CLOSES here.** Edit hides because the component knows its lens, not because a route blocks the page — which was the whole point of the flag.
+
+**The dead href from `27ca3b6` is closed.** `npm run build`'s route manifest now lists `/retailers/[id]` alongside `/dashboard/retailers/[id]`. That was the blocking condition on that review; it is discharged.
+
+### The two structural changes are both improvements
+
+**`RETAILER_SELECT` extracted** to `lib/queries/retailers.ts`, used by `fetchRetailers` and both detail routes. The stated reason is the right one — *"It was about to be hand-typed a third time, which is how one lens quietly ends up missing a column."* A column present on one lens and absent on the other is exactly the class of bug that survives review, because both pages look fine in isolation.
+
+**`RetailerDetail` moved to `src/components/retailers/`** now that two routes render it, matching `OrderDetailView` in `src/components/orders/`. Git tracks it as a rename. I re-ran the used-vs-defined CSS class comparison after the move — **8 unique `styles.*` references, all resolve**; `back.row`/`back.link`/`back.label` all resolve too. A file move is precisely when a CSS-module reference goes stale silently, so this was worth checking rather than assuming.
+
+Keeping `RetailerModal` in the dashboard folder is also right and argued rather than assumed: the editor is staff-only by RLS *and* by the component, so it belongs beside the queue that opens it, and `scan/[id]` → godown's `PickScreen` is the existing precedent for the cross-folder import.
+
+`RetailerRow` now imports from `lib/queries/retailers` rather than `../page` — the type follows the select it describes, which is where it should have been.
+
+**Step 3 is disclosed as outstanding** in the message rather than left to be discovered. Reviewed separately below.
+
+### 🟡 68 — the deferred dashboard redirect is now materially easier to hit (owner-deferred, not a new ask)
+
+`src/app/dashboard/layout.tsx` reads `profiles.role` **only** to label the nav and set `isAdmin`. It does not gate. So a salesman who types `/dashboard/retailers/<id>` gets the office shell, `role="staff"`, and therefore a visible **Edit** button — which on tap reaches `retailers_staff_update`, is refused, and surfaces a raw RLS error. That is the precise failure the spec's decision 3 was written to prevent, prevented on the salesman route and still reachable one path segment away.
+
+**No data is exposed by this.** RLS still scopes rows to active shops, and `tally_ledger_name` is already on the wire for him via the picker's `fetchRetailers`. It is an affordance bug, not a leak.
+
+Recording it only because the *context changed*: before this commit the salesman had no reason to be anywhere near a retailer URL, and now he has a retailer page whose office twin differs by one segment. The owner deferred this redirect deliberately ("not annoying us right now") and that call stands — this is a note against it, not a re-ask.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 68 above.
+
+**Domain / correctness checks:** **RLS** — the load-bearing element, and correctly relied upon rather than duplicated; policy re-confirmed `active`-only. **Money** — `outstanding_paise` rides in `RETAILER_SELECT` but this commit renders nothing new. **Mobile** — the salesman lens has no dashboard shell, so it fills the viewport as `orders/[id]` does. **State machine / snapshots** — untouched.
+
+**What I tried:** Read the route in full looking specifically for a role check (none); confirmed `retailers_select_salesman` is `active`-only in prod; scripted used-vs-defined CSS class comparison across the moved component and its stylesheet (8 refs, 0 dangling); checked `back.*` resolution; `npm run build` and read the route manifest to confirm `/retailers/[id]` now exists; read `dashboard/layout.tsx` to see whether the office shell gates by role (it does not — the basis of 🟡 68); `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** **CLOSED: 🟡 59.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (step 3 next), 🟡 62, 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67, 🟡 68 (owner-deferred).
+
+---
+
+## Review of f71e4f3 — feat(retailers): loading boundaries for both retailer-detail routes
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 3 — the loading boundary the previous commit flagged as missing. Both routes get one from a single shared skeleton.
+
+**One skeleton, two lenses, and the lens rules are actually mirrored.** `RetailerDetailSkeleton` takes the same `role` union the page does. I checked the parity against the real component rather than trusting the comment:
+
+| | real `RetailerDetail` | skeleton |
+|---|---|---|
+| staff facts | Area, Phone, Tally ledger name (`:45`, `:46`, `:50–51`) | `["Area","Phone","Tally ledger name"]` |
+| salesman facts | Area, Phone | `["Area","Phone"]` |
+| Edit | `isStaff &&` (`:90`) | `isStaff &&` placeholder |
+
+Exact match on both lenses. This is what makes the skeleton worth having — a shape-matched fallback that does not jump when content lands. A shared skeleton with a role prop is also the same arrangement `OrderDetailSkeleton` already has with its two routes, so this follows the house pattern rather than inventing one.
+
+**`.headRowAction` is a real fix, and the stated reason is exactly right.** The claim is that `Skeleton` renders a `<div>` so the existing `.headRow button { margin-left: auto }` cannot reach it, leaving the placeholder bar against the title instead of hard right. Verified: that `button` rule is real, at `RetailerDetail.module.css:58`. This is the kind of detail that normally ships wrong and gets noticed as "the skeleton looks slightly off" months later.
+
+**All class references resolve** — re-ran the comparison over the new component: `page`, `headRow`, `headRowAction`, `facts`, `fact` all defined, plus `back.row`. Given this project has shipped an invented-class skeleton **once already this session**, that check was the point.
+
+**The prefetch reasoning carried over from the dashboard boundary is correct and now actually pays.** For a dynamic route the loading boundary is what `<Link>` warms — so step 4's link into `/retailers/[id]` had nothing to prefetch until this commit. The comment's warning that deleting the file "silently makes navigation feel slower without breaking anything" is worth keeping where it is.
+
+**🟡 61 CLOSES with this commit** — all four steps of the salesman-lens spec are in: role prop, route, loading boundary, entry point.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** The title placeholder is `height={26}` while `8beade3` moved the real headline to `--text-name-size` (21px, ~27px line box). Off by ~1px — below the threshold of a visible jump, noted only so the number is not mistaken for derived when someone next touches it.
+
+**Domain / correctness checks:** **RLS / money / state machine / snapshots** — untouched, this is a fallback UI. **Mobile** — the salesman boundary has no shared layout and fills the viewport, matching `orders/[id]/loading.tsx`; the staff one sits inside the dashboard shell. Both correct for their lens.
+
+**What I tried:** Read both `loading.tsx` files and the shared skeleton; compared the skeleton's per-lens fact list and Edit gate line-by-line against `RetailerDetail.tsx` (`:45`, `:46`, `:50–51`, `:90`); scripted used-vs-defined class comparison for the skeleton against `RetailerDetail.module.css` (0 dangling); confirmed `.headRow button` exists at `:58`, which is what makes `.headRowAction` necessary; `tsc --noEmit` (0), `eslint src` (0), `npm run build` (clean).
+
+**Open flags (cumulative):** **CLOSED: 🟡 61.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 62, 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67, 🟡 68 (owner-deferred).
