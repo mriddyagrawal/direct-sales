@@ -3,7 +3,7 @@ import { LoginForm } from "./LoginForm";
 import styles from "./login.module.css";
 
 interface LoginPageProps {
-  searchParams: Promise<{ reason?: string }>;
+  searchParams: Promise<{ reason?: string; next?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <div className={styles.card}>
         <Image src="/icon.png" alt="" width={40} height={40} className={styles.mark} />
         <h1 className={styles.name}>Ganpati Enterprises</h1>
-        <LoginForm deactivated={deactivated} />
+        <LoginForm deactivated={deactivated} next={params.next} />
         <p className={styles.footer}>Forgot password? Call the office to reset it.</p>
       </div>
     </main>
