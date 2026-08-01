@@ -7313,3 +7313,63 @@ The correction is right: `10 + 17 + 10 = 37`, so clearing the 48px floor needs *
 **What I tried:** Read the diff (comment-only, one rule's block); re-derived 37px from `--text-body-size: 13px` and `.row`'s `10px 4px` padding and confirmed ~15.5px is what reaches 48.
 
 **Open flags (cumulative):** **CLOSED: 🟡 71.** Still open: 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
+
+---
+
+## Review of 953b62c — feat(retailers): the salesman Retailers tab
+
+**Verdict:** ✅ — step 3 lands the spec as written, and the one thing I have been waiting three commits to see actually works.
+
+**Phase / commit goal:** The final step — `/retailers` list route, the 4th tab, and the `RetailerDetail` fallback.
+
+### The `href` branch renders for the first time, and it is right
+
+I flagged this twice: every previous render of `RetailerList` went through `onSelect`, so the `<Link>` path — the entire reason the component is shared — had never executed. It now has a caller:
+
+```tsx
+<RetailerList retailers={retailers} recentRetailerIds={recentRetailerIds}
+              href={(r) => `/retailers/${r.id}`} />
+```
+
+`npm run build` registers `/retailers` and `/retailers/[id]` together, so the rows point at a route that exists. The discriminated union from `eaa4ea0` did its job: this call site could not have passed both props.
+
+### Everything the spec settled is present, and the checks were run rather than assumed
+
+| spec decision | verified |
+|---|---|
+| Tab order `Products · Orders · Retailers · Deposits`, `Store` icon | exact — `/products` Tag, `/` ReceiptText, `/retailers` **Store**, `/deposits` Wallet |
+| Tab home has **NO back arrow** | the only `BackLink` occurrence in the route is a **comment explaining its absence**; nothing renders one |
+| Mirror `/products` for the shell | auth → `getQueryClient()` → prefetch → `TopStrip` / `BottomTabBar` / `HydrationBoundary` |
+| Share the `["retailers"]` cache | same key, `fetchRetailers`, no new query and no new privilege |
+| All active shops, no "his shops" filter | page adds no filter; RLS scopes it, and the comment says why a `my shops` list would be a fiction |
+| No quick-add, no FAB | neither present |
+| `RetailerDetail` fallback `/` → `/retailers` | `fallback={isStaff ? "/dashboard/retailers" : "/retailers"}` |
+
+RECENT is derived from the same `orders` query shape `new-order/page.tsx` uses, so the picker and the tab lead with the same shops rather than two different ideas of "recent".
+
+**CSS references all resolve** — the two apparent danglings were artifacts of my own grep (`shell.module` from the import path) and a comment, not real. Confirmed by reading both.
+
+**The loading boundary shape-matches** — `padding: 16 / flex column / gap: 16` in the skeleton against `RetailersBrowse.module.css`'s `.page { padding: 16px; display: flex; flex-direction: column; gap: 16px }`. Identical values, so no jump. This is the flag-62 defect class and it is clear here.
+
+### 🟡 72 — `tab-shell.module.css` is shared by name but has one consumer
+
+The new file is byte-identical (comment included) to `.page`/`.content` in `src/app/page.module.css` and `src/app/products/products.module.css`, and to `.page`/`.scroll` in `src/app/deposits/deposits.module.css`. **Verified all three** — each has the `position: fixed; inset: 0` block with the same 2026-07-24 keyboard/URL-bar rationale, and deposits does name its scroller `.scroll` exactly as the file's note says.
+
+So today the count is **four copies, not one** — the shared file prevents a fifth rather than removing any.
+
+**The commit is completely straight about this,** and its disposal is right: it says three copies exist, names them, says adopting the shared file in each is a one-import change with no visual difference, and explains the deferral — those are live screens and this commit was about a new route. Doing risky migration work in the wrong commit is worse than leaving a documented note.
+
+Flagged only so it lives somewhere tracked rather than solely in a CSS comment. The failure mode if it is forgotten is specific: someone needing this shell finds `products.module.css` first and copies *that*, and the count goes to five.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- The skeleton hard-codes its four layout values inline rather than importing `RetailersBrowse.module.css`. They match today — checked — but a change to the real page's padding will not follow, and the skeleton silently stops matching. Importing the same stylesheet would make that structural rather than remembered.
+- A **staff** user who navigates to `/retailers` gets the salesman lens over `retailers_select_staff`, which has no `active` predicate — so they would see the 23 deactivated shops with no chip to distinguish them. Staff have their own page and no link points here for them, so this is a curiosity rather than a defect; noted alongside 🟡 68, which is the same family.
+
+**Domain / correctness checks:** **RLS** — the load-bearing element again, and correctly relied upon rather than duplicated: no filter is written, and the comment says the URL is not what scopes the rows. **Money** — balances render through `readBalance` via the shared row; nothing new. **Mobile** — the entire surface; the tab shell is the fixed-viewport pattern the other three salesman tabs already use. **State machine / snapshots** — untouched.
+
+**What I tried:** Read the route, the browse component, the loading boundary and the tab bar in full; confirmed the `href` branch has a real caller and that `npm run build` registers both `/retailers` and `/retailers/[id]`; checked the tab order and icon against `DashboardNav`'s `Store`; grepped the route for `BackLink` and confirmed the single hit is a comment; verified the fallback change; diffed `tab-shell.module.css` against all three existing copies including deposits' `.scroll` naming; compared the skeleton's inline layout values against `RetailersBrowse.module.css`; scripted used-vs-defined class checks on both new files; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 72. Still open: 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
