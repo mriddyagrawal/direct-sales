@@ -7660,3 +7660,29 @@ It existed only because a two-line back corner broke the 24px assumption behind 
 **What I tried:** Read the diff; grepped for the `Dr`/`Cr` template literals to confirm the change is confined to the two lines in `OrderDetailView` and has not reached `lib/balance.ts` or any list surface; checked `retailer_ledger_entries` carries no Dr/Cr text that could corroborate the Tally-formatting claim (it does not — the markers are implied by the debit/credit columns); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of 46e89ee — style(orders): the Dr/Cr marker moves after the figure, as Tally prints it
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Trailing marker — `₹84,320 Dr` — which is the change `16842f9`'s own note said was one line away.
+
+**The line has now converged on Tally's exact convention**, over four commits on the same hero line: the balance appears (`b22772e`), takes ledger markers (`94c73ab`), loses the full stops (`16842f9`), and now puts the marker where Tally puts it. Each step was owner-driven off a rendered screen and each recorded the next option; this one closes the note the previous one left. Worth saying because the sequence looks like churn in a log and is not — it is a line being fitted to the system of record one observation at a time.
+
+**The legibility claim checks out.** The line ends `… Dr as of 01 Aug` — two trailing phrases — and the commit argues they stay separable because they sit on the weight split already in place. Verified: `balanceText` is `` `${balance.text} Dr` ``, so "Dr" is inside the string that renders in `.heroBalance` (**600**, coloured), while "as of 01 Aug" renders in `.heroBalanceLabel` (**400**, `--color-locked`). The two words are distinguished by weight and colour, not by a separator — which is consistent with `dedf766` deleting the "·" for doing no work.
+
+**The two things most likely to break in a reorder are both intact:** `Cr` still takes the **absolute value** (`-₹45,000 Cr` would state the opposite), and a square **₹0 still takes neither marker**, falling through to `balance.text`.
+
+**The commit flags 🟡 74 itself** — noting the wording lives in `OrderDetailView`, not `lib/balance.ts`, so the queue, picker and tab still read `-₹45,000`. Acknowledging an open reviewer flag rather than quietly leaving it is the right habit; it stays open and unifying it remains its own change.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — worked examples still span the real prod extremes (₹16,78,234 owed, ₹5,00,000 credit), both verified against prod at `94c73ab`; `null` still reads "not in the last sync", never ₹0. Nothing else touched.
+
+**What I tried:** Read the diff; confirmed `Dr` is concatenated into the coloured 600 span rather than the grey 400 one, and checked both classes' declared weights — the basis of the legibility claim; re-checked the absolute-value branch and the ₹0 fall-through survive the reorder; confirmed the change is still confined to `OrderDetailView` and has not reached `lib/balance.ts`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
