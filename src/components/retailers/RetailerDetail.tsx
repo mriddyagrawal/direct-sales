@@ -62,11 +62,16 @@ export function RetailerDetail({
             to check it is creditworthy → return to THAT order. A hierarchical
             back would dump them on the retailers list every time.
             `href` stays the lens default so SSR, cmd-click and no-JS still
-            land somewhere real; the salesman has no retailers list, so his is
-            the salesman home.
+            land somewhere real. His was `/` only because the salesman had no
+            retailers list; that premise died when /retailers shipped, so it is
+            the list that contains this shop now. Narrow change on purpose:
+            back has been CONTEXTUAL since 28a9303, so the fallback is reached
+            only on a COLD load (an empty nav mirror — a link opened from
+            WhatsApp). Arriving from a row, or from the shop name on order
+            detail, still returns to where he came from via the mirror.
             Chrome comes from the SHARED back stylesheet — identical glyph,
             size and placement to order detail (owner 2026-08-01). */}
-        <BackLink contextual fallback={isStaff ? "/dashboard/retailers" : "/"} className={back.link}>
+        <BackLink contextual fallback={isStaff ? "/dashboard/retailers" : "/retailers"} className={back.link}>
           <Glyph icon={ChevronLeft} />
           <span className={back.label}>Back</span>
         </BackLink>
