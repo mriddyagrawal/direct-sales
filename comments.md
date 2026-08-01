@@ -7634,3 +7634,29 @@ It existed only because a two-line back corner broke the 24px assumption behind 
 **What I tried:** `git diff dedf766 HEAD -- src/components/orders/` to confirm the revert is exact rather than approximate (empty); scripted the dead-class sweep in both directions after the revert restored `.byline` and the grouping rule; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** **CLOSED: 🟡 75.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of 16842f9 — style(orders): Dr/Cr without the full stops
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Drop the full stops — `Dr.`/`Cr.` → `Dr`/`Cr`.
+
+**The reasoning is the right kind.** Not "the textbook says so" but *"Tally prints them bare, and Tally is the system this office reads all day"* — matching the system of record over a style guide. That is the same instinct behind translating `Rcpt G Type` into "Receipt" earlier in this run: the app should speak the office's language, and the office's language is whatever Tally shows them.
+
+**Scope is unchanged** — the strings live at `OrderDetailView.tsx:360` and `:362` only, so this is still order-detail-only and **🟡 74 stands exactly as it was**: a credit reads `Cr ₹45,000` here and `-₹45,000` in the queue, the picker and the tab.
+
+**One claim I cannot check from the repo, stated plainly:** that Tally prints `Dr`/`Cr` without stops. Nothing in `retailer_ledger_entries` carries the marker — the sync stores `debit_paise`/`credit_paise` as numbers and the voucher types hold no Dr/Cr text — so there is no evidence either way in this codebase. It matches standard Tally output as far as I know it, and the owner reads those screens daily, so it is their call to confirm rather than mine to verify.
+
+**The note left for later is the valuable part of this commit.** Tally puts the marker **after** the figure (`22,134.00 Dr`); this app leads with it. The commit says so, explains why it chose differently (it reads better beside a shop name, and matches the app's label-first habit elsewhere), and records that reversing it is a one-line change. That is a real difference from the system of record, deliberately taken and written down where the next person will find it.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the worked examples still cover the real prod extremes (₹16,78,234 owed, ₹5,00,000 credit), both of which I verified against prod at `94c73ab`; `₹0` still takes neither marker and `null` still reads "not in the last sync". Nothing else touched.
+
+**What I tried:** Read the diff; grepped for the `Dr`/`Cr` template literals to confirm the change is confined to the two lines in `OrderDetailView` and has not reached `lib/balance.ts` or any list surface; checked `retailer_ledger_entries` carries no Dr/Cr text that could corroborate the Tally-formatting claim (it does not — the markers are implied by the debit/credit columns); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
