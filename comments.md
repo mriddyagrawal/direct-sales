@@ -6970,3 +6970,60 @@ copy of the reading rule); `tsc --noEmit` (0), `eslint src` (0).
 **Open flags (cumulative):** New: 🟡 70 (decide at step 2). Still open: 🟡 56,
 🟡 64 (owner deferred the chevron decision), 🟡 68 (owner-deferred). Closed by
 owner ruling this session: 🟡 ㊿, 🟡 55, 🟡 69.
+
+---
+
+## Review of eaa4ea0 — feat(retailers): shared RetailerList — the picker row gains the balance
+
+**Verdict:** ✅ — all four flagged traps handled, the seam is in the right place, and one solution is better than what the spec asked for.
+
+**Phase / commit goal:** Step 2 — extract search + sectioning + rows into a shared `RetailerList`, and give the Quick Order picker the new row (name + balance on line 1, area + NEW on line 2).
+
+### The four traps — each checked, each clear
+
+**1. `align-items` — handled, and better than specified.** The spec said `flex-start`; the build uses **`baseline`**. That is the more correct answer: `.body` is a flex *column*, so its baseline derives from its first item, which means the amount aligns to the **shop name's baseline** rather than to box tops. With the amount and the name at different font sizes, `flex-start` would have left them visibly off by a couple of pixels. Taking the better option rather than the specified one, silently and correctly, is the right call.
+
+**2. `min-width: 0` — present.** `.body { flex: 1; min-width: 0 }`, and `.name` keeps `overflow/text-overflow/white-space`. This is what stops a 44-character shop name pushing the amount off the row.
+
+**3. The desktop width cap — present.** `.content` gains `max-width: 480px; width: 100%; margin: 0 auto`. Narrower than the 560–640px I suggested, which is a defensible call rather than a miss: it keeps the flow reading as a phone flow on a wide screen instead of a stretched one.
+
+**4. Line 2's condition — correct.** `Boolean(retailer.area) || !retailer.verified`, with a comment naming the failure it avoids. Keyed on the area alone, a quick-added shop would have silently lost its NEW badge.
+
+### The seam is in the right place — measured, per the spec's own test
+
+`PickRetailer` went **200 → 160 lines**, and the extraction is complete rather than partial: grepping the file for `matches`, `localeCompare`, `recentIdSet`, `sectionLabel` and `noResults` finds **no second copy** of any of them. What remains is quick-add state, the quick-add form, the clash card and the `FlowHeader` — exactly what the spec said stays.
+
+**`readBalance` is used, not re-implemented** — the whole point of step 1, and it held under the first surface that could have forked it.
+
+**The tap behaviour is enforced by the type system, not by a comment:**
+
+```ts
+type TapBehaviour =
+  | { onSelect: (retailer: RetailerRow) => void; href?: never }
+  | { href: (retailer: RetailerRow) => string; onSelect?: never };
+```
+
+A union with `never` makes "one or the other, never both" a compile error. That is materially better than a prop pair plus a comment asking nicely, and it is the kind of thing that stops a future caller passing both and getting undefined behaviour.
+
+**The `emptyState` slot keeps quick-add out of the shared component** while still letting the picker offer *"+ Add it as a new shop"* seeded with the live query. The component never learns what quick-add is — it just hands back the query.
+
+### Scope discipline held
+
+**The admin retailers card was NOT touched** — `git show --stat` for `src/app/dashboard/retailers/` is empty and the `No area/phone on file` string is still there. The owner had not decided that question when this commit was written, and the builder correctly did not decide it for them. (It has since been decided; it belongs in a later commit.)
+
+**Verified alongside:** 12 `styles.*` refs in `RetailerList`, 8 in `PickRetailer`, **0 dangling** in either — the CSS-module trap that has bitten this project twice. `PickRetailer.module.css` has **no dead rules** left behind: every retired class (`.retailerRow`, `.retailerName`, `.retailerMeta`, `.newTag`) was removed rather than orphaned. `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**The density question was handed back, as instructed** — the commit message ends by naming the 41%-red problem and saying to judge it by eye rather than pre-emptively softening it. That is the correct disposal of a taste call.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- **The `href` branch of `RetailerList` is unexercised.** `<RetailerList` appears at exactly one call site, and it passes `onSelect`. So the `<Link>` path — and with it the whole reason the component is shared — has never rendered. It is three lines and hard to get wrong, but it is untested code until step 3 wires the tab, and step 3 is where a mistake in it will surface. Worth an explicit look there rather than assuming the symmetric branch works because the other one does.
+- 🟡 70 (credit renders as `-₹50`) is unchanged here, as the owner deferred it pending a conversation. Step 2 has now shipped that reading to a second surface, which is what 70 predicted — still one-line to change in `readBalance`.
+
+**Domain / correctness checks:** **Money** — `readBalance` only; no raw paise, no second formatting path, and `null` still cannot render as ₹0. **RLS** — untouched; no query change, and the picker already received `outstanding_paise`. **State machine / snapshots / gapless** — untouched. **Mobile** — the primary surface here, and the reason traps 1 and 2 mattered: both defects would have shown on a phone first. The desktop cap is the deliberate side-effect decision the spec asked to be made and stated.
+
+**What I tried:** Read `RetailerList.tsx` and its stylesheet in full; checked `.row` for `align-items` (baseline, not center) and `.body` for `min-width: 0`; checked `.content` for the width cap; verified the line-2 condition against the spec's `area || !verified`; measured `PickRetailer` before/after from `eaa4ea0^` (200 → 160) and grepped it for every piece of the extracted logic to confirm no duplicate survived; scripted used-vs-defined CSS class comparison on both files (20 refs, 0 dangling) and a reverse check for orphaned rules (none); confirmed `src/app/dashboard/retailers/` is untouched; `tsc` (0), `eslint src` (0), `npm run build` (clean).
+
+**Open flags (cumulative):** 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending a conversation). Closed this session by owner ruling: 🟡 ㊿, 🟡 55, 🟡 69.
