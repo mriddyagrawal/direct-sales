@@ -346,20 +346,21 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   // what the label was really for: this page has a big order total on it, and
   // "Dr" makes clear the figure is the SHOP's ledger, not the order's money.
   //
-  // NO full stops, deliberately: Tally prints "Dr" and "Cr" bare, and Tally is
-  // the system this office reads all day — matching it beats matching a
-  // textbook. It also keeps the line clean, the same reason the "·" before the
-  // date went.
+  // TRAILING, and with no full stops — "₹22,134 Dr", exactly as Tally prints
+  // it (owner 2026-08-02). Both halves of that are the same argument: Tally is
+  // the system this office reads all day, so the app matching it beats the app
+  // being internally tidy. An earlier version led with the marker and said in
+  // the code that reversing it was a one-line change; this is that change.
   //
   // Cr takes the ABSOLUTE value: formatRupees(-4500000) is "-₹45,000", and
-  // "Cr -₹45,000" would say the opposite of what it means. A square ₹0 gets
-  // NEITHER word — it is not a debit or a credit, it is nothing owed either
+  // "-₹45,000 Cr" would say the opposite of what it means. A square ₹0 gets
+  // NEITHER marker — it is not a debit or a credit, it is nothing owed either
   // way — and stays green with the other nothing-to-chase balances.
   const balanceText =
     balance.state === "owed"
-      ? `Dr ${balance.text}`
+      ? `${balance.text} Dr`
       : balance.paise !== null && balance.paise < 0
-        ? `Cr ${formatRupees(Math.abs(balance.paise))}`
+        ? `${formatRupees(Math.abs(balance.paise))} Cr`
         : balance.text;
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
