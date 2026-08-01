@@ -14,6 +14,7 @@ import { ProductModal, type BrandOption } from "./ProductModal";
 import { ImportWizard } from "./ImportWizard";
 import { StockImportWizard } from "./StockImportWizard";
 import type { ProductRow } from "./page";
+import table from "@/components/ui/table.module.css";
 import styles from "./ProductsPricing.module.css";
 
 type ModalState = { mode: "add" } | { mode: "edit"; product: ProductRow } | null;
@@ -304,16 +305,16 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
             </p>
           )}
           {filteredProducts.length > 0 && (
-          <table className={styles.table}>
+          <table className={table.table}>
             <thead>
               <tr>
-                <th className={styles.numeric}>#</th>
+                <th className={table.numeric}>#</th>
                 <th>BRAND</th>
                 <th>CATEGORY</th>
                 <th>DISPLAY NAME</th>
                 <th>TALLY NAME</th>
-                <th className={styles.numeric}>PRICE</th>
-                <th className={styles.numeric}>STOCK</th>
+                <th className={table.numeric}>PRICE</th>
+                <th className={table.numeric}>STOCK</th>
                 <th>ACTIVE</th>
               </tr>
             </thead>
@@ -321,19 +322,19 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
               {filteredProducts.map((p, index) => (
                 <tr
                   key={p.id}
-                  className={`${styles.clickable} ${!p.active ? styles.rowInactive : ""}`}
+                  className={`${table.clickable} ${!p.active ? styles.rowInactive : ""}`}
                   onClick={() => setModal({ mode: "edit", product: p })}
                 >
-                  <td className={`${styles.mono} ${styles.numeric} ${styles.cellMeta}`}>{index + 1}</td>
-                  <td className={styles.cellMeta}>{p.brands?.name ?? "—"}</td>
-                  <td className={styles.cellMeta}>{p.category}</td>
-                  <td className={styles.cellName}>{p.name}</td>
-                  <td className={`${styles.mono} ${styles.cellMeta}`}>{p.tally_name}</td>
-                  <td className={`${styles.mono} ${styles.numeric}`}>
+                  <td className={`${table.mono} ${table.numeric} ${table.cellMeta}`}>{index + 1}</td>
+                  <td className={table.cellMeta}>{p.brands?.name ?? "—"}</td>
+                  <td className={table.cellMeta}>{p.category}</td>
+                  <td className={table.cellName}>{p.name}</td>
+                  <td className={`${table.mono} ${table.cellMeta}`}>{p.tally_name}</td>
+                  <td className={`${table.mono} ${table.numeric}`}>
                     {p.price_paise === null ? <span className={styles.tbd}>—</span> : formatRupees(p.price_paise)}
                   </td>
                   <td
-                    className={`${styles.mono} ${styles.numeric}`}
+                    className={`${table.mono} ${table.numeric}`}
                     title={p.stock_updated_at ? `as of ${formatShortDate(p.stock_updated_at)}` : undefined}
                   >
                     {p.stock_qty === null ? <span className={styles.tbd}>—</span> : p.stock_qty}
