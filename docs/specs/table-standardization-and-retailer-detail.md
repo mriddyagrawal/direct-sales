@@ -3,9 +3,15 @@
 Owner-approved 2026-08-01. **No DB work anywhere in this spec.** Every column it
 reads already shipped. If you think you need a migration, stop and ask.
 
-**The product is live and in use. Every step below is its own branch and its own
-merge.** Do not commit straight to `main` for any of this — it touches four
-pages people are using right now.
+**The product is live and in use. All of this happens on ONE branch — do not
+commit to `main`.** (Owner 2026-08-01, superseding the earlier branch-per-step
+plan.) Push after every commit; the owner reviews the **Vercel preview
+deployment** for that branch, not production, and the branch only merges to
+`main` once they have signed it off.
+
+The six steps below are still the **commit order** and still each leave the app
+working — that property is what makes the preview reviewable at any point. They
+just share a branch now.
 
 ---
 
@@ -61,25 +67,22 @@ two should not look identical.
 usual objection (it slows the verification queue) was measured and is void:
 **0 shops are pending verification.** There is no batch workflow to protect.
 
-**The Tally ledger name is a disclosure, not a second field (owner 2026-08-01).**
-Measured: of 599 active shops, **596 have `tally_ledger_name` identical to `name`,
-1 differs, 2 unset.** So a co-equal second text input is heavy UI for something
-that matches 99.8% of the time — the owner was right to push on this.
+**The Tally ledger name stays a real field in the editor, and never appears in
+the list (owner 2026-08-01).** Measured: of 599 active shops, **596 have
+`tally_ledger_name` identical to `name`, 1 differs, 2 unset** — so it is an
+editing concern, not a scanning one.
 
-Keep the **column**; it is what makes renaming a shop safe (the display name is
-for humans and may be edited; the ledger link must not move when it is, or a typo
-fix re-points real money). Drop the second **input**:
+- **Editor (detail page, and the quick-add):** keep it as a normal labelled
+  field, plainly distinct from Shop name. No collapsing, no disclosure widget —
+  the owner wants it visible and editable where a shop is being edited.
+- **Retailers table and cards: do not show it, in any form.** No Tally column, no
+  second line under the name, nothing. The list shows the shop's name. Two
+  near-identical names side by side on 599 rows is noise that would make the list
+  harder to scan for no gain.
 
-- Show one **Shop name** field.
-- Beneath it, a quiet line — `Tally ledger: MA Sharda Sales Kusmunda` — with a
-  small edit affordance.
-- **Expand it by default only when it differs from the name**, which today is one
-  shop out of 599. Otherwise it stays collapsed and the form reads as one field.
-- On save, `resolveTallyLedgerName` already does the right thing whether the
-  control was touched or not — no logic change, this is presentation only.
-
-Apply the same treatment on the salesman quick-add: the field stays optional and
-secondary, and a salesman who never opens it is unaffected.
+Keep the **column** regardless of how it is displayed: it is what makes renaming
+a shop safe. The display name is for humans and will be edited; the ledger link
+must not move when it is, or a typo fix silently re-points real money.
 
 ---
 
