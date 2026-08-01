@@ -30,12 +30,22 @@
                floor means one band height for both lenses.
 
    margin-top  a 48px row centres its title 24px down from its own top; order
-               detail's hero centres its first line at ~13.5px (half a 21px
-               line box). Everything above is now identical — 16px padding,
-               a 24px back band, a 16px gap — so pulling this row up by the
-               ~10px difference lands the two headlines together.
-               If either the touch target or the name type scale changes, this
-               number is what has to be re-derived. */
+               detail's hero centres its first line at ~13.5px — half a ~27px
+               LINE BOX, which is what 21px type at `line-height: normal`
+               produces. (Not half of 21. An earlier draft of this comment
+               said "half a 21px line box", which would re-derive to -13.5px
+               and shift the headline 3.5px — REVIEWER 🟡 65.)
+               Everything above is now identical — 16px padding, a 24px back
+               band, a 16px gap — so pulling this row up by the ~10px
+               difference lands the two headlines together.
+
+               THREE things force a re-derivation: the touch target, the name
+               type scale, and — least visibly — the display FONT. Nothing in
+               globals.css sets a line-height, so that ~27px box comes from
+               Space Grotesk's own metrics via next/font; a different face
+               changes it without a single number in this repo changing
+               (REVIEWER 🟡 66). The alignment itself is a rendered-pixel
+               fact, confirmed by the owner on screenshots, not by the CSS. */
 .headRow {
   display: flex;
   flex-wrap: wrap;
