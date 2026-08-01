@@ -11,6 +11,7 @@ import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
 import { formatRupees } from "@/lib/format";
 import Link from "next/link";
 import { RetailerModal } from "./RetailerModal";
+import fab from "@/components/ui/fab.module.css";
 import table from "@/components/ui/table.module.css";
 import styles from "./RetailersQueue.module.css";
 
@@ -278,7 +279,7 @@ export function RetailersQueue() {
       )}
 
       {/* Phone FAB — the same entry point as the desktop button. */}
-      <button type="button" className={styles.pFab} onClick={() => setAdding(true)}>
+      <button type="button" className={`${fab.fab} ${fab.phoneOnly}`} onClick={() => setAdding(true)}>
         <Glyph icon={MapPinPlus} />
         Add
       </button>

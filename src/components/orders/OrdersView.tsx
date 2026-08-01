@@ -15,6 +15,7 @@ import { DEFAULT_RANGE } from "@/lib/date-range";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { SalesmanFilter } from "./SalesmanFilter";
 import { BrandFilter } from "./BrandFilter";
+import fab from "@/components/ui/fab.module.css";
 import table from "@/components/ui/table.module.css";
 import styles from "./OrdersView.module.css";
 
@@ -630,7 +631,7 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
           card. */}
       {/* No New Order FAB for the godown — it never creates orders. */}
       {!isGodown && (
-        <Link href="/new-order" className={styles.fab}>
+        <Link href="/new-order" className={`${fab.fab} ${fab.desktopCorner}`}>
           <Glyph icon={Plus} />
           New Order
         </Link>

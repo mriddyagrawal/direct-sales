@@ -24,32 +24,6 @@
   display: none;
 }
 
-.pFab {
-  position: fixed;
-  right: 16px;
-  /* 70px bottom bar + 16px breathing room, matching the Orders FAB (the
-     owner-final phone layout, so it is the reference). The 76px this and
-     Products carried was a fossil of the office bar's old 60px height —
-     DashboardNav raised it to 70px for salesman-bar parity and the FAB offsets
-     were never updated, leaving both sitting 10px low. */
-  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 0 18px;
-  background: var(--color-accent);
-  color: var(--color-white);
-  border: none;
-  border-radius: 24px;
-  font-family: var(--font-structure);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
-}
-
 @media (min-width: 768px) {
   /* House rule: 16px on the phone, 24px on desktop (Orders/Products/Users all
      do this; this page and Deposits had simply never got the override). */
@@ -59,10 +33,6 @@
 
   .addDesktop {
     display: block;
-  }
-
-  .pFab {
-    display: none;
   }
 }
 

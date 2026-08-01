@@ -14,6 +14,7 @@ import { voidDeposit } from "@/lib/deposit-rpcs";
 import { createClient } from "@/lib/supabase/client";
 import { fetchDepositsList, type DepositListRow, type DepositsScope } from "@/lib/queries/deposits";
 import { useQuery } from "@tanstack/react-query";
+import fab from "@/components/ui/fab.module.css";
 import styles from "./DepositsView.module.css";
 
 // The row shape + list query live in the shared builder (spec D12); the type
@@ -396,7 +397,7 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
       )}
 
       {/* Everyone who can record gets the FAB — salesman page AND office view. */}
-      <Link href="/deposits/new" className={styles.fab}>
+      <Link href="/deposits/new" className={`${fab.fab} ${fab.desktopCorner}`}>
         <Glyph icon={Plus} />
         New deposit
       </Link>

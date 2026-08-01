@@ -14,6 +14,7 @@ import { ProductModal, type BrandOption } from "./ProductModal";
 import { ImportWizard } from "./ImportWizard";
 import { StockImportWizard } from "./StockImportWizard";
 import type { ProductRow } from "./page";
+import fab from "@/components/ui/fab.module.css";
 import table from "@/components/ui/table.module.css";
 import styles from "./ProductsPricing.module.css";
 
@@ -449,7 +450,7 @@ export function ProductsPricing({ brands, isAdmin }: { brands: BrandOption[]; is
 
       {/* Phone FAB (admin): the one Add entry point → the chooser sheet. */}
       {isAdmin && (
-        <button type="button" className={styles.pFab} onClick={() => setAddChooser(true)}>
+        <button type="button" className={`${fab.fab} ${fab.phoneOnly}`} onClick={() => setAddChooser(true)}>
           <Glyph icon={PackagePlus} />
           Add
         </button>
