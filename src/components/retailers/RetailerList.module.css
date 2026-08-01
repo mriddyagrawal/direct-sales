@@ -1,0 +1,131 @@
+/* The shared retailer list — search field, RECENT/ALL sections, rows. Lifted
+   out of PickRetailer.module.css, which is where all of this grammar was born;
+   the picker keeps its shell, its quick-add screen and its empty state. */
+
+.sectionLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+  margin-bottom: 4px;
+}
+
+/* The row. `align-items: baseline` is load-bearing and replaces the
+   `center` this rule used to carry (spec trap 1): the left column can now be
+   TWO lines, and centred alignment would float the amount to the vertical
+   middle of the row — so the amounts would wobble up and down the list
+   depending on whether each shop happens to have an area. A flex item's
+   baseline is the baseline of its FIRST line box, so `baseline` pins the
+   amount to line 1 no matter how tall the left column gets.
+
+   `text-decoration: none` is here because this class is worn by a <button> on
+   the picker and an <a> on the Retailers tab. */
+.row {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--color-hairline);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* The left column. `min-width: 0` is load-bearing (spec trap 2): the name
+   truncated before only because it was a DIRECT flex child of the row. Wrapped
+   in this column it inherits `min-width: auto`, which refuses to shrink below
+   its content, so a long name would shove the amount off the row instead of
+   ellipsising. The longest active shop name is 44 characters — this is not
+   hypothetical. */
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Owner feedback: the names are the scan target — full ink, semibold. */
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* Line 2 — area and/or the NEW badge. Rendered ONLY when there is something to
+   put on it, and nothing is reserved for it: 582 of 599 shops have no area, so
+   reserving space would make 97% of rows taller to serve 3%. */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-locked);
+  font-size: 12px;
+}
+
+/* The area truncates too — it is the only elastic thing on line 2. */
+.area {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.newTag {
+  flex-shrink: 0;
+  font-family: var(--font-figures);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--color-amber);
+  border: 1px solid var(--color-amber);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+}
+
+/* The balance. Figures font, and the row's own 13px rather than the 15px the
+   office phone card uses — this row's name is 13px, and the amount has to read
+   as the same line, not as a heading over it. */
+.amount {
+  flex-shrink: 0;
+  font-family: var(--font-figures);
+  font-weight: 600;
+}
+
+/* Colours map lib/balance.ts's states. Binary, never a threshold — the colour
+   never depends on HOW much is owed (credit-limit tiers were deliberately
+   dropped 2026-07-31). Same three tones as the office ledger, on purpose. */
+.amtOwed {
+  color: var(--color-error);
+}
+
+.amtClear {
+  color: var(--color-processed);
+}
+
+/* "Not in the last sync" — deliberately UNcoloured. Red or green would each be
+   a claim we cannot make about a shop Tally never matched. */
+.amtNone {
+  color: var(--color-locked);
+}
+
+/* The default empty state. The picker overrides it with its own, which offers
+   quick-add; this is what a read-only surface shows. */
+.empty {
+  padding: 24px 0;
+  text-align: center;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
