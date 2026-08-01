@@ -87,11 +87,23 @@
   font-weight: 600;
 }
 
-.numeric {
+/* BOTH scoped as `.table td.x` for the same reason the two rules above are.
+   A bare `.mono` (0,1,0) LOSES to `.table td` (0,1,1), which sets
+   font-family — so an unscoped `.mono` never reaches a cell at all. That is a
+   live bug in the four page-level copies this file replaces: Orders' refs,
+   timestamps and totals have been rendering in Space Grotesk, not JetBrains
+   Mono, against the design spec's mono-figures rule.
+
+   A bare `.numeric` happens to work today only because `.table td` sets no
+   text-align — it would die silently the moment anyone added one. Scoped now
+   rather than left as a trap.
+
+   (Caught by the REVIEWER on step 1, before any page had adopted the file.) */
+.table td.numeric {
   text-align: right;
 }
 
-.mono {
+.table td.mono {
   font-family: var(--font-figures);
 }
 
