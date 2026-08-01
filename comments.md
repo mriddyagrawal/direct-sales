@@ -6563,3 +6563,66 @@ Building 4 before 2 was defensible on its own terms (step 1 shipped a contextual
 **What I tried:** `git show --stat` + full diff; `ls` and `git ls-files` on `src/app/retailers/` (both empty — this is what makes the href dead); `pg_policies` for all three `retailers` SELECT policies; a prod count of orders on deactivated shops, split by status and by the owning profile's role; grep for `.heroRetailerLink` and `.parentLink` in the stylesheet; read `dashboard/retailers/[id]/page.tsx` to confirm staff render an inactive shop rather than 404; `tsc --noEmit` (0), `eslint src` (0).
 
 **Open flags (cumulative):** 🟡 59 still pends step 2 (the lens now has a caller, but the route it calls does not exist). Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (in progress — steps 2 and 3 remain), 🟡 62.
+
+---
+
+## Review of 8beade3 — style(detail): one back eyebrow for both detail pages, matched headlines, no underline
+
+**Verdict:** ⚠️ — the consolidation is clean and verified; three non-blocking flags, one of which is a documentation error inside an explicitly load-bearing comment.
+
+**Phase / commit goal:** Three owner calls off side-by-side screenshots — drop the hero underline, match the two headline sizes, and collapse two divergent back eyebrows into one shared stylesheet.
+
+### The reversal is recorded exactly the way it should be
+
+This commit deletes the persistent underline that `27ca3b6` added **and defended at length** one commit earlier ("a tappable headline with no visible cue is a link nobody ever finds"). Rather than quietly dropping that reasoning, the new comment states the cost and says why it must not be undone:
+
+> *"Accepted cost, stated so nobody 'fixes' it back: on the phone there is now NO visual cue that the name is tappable… The hover tint below is desktop-only by nature and cannot be the affordance."*
+
+That is the right way to overturn a previous commit's argument — the owner saw it rendered and made a call, and the losing argument stays on the record where the next person will find it. Noted so the pattern gets repeated.
+
+The cost is real, though, so it gets a number rather than living only in a CSS comment: **🟡 64**.
+
+**🟡 64 — the linked shop name has zero affordance on the phone.** Final state is `color: inherit; text-decoration: none`, with the only cue on `:hover` → accent. On a touch screen the name is pixel-identical to plain text, so discovery is by accident. Owner-accepted and not a defect — recorded so it is not "found" again in three weeks and re-litigated from scratch. If it ever wants solving without reintroducing the marked-up look, the untried option is a trailing disclosure chevron (`›`) after the name — the standard mobile list idiom, which cues tappability without touching the type.
+
+### The shared eyebrow is clean — verified, not read
+
+- **All three classes resolve.** Enumerated every `back.*` reference across the five importing files against the definitions in `back.module.css`: `.row`, `.link`, `.label` used, same three defined, nothing dangling. This is the CSS-module trap that has bitten this project twice, and it is clear here.
+- **"No `styles.backRow`/`breadcrumb`/`backRef` survives anywhere in src" is true** — grep returns nothing.
+- **`npm run build` clean** — I ran it, not just `tsc`. Route manifest also confirms `/retailers/[id]` is still absent (step 2 outstanding; owner has taken the sequencing, so noted rather than re-flagged).
+- **Headline tokens verified:** `--text-name-size: 21px`, `--text-name-weight: 700`, `--touch-target-min: 48px` all exist and are what the commit says they are. Removing the one-off `22px/700` in favour of the tokens every other page title uses is a genuine drift fix, not a cosmetic one.
+
+**The "same y by coincidence" diagnosis is the good part of this commit.** Two independent accidents — retailer's smaller back row cancelling against its title being centred in a 48px button row — were holding the alignment together, and matching the eyebrows destroyed the cancellation. Catching that *before* shipping, rather than after a screenshot looked off, is the kind of thing that usually gets found the expensive way.
+
+### 🟡 65 — the `-10px` derivation in the comment does not compute
+
+`RetailerDetail.module.css` `.headRow` carries `margin-top: -10px` with a comment that ends *"If either the touch target or the name type scale changes, this number is what has to be re-derived."* So the derivation is explicitly meant to be re-run later — which makes an error in it consequential.
+
+The stated basis:
+
+> *"a 48px row centres its title 24px down from its own top; order detail's hero centres its first line at ~13.5px (**half a 21px line box**)"*
+
+**Half of 21 is 10.5, not 13.5.** The two halves of that sentence disagree. The `13.5` is the plausible figure — it implies a **~27px line box**, which is what a 21px font actually produces — so the resulting `-10px` (24 − 13.65 ≈ 10.35) is very likely correct. It is the *parenthetical* that is wrong: it conflates the font-size with the line box.
+
+Left as-is, anyone re-deriving from the stated basis gets `-13.5px` and moves the headline by 3.5px while believing they followed the instructions. One-word fix: `half a ~27px line box`.
+
+### 🟡 66 — that number silently depends on a font metric nobody set
+
+There is **no `line-height` anywhere in `globals.css`**, so the 27px line box comes from `normal` — i.e. from Space Grotesk's own metrics via `next/font`. `-10px` therefore depends on a value that is not written down in this codebase at all.
+
+Practical consequence: the comment lists the two things that force a re-derivation (touch target, name type scale) but misses the third and least visible one — **changing the display font**. Worth adding to that list. This also means the alignment claim is genuinely owner-verified-by-screenshot rather than reviewer-verified: I can confirm the CSS is internally coherent and every term resolves, but "the two headlines land on the same y" is a rendered-pixel fact and the side-by-side screenshots are the real check.
+
+### 🟡 67 — `next-env.d.ts` is a build artefact and should not be riding in feature commits
+
+The diff flips `./.next/dev/types/routes.d.ts` → `./.next/types/routes.d.ts`. Next rewrites that line depending on whether `next dev` or `next build` ran last — so this is not a code change, it is a fingerprint of the builder having run `npm run build` before committing (which independently corroborates that claim).
+
+It will flip straight back the next time anyone runs `npm run dev`, which is why it was already sitting dirty in the working tree at the start of this session. Left alone it produces a permanently dirty file, spurious diffs in unrelated commits, and an easy merge conflict. Decide it once — either stop committing it or pin it — rather than letting each commit carry whichever value the last command left behind.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 64, 🟡 65, 🟡 66, 🟡 67 above. 65 is a one-word fix and worth folding into the next commit that touches the file.
+
+**Domain / correctness checks:** **RLS / state machine / money / gapless sequences** — untouched, this is presentation only. **Mobile** — the central question of the commit, and handled with an explicitly stated cost (🟡 64); `min-height: var(--touch-target-min)` on `.headRow` keeps the salesman lens's band from collapsing where the Edit button is absent, which is the right instinct. **Immutable snapshots** — untouched.
+
+**What I tried:** `git show --stat` + full diff on all seven files; enumerated every `back.*` usage across the five importing files against `back.module.css`'s definitions; grepped `src/` for the three deleted class names (none survive); read the final `.heroRetailerLink` rule to confirm the affordance is genuinely gone rather than merely softened; checked `--text-name-size`, `--text-name-weight`, `--touch-target-min` in `globals.css`; grepped `globals.css` for any `line-height` (there is none — the basis of 🟡 66); recomputed the `-10px` derivation by hand (the basis of 🟡 65); `npm run build` (clean, and its route manifest confirms `/retailers/[id]` does not exist yet).
+
+**Open flags (cumulative):** New: 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67. Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 + 🟡 61 (steps 2–3 outstanding), 🟡 62.
