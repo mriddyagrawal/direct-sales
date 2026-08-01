@@ -6716,3 +6716,39 @@ Exact match on both lenses. This is what makes the skeleton worth having — a s
 **What I tried:** Read both `loading.tsx` files and the shared skeleton; compared the skeleton's per-lens fact list and Edit gate line-by-line against `RetailerDetail.tsx` (`:45`, `:46`, `:50–51`, `:90`); scripted used-vs-defined class comparison for the skeleton against `RetailerDetail.module.css` (0 dangling); confirmed `.headRow button` exists at `:58`, which is what makes `.headRowAction` necessary; `tsc --noEmit` (0), `eslint src` (0), `npm run build` (clean).
 
 **Open flags (cumulative):** **CLOSED: 🟡 61.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 62, 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67, 🟡 68 (owner-deferred).
+
+---
+
+## Review of 36cf498 — docs(retailers): fix the -10px derivation; stop next-env.d.ts riding in commits
+
+**Verdict:** ✅ — all three flags closed, and 🟡 67 resolved better than I proposed.
+
+**Phase / commit goal:** Clear REVIEWER flags 65, 66 and 67 from the review of `8beade3`. No behaviour change.
+
+**🟡 65 CLOSED.** The corrected comment keeps the `-10px` (correct, and unchanged) and fixes the basis: *"half a ~27px LINE BOX, which is what 21px type at `line-height: normal` produces."* It then names the wrong version explicitly — *"An earlier draft of this comment said 'half a 21px line box', which would re-derive to -13.5px and shift the headline 3.5px"*. That is the right shape for a correction inside a comment whose whole purpose is to be re-run later: the erroneous reasoning is the thing most likely to be independently re-invented, so recording it is worth more than silently deleting it.
+
+**🟡 66 CLOSED.** The re-derivation list is now three terms — touch target, name type scale, and the display font — with the mechanism spelled out: nothing sets a `line-height`, so the ~27px box comes from Space Grotesk's metrics via `next/font`, and swapping the face moves the headline without any number in this repo changing. The comment also now says the alignment is *"a rendered-pixel fact, confirmed by the owner on screenshots, not by the CSS"*, which is the honest limit on what any reviewer can check here.
+
+### 🟡 67 CLOSED — and the builder found the better answer
+
+My flag said to decide the policy once. The builder went and looked instead, and found the decision had **already been made and simply never enforced**: `.gitignore` has listed `next-env.d.ts` since the beginning — I verified it, **line 11** — and `.gitignore` does not apply to files git is already tracking. So the file was ignored-but-tracked, which is exactly how it ends up flipping between `./.next/dev/types/routes.d.ts` and `./.next/types/routes.d.ts` depending on whether `dev` or `build` ran last, and why it was already dirty at the start of this session.
+
+`git rm --cached` makes tracking match the repo's own stated intent rather than setting new policy. That is a materially better resolution than the one my flag suggested, and the distinction is worth naming: it is not a preference anyone has to defend later.
+
+**I verified the one way this could bite — by running it, not by reasoning about it.** Untracking a generated file breaks a fresh clone if anything typechecks before Next regenerates it. Checked:
+
+- Moved `next-env.d.ts` off disk entirely, ran `npm run build` → **compiled successfully and the file was regenerated**. The fresh-clone path works.
+- **No `.github/workflows` exists**, so there is no pipeline running `tsc --noEmit` ahead of `next build`.
+- `git status` is now clean rather than permanently showing a modified file.
+
+Residual, minor and self-healing: a developer who clones and runs `npx tsc --noEmit` before ever running `dev` or `build` will see Next type errors until they run either once. Not worth a flag.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **RLS / money / state machine / snapshots / mobile** — all untouched; this commit is one CSS comment and one index entry, exactly as the message claims.
+
+**What I tried:** Read the corrected comment in full; confirmed `.gitignore:11` carries `next-env.d.ts`; checked for CI workflows (none); **removed `next-env.d.ts` from disk and ran `npm run build` to prove regeneration** (compiled clean, file restored by Next); confirmed `git status` is clean afterwards; `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** **CLOSED: 🟡 65, 🟡 66, 🟡 67.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 62, 🟡 64 (owner-accepted — the phone affordance; owner is actively deciding the replacement), 🟡 68 (owner-deferred).
