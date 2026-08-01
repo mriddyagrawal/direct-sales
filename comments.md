@@ -7256,3 +7256,60 @@ the `OrderDetailView` change appears exactly once and `.waitLine` is still used;
 
 **Open flags (cumulative):** New: 🟡 71. Still open: 🟡 56, 🟡 64 (owner
 deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
+
+---
+
+## Review of f6dc8e5 — fix(deposits): the deposit picker fetched no balance and rendered ₹NaN
+
+**Verdict:** ✅ — **the blocking issue from `14b024c` is CLEARED**, and the fix is a sweep rather than a spot repair.
+
+**Phase / commit goal:** The one-line fix for the `₹NaN` regression: `/deposits/new` hand-typed its retailer select, omitted `outstanding_paise`, and cast the result to a type that promised it.
+
+**The fix is the right one.** `.select(RETAILER_SELECT)`, and `RETAILER_SELECT` is confirmed to carry the column: `"id, name, area, phone, verified, active, tally_ledger_name, outstanding_paise"`. So the value the picker reads now exists, `=== null` behaves, and the `owed`/`₹NaN` arm is unreachable for these rows.
+
+### The sweep claim is the valuable part, and it verifies exactly
+
+The commit says it looked for the same lie everywhere rather than fixing only the reported site: four casts to `RetailerOption`/`RetailerRow` exist, the other three already sit on `RETAILER_SELECT` queries, and this was the only hand-typed retailers select feeding a cast. Checked independently:
+
+| cast | its query |
+|---|---|
+| `deposits/new/page.tsx:93` | `RETAILER_SELECT` (fixed here) |
+| `dashboard/retailers/[id]/page.tsx:20` | `RETAILER_SELECT` |
+| `retailers/[id]/page.tsx:23` | `RETAILER_SELECT` |
+| `lib/queries/retailers.ts:43` | `RETAILER_SELECT` |
+
+And a separate grep for every `from("retailers").select(…)` in `src/` returns **four call sites, all four using `RETAILER_SELECT`** — there is no hand-typed retailers select left anywhere. Every cast in the codebase is now truthful, which is a stronger result than fixing the one screen that broke.
+
+**The quick-add exemption also checks out.** `PickRetailer`'s insert still does `.select("id, name, area, verified")`, but its result is consumed as `onSelect({ id: data.id, name: data.name, area: data.area })` into `SelectedRetailer { id, name, area }` — a three-field type that never becomes a `RetailerRow` and never reaches `readBalance`. Verified against both the call and the interface. Correctly identified as the same *shape* of hole without the same consequence, and correctly left alone.
+
+**Declining to switch to `fetchRetailers()` is good judgment.** That would have deleted the cast outright, which is tempting — but it `throw`s on error where this page currently degrades to an empty list. Changing failure behaviour is not something a blocking fix should smuggle in. Naming the tradeoff instead of taking it silently is the right call.
+
+**Blocking issues:** None. The one from `14b024c` is cleared.
+
+**Non-blocking suggestions:** None. The `as RetailerOption[]` cast survives, but it is now truthful and the commit explains why removing it belongs in separate work.
+
+**Domain / correctness checks:** **Money** — a fabricated amount is no longer rendered as fact; `null` still reads `—` and `0` still reads `₹0`. **RLS** — the select widens the columns fetched, all of which `authenticated` already holds column-level SELECT on and all of which the salesman already receives elsewhere; no policy involved. **Mobile** — the affected surface.
+
+**What I tried:** Confirmed `RETAILER_SELECT` contains `outstanding_paise`; independently enumerated every cast to `RetailerOption`/`RetailerRow` (4) and every `from("retailers").select(…)` (4) and cross-checked that all four use the constant — no hand-typed select remains; traced the quick-add insert to `onSelect` and read `SelectedRetailer`'s shape to confirm it cannot reach `readBalance`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+---
+
+## Review of c1939ba — docs(retailers): the row-height remedy needs ~15.5px, not 13px
+
+**Verdict:** ✅ — **🟡 71 CLOSED.**
+
+**Phase / commit goal:** Correct the arithmetic in `.row`'s comment, which offered 13px of padding as the remedy if 37px rows start causing mis-taps.
+
+Comment only; no rule changed and nothing renders differently — verified from the diff, which touches five lines of a CSS comment and nothing else.
+
+The correction is right: `10 + 17 + 10 = 37`, so clearing the 48px floor needs **+5.5px a side, ~15.5px**, and the 13px previously offered reaches only ~43px — still under the target it was meant to restore. The new text names that shortfall explicitly rather than just substituting the number, which is what stops 13px being offered again by someone who remembers a figure but not why it changed. Same discipline as the `-10px` correction in `36cf498`.
+
+**The 37px itself is unchanged and remains the owner's accepted call** — 🟡 71 was never about reversing that, only about the remedy being unusable as written.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Nothing renders differently; no data, money, RLS or state-machine surface.
+
+**What I tried:** Read the diff (comment-only, one rule's block); re-derived 37px from `--text-body-size: 13px` and `.row`'s `10px 4px` padding and confirmed ~15.5px is what reaches 48.
+
+**Open flags (cumulative):** **CLOSED: 🟡 71.** Still open: 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
