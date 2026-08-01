@@ -6408,3 +6408,41 @@ The shared base is the **union** of what two element types need, and every added
 **Seven bugs surfaced that predated this work** and were found only because copies were read side by side for the first time: `.mono` dead in all four tables; `.numeric` dead on ImportWizard's headers; Users' headers 12px out of line; Orders' hover trail; Cancel mispositioned on phone; the order-detail skeleton floating and overflowing; `PickSkeleton` carrying the same width bug (🟡 62, still open).
 
 **Two were found only by the owner clicking**, not by review: both surfaces rendering on desktop, and the Safari overlay. Both were functional, both invisible to reading, and both on a commit already signed off. The localhost loop earned its cost.
+
+---
+
+## Review of deb0417 — feat(users): phone FAB for Add, desktop keeps the button — matches Products/Retailers
+
+**Verdict:** ⚠️ accept-with-followups
+
+**Phase / commit goal:** Bring Users into line with the other two dashboard pages — hide the inline Add button on phone, offer a FAB instead.
+
+**What works — premise and execution both checked:**
+
+- **The premise is true.** Before this commit `.titleActions` was `display: flex` with **one** mention in the whole module and no breakpoint, so the button really did render at every width while Products and Retailers hid theirs. Users was the odd one out.
+- **The desktop path survives**, which was the thing this could most easily have broken: the base is now `display: none` (line 31) and the `@media (min-width: 768px)` override restoring `display: flex` sits at line 137 — **after** the base rule. Had it been written above, the media query adds no specificity, the base would have won the source-order tie, and Add would have vanished at every width. That is the exact trap that produced the `.list` bug and flag 60 in this same run; here it is on the right side of it.
+- **It consumes the shared FAB rather than starting a fifth copy** — `fab.fab` + `fab.phoneOnly`, no local `.fab`/`.pFab` rule anywhere in the module. One commit after consolidation, the first new caller took the shared file. That is the consolidation paying for itself immediately.
+- **`UserRoundPlus` really is exported** by the installed lucide-react (checked at runtime, not just in types). The commit claims it verified this; it did.
+- `tsc` and `eslint src` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **63 Three pages now show a phone FAB over content that reserves no room for it.** Measured:
+
+  ```
+  OrdersView       padding-bottom: 96px    reserves room
+  DepositsView     padding-bottom: 96px    reserves room
+  ProductsPricing  none
+  RetailersQueue   none
+  UsersAdmin       none
+  ```
+
+  So on phone the last row of Products, Retailers and Users can sit underneath the FAB. Pre-existing on the first two; **this commit adds the third instance**, since Users had no FAB before. The builder flagged it rather than fixing it, correctly — it is a phone-layout change and phone layouts are owner-final. But it is now a pattern rather than an oddity, and the fix is one declaration on each of three pages.
+
+**Domain / correctness checks:** presentation only. No data, RLS, money or state-machine surface. Mobile-first: the change is *about* the phone layout, and its one gap is 63.
+
+**What I tried:** Diffed `.titleActions` before and after (`display: flex`, 1 mention, no breakpoint → `display: none` + a 768px override); confirmed by line number that the override follows the base rather than preceding it; grepped the module for any local FAB rule (none) and the JSX for the shared import; checked `typeof lucide.UserRoundPlus` at runtime; compared `padding-bottom` across all five FAB-bearing modules; `tsc` (0), `eslint src` (0).
+
+**Open flags (cumulative):** new 🟡 63. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 (owner deferred), 🟡 61, 🟡 62. **No blocking items.**
