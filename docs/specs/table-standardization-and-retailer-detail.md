@@ -4,14 +4,27 @@ Owner-approved 2026-08-01. **No DB work anywhere in this spec.** Every column it
 reads already shipped. If you think you need a migration, stop and ask.
 
 **The product is live and in use. All of this happens on ONE branch — do not
-commit to `main`.** (Owner 2026-08-01, superseding the earlier branch-per-step
-plan.) Push after every commit; the owner reviews the **Vercel preview
-deployment** for that branch, not production, and the branch only merges to
-`main` once they have signed it off.
+commit to `main`, and do NOT push.** (Owner 2026-08-01, superseding both the
+earlier branch-per-step plan and the Vercel-preview idea.)
 
-The six steps below are still the **commit order** and still each leave the app
-working — that property is what makes the preview reviewable at any point. They
-just share a branch now.
+The loop, after **every** commit:
+
+1. Commit to the branch. **Do not push.** Nothing leaves this machine until the
+   whole run is signed off.
+2. Start the app on localhost (`npm run dev`) and leave it running.
+3. Tell the owner it is up, and say plainly **what changed and what to look at** —
+   which pages, which surface, phone or desktop.
+4. Wait. The owner clicks through it and comes back with how it feels.
+5. Only then move to the next step.
+
+The steps below are the commit order, and each one leaves the app working — that
+property is what makes this loop possible at all. Push and merge happen once,
+at the end, after every step has been looked at.
+
+**Note on localhost vs production:** Next's route prefetching is a **no-op in dev**.
+The Orders desktop hover trail therefore will NOT reproduce on localhost. That is
+expected, it is pre-existing behaviour, and nothing in this task should be judged
+by its absence there.
 
 ---
 
@@ -222,16 +235,34 @@ leaving two ways to edit.
 
 ---
 
+**7 — Consolidate the FAB.** Last, and only after step 6 has been looked at.
+
+The FAB **bug is already fixed** (d5c49cf): all four now agree on `bottom`,
+`min-height`, `padding`, `border-radius`, `font-size` and `box-shadow`, and
+`bottom: calc(86px + …)` is correct against the 70px bar. **Nothing here is
+user-visible** — this step is purely removing the duplication that let it drift,
+which is why it goes last and can be dropped without affecting anything else.
+
+Same treatment as the table: **`src/components/ui/fab.module.css`**, imported by
+the four pages, page-specific bits staying local. Two differences are deliberate
+and must survive:
+
+- Orders and Deposits keep the FAB on desktop and reposition to `bottom: 32px`.
+- Products and Retailers `display: none` theirs at 768px — those pages have a
+  desktop Add button instead.
+
+Also delete the stale comment above the Products FAB
+(`ProductsPricing.module.css:506`): it still says the bottom bar is **60px**,
+which is the exact wrong number the `76px` bug was computed from. The correct
+note already sits three lines below it.
+
+---
+
 ## Out of scope
 
-**The FAB.** It has the identical disease — four copies across Orders, Deposits,
-Products and Retailers, drifted three ways, and `76px` bottom on two of them
-against a `70px` bar (should be `86px`; the `76` was computed when the office nav
-was 60px). It needs the same cure and it gets its **own** pass. Tangling a
-four-file table refactor with a four-file FAB refactor means one bad review
-reverts both.
-
-**Deposits' table.** See above — different object, deliberately.
+**Deposits' table.** Different object, deliberately — no top rule, no zebra, no
+fixed row height, padding-sized headers. Making it match would change what it
+*is*, not tidy it.
 
 **The balance column and the ledger/statement page.** Next task. Adding one
 right-aligned mono column to a shared table is cheap once this exists.
