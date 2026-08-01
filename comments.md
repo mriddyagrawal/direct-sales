@@ -5834,3 +5834,42 @@ That is 70px of bottom bar + 16px, matching Orders. The previous 76px on Product
 Each is a clean `--no-ff` merge of a reviewed feature branch into `main` with no conflicts and no content beyond the branch tips reviewed above. `npx tsc --noEmit` and `npx eslint src` are clean at `main`'s tip.
 
 **One process note, non-blocking:** all four branches were merged straight to `main` on a product that is live and in use. That was acceptable for additive UI, but `docs/specs/table-standardization-and-retailer-detail.md` requires branch-per-step for the refactor that follows, because it touches four pages people are working in. Flagging so the change of discipline is deliberate rather than a surprise.
+
+---
+
+## Follow-up — browser verification closed, 2026-08-01
+
+The two items left open at the `264a8ac / f3288ee / e0556c7 / c3b4f71` block —
+the ones I read but could not click — were **exercised by the owner and both
+behave**:
+
+- Salesman quick-add: entering a name that already exists surfaces the existing
+  shop with a working one-tap "use that one instead".
+- Office modal: renaming a shop onto another shop's name raises the inline
+  warning before save.
+
+That closes the only unverified surface in that review. The commits stand at ✅.
+
+**Flag dispositions (owner, same session):**
+
+- 🟡 ㊾ — **CLOSED at d88e456.** Comment corrected; code deliberately unchanged.
+  The divergence only ever makes the client stricter than the index, and matching
+  `btrim`'s space-only behaviour would stop the form trimming tabs, which is worse
+  for a human-typed name. Closing it properly needs the indexes rebuilt on
+  `btrim(x, E' \t\n\r')` — a migration, not worth it for input this rare.
+- 🟡 ㊿ — **owner accepts as-is.** The Not-synced tab keys on a null balance alone
+  and will mislabel the first shop that lands in "matched, but Tally sent no
+  figure". Currently 0 shops are in that state. Left open deliberately, not missed.
+- 🟡 51 — acknowledged; consolidation is scoped to its own pass in
+  `docs/specs/table-standardization-and-retailer-detail.md`.
+- 🟡 52 — **CLOSED at d88e456.** `analysis/**` added to `globalIgnores`; full-repo
+  eslint 22 problems → 0. Verified the fix removed noise and not signal: a
+  deliberate `no-explicit-any` under `src/lib` was still reported, then removed
+  and the run went clean.
+
+**Design decision recorded (owner 2026-08-01):** keep `tally_ledger_name` as a
+column, drop it as a co-equal form field. Measured 596 of 599 identical to `name`,
+1 differing, 2 unset — so the second input is heavy UI for a 0.2% case, but the
+column is what keeps a rename from silently re-pointing a shop's ledger link.
+Spec amended: the Tally name becomes a collapsed disclosure that auto-expands only
+when it differs.

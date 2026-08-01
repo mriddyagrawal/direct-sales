@@ -61,6 +61,26 @@ two should not look identical.
 usual objection (it slows the verification queue) was measured and is void:
 **0 shops are pending verification.** There is no batch workflow to protect.
 
+**The Tally ledger name is a disclosure, not a second field (owner 2026-08-01).**
+Measured: of 599 active shops, **596 have `tally_ledger_name` identical to `name`,
+1 differs, 2 unset.** So a co-equal second text input is heavy UI for something
+that matches 99.8% of the time — the owner was right to push on this.
+
+Keep the **column**; it is what makes renaming a shop safe (the display name is
+for humans and may be edited; the ledger link must not move when it is, or a typo
+fix re-points real money). Drop the second **input**:
+
+- Show one **Shop name** field.
+- Beneath it, a quiet line — `Tally ledger: MA Sharda Sales Kusmunda` — with a
+  small edit affordance.
+- **Expand it by default only when it differs from the name**, which today is one
+  shop out of 599. Otherwise it stays collapsed and the form reads as one field.
+- On save, `resolveTallyLedgerName` already does the right thing whether the
+  control was touched or not — no logic change, this is presentation only.
+
+Apply the same treatment on the salesman quick-add: the field stays optional and
+secondary, and a salesman who never opens it is unaffected.
+
 ---
 
 ## The canonical grammar
