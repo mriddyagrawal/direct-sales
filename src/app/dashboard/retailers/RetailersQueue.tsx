@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store } from "lucide-react";
+import { MapPinPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { createClient } from "@/lib/supabase/client";
@@ -79,7 +79,7 @@ export function RetailersQueue() {
             pattern). No import counterpart — shops are added one at a time. */}
         <div className={styles.addDesktop}>
           <Button variant="primary" onClick={() => setAdding(true)}>
-            <Glyph icon={Store} />
+            <Glyph icon={MapPinPlus} />
             Add
           </Button>
         </div>
@@ -174,7 +174,7 @@ export function RetailersQueue() {
 
       {/* Phone FAB — the same entry point as the desktop button. */}
       <button type="button" className={styles.pFab} onClick={() => setAdding(true)}>
-        <Glyph icon={Store} />
+        <Glyph icon={MapPinPlus} />
         Add
       </button>
 
