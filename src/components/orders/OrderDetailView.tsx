@@ -341,20 +341,25 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
       : balance.state === "clear"
         ? styles.balanceClear
         : styles.balanceOwed;
-  // Dr./Cr. instead of an "Outstanding" label (owner 2026-08-02) — the ledger
+  // Dr/Cr instead of an "Outstanding" label (owner 2026-08-02) — the ledger
   // words the office already thinks in, and they carry the direction, which is
   // what the label was really for: this page has a big order total on it, and
-  // "Dr." makes clear the figure is the SHOP's ledger, not the order's money.
+  // "Dr" makes clear the figure is the SHOP's ledger, not the order's money.
   //
-  // Cr. takes the ABSOLUTE value: formatRupees(-4500000) is "-₹45,000", and
-  // "Cr. -₹45,000" would say the opposite of what it means. A square ₹0 gets
+  // NO full stops, deliberately: Tally prints "Dr" and "Cr" bare, and Tally is
+  // the system this office reads all day — matching it beats matching a
+  // textbook. It also keeps the line clean, the same reason the "·" before the
+  // date went.
+  //
+  // Cr takes the ABSOLUTE value: formatRupees(-4500000) is "-₹45,000", and
+  // "Cr -₹45,000" would say the opposite of what it means. A square ₹0 gets
   // NEITHER word — it is not a debit or a credit, it is nothing owed either
   // way — and stays green with the other nothing-to-chase balances.
   const balanceText =
     balance.state === "owed"
-      ? `Dr. ${balance.text}`
+      ? `Dr ${balance.text}`
       : balance.paise !== null && balance.paise < 0
-        ? `Cr. ${formatRupees(Math.abs(balance.paise))}`
+        ? `Cr ${formatRupees(Math.abs(balance.paise))}`
         : balance.text;
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
