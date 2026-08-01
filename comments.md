@@ -7606,3 +7606,31 @@ Not blocking, and arguably not even wrong — the two pages are only ever seen s
 **What I tried:** Read the diff; confirmed `back.module.css` is not among the changed files (so retailer detail cannot be affected); traced both surviving `byline` mentions in the component to comments; scripted the dead-class sweep in both directions (every `styles.*` resolves; no unused rule); re-read `8beade3`'s `-10px` derivation comment and checked its stated 24px assumption against a two-line corner — the basis of 🟡 75; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 75. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of 521920c — Revert "style(orders): the bill number moves under the status chip"
+
+**Verdict:** ✅ — **🟡 75 CLOSED.** The revert is exact and the tree is consistent.
+
+**Phase / commit goal:** Undo `b239a3c`. The bill number returns to the hero.
+
+**The revert is byte-exact, which is the thing worth checking on a revert.** `git diff dedf766 HEAD -- src/components/orders/` produces **nothing** — the tree is identical to the pre-move state, not merely similar. A hand-rolled undo is where a stray line survives; this is a true `git revert` and nothing was left behind.
+
+**Consistent afterwards, both directions:** every `styles.*` reference resolves and no rule in the stylesheet is unused. That matters here specifically because `b239a3c` had *deleted* `.byline` and half of the grouping rule — a revert has to bring both back, and it did, matched to their render sites.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+### 🟡 75 CLOSED
+
+It existed only because a two-line back corner broke the 24px assumption behind `RetailerDetail`'s `margin-top: -10px`, narrowing the cross-page headline alignment to unbilled orders. With the corner back to one line that premise holds again for every order, and the `-10px` comment's three stated re-derivation triggers are complete once more. No edit needed — the flag is closed by the geometry returning, not by a fix.
+
+**Worth keeping on the record:** the alternative `b239a3c` proposed in its own message — the bill number on the same line, between the ref and the chip — is still untried, and it is the one shape that gets "Billed and its number are one fact" without a second line. If the pairing is ever wanted again, that is where to start rather than re-attempting the stacked version.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Presentation only; nothing touched money, RLS, the state machine or snapshots. **Mobile** — the back band returns to one line, so the hero sits where it did on every other screen.
+
+**What I tried:** `git diff dedf766 HEAD -- src/components/orders/` to confirm the revert is exact rather than approximate (empty); scripted the dead-class sweep in both directions after the revert restored `.byline` and the grouping rule; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** **CLOSED: 🟡 75.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
