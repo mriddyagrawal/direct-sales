@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { UserModal } from "./UserModal";
 import { setUserActive } from "./actions";
 import type { UserRow } from "./page";
+import table from "@/components/ui/table.module.css";
 import styles from "./UsersAdmin.module.css";
 
 type ModalState = { mode: "add" } | { mode: "edit"; user: UserRow } | null;
@@ -94,7 +95,7 @@ export function UsersAdmin({ users, callerId }: { users: UserRow[]; callerId: st
 
       {error && <p className={styles.error}>{error}</p>}
 
-      <table className={styles.table}>
+      <table className={table.table}>
         <thead>
           <tr>
             <th>USERNAME</th>
@@ -108,13 +109,13 @@ export function UsersAdmin({ users, callerId }: { users: UserRow[]; callerId: st
           {displayUsers.map((u) => (
             <tr
               key={u.id}
-              className={`${styles.clickable} ${!u.active ? styles.rowInactive : ""}`}
+              className={`${table.clickable} ${!u.active ? styles.rowInactive : ""}`}
               onClick={() => setModal({ mode: "edit", user: u })}
             >
-              <td className={`${styles.mono} ${styles.cellName}`}>{u.username ?? "—"}</td>
-              <td className={styles.cellMeta}>{u.full_name}</td>
-              <td className={styles.cellMeta}>{ROLE_LABEL[u.role] ?? u.role}</td>
-              <td className={`${styles.mono} ${styles.cellMeta}`}>{u.email || "—"}</td>
+              <td className={`${table.mono} ${table.cellName}`}>{u.username ?? "—"}</td>
+              <td className={table.cellMeta}>{u.full_name}</td>
+              <td className={table.cellMeta}>{ROLE_LABEL[u.role] ?? u.role}</td>
+              <td className={`${table.mono} ${table.cellMeta}`}>{u.email || "—"}</td>
               <td onClick={(e) => e.stopPropagation()}>{activeToggle(u)}</td>
             </tr>
           ))}

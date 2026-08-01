@@ -30,69 +30,16 @@
   gap: 8px;
 }
 
+/* Phone card only — the desktop row's cursor now comes from the shared table
+   grammar. Different element, so this is not a duplicate of it. */
 .clickable {
   cursor: pointer;
-}
-
-.table tbody tr.clickable:hover {
-  background: rgba(29, 78, 216, 0.05);
 }
 
 .error {
   font-family: var(--font-structure);
   font-size: 12px;
   color: var(--color-error);
-}
-
-/* Desktop ledger — same S8 grammar as ProductsPricing (hairlines, mono
-   figures, muted metadata, bold primary column). Hidden on mobile. */
-.table {
-  display: none;
-  width: 100%;
-  border-collapse: collapse;
-  border-top: 2px solid var(--color-ink);
-}
-
-.table thead th {
-  text-align: left;
-  font-family: var(--font-figures);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--color-locked);
-  height: 32px;
-  border-bottom: 2px solid var(--color-ink);
-}
-
-.table tbody tr {
-  height: 40px;
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.table tbody tr:nth-child(even) {
-  background: rgba(20, 24, 31, 0.02);
-}
-
-.table td {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  color: var(--color-ink);
-  padding-right: 12px;
-}
-
-.mono {
-  font-family: var(--font-figures);
-}
-
-/* Username is the primary scan target; everything else recedes. Scoped as
-   `.table td.cellX` so it beats `.table td`'s own colour on specificity. */
-.table td.cellMeta {
-  color: var(--color-locked);
-  font-weight: 400;
-}
-
-.table td.cellName {
-  color: var(--color-ink);
-  font-weight: 600;
 }
 
 .rowInactive td {
@@ -181,10 +128,6 @@
 @media (min-width: 768px) {
   .page {
     padding: 24px;
-  }
-
-  .table {
-    display: table;
   }
 
   .cards {

@@ -56,6 +56,13 @@
   background: rgba(20, 24, 31, 0.02);
 }
 
+/* Row-scoped, so this module fully owns clickable-ROW behaviour. A page's own
+   `.clickable` (e.g. a phone card) stays that page's business — different
+   element, not drift. */
+.table tbody tr.clickable {
+  cursor: pointer;
+}
+
 .table tbody tr.clickable:hover {
   background: rgba(29, 78, 216, 0.05);
 }
