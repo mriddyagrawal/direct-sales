@@ -37,7 +37,7 @@ drift, including numbers.
 
 ---
 
-## Seven things the spec settles — do not re-open
+## Eight things the spec settles — do not re-open
 
 Each was decided by measuring something or by an explicit owner call.
 
@@ -68,10 +68,23 @@ private copy makes that comment false.
 **No quick-add on the tab, and therefore no FAB.** Adding a shop is part of
 taking an order from it. The tab is read-only, exactly like `/products`.
 
+**`/retailers` is a TAB HOME and has NO back arrow.** `TopStrip` above,
+`BottomTabBar` below, like `/products` and `/` — neither of which renders a
+`BackLink`. It is a destination, not a step in a flow, so there is nothing behind
+it. The picker is the opposite case and keeps its `FlowHeader` back with no tab
+bar, because it sits *inside* the new-order flow and leaving that flow is what
+its back means. Three different shells; do not blur them. The spec tabulates all
+three.
+
 **`RetailerDetail`'s salesman fallback becomes `/retailers`.**
 `RetailerDetail.tsx:69` has `/` **only because the salesman had no retailers
-list**. That premise dies in step 3. Back stays contextual; only the cold-load
-fallback moves.
+list**. That premise dies in step 3.
+
+Back is already `contextual` (`28a9303`), so it returns to `previousPathname()`
+and **the fallback fires only on a cold load**. Row-tap-to-list and
+shop-name-to-order already work through the nav mirror and are untouched here —
+do not "fix" the mirror thinking the fallback is what makes them work. Only the
+cold-open case moves, from `/` to `/retailers`.
 
 ---
 
