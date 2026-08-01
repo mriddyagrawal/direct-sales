@@ -6209,3 +6209,42 @@ That keeps everything the stretched link was chosen for — prefetch, keyboard f
 **Rejected alternative:** an `<a>` in every cell. It works and is bulletproof, but it multiplies keyboard tab stops by the column count — four per row across 599 rows — which is a worse accessibility outcome than the one it fixes.
 
 **Open flags (cumulative):** 🔴 58 (blocking, was 🟡). 🟡 61, 🟡 59 (restated), 🟡 60, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+---
+
+## 🔴 58 — CLOSED at b262529 (owner-confirmed in Safari, 2026-08-01)
+
+Two attempts failed before this one, and both failures were mine:
+
+- `dfd61b4` moved `position: relative` from the `<tr>` to the `<td>`. The owner reproduced the identical symptom. **WebKit does not establish a containing block for `position: relative` on table internals — not a row, not a cell.** Moving one element down was a guess dressed as a fix.
+- A third guess would have cost another round trip, so `b262529` removed the dependency instead: **no overlay at all.** The name cell's anchor is `display: block` and fills the cell; the rest of the row is the `onClick` already on the `<tr>`. Zero `position: absolute`, zero `position: relative`, zero `::after` in the module. Nothing left that an engine can disagree about.
+
+**Also worth recording: the first two Safari tests were invalid.** The dev server had not recompiled since 17:29:58, while the fixes were committed at 17:44 and 17:54 — so both runs served the original `ce69eed` code and the symptoms never changed. Diagnosed by finding `rowLink:after{...position:absolute...}` still present in the compiled chunk and the superseded JSX comment still in the SSR bundle. **A "the fix didn't work" report is worth one timestamp check on the served build before believing it.**
+
+Follow-ups shipped alongside at `ed1d661`: a selection guard (a drag-select ends in a click, so copying a phone number used to navigate away) and the missing `loading.tsx` — which matters beyond the skeleton, because for a dynamic route the loading boundary is exactly what `<Link>` prefetches.
+
+---
+
+## 📋 Open items — current state, 2026-08-01
+
+Flags run ㊾ (49) → 61. **There is no 62.** No 🔴 blocking items open.
+
+| # | State | What |
+|---|---|---|
+| ㊾ | ✅ CLOSED `d88e456` | `norm()` doc overclaimed; comment corrected, code deliberately unchanged |
+| ㊿ | 🟡 open — **owner-accepted** | Not-synced tab keys on a null balance alone, conflating "never matched" with "matched, Tally sent no figure". 0 shops in that state today |
+| 51 | 🟡 open — **folded into step 7** | "one FAB, four pages" unified the values, not the four copies |
+| 52 | ✅ CLOSED `d88e456` | eslint walked into `analysis/.venv`; 22 problems → 0, signal verified retained |
+| 53 | ✅ CLOSED `fed0523` | bare `.mono` dead inside `.table`; scoped for all five tables at once |
+| 54 | ✅ CLOSED `fed0523` | bare `.numeric` latent; scoped alongside |
+| 55 | 🟡 open | Products commit says figures render mono *"again"* — they render mono for the first time |
+| 56 | 🟡 open | `.errorRow td` ties `.table td` on specificity and wins only on source order (line 254 vs 211). A tidy-up that moves it silently returns error rows to full ink |
+| 57 | ✅ CLOSED `5b3e5ed` | Orders "had no hover" was wrong; the shared hover is load-bearing and now pinned against deletion |
+| 58 | ✅ CLOSED `b262529` | Safari sent every click in the top region to the last retailer. Overlay removed entirely |
+| 59 | 🟡 open | No route-level role gate on `/dashboard`. Access is **intended** (owner) and RLS holds, but the Edit button renders for a role the DB refuses → raw RLS error, and a salesman landing there gets the office shell |
+| 60 | 🟡 open | `OrderDetailView.module.css`: the phone override on `.cancelAction` is dead (media block at 510 precedes the base rule at 521), so Cancel sits pushed to the far end on phone. **Pre-existing, owner-final phone territory** |
+| 61 | 🟡 open | Retailers has only `/dashboard/retailers/[id]`. Orders has had both halves all along (`/orders/[id]` + `/dashboard/orders/[id]`, chosen via `detailBase`). Salesmen are meant to see the balance and statement here |
+
+**Two of these are decisions, not defects.** 61 wants settling *before* the balance task, not after — retrofitting a second route onto a page carrying every shop's credit position is a much worse trade than adding it while the page is four fields and an Edit button. 60 is one line in phone layout the owner has declared final, so it wants an eye rather than a patch.
+
+**Step 7 (FAB consolidation) is the only work left in this run**, and it is cosmetic: the FAB bug is already fixed, so consolidating the four copies changes no pixels.
