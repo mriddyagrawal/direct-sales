@@ -191,6 +191,11 @@ export function RetailersQueue() {
                     // instead of navigating twice.
                     if ((e.target as HTMLElement).closest("a")) return;
                     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    // Don't navigate out from under someone copying a phone
+                    // number: a drag-select inside a row ends with a click on
+                    // it, so without this the office loses the selection and
+                    // lands on the detail page instead.
+                    if (window.getSelection()?.toString()) return;
                     router.push(`/dashboard/retailers/${r.id}`);
                   }}
                 >
