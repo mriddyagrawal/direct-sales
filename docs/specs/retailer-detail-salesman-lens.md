@@ -67,12 +67,48 @@ scoping already exist, so this is small.
 **1. Add a lens prop, do not fork the component.** `RetailerDetail` takes a
 `role: "salesman" | "staff"`. One component, one query, exactly as orders does.
 
-**2. Salesman back destination is `/`.** Their retailers list does not exist, so
-`/dashboard/retailers` would drop them into the office shell. `/` is also
-consistent with `BackLink`'s documented behaviour: it upgrades to
-`history.back()` only when the previous page *is* the fallback, and falls
-through to a plain link otherwise — the component's own comment calls that the
-intended trade for "a detail reached from another detail".
+**2. Back is CONTEXTUAL, the label is always the single word "Back", and it uses
+the existing nav mirror — NOT a `?from=` query param.** (Owner 2026-08-01.)
+
+The deciding journey is the admin's: approve an order → open the shop to check
+whether it is creditworthy → return to that order. A hierarchical back landing
+on the retailers list breaks that loop on **every** order, and it is the main
+journey rather than an edge case.
+
+`?from=` was the obvious mechanism and is **not** what to build. `src/lib/nav-history.ts`
+already does this properly:
+
+- **module-level, per-tab, reset on any hard load** — so a cold load (a link
+  opened from WhatsApp) has an empty stack, `previousPathname()` returns null,
+  and Back falls through to the lens default. The case that defeats a blind
+  `router.back()` is already handled.
+- **popstate-aware** — a back traversal *pops* the mirror rather than pushing,
+  so the `detail ‹ scan ‹ detail` cycle the owner reproduced in 2026-07 is
+  solved **at the mirror**, not by avoiding `router.back()`.
+
+**Why the label change is what makes this viable.** `BackLink` only upgrades to
+`router.back()` when `previousPathname() === fallback` — a strict check that
+back lands where *the arrow promises*, which exists because the label names a
+destination (`‹ Retailers`). With the label reduced to **"Back"**, the arrow
+promises no particular screen, so "return to wherever you came from" is coherent
+and the strict check stops earning its keep.
+
+Build it as: decide **in the click handler**, never during render —
+`previousPathname()` is client-only module state and reading it while rendering
+would hydrate differently from the server. `href={fallback}` stays the lens
+default (`/dashboard/retailers` for staff, `/` for the salesman, who has no
+retailers list) so SSR, modified clicks and no-JS all still land somewhere real.
+
+**Accepted cost:** the strict check was also what kept a *drifted* mirror safe —
+the module's own comment notes it can diverge on a forward button or an
+unexpected traversal, after which BackLink used to fall through to the plain
+link. Loosened, a drifted mirror sends the user to an unexpected in-app page
+instead. Rare, and the failure is "a different app screen", not a broken state.
+
+**Do NOT add a `?from=` param.** It would work, but it puts an
+attacker-controlled path in the URL (needing the same validation as `safeNext`),
+pollutes shareable links with their origin, and duplicates a mechanism this
+codebase already has and has already debugged twice.
 
 **3. Edit is staff-only.** Hide it on the salesman lens. Not because it is
 unsafe — `retailers_staff_update` already refuses their write — but because an

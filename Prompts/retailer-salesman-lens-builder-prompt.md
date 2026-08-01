@@ -44,8 +44,19 @@ inactive shop because `retailers_select_salesman` returns no row and
 `maybeSingle()` → `notFound()` — **not** because you wrote a check. Do not add
 role guards to the route; add a `role` prop to the component.
 
-**Salesman back destination is `/`, not `/dashboard/retailers`.** They have no
-retailers list, and that fallback would drop them in the office shell.
+**Back is contextual and uses `src/lib/nav-history.ts` — do NOT add a `?from=`
+query param.** The mirror is per-tab, resets on any hard load (so a cold link
+falls back correctly) and is popstate-aware (so the `detail ‹ scan ‹ detail`
+cycle is already solved). Decide in the CLICK HANDLER, never during render —
+it is client-only module state and reading it while rendering hydrates
+differently from the server. `href` stays the lens default:
+`/dashboard/retailers` for staff, `/` for the salesman, who has no retailers
+list.
+
+**The label is always the single word "Back".** That is what makes the above
+sound: `BackLink`'s strict `previousPathname() === fallback` check exists
+because the label names a destination. A label that promises nothing cannot
+break its promise.
 
 **Edit is hidden on the salesman lens** — the DB already refuses their write, so
 the button would only ever produce a raw RLS error. This is also what closes
