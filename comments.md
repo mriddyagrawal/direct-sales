@@ -6155,3 +6155,30 @@ The reason is diagnosable: I audited step 6 as a set of *rules in isolation* —
 **What I tried:** Read the diff and confirmed the media block now follows the base rule; scripted a repo-wide sweep for media-before-base selector collisions across every module; hand-verified both hits for shared properties; identified the enclosing media query for the surviving hit by line number.
 
 **Open flags (cumulative):** new 🟡 60. 🟡 58 (needs a Safari click), 🟡 59, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+---
+
+## Flag 59 — RESTATED, and flag 61 raised (owner clarification, 2026-08-01)
+
+**Owner: salesmen seeing each retailer and their history is INTENDED, not a leak.** That changes what flag 59 is. It was written as "a salesman can reach a page they should not"; that premise is wrong. Restating it, and raising the structural gap it was obscuring.
+
+**🟡 59 (restated) — not access, chrome.** The access is intended and the data boundary is sound: `retailers_select_salesman` scopes reads to active shops, `retailers_staff_update` refuses their writes. Two things remain, both cosmetic-to-confusing rather than unsafe:
+
+- The **Edit** button renders for a role the database will reject, so a salesman who taps it gets a raw RLS error. Gate the affordance on role; the DB already guards the action.
+- `/dashboard/**` has no route-level role gate, so a salesman landing there gets the **office shell** — `DashboardNav`, not their own bottom tab bar — with no way back into their app.
+
+**🟡 61 — the retailer detail page has no salesman-side route, and the next task needs one.** This codebase already has the answer for exactly this problem, applied consistently to orders:
+
+```
+src/app/orders/[id]             salesman
+src/app/dashboard/orders/[id]   staff
+detailBase = isStaff ? "/dashboard/orders" : "/orders"    (new-order/page.tsx:84)
+```
+
+echoed at `scan/[id]/page.tsx:35` and mirrored by `deposits/new`. Retailers has **only** the `/dashboard` half — step 6 built the office queue's destination, which is all its spec asked for, so this is a gap for the *next* task rather than a defect in this one.
+
+It matters because the owner has already decided salesmen see the balance and the statement on this page ("the salesman should be able to see the statement and the balance, like the admin and the accountant"). Without the second route they either reach it through the office shell or cannot reach it at all — and today there is no link to retailer detail from any salesman surface, so it is currently the latter.
+
+**Recommendation for the balance/statement task:** add `src/app/retailers/[id]` alongside the dashboard one and select between them with the established `detailBase` idiom, rather than inventing a third pattern or relaxing the dashboard gate. Deciding this *before* the balance lands is the cheap moment — retrofitting a second route after the page carries every shop's credit position is not.
+
+**Open flags (cumulative):** 🟡 59 restated, new 🟡 61. 🟡 58 (needs a Safari click), 🟡 60, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
