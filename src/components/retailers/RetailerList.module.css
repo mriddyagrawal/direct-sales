@@ -82,16 +82,23 @@
   white-space: nowrap;
 }
 
+/* Owner 2026-08-01: too big and too thick on the row. 10px -> 9px, which is
+   also what every OTHER NEW badge in the app uses (the retailers queue, the
+   orders list, order detail — all 9px/700), and the padding drops 2px 6px ->
+   1px 5px. Total height ~19px -> ~16px.
+   This one keeps its outline rather than adopting those badges' filled amber:
+   an outline is the lighter of the two, and "lighter" is the ask. It sits
+   beside grey 12px area text on line 2, not against a heading. */
 .newTag {
   flex-shrink: 0;
   font-family: var(--font-figures);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--color-amber);
   border: 1px solid var(--color-amber);
   border-radius: var(--radius);
-  padding: 2px 6px;
+  padding: 1px 5px;
 }
 
 /* The balance. Figures font, and the row's own 13px rather than the 15px the
