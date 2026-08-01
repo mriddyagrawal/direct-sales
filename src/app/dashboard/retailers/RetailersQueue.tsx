@@ -145,12 +145,32 @@ export function RetailersQueue() {
         </div>
       ) : (
         <>
-          {/* DESKTOP. Navigation is a real <a> in the name cell stretched over
-              the whole row (.rowLink::after), NOT a <tr onClick>: one anchor
-              gives prefetch, keyboard focus, middle-click and open-in-new-tab
-              with no click handler and no re-render. The badges move out of
-              the name and become their own STATUS column, so names left-align
-              instead of starting at a different x on every row. */}
+          {/* DESKTOP. Navigation is a real <a> in the name cell PLUS a plain
+              row click for the rest of the row.
+
+              It was one <a> stretched over the whole row via
+              `.rowLink::after` + `position: relative` on the <tr>. That is
+              broken in Safari (REVIEWER flag 58, reproduced 2026-08-01):
+              WebKit does not make a <tr> a containing block, and nothing above
+              it is positioned either (.shell is fixed only on phone), so every
+              row's overlay fell through to the INITIAL containing block — one
+              viewport-sized box at the top of the document. All ~599 stacked
+              there, the last in DOM order won every click, and the rows
+              underneath got no hover at all.
+
+              Do NOT re-fix that by adding `position: relative` to a wrapper:
+              the overlays would simply all escape to that box instead.
+
+              So the stretch is scoped to the name CELL, which positions
+              reliably everywhere, and the rest of the row gets an onClick. The
+              anchor still carries prefetch, keyboard focus, middle-click,
+              open-in-new-tab and screen-reader semantics. The handler is safe
+              here because there is NO onMouseEnter and no state — Orders'
+              hover trail came from setSelectedIndex firing on hover, never
+              from onClick.
+
+              The badges move out of the name into a STATUS column, so names
+              left-align instead of starting at a different x on every row. */}
           <table className={table.table}>
             <thead>
               <tr>
@@ -164,9 +184,17 @@ export function RetailersQueue() {
               {filtered.map((r) => (
                 <tr
                   key={r.id}
-                  className={`${table.clickable} ${styles.linkRow} ${!r.active ? styles.rowDeactivated : ""}`}
+                  className={`${table.clickable} ${!r.active ? styles.rowDeactivated : ""}`}
+                  onClick={(e) => {
+                    // The name cell owns a real <a>. Let it handle its own
+                    // click — including cmd/ctrl/middle-click for a new tab —
+                    // instead of navigating twice.
+                    if ((e.target as HTMLElement).closest("a")) return;
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    router.push(`/dashboard/retailers/${r.id}`);
+                  }}
                 >
-                  <td className={table.cellName}>
+                  <td className={`${table.cellName} ${styles.nameCell}`}>
                     <Link href={`/dashboard/retailers/${r.id}`} className={styles.rowLink}>
                       {r.name}
                     </Link>

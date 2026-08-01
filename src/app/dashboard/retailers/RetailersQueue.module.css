@@ -153,13 +153,30 @@
   }
 }
 
-/* The stretched-link pattern (spec 2026-08-01): the anchor lives in the NAME
-   cell but its ::after covers the whole row, so the entire row is clickable
-   without a <tr onClick>. Keeps prefetch, focus, middle-click and
-   open-in-new-tab; costs no click handler and no re-render.
-   Anything interactive added to a row later needs `position: relative` to sit
-   above this overlay. */
-.linkRow {
+/* The anchor lives in the NAME cell and its ::after covers THAT CELL — not the
+   whole row.
+
+   It used to stretch over the row, with `position: relative` on the <tr>.
+   Safari broke it (REVIEWER flag 58, reproduced 2026-08-01): WebKit does not
+   make a <tr> a containing block, and nothing above it is positioned either
+   (.shell is `position: fixed` on phone but `static` at desktop), so every
+   overlay resolved against the INITIAL containing block instead — a single
+   viewport-sized box at the top of the document. All ~599 stacked there, the
+   last in DOM order swallowed every click in that region, and the real rows
+   beneath it never saw hover.
+
+   ⚠️ Do NOT restore the row stretch by giving a wrapper `position: relative`.
+   The overlays would just escape to that box instead — the same bug in a
+   smaller rectangle, which would look fixed on a short list and stay broken on
+   a long one. A <td> is the largest box that positions reliably here.
+
+   The rest of the row is covered by an onClick on the <tr> (see the JSX). That
+   handler is safe: no onMouseEnter, no state, so it cannot reproduce the Orders
+   hover trail, which came from setSelectedIndex firing on hover.
+
+   Anything interactive added to the NAME cell later needs `position: relative`
+   to sit above this overlay. */
+.nameCell {
   position: relative;
 }
 
