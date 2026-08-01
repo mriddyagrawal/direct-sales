@@ -5917,3 +5917,49 @@ The two specificity comments are genuinely good work: the author noticed that a 
 **Open flags (cumulative):** new 🔴 53, 🟡 54. 🟡 ㊿ open (owner-accepted). ㊾, 52 closed at d88e456. 51 folded into step 7.
 
 **Next-commit suggestion:** scope `.mono` and `.numeric` to `.table td.…` before touching Users. One line each, and it converts a five-table bug into a five-table fix at zero extra cost.
+
+---
+
+## Review of 5503d59 — refactor(users): adopt the shared table grammar — fixes the 12px header misalignment
+
+**Verdict:** ⚠️ accept-with-followups (superseded within minutes — see the fed0523 block below)
+
+**Phase / commit goal:** Step 2 — Users imports `table.module.css`, its own `.table*` rules are deleted, and its 12px header misalignment disappears as a consequence.
+
+**What works:** Exactly as described. `UsersAdmin.module.css` has **zero** `.table` rules left, so the page has one source for the grammar. Builder's self-review claim verified independently: `npx tsc --noEmit` exit 0, `npx eslint src` exit 0.
+
+The `.table tbody tr.clickable { cursor: pointer }` addition is a **genuine catch that my spec's block omitted** — Users' page-local `.clickable` had been supplying it, so the desktop row would have silently lost its pointer on migration. The commit reasons about it correctly and keeps Users' page-local `.clickable` for the phone card, which is a `div role="button"` and therefore a different element, not a duplicate. Documented in the commit and in the CSS.
+
+**Blocking issues:** 🔴 **53 went live on this page.** `UsersAdmin.tsx:115,118` now render `${table.mono}` on the username and email cells while the page's local `.mono` was deleted, so both take the shared **bare** `.mono` (0,1,0) and lose to `.table td` (0,1,1). Those two columns render in Space Grotesk, not JetBrains Mono.
+
+Fairness note on process: this commit landed **38 seconds** after the review that raised 53 (16:46:46 → 16:47:24), so the builder had not read it — this was concurrency, not a decision to build on a known-broken base. The base was nevertheless broken, and the flag was already correct.
+
+**Non-blocking suggestions:** none.
+
+**What I tried:** `tsc`, `eslint src`, both clean; `grep -c '^\.table' UsersAdmin.module.css` → 0; read the JSX to confirm which cells take `table.mono`; compared timestamps on the two commits.
+
+**Open flags (cumulative):** 🔴 53 (live here), 🟡 54, 🟡 ㊿.
+
+---
+
+## Review of fed0523 — fix(ui): scope .mono and .numeric to .table td — a bare .mono never reached a cell
+
+**Verdict:** ✅ — 🔴 53 **CLOSED**, 🟡 54 **CLOSED**
+
+**Phase / commit goal:** Fix the blocking flag from the step-1 review, in the very next commit, before step 3.
+
+**What works:** Both rules are now `.table td.numeric` and `.table td.mono` — (0,1,2), which beats `.table td` (0,1,1), so they finally apply. This is the protocol working as designed: flag raised on step 1, page adopted it at step 2 before the flag was seen, fixed immediately after, ahead of any further migration.
+
+Scope is right too — 16 lines, one file, nothing else touched. And it fixes the bug for **all five** tables at once rather than four times over, which was the whole argument for catching it while the file had no importers.
+
+The comment it leaves behind is better than the fix: it records that this was a live bug in the four page-level copies, names the visible consequence (Orders' refs, timestamps and totals in the wrong face against the design spec), and explains that bare `.numeric` only *appeared* to work because `.table td` sets no `text-align`. That is the kind of note that stops the trap being re-laid.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** Worth a look on localhost at step 5 — Orders' order-ref and total columns will change face when it migrates. That is the fix landing, not a regression, but it is the most visible pixel change in this whole run and shouldn't surprise anyone.
+
+**What I tried:** Read the diff; confirmed both selectors are now `.table td.x`; confirmed the specificity arithmetic against `.table td`; confirmed nothing outside the shared file changed.
+
+**Open flags (cumulative):** 🔴 53 ✅ CLOSED. 🟡 54 ✅ CLOSED. 🟡 ㊿ open (owner-accepted). 51 folded into step 7.
+
+**Note on where these blocks live:** my review commits are landing on `feat/table-standardisation`, not `main` — the builder and I share one working tree, so `git commit` follows whatever they have checked out. Making that **deliberate** from here: reviews of this branch's work belong with the branch and arrive on `main` when it merges. It avoids a cherry-pick that would collide on `comments.md` at merge time.
