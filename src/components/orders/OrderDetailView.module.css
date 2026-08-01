@@ -511,15 +511,23 @@
   .secondaries > * {
     flex: 1;
   }
-
-  .cancelAction {
-    margin-left: 0;
-  }
 }
 
 /* Cancel sits red at the FAR END of the secondaries row (spec §3). */
 .cancelAction {
   margin-left: auto;
+}
+
+/* Phone: the three buttons already share the row equally via `flex: 1` above,
+   so the auto margin must go or Cancel is shoved off the far end.
+   MUST stay BELOW the base rule. A media query adds no specificity, so while
+   this lived in the block above it tied `.cancelAction` at (0,1,0) and lost the
+   source-order tie — the override was dead and Cancel sat pushed right on phone
+   the whole time. (REVIEWER flag 60; same trap as the Retailers .list bug.) */
+@media (max-width: 767px) {
+  .cancelAction {
+    margin-left: 0;
+  }
 }
 
 /* Spec §3 ITEMS — brand shape. */
