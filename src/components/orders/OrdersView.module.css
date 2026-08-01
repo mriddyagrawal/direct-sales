@@ -238,9 +238,19 @@
   padding: 24px 0;
 }
 
-/* Keyboard-selection state, NOT hover — deliberately kept at 0.06 and NOT
-   unified with the shared grammar's 0.05 hover (spec, 2026-08-01): the two
-   should not look identical. !important still beats the shared zebra stripe. */
+/* Selection state — driven by arrow keys AND by onMouseEnter, which makes the
+   row under the cursor the selected row. So this paints on hover too, through
+   React. (An earlier version of this comment said "NOT hover"; that was wrong
+   — REVIEWER, 2026-08-01.) Kept at 0.06 and deliberately not unified with the
+   shared grammar's 0.05.
+
+   ⚠️ DO NOT delete `.table tbody tr.clickable:hover` from the shared grammar as
+   redundant just because this !important outranks it on the same row. That CSS
+   hover is what makes the tint appear INSTANTLY — compositor, no JavaScript —
+   after which React merely deepens it by 0.01, which the eye cannot see.
+   Remove it and the tint goes back to chasing the cursor through a render
+   queue: the visible "hover trail" this page had before the migration.
+   (REVIEWER flag 57.) */
 .rowSelected {
   background: rgba(29, 78, 216, 0.06) !important;
 }
