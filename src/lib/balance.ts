@@ -22,6 +22,13 @@ export interface BalanceReading {
   state: BalanceState;
   // Already formatted for display: rupees, en-IN. Never raw paise.
   text: string;
+  // The raw value, carried so a surface that needs FINER copy than the three
+  // states can get it without re-deriving the rule. Order detail uses it to
+  // tell a credit (Dr./Cr. accounting labels) from a square ₹0, both of which
+  // are "clear" and both of which are green — the STATE stays binary, because
+  // that is what colour is keyed on, and splitting it would have forced every
+  // existing consumer to learn a fourth case.
+  paise: number | null;
 }
 
 // `paise` is retailers.outstanding_paise, written by the nightly Tally sync.
@@ -35,8 +42,8 @@ export function readBalance(paise: number | null): BalanceReading {
   // must NEVER render as ₹0: zero is a real, square balance and a different
   // fact. Hence a dash, and a state its own surfaces leave UNcoloured, because
   // owed-red or clear-green would each be a claim we cannot make.
-  if (paise === null) return { state: "unknown", text: "—" };
+  if (paise === null) return { state: "unknown", text: "—", paise };
   // <= 0 is nothing to chase: square, or in credit because they paid ahead.
-  if (paise <= 0) return { state: "clear", text: formatRupees(paise) };
-  return { state: "owed", text: formatRupees(paise) };
+  if (paise <= 0) return { state: "clear", text: formatRupees(paise), paise };
+  return { state: "owed", text: formatRupees(paise), paise };
 }

@@ -341,6 +341,21 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
       : balance.state === "clear"
         ? styles.balanceClear
         : styles.balanceOwed;
+  // Dr./Cr. instead of an "Outstanding" label (owner 2026-08-02) — the ledger
+  // words the office already thinks in, and they carry the direction, which is
+  // what the label was really for: this page has a big order total on it, and
+  // "Dr." makes clear the figure is the SHOP's ledger, not the order's money.
+  //
+  // Cr. takes the ABSOLUTE value: formatRupees(-4500000) is "-₹45,000", and
+  // "Cr. -₹45,000" would say the opposite of what it means. A square ₹0 gets
+  // NEITHER word — it is not a debit or a credit, it is nothing owed either
+  // way — and stays green with the other nothing-to-chase balances.
+  const balanceText =
+    balance.state === "owed"
+      ? `Dr. ${balance.text}`
+      : balance.paise !== null && balance.paise < 0
+        ? `Cr. ${formatRupees(Math.abs(balance.paise))}`
+        : balance.text;
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
     const d = (e.details ?? {}) as Record<string, unknown>;
@@ -597,8 +612,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
             shop owes has nothing to do with putting boxes on a van. */}
         {!isGodown && (
           <p className={styles.heroBalance}>
-            <span className={styles.heroBalanceLabel}>Outstanding</span>{" "}
-            <span className={balanceClass}>{balance.text}</span>
+            <span className={balanceClass}>{balanceText}</span>
             {balance.state !== "unknown" && order.retailerBalanceAsOf && (
               <span className={styles.heroBalanceLabel}>
                 {" "}
@@ -621,21 +635,22 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           const meta = metaParts.filter(Boolean).join(" · ");
           return meta ? <p className={styles.heroMeta}>{meta}</p> : null;
         })()}
-        {/* Billed byline: when + who + the Tally bill number. `Bill #` only
-            renders when present, so the pre-existing billed orders (null bill
-            no) show the byline without it. */}
-        {(order.status === "billed" || order.status === "dispatched") && order.processedAt && (
-          <p className={styles.byline}>
-            billed {formatOrderTimestamp(order.processedAt, now)}
-            {order.processedByName ? ` by ${order.processedByName}` : ""}
-            {order.tallyBillNo ? ` · Bill #${order.tallyBillNo}` : ""}
-            {order.status === "dispatched" && order.dispatchedAt
-              ? ` · dispatched ${formatOrderTimestamp(order.dispatchedAt, now)}${
-                  order.dispatchedByName ? ` by ${order.dispatchedByName}` : ""
-                }${order.dispatchNote ? ` · ${order.dispatchNote}` : ""}`
-              : ""}
-          </p>
-        )}
+        {/* The Tally bill number, and ONLY that (owner cleanup 2026-08-02).
+            This line used to read "billed 14:27 by Uma Nishad · Bill #LG/0172 ·
+            dispatched 16:02 by … · <note>", every clause of which HISTORY
+            already prints verbatim — checked against describeEvent, which
+            renders "14:27 Billed by Uma Nishad" and
+            "16:02 Dispatched by … · <note>". The status chip above states the
+            stage a third time.
+
+            The bill number is the exception: it appears NOWHERE else on this
+            page or in the history, and it is what the office reads back into
+            Tally, so it stays and is now the whole line.
+
+            Cost, stated: on a PHONE, who billed it and when is now a scroll
+            away in HISTORY. On desktop nothing moves out of sight — the rail
+            is side by side at 768px, so history was always on screen. */}
+        {order.tallyBillNo && <p className={styles.byline}>Bill #{order.tallyBillNo}</p>}
       </div>
 
       {/* Admin note (RED) — a held-stage flag from the admin, visible to

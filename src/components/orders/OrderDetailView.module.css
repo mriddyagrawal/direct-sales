@@ -8,35 +8,11 @@
 /* `.breadcrumb` lived here; it is `back.module.css` now — shared with retailer
    detail so the two back eyebrows cannot drift (owner 2026-08-01). */
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.ref {
-  font-family: var(--font-figures);
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
 .byline {
   font-family: var(--font-structure);
   font-size: 12px;
   color: var(--color-locked);
   margin-top: 2px;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.actions > a {
-  display: contents;
 }
 
 .error {
@@ -244,32 +220,6 @@
 .editActions {
   display: flex;
   gap: 8px;
-}
-
-.card {
-  padding: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-}
-
-.retailerName {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
-.meta {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-locked);
-}
-
-.metaMono {
-  font-family: var(--font-figures);
-  font-size: 12px;
-  color: var(--color-locked);
 }
 
 .newBadge {
@@ -491,21 +441,22 @@
   color: var(--color-accent);
 }
 
-/* The shop's balance, on its own line under the name (owner 2026-08-01). The
-   AMOUNT is 15px figures/600 — the same weight the office phone card gives a
-   balance — so it reads a step above the grey meta line beneath it without
-   competing with the 21px shop name above it. */
+/* The shop's balance, on its own line under the name (owner 2026-08-01).
+   13px, down from 15px (owner 2026-08-02: keep the colour, lose the size) —
+   the body size, so it sits with the meta line beneath it and lets the 21px
+   shop name stay the loudest thing in the hero. Colour and weight do the work
+   now, not scale. */
 .heroBalance {
   font-family: var(--font-figures);
-  font-size: 15px;
+  font-size: var(--text-body-size);
   font-weight: 600;
 }
 
-/* "Outstanding", "· as of 31 Jul", "not in the last sync" — the quiet parts.
-   Dropped to the meta line's size and colour so the coloured figure is the
-   only thing that carries. */
+/* "· as of 31 Jul" and "not in the last sync" — the quiet parts. A step down
+   again in size and dropped to grey, so the coloured Dr./Cr. figure is the only
+   thing on the line that carries. */
 .heroBalanceLabel {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--color-locked);
 }
@@ -550,14 +501,6 @@
 }
 
 /* Approved override on staff: Mark billed (blue) | Scan (white), equal halves. */
-.splitRow {
-  display: flex;
-  gap: 8px;
-}
-
-.splitRow > * {
-  flex: 1;
-}
 
 /* Mobile: the secondaries split the row into EQUAL parts (mockup 7c) —
    Edit · Share · Cancel each a third. Desktop keeps content-width buttons
@@ -658,7 +601,6 @@
   font-size: 12px;
   color: var(--color-locked);
 }
-
 
 /* Primary + secondaries as one block: vertical gap == the 8px horizontal
    gap between the row's buttons. */
