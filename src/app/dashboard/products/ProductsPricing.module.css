@@ -508,7 +508,10 @@
 .pFab {
   position: fixed;
   right: 16px;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  /* 70px bottom bar + 16px, matching the Orders FAB. Was 76px — a fossil of
+     the office bar's old 60px height (DashboardNav raised it to 70px for
+     salesman-bar parity; the FAB offset never followed), so it sat 10px low. */
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   display: flex;
   align-items: center;
@@ -523,6 +526,7 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
 }
 
 /* Add chooser — the ProductModal responsive pattern: bottom sheet on phone,

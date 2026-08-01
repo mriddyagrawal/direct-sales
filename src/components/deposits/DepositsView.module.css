@@ -443,9 +443,12 @@
   color: var(--color-white);
   border-radius: 24px;
   font-family: var(--font-structure);
-  font-size: var(--text-body-size);
+  /* 14px + the lift, matching the Orders FAB — this one had drifted to the
+     13px body token and carried no shadow. */
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
+  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
 }
 
 /* 768px, not 1024px: Orders moves its FAB to the desktop corner at the same
