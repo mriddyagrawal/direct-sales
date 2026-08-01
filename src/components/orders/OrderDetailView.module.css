@@ -8,26 +8,15 @@
 /* `.breadcrumb` lived here; it is `back.module.css` now — shared with retailer
    detail so the two back eyebrows cannot drift (owner 2026-08-01). */
 
-/* The status corner: the chip, and under it the Tally bill number when there
-   is one. Right-aligned so both hang off the same edge.
-
-   KNOWN COST, and the reason this was flagged before it was built: the back
-   eyebrow's band is a single line everywhere else, so on a BILLED order this
-   corner is two lines and the band grows — the shop name below then sits a few
-   pixels lower than it does on an unbilled order. The band's own 24px floor
-   (back.module.css) is unaffected; this only ever makes it taller. */
-.statusStack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-/* Mono, because it is an identifier the office reads back into Tally
-   character by character — the same reason order refs and serials are mono. */
-.billNo {
-  font-family: var(--font-figures);
-  font-size: 11px;
+/* The bill number — the second line of the ORDER group, so it takes the hero's
+   own 3px rhythm. The old `margin-top: 2px` is gone: it dated from when this
+   line carried the whole billed byline and needed lifting off the meta line,
+   and it now only fights the grouping above. When the bill number is the
+   group's FIRST line (an order with no area, phone or salesman to show), the
+   `.heroBalance + .byline` rule gives it the 8px seam instead. */
+.byline {
+  font-family: var(--font-structure);
+  font-size: 12px;
   color: var(--color-locked);
 }
 
@@ -483,18 +472,15 @@
    flex gap is the within-group rhythm; this adds 5px on top of it — 8px — at
    the seam between them.
 
-   An adjacent-sibling selector rather than a wrapper div, because both lines
-   are conditional: the balance is hidden on the godown lens, and the meta line
-   needs an area, phone or salesman to exist. When the balance is absent there
-   is no seam to mark, which falls out for free. A wrapper would have to be
-   conditionally rendered on the OR of its children to avoid contributing a
-   stray gap of its own.
-
-   `.heroBalance + .byline` was here too, for when the bill number followed the
-   balance directly. The bill number left the hero for the status corner, so
-   that half is gone rather than left dangling on a class this file no longer
-   renders. */
-.heroBalance + .heroMeta {
+   Adjacent-sibling selectors rather than a wrapper div, because the lines are
+   each conditional: the balance is hidden on the godown lens, the meta line
+   needs an area/phone/salesman to exist, and the bill number only exists once
+   billed. Whichever line lands first in the second group takes the gap, and
+   when the balance is absent there is no seam to mark. A wrapper would have to
+   be conditionally rendered on the OR of its children to avoid contributing a
+   stray gap of its own. */
+.heroBalance + .heroMeta,
+.heroBalance + .byline {
   margin-top: 5px;
 }
 

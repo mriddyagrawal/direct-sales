@@ -558,14 +558,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           <Glyph icon={ChevronLeft} />
           <span className={back.label}>{order.orderRef}</span>
         </BackLink>
-        {/* The bill number lives UNDER the chip (owner 2026-08-02): "Billed"
-            and the number Tally gave it are one fact, so they belong in one
-            place, and it is out of the shop's identity block where it read as
-            money. Nothing else is in this stack — it stays a status corner. */}
-        <div className={styles.statusStack}>
-          <StatusTag tone={statusTag.tone} label={statusTag.label} sublabel={statusTag.sublabel} />
-          {order.tallyBillNo && <p className={styles.billNo}>Bill #{order.tallyBillNo}</p>}
-        </div>
+        <StatusTag tone={statusTag.tone} label={statusTag.label} sublabel={statusTag.sublabel} />
       </div>
 
       {/* Hero (spec §3): the RETAILER is the headline — name bold + large,
@@ -639,11 +632,22 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           const meta = metaParts.filter(Boolean).join(" · ");
           return meta ? <p className={styles.heroMeta}>{meta}</p> : null;
         })()}
-        {/* The billed byline that used to close the hero is gone (2026-08-02):
-            "billed 14:27 by Uma Nishad · dispatched 16:02 by … · <note>" is
-            printed verbatim by HISTORY, and the status chip states the stage a
-            third time. Its one unique fact, the Tally bill number, moved up to
-            sit under that chip. */}
+        {/* The Tally bill number, and ONLY that (owner cleanup 2026-08-02).
+            This line used to read "billed 14:27 by Uma Nishad · Bill #LG/0172 ·
+            dispatched 16:02 by … · <note>", every clause of which HISTORY
+            already prints verbatim — checked against describeEvent, which
+            renders "14:27 Billed by Uma Nishad" and
+            "16:02 Dispatched by … · <note>". The status chip above states the
+            stage a third time.
+
+            The bill number is the exception: it appears NOWHERE else on this
+            page or in the history, and it is what the office reads back into
+            Tally, so it stays and is now the whole line.
+
+            Cost, stated: on a PHONE, who billed it and when is now a scroll
+            away in HISTORY. On desktop nothing moves out of sight — the rail
+            is side by side at 768px, so history was always on screen. */}
+        {order.tallyBillNo && <p className={styles.byline}>Bill #{order.tallyBillNo}</p>}
       </div>
 
       {/* Admin note (RED) — a held-stage flag from the admin, visible to
