@@ -6182,3 +6182,30 @@ It matters because the owner has already decided salesmen see the balance and th
 **Recommendation for the balance/statement task:** add `src/app/retailers/[id]` alongside the dashboard one and select between them with the established `detailBase` idiom, rather than inventing a third pattern or relaxing the dashboard gate. Deciding this *before* the balance lands is the cheap moment — retrofitting a second route after the page carries every shop's credit position is not.
 
 **Open flags (cumulative):** 🟡 59 restated, new 🟡 61. 🟡 58 (needs a Safari click), 🟡 60, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+---
+
+## Flag 58 — CONFIRMED IN SAFARI, upgraded to 🔴 BLOCKING (owner test, 2026-08-01)
+
+The owner tested desktop Safari on `/dashboard/retailers` and reproduced the bad variant. **The branch must not merge with this in it.**
+
+**Observed:** the top of the page and roughly the first ten rows are clickable but all navigate to the **last** retailer in the list; those rows show no hover at all; below that region hover works but clicking anywhere except the shop name does nothing.
+
+**Mechanism — the three symptoms are one cause.** Safari does not establish a containing block for `position: relative` on a `<tr>`. `.rowLink::after { position: absolute; inset: 0 }` therefore resolves against the nearest positioned ancestor — and there isn't one: `.shell` is `position: fixed` only on phone and `position: static` at desktop (`dashboard-layout.module.css:33`), with nothing else positioned between the row and the root. So every overlay falls through to the **initial containing block**, a single viewport-sized box at the top of the document.
+
+- All ~599 overlays stack in that one box; the last in DOM order wins the paint, so any click there goes to the last retailer. ✔ matches
+- Inside the box the overlay swallows pointer events, so the rows beneath never receive hover. ✔ matches
+- Below the box there is no overlay, so the real name anchors hover normally but nothing extends them. ✔ matches
+
+**Do not "fix" this by adding `position: relative` to a wrapper.** The overlays would simply all escape to *that* box instead — same bug, different rectangle, and it would look fixed at the top of a short list.
+
+**Recommended fix — drop the stretch on rows, keep the anchor:**
+
+- `position: relative` on the **`<td>`**, not the `<tr>`, and let the anchor cover only the name cell. A `<td>` positions reliably everywhere.
+- Add a plain `onClick={() => router.push(...)}` on the `<tr>` for whole-row convenience.
+
+That keeps everything the stretched link was chosen for — prefetch, keyboard focus, middle-click, open-in-new-tab, screen-reader semantics, all via the one real anchor — while the row-level click is a handler with **no `onMouseEnter` and no React state**, so it cannot reproduce Orders' re-render trail. The trail came from `setSelectedIndex` on hover, never from `onClick`.
+
+**Rejected alternative:** an `<a>` in every cell. It works and is bulletproof, but it multiplies keyboard tab stops by the column count — four per row across 599 rows — which is a worse accessibility outcome than the one it fixes.
+
+**Open flags (cumulative):** 🔴 58 (blocking, was 🟡). 🟡 61, 🟡 59 (restated), 🟡 60, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
