@@ -15,6 +15,8 @@ import { DEFAULT_RANGE } from "@/lib/date-range";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { SalesmanFilter } from "./SalesmanFilter";
 import { BrandFilter } from "./BrandFilter";
+import fab from "@/components/ui/fab.module.css";
+import table from "@/components/ui/table.module.css";
 import styles from "./OrdersView.module.css";
 
 // The row shape + list query live in the shared builder (spec D12); the type
@@ -505,7 +507,7 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
         </p>
       ) : (
         <>
-          <table className={styles.table}>
+          <table className={table.table}>
             <thead>
               <tr>
                 <th>REF</th>
@@ -513,7 +515,7 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
                 {isStaff && <th>SALESMAN</th>}
                 {multiBrand && <th>BRAND</th>}
                 <th>RETAILER</th>
-                <th className={styles.numeric}>TOTAL</th>
+                <th className={table.numeric}>TOTAL</th>
                 <th>STATUS</th>
               </tr>
             </thead>
@@ -521,6 +523,7 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
               {finalFiltered.map((order, index) => {
                 const tag = getOrderStatusTag(order);
                 const rowClasses = [
+                  table.clickable,
                   index === safeIndex ? styles.rowSelected : "",
                   newIds.has(order.id) ? styles.rowNew : "",
                 ]
@@ -541,18 +544,18 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
                       router.prefetch(`${detailBase}/${order.id}`);
                     }}
                   >
-                    <td className={styles.mono}>{order.order_ref}</td>
-                    <td className={`${styles.mono} ${styles.cellMeta}`}>{formatOrderTimestamp(order.submitted_at, now)}</td>
-                    {isStaff && <td className={styles.cellMeta}>{order.profiles?.full_name ?? "—"}</td>}
-                    {multiBrand && <td className={styles.cellMeta}>{order.brands?.name ?? "—"}</td>}
-                    <td className={styles.cellRetailer}>
+                    <td className={table.mono}>{order.order_ref}</td>
+                    <td className={`${table.mono} ${table.cellMeta}`}>{formatOrderTimestamp(order.submitted_at, now)}</td>
+                    {isStaff && <td className={table.cellMeta}>{order.profiles?.full_name ?? "—"}</td>}
+                    {multiBrand && <td className={table.cellMeta}>{order.brands?.name ?? "—"}</td>}
+                    <td className={table.cellName}>
                       {order.retailers?.name ?? "—"}
                       {order.retailers && !order.retailers.verified && <span className={styles.newBadge}>NEW</span>}
                       {order.admin_comment && order.status === "pending_approval" && (
                         <span className={styles.rowAdminNote}>⚠ {order.admin_comment}</span>
                       )}
                     </td>
-                    <td className={`${styles.mono} ${styles.numeric}`}>{formatRupees(order.total_paise)}</td>
+                    <td className={`${table.mono} ${table.numeric}`}>{formatRupees(order.total_paise)}</td>
                     <td>
                       <StatusTag tone={tag.tone} label={tag.label} sublabel={tag.sublabel} />
                     </td>
@@ -628,7 +631,7 @@ export function OrdersView({ scope, salesmen, brands, role, currentUserId, title
           card. */}
       {/* No New Order FAB for the godown — it never creates orders. */}
       {!isGodown && (
-        <Link href="/new-order" className={styles.fab}>
+        <Link href="/new-order" className={`${fab.fab} ${fab.desktopCorner}`}>
           <Glyph icon={Plus} />
           New Order
         </Link>

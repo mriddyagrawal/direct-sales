@@ -8,6 +8,35 @@ export interface LoginState {
   error: string | null;
 }
 
+/**
+ * Where to send someone after a successful sign-in.
+ *
+ * SECURITY: this value arrives from the query string, so it is attacker-
+ * controlled. An unvalidated redirect target is a textbook open redirect —
+ * `/login?next=https://evil.example` would let a phishing mail send someone
+ * through the real, correctly-certificated Ganpati login and out the other
+ * side onto a lookalike, which is exactly the trust the attacker wants to
+ * borrow. So this is an ALLOW-list of shapes, not a block-list of bad ones:
+ *
+ *   - must start with a single "/" — a same-origin absolute path;
+ *   - "//host" is rejected: protocol-relative, resolves to another origin;
+ *   - backslashes are rejected outright, because "/\evil.example" is treated
+ *     as protocol-relative by several browsers and by WHATWG URL parsing;
+ *   - "/login" is rejected so a stale ?next= cannot make a redirect loop.
+ *
+ * Anything failing those checks falls back to "/", where the proxy routes by
+ * role. Never "fix up" a suspicious value — drop it.
+ */
+function safeNext(raw: FormData | string | null): string {
+  const value = typeof raw === "string" ? raw : String((raw as FormData)?.get("next") ?? "");
+  const next = value.trim();
+  if (!next.startsWith("/")) return "/";
+  if (next.startsWith("//")) return "/";
+  if (next.includes("\\")) return "/";
+  if (next === "/login" || next.startsWith("/login/") || next.startsWith("/login?")) return "/";
+  return next;
+}
+
 // Username -> email resolution happens entirely server-side via a
 // service-role client (src/lib/supabase/service.ts). Supabase Auth only
 // authenticates by email/phone (no native username login), so a
@@ -48,8 +77,9 @@ export async function signInWithUsername(
     return { error: "Wrong username or password." };
   }
 
-  // Role routing happens in the proxy (middleware) based on the caller's
-  // profile — redirecting to "/" lets it send accountant/admin to
-  // /dashboard as needed.
-  redirect("/");
+  // Back to wherever they were headed before the guard intercepted them, so a
+  // shared link survives the login. With no (or an unsafe) `next`, "/" — and
+  // role routing happens in the proxy from there, sending accountant/admin on
+  // to /dashboard as needed.
+  redirect(safeNext(formData));
 }

@@ -5873,3 +5873,1816 @@ column, drop it as a co-equal form field. Measured 596 of 599 identical to `name
 column is what keeps a rename from silently re-pointing a shop's ledger link.
 Spec amended: the Tally name becomes a collapsed disclosure that auto-expands only
 when it differs.
+
+---
+
+## Review of 323dcb7 — feat(ui): add the shared table grammar + --text-table-head-tracking token
+
+**Verdict:** ⚠️ accept-with-followups — **fix flag 53 before step 2**
+
+**Phase / commit goal:** Step 1 of `docs/specs/table-standardization-and-retailer-detail.md` — create `src/components/ui/table.module.css` and the new token, imported by nothing, changing no pixels.
+
+**What works:** Everything the step asked for. Token is `0.06em` at `globals.css:39`, **not** a reuse of the 0.08em section-label token — the trap the spec called out. Header `font-size` moved to `var(--text-section-label-size)` (also 10px, so a genuine no-op). All three drift fixes are folded in: `padding-right: 12px` on `thead th` (Users' bug), `cellMeta` on `var(--color-locked)` (Orders' lighter hardcoded grey), and `tr.clickable:hover` at `0.05`. Two files touched, 101 insertions, **nothing imports it** and the branch is **not pushed** — both as instructed. Commit message is accurate and unusually complete; it states plainly that no pixels change, which is true.
+
+The two specificity comments are genuinely good work: the author noticed that a bare `.numeric` (0,1,0) loses to `.table thead th` (0,1,2) and scoped both it and `.cellMeta`/`.cellName` correctly.
+
+**Blocking issues (fix in the next commit, before step 2):**
+
+- 🔴 **53 `.mono` is dead inside `.table`, and this file is about to enshrine that for five tables.** Bottom of `table.module.css`:
+
+  ```css
+  .mono { font-family: var(--font-figures); }    /* (0,1,0) */
+  ```
+
+  against, twenty lines above it:
+
+  ```css
+  .table td { font-family: var(--font-structure); ... }   /* (0,1,1) */
+  ```
+
+  `.table td` wins, so `.mono` never applies to a cell. This is **the exact trap the author documented twice in this very file**, reintroduced at the bottom of it.
+
+  It is **pre-existing, not newly caused**: Orders, Products and Users all have the same bare `.mono` against the same `.table td`, so `<td className={styles.mono}>` has never rendered in JetBrains Mono on any of them — the Orders desktop table's order ref, timestamp and total are all in Space Grotesk today (`OrdersView.tsx:544,545,555`). That contradicts the design spec, which calls for mono figures on a shared right edge.
+
+  Fix is one line — scope it `.table td.mono` — and it must land **now**, while the file has no importers. After step 2 it is live on Users; by step 5 it is on Orders where it is most visible; and the new Retailers table would inherit it in step 6.
+
+**Non-blocking suggestions:**
+
+- 🟡 **54 bare `.numeric` is latent, not live.** `.table td` does not set `text-align`, so `(0,1,0)` currently wins by default and right-aligned cells do work. It breaks silently the moment anyone adds `text-align` to `.table td`. Scope it `.table td.numeric` alongside 53 for consistency with the header rule right above it.
+
+**Domain / correctness checks:** Money math — n/a here, but 53 touches how money *renders*: the totals column is one of the cells losing its mono face. Immutable snapshots / RLS / state machine — untouched.
+
+**What I tried:** Read the whole file; compared `.table td` across all three existing modules (identical, all set `font-family`); confirmed `--font-structure` = Space Grotesk and `--font-figures` = JetBrains Mono at `globals.css:23-24`, so the difference is visible not theoretical; grepped Orders for any rule that would rescue `.mono` (there is none, one bare rule at :293); confirmed `styles.mono` is used on three `<td>`s in Orders; verified no importers and that the branch is absent from origin.
+
+**Open flags (cumulative):** new 🔴 53, 🟡 54. 🟡 ㊿ open (owner-accepted). ㊾, 52 closed at d88e456. 51 folded into step 7.
+
+**Next-commit suggestion:** scope `.mono` and `.numeric` to `.table td.…` before touching Users. One line each, and it converts a five-table bug into a five-table fix at zero extra cost.
+
+---
+
+## Review of 5503d59 — refactor(users): adopt the shared table grammar — fixes the 12px header misalignment
+
+**Verdict:** ⚠️ accept-with-followups (superseded within minutes — see the fed0523 block below)
+
+**Phase / commit goal:** Step 2 — Users imports `table.module.css`, its own `.table*` rules are deleted, and its 12px header misalignment disappears as a consequence.
+
+**What works:** Exactly as described. `UsersAdmin.module.css` has **zero** `.table` rules left, so the page has one source for the grammar. Builder's self-review claim verified independently: `npx tsc --noEmit` exit 0, `npx eslint src` exit 0.
+
+The `.table tbody tr.clickable { cursor: pointer }` addition is a **genuine catch that my spec's block omitted** — Users' page-local `.clickable` had been supplying it, so the desktop row would have silently lost its pointer on migration. The commit reasons about it correctly and keeps Users' page-local `.clickable` for the phone card, which is a `div role="button"` and therefore a different element, not a duplicate. Documented in the commit and in the CSS.
+
+**Blocking issues:** 🔴 **53 went live on this page.** `UsersAdmin.tsx:115,118` now render `${table.mono}` on the username and email cells while the page's local `.mono` was deleted, so both take the shared **bare** `.mono` (0,1,0) and lose to `.table td` (0,1,1). Those two columns render in Space Grotesk, not JetBrains Mono.
+
+Fairness note on process: this commit landed **38 seconds** after the review that raised 53 (16:46:46 → 16:47:24), so the builder had not read it — this was concurrency, not a decision to build on a known-broken base. The base was nevertheless broken, and the flag was already correct.
+
+**Non-blocking suggestions:** none.
+
+**What I tried:** `tsc`, `eslint src`, both clean; `grep -c '^\.table' UsersAdmin.module.css` → 0; read the JSX to confirm which cells take `table.mono`; compared timestamps on the two commits.
+
+**Open flags (cumulative):** 🔴 53 (live here), 🟡 54, 🟡 ㊿.
+
+---
+
+## Review of fed0523 — fix(ui): scope .mono and .numeric to .table td — a bare .mono never reached a cell
+
+**Verdict:** ✅ — 🔴 53 **CLOSED**, 🟡 54 **CLOSED**
+
+**Phase / commit goal:** Fix the blocking flag from the step-1 review, in the very next commit, before step 3.
+
+**What works:** Both rules are now `.table td.numeric` and `.table td.mono` — (0,1,2), which beats `.table td` (0,1,1), so they finally apply. This is the protocol working as designed: flag raised on step 1, page adopted it at step 2 before the flag was seen, fixed immediately after, ahead of any further migration.
+
+Scope is right too — 16 lines, one file, nothing else touched. And it fixes the bug for **all five** tables at once rather than four times over, which was the whole argument for catching it while the file had no importers.
+
+The comment it leaves behind is better than the fix: it records that this was a live bug in the four page-level copies, names the visible consequence (Orders' refs, timestamps and totals in the wrong face against the design spec), and explains that bare `.numeric` only *appeared* to work because `.table td` sets no `text-align`. That is the kind of note that stops the trap being re-laid.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** Worth a look on localhost at step 5 — Orders' order-ref and total columns will change face when it migrates. That is the fix landing, not a regression, but it is the most visible pixel change in this whole run and shouldn't surprise anyone.
+
+**What I tried:** Read the diff; confirmed both selectors are now `.table td.x`; confirmed the specificity arithmetic against `.table td`; confirmed nothing outside the shared file changed.
+
+**Open flags (cumulative):** 🔴 53 ✅ CLOSED. 🟡 54 ✅ CLOSED. 🟡 ㊿ open (owner-accepted). 51 folded into step 7.
+
+**Note on where these blocks live:** my review commits are landing on `feat/table-standardisation`, not `main` — the builder and I share one working tree, so `git commit` follows whatever they have checked out. Making that **deliberate** from here: reviews of this branch's work belong with the branch and arrive on `main` when it merges. It avoids a cherry-pick that would collide on `comments.md` at merge time.
+
+---
+
+## Review of 4bc21e9 — refactor(products): adopt the shared table grammar
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 3 — Products imports `table.module.css`; its own `.table*`, `.numeric`, `.cellMeta`/`.cellName` and row-hover rules go. Two of four copies gone.
+
+**What works:** Zero `.table` rules left in the page module, import at `ProductsPricing.tsx:17`, `tsc` and `eslint src` both exit 0 (verified independently, not taken from the self-review).
+
+I checked the thing most likely to go wrong in a migration like this — **a page-specific value deleted along with the shared ones**. It didn't happen: every deleted declaration is pure grammar (`width: 100%`, the header block, zebra, `td` typography, `cellMeta`/`cellName`), all of it covered by the shared file. No column widths, no `white-space`, no Products-only tweaks went with it.
+
+The `.clickable` handling looked wrong in the diff and isn't. The rule is **byte-identical before and after**; what changed is who uses it. Before, one page-local `.clickable` served both the phone card (a div) and the desktop row. Now the desktop row takes `table.clickable` — which resolves to `.table tbody tr.clickable`, scoped so it can only reach a row — and the phone card keeps the page-local one. The classes look duplicated and are not: different elements, and the scoped selector provably cannot reach a div. The commit says exactly this and is right.
+
+Both `.numeric` scopings earn their keep here for the first time: `<th className={table.numeric}>` (`:311,316,317`) hits `.table thead th.numeric`, and `<td className={table.mono + table.numeric + table.cellMeta}>` (`:328`) hits all three `.table td.x` rules. On Users, `.numeric` was unused — this is the first page where step 1's specificity fix is load-bearing.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **55 Commit-message nit: "render in JetBrains Mono *again*".** They don't render in mono again — they render in mono **for the first time**. Products paired `.table td { font-family: structure }` with a bare `.mono` for as long as the current history shows, so the desktop table's figures have never been mono. Trivial, but this log's whole value is that a future reader can trust it, and "again" implies a regression was fixed rather than a bug that had always been there.
+
+**Domain / correctness checks:** Money math — the PRICE column is one of the cells gaining its mono face; values themselves untouched, presentation only. RLS / state machine / snapshots — untouched.
+
+**What I tried:** `tsc --noEmit` (0), `eslint src` (0); `grep -c '^\.table'` on the page module → 0; enumerated every deleted CSS declaration and matched each against the shared file; diffed `.clickable` between `5503d59` and `4bc21e9` (identical) and traced both call sites; confirmed `table.numeric` is used on both `th` and `td` and that the shared file scopes both.
+
+**Open flags (cumulative):** new 🟡 55. 🟡 ㊿ open (owner-accepted). 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
+
+**Next-commit suggestion:** ImportWizard (step 4) — the smallest remaining copy, and the only one inside a modal rather than a page.
+
+---
+
+## Review of 9f8192c — fix(import-wizard): scope .mono/.numeric/.cellName — NOT migrated to the shared grammar
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 4 as amended — fix ImportWizard's specificity bugs in place rather than migrating it, on the grounds the builder raised and the owner accepted.
+
+**What works:** `.table td.mono`, `.table thead th.numeric, .table td.numeric` (grouped), `.table td.cellName`. CSS only — 25 insertions, 3 deletions, **no markup changed**, as claimed. `tsc` and `eslint src` both exit 0, verified independently.
+
+The grouped `.numeric` selector implements the finding I added to the amended spec: the **header** case was the actively-broken one, because `.table thead th` sets `text-align: left` at (0,1,2) and outranks a bare class, so ROW and PRICE headers had been sitting left-aligned over right-aligned numbers. The commit says exactly that and does not overstate the cell case, which worked by luck.
+
+**I checked the one thing that could have gone wrong here.** Scoping `.cellName` to `.table td.cellName` narrows it from (0,1,0) to (0,1,2) — if that class were used anywhere that is not a `td` inside `.table`, it would silently stop applying. All six call sites (`ImportWizard.tsx:283,288,295,304,305,306`) are `<th>`/`<td>` between lines 280 and 313, inside `<table className={styles.table}>`. Safe.
+
+**I also checked for classes they might have missed** — every class used inside that table, not just the three they touched. Three others are unscoped and all three survive, for three different reasons:
+
+- `.reason` and `.statusTag` sit on `<span>`s inside cells. A rule on the element beats a value **inherited** from the parent `td`, so they never competed with `.table td` at all. (Same mechanism that keeps StatusTag pills mono in the page tables.)
+- `.errorRow td` is (0,1,1) — **equal** to `.table td`, not higher — so it wins only because it sits at line 254 against line 211. Source order, not specificity.
+
+Nothing was left dead.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **56 `.errorRow td` wins on source order alone.** It ties `.table td` on specificity and is only correct because it appears later in the file. Moving it above the `.table` block — a plausible tidy-up — would silently turn error rows back to full ink and cost the row its muted treatment. Same family as 54: a rule that works today for a reason nobody wrote down. One extra class (`.table tbody tr.errorRow td`) or a comment would pin it.
+
+**Domain / correctness checks:** Money math — the PRICE column and its header both change presentation only; values untouched. No markup, no data path, no RLS surface.
+
+**What I tried:** Read the full diff; enumerated every `styles.*` class used between the `<table>` tags and classified each as scoped / bare-but-safe / bare-and-dead; traced all six scoped call sites to confirm they are `th`/`td` inside the table; compared line numbers of `.errorRow td` (254) against `.table td` (211) to determine which wins; `tsc --noEmit` (0), `eslint src` (0); confirmed only the CSS file changed.
+
+**Open flags (cumulative):** new 🟡 56. 🟡 55, 🟡 ㊿ open. 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
+
+**Next-commit suggestion:** Orders (step 5) — the last of the four copies, and the loudest pixel change in the run: its refs, timestamps and totals all gain their mono face at once.
+
+---
+
+## Review of 893ef4f — refactor(orders): adopt the shared table grammar — last of the four copies
+
+**Verdict:** ⚠️ accept-with-followups (message accuracy only; the code is right)
+
+**Phase / commit goal:** Step 5 — Orders migrates, leaving zero page-level `.table` copies.
+
+**What works:** Zero `.table` rules remain in any of the three migrated modules. `tsc` and `eslint src` exit 0. Phone cards untouched — **0** card lines in the diff.
+
+**The step's one hard constraint held.** It required styles-only, and I verified that independently rather than accepting the self-review: the TSX diff contains **no** line mentioning `prefetch`, `onMouseEnter`, `setSelectedIndex`, `router.push`, `safeIndex` or the `rowSelected` expression. Every change is a `styles.x` → `table.x` swap plus the import. `.rowSelected` stays local at 0.06 with `!important` and a comment explaining that it is keyboard-selection state, not hover — exactly as specced.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **57 "Rows gain a hover tint … Orders had none" is wrong, and the truth is more interesting.** Orders **did** tint on hover — via JavaScript, not CSS. `onMouseEnter` sets `selectedIndex`, so the hovered row becomes the selected row and picks up `.rowSelected` at 0.06. The owner observed exactly this on 2026-08-01 and described its lag ("fades in and out, like a trail"). So the claim is inaccurate twice over: there was a hover tint, and the new 0.05 one is largely **masked** on the same row by the `!important` 0.06.
+
+  **But the real effect is better than the commit claims, and it must not be tidied away.** Because `table.clickable` is now on every row, CSS `:hover` paints at 0.05 **immediately** — compositor, no JS — and React then deepens it to 0.06 when the state catches up. A 0.01 alpha step is imperceptible, so what the owner will see is the tint arriving *instantly* instead of trailing the cursor through a re-render queue. **The migration accidentally fixed the hover lag on the busiest page in the app.**
+
+  The risk this creates: the hover rule now looks redundant to anyone reading the CSS (`.rowSelected` outranks it on the same row, so why is it there?). Removing it as dead weight would silently restore the trail. Worth a comment on the Orders side saying the shared hover is what makes the tint feel instant.
+
+**Domain / correctness checks:** Money math — TOTAL changes face only; `formatRupees` untouched, values unchanged. State machine / RLS / snapshots — no logic in the diff at all, verified by grep. Mobile-first — phone cards provably untouched.
+
+**What I tried:** Grepped the TSX diff for every logic identifier the step forbade changing (none present); read the full class-swap diff; confirmed `.rowSelected` retains `!important` and 0.06; read `rowClasses` to confirm `table.clickable` is unconditional and `.rowSelected` conditional, which is what produces the layering above; `grep -c '^\.table'` → 0 across all three migrated modules; `tsc` (0), `eslint src` (0); counted card lines in the diff (0).
+
+**Open flags (cumulative):** new 🟡 57. 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54 ✅ CLOSED. 51 folded into step 7.
+
+**Next-commit suggestion:** step 6 (Retailers) — the only step with new markup rather than a migration, and the first to add a route.
+
+---
+
+## Review of 5b3e5ed — docs(orders): correct the .rowSelected comment + pin flag 57 (hover is load-bearing)
+
+**Verdict:** ✅ — 🟡 57 **CLOSED**
+
+**Phase / commit goal:** Close the flag raised on the previous commit: the `.rowSelected` comment claimed the state was "NOT hover", and the shared hover rule it now sits beside looks deletable.
+
+**What works:** Both halves, cleanly. One file, 13 insertions, 3 deletions, comment-only — no selector, value or markup touched. `tsc` and `eslint src` still exit 0, and the rule the comment protects (`.table tbody tr.clickable:hover`) is confirmed still present in the shared grammar.
+
+The correction is honest rather than quiet: it states that the earlier comment was wrong, says what is actually true (selection is driven by arrow keys **and** `onMouseEnter`, so it paints on hover through React), and attributes the correction and date. A future reader gets the amended fact *and* the fact that it was amended, which is worth more than a silently-rewritten line.
+
+The flag-57 pin does the job it needs to do — it names the exact tempting deletion, explains why the rule is not redundant despite being outranked on the same row, and states the consequence in observable terms ("the tint goes back to chasing the cursor"). That is the right shape for a warning: it survives someone who does not know the history, because it tells them what they will break rather than merely asking them not to.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**What I tried:** Read the full diff (comment lines only); `tsc --noEmit` (0), `eslint src` (0); confirmed `.table tbody tr.clickable:hover` still exists in `src/components/ui/table.module.css`.
+
+**Open flags (cumulative):** 🟡 57 ✅ CLOSED. 🟡 55, 🟡 56, 🟡 ㊿ open — all three are documentation/latent-fragility notes, none gating. 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
+
+**Process note:** second time in this run a flag has been closed in the very next commit (53 at fed0523, 57 here), and once the builder stopped mid-step to contest a spec instruction that measurement showed was wrong (step 4). The loop is doing what it is for.
+
+---
+
+## Review of ce69eed — feat(retailers): desktop table + phone cards + /dashboard/retailers/[id] detail route
+
+**Verdict:** ⚠️ accept-with-followups
+
+**Phase / commit goal:** Step 6 — the first step with new markup and a new route: Retailers gets a desktop table on the shared grammar, keeps its phone cards, and rows navigate to a real detail page with the edit action relocated there.
+
+**What works:**
+
+- **The navigation pattern is the specced one, not Orders'.** A real `<Link>` in the name cell (`RetailersQueue.tsx:170`) with `.rowLink::after { inset: 0 }` stretching it, and `.linkRow` carrying `position: relative`. No click handler, no `onMouseEnter`, no state — so this page cannot develop the re-render trail Orders had.
+- **Phone cards preserved and upgraded.** Layout untouched (owner-final); they are now a real `<Link>` (`:193`) instead of a div, so they prefetch on scroll like Orders' cards and gain long-press / new-tab.
+- **`tally_ledger_name` appears in the list exactly 0 times**, and does appear on the detail page. That is the owner's editor-only rule implemented precisely.
+- **The route is real and handles absence correctly**: async `params` (Next 16), server client, `.maybeSingle()` → `notFound()`. Links resolve, and a missing row 404s rather than throwing.
+- **The modal decision is the deliberate one the spec asked for.** `RetailerModal` is kept as the single editor, now reached from exactly two intentional places — Add on the queue (`:88`, `:217`) and Edit on the detail page — with `setEditing` gone from the queue entirely (verified: 0 occurrences). One editor means one copy of the save rules; retiring it would have duplicated the blank-ledger-name resolution, rename safety and duplicate guard.
+- Badges move from inline-after-the-name into a STATUS column, so names left-align instead of starting at a different x per row. `tsc` and `eslint src` exit 0.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **58 `position: relative` is on the `<tr>`, which is the historically unreliable half of the stretched-link pattern.** `.linkRow` is applied at `:167` to the row, not a cell. Where an engine does not establish a containing block on a table row, `inset: 0` resolves against the nearest positioned ancestor *above* it and the invisible overlay escapes the row — swallowing clicks across a much larger area, which fails silently and looks like "the page stopped responding in one region". Blink and Gecko handle rows fine; WebKit was the long-standing holdout.
+
+  **I cannot verify this — it needs a browser, and I do not have one.** Scope is limited: the table is `display: none` below 768px, so the exposure is desktop Safari and iPad, not the salesmen's phones. **One manual check in Safari settles it.** If it misbehaves, the fix is to move `position: relative` onto the `<td>` and accept a name-cell-only target, or put an anchor in every cell.
+
+- 🟡 **59 A salesman can reach the new page and will be shown an Edit button that cannot work — pre-existing, not caused here.** `src/app/dashboard/layout.tsx` reads the profile only to style the nav (`isAdmin` for `DashboardNav`); it never redirects, so `/dashboard/**` has no route-level role gate at all. Live policies:
+
+  - `retailers_select_salesman` — a salesman may read **active** retailers, so the detail page renders for them.
+  - `retailers_staff_update` — UPDATE is accountant/admin only, so their save is **refused by the database**.
+
+  The data boundary therefore holds: read is scoped, write is rejected. What they get is a raw RLS error instead of a friendly one. Not introduced by this commit — the same salesman could already open the queue and the same modal — but this adds one more surface where it shows, and the balance/statement task will add a much more sensitive one to this same page. Worth a role gate in the dashboard layout before that lands.
+
+  One thing composes correctly here, apparently by accident: an **inactive** retailer returns null under the salesman policy, so `maybeSingle()` → `notFound()` 404s it rather than revealing that it exists.
+
+**Domain / correctness checks:** **RLS/auth** — checked against live `pg_policies` rather than by reading the app: read scoped by role, update staff-only, verified above. **Money math** — no amounts rendered yet; `outstanding_paise` is selected but only `isNotSynced` consumes it. **Mobile-first** — phone cards' layout provably unchanged, only the wrapper element differs. **Immutable snapshots / state machine** — untouched.
+
+**What I tried:** Read all five changed files; traced `.linkRow`/`.rowLink` to the element each lands on; read `page.tsx` for the params/fetch/404 path; queried live `pg_policies` for `retailers` to establish what a salesman can actually read and write; grepped the queue for `tally_ledger_name` (0) and `setEditing` (0); confirmed the modal's two remaining entry points; `tsc --noEmit` (0), `eslint src` (0). **Not verified:** the stretched link in a real browser — flag 58 exists precisely because I cannot.
+
+**Open flags (cumulative):** new 🟡 58, 🟡 59. 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+**Next-commit suggestion:** step 7 (FAB consolidation) — but 58 wants a Safari click first, since it is the only thing in this run that could be functionally broken rather than visually off.
+
+---
+
+## Review of 9bdf2e5 — fix(retailers): desktop showed BOTH the table and the cards — source-order bug
+
+**Verdict:** ✅ — and a **REVIEWER miss** recorded below
+
+**Phase / commit goal:** Fix a functional bug in step 6 that the owner found on localhost: on desktop the new table and the phone cards both rendered.
+
+**What works:** Correct diagnosis and correct fix. `.list { display: none }` sat in a media block near the top of the file while the base `.list { display: flex }` is ~90 lines below. **A media query adds no specificity**, so at an equal (0,1,0) the later base rule won the source-order tie and the cards never stepped aside. Moved into its own `@media (min-width: 768px)` block immediately after the base rule, with a comment explaining why it has to live there. CSS only, phone unaffected either way.
+
+*(Note: this landed twice as `9854352` then `9bdf2e5` — identical trees, an amend. Reviewing the surviving sha.)*
+
+**🔴 REVIEWER MISS — recording it, because the log is only worth having if it records its own failures.** I reviewed `ce69eed` as ⚠️ with two flags and did not catch this. It is a **visible, functional** bug on the page the step exists to build, and the owner found it by clicking, not me by reading.
+
+Worse, I had raised **flag 56 one step earlier** about precisely this trap — `.errorRow td` in ImportWizard winning on source order alone. I identified the class of bug in someone else's file and then failed to check the new file for it.
+
+The reason is diagnosable: I audited step 6 as a set of *rules in isolation* — is the stretched link on the right element, is `tally_ledger_name` absent from the list, does RLS hold — and never asked the whole-file question, **"are the two surfaces mutually exclusive?"** A per-rule review cannot see a source-order bug by construction.
+
+**Corrective action taken:** swept **every** `*.module.css` in the repo for the same shape — a selector whose media-query rule appears *before* its base rule — then hand-checked each hit for a shared property, since selector overlap alone is not enough.
+
+- `OrdersView .searchWrap` (media 153 / base 205) — **false positive**: media sets `width`, base sets `flex`/`min-width`/`display`. No shared property, the override survives.
+- `OrderDetailView .cancelAction` — **real, and pre-existing in a file this branch never touched**. See flag 60.
+
+**Non-blocking suggestions:**
+
+- 🟡 **60 `OrderDetailView.module.css`: the phone override on `.cancelAction` is dead.** Line 510 opens `@media (max-width: 767px)`; line 515 sets `.cancelAction { margin-left: 0 }`; line 521 — outside and after — sets `.cancelAction { margin-left: auto }`. Equal specificity, later wins, so **`margin-left: auto` applies on phone too** and Cancel is pushed to the far end of the secondaries row where the phone block wanted it flush. Same one-line fix as this commit: move the media block below the base rule. Phone layouts are owner-final, so this is worth a look before it is changed.
+
+**What I tried:** Read the diff and confirmed the media block now follows the base rule; scripted a repo-wide sweep for media-before-base selector collisions across every module; hand-verified both hits for shared properties; identified the enclosing media query for the surviving hit by line number.
+
+**Open flags (cumulative):** new 🟡 60. 🟡 58 (needs a Safari click), 🟡 59, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+---
+
+## Flag 59 — RESTATED, and flag 61 raised (owner clarification, 2026-08-01)
+
+**Owner: salesmen seeing each retailer and their history is INTENDED, not a leak.** That changes what flag 59 is. It was written as "a salesman can reach a page they should not"; that premise is wrong. Restating it, and raising the structural gap it was obscuring.
+
+**🟡 59 (restated) — not access, chrome.** The access is intended and the data boundary is sound: `retailers_select_salesman` scopes reads to active shops, `retailers_staff_update` refuses their writes. Two things remain, both cosmetic-to-confusing rather than unsafe:
+
+- The **Edit** button renders for a role the database will reject, so a salesman who taps it gets a raw RLS error. Gate the affordance on role; the DB already guards the action.
+- `/dashboard/**` has no route-level role gate, so a salesman landing there gets the **office shell** — `DashboardNav`, not their own bottom tab bar — with no way back into their app.
+
+**🟡 61 — the retailer detail page has no salesman-side route, and the next task needs one.** This codebase already has the answer for exactly this problem, applied consistently to orders:
+
+```
+src/app/orders/[id]             salesman
+src/app/dashboard/orders/[id]   staff
+detailBase = isStaff ? "/dashboard/orders" : "/orders"    (new-order/page.tsx:84)
+```
+
+echoed at `scan/[id]/page.tsx:35` and mirrored by `deposits/new`. Retailers has **only** the `/dashboard` half — step 6 built the office queue's destination, which is all its spec asked for, so this is a gap for the *next* task rather than a defect in this one.
+
+It matters because the owner has already decided salesmen see the balance and the statement on this page ("the salesman should be able to see the statement and the balance, like the admin and the accountant"). Without the second route they either reach it through the office shell or cannot reach it at all — and today there is no link to retailer detail from any salesman surface, so it is currently the latter.
+
+**Recommendation for the balance/statement task:** add `src/app/retailers/[id]` alongside the dashboard one and select between them with the established `detailBase` idiom, rather than inventing a third pattern or relaxing the dashboard gate. Deciding this *before* the balance lands is the cheap moment — retrofitting a second route after the page carries every shop's credit position is not.
+
+**Open flags (cumulative):** 🟡 59 restated, new 🟡 61. 🟡 58 (needs a Safari click), 🟡 60, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+---
+
+## Flag 58 — CONFIRMED IN SAFARI, upgraded to 🔴 BLOCKING (owner test, 2026-08-01)
+
+The owner tested desktop Safari on `/dashboard/retailers` and reproduced the bad variant. **The branch must not merge with this in it.**
+
+**Observed:** the top of the page and roughly the first ten rows are clickable but all navigate to the **last** retailer in the list; those rows show no hover at all; below that region hover works but clicking anywhere except the shop name does nothing.
+
+**Mechanism — the three symptoms are one cause.** Safari does not establish a containing block for `position: relative` on a `<tr>`. `.rowLink::after { position: absolute; inset: 0 }` therefore resolves against the nearest positioned ancestor — and there isn't one: `.shell` is `position: fixed` only on phone and `position: static` at desktop (`dashboard-layout.module.css:33`), with nothing else positioned between the row and the root. So every overlay falls through to the **initial containing block**, a single viewport-sized box at the top of the document.
+
+- All ~599 overlays stack in that one box; the last in DOM order wins the paint, so any click there goes to the last retailer. ✔ matches
+- Inside the box the overlay swallows pointer events, so the rows beneath never receive hover. ✔ matches
+- Below the box there is no overlay, so the real name anchors hover normally but nothing extends them. ✔ matches
+
+**Do not "fix" this by adding `position: relative` to a wrapper.** The overlays would simply all escape to *that* box instead — same bug, different rectangle, and it would look fixed at the top of a short list.
+
+**Recommended fix — drop the stretch on rows, keep the anchor:**
+
+- `position: relative` on the **`<td>`**, not the `<tr>`, and let the anchor cover only the name cell. A `<td>` positions reliably everywhere.
+- Add a plain `onClick={() => router.push(...)}` on the `<tr>` for whole-row convenience.
+
+That keeps everything the stretched link was chosen for — prefetch, keyboard focus, middle-click, open-in-new-tab, screen-reader semantics, all via the one real anchor — while the row-level click is a handler with **no `onMouseEnter` and no React state**, so it cannot reproduce Orders' re-render trail. The trail came from `setSelectedIndex` on hover, never from `onClick`.
+
+**Rejected alternative:** an `<a>` in every cell. It works and is bulletproof, but it multiplies keyboard tab stops by the column count — four per row across 599 rows — which is a worse accessibility outcome than the one it fixes.
+
+**Open flags (cumulative):** 🔴 58 (blocking, was 🟡). 🟡 61, 🟡 59 (restated), 🟡 60, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
+
+---
+
+## 🔴 58 — CLOSED at b262529 (owner-confirmed in Safari, 2026-08-01)
+
+Two attempts failed before this one, and both failures were mine:
+
+- `dfd61b4` moved `position: relative` from the `<tr>` to the `<td>`. The owner reproduced the identical symptom. **WebKit does not establish a containing block for `position: relative` on table internals — not a row, not a cell.** Moving one element down was a guess dressed as a fix.
+- A third guess would have cost another round trip, so `b262529` removed the dependency instead: **no overlay at all.** The name cell's anchor is `display: block` and fills the cell; the rest of the row is the `onClick` already on the `<tr>`. Zero `position: absolute`, zero `position: relative`, zero `::after` in the module. Nothing left that an engine can disagree about.
+
+**Also worth recording: the first two Safari tests were invalid.** The dev server had not recompiled since 17:29:58, while the fixes were committed at 17:44 and 17:54 — so both runs served the original `ce69eed` code and the symptoms never changed. Diagnosed by finding `rowLink:after{...position:absolute...}` still present in the compiled chunk and the superseded JSX comment still in the SSR bundle. **A "the fix didn't work" report is worth one timestamp check on the served build before believing it.**
+
+Follow-ups shipped alongside at `ed1d661`: a selection guard (a drag-select ends in a click, so copying a phone number used to navigate away) and the missing `loading.tsx` — which matters beyond the skeleton, because for a dynamic route the loading boundary is exactly what `<Link>` prefetches.
+
+---
+
+## 📋 Open items — current state, 2026-08-01
+
+Flags run ㊾ (49) → 61. **There is no 62.** No 🔴 blocking items open.
+
+| # | State | What |
+|---|---|---|
+| ㊾ | ✅ CLOSED `d88e456` | `norm()` doc overclaimed; comment corrected, code deliberately unchanged |
+| ㊿ | 🟡 open — **owner-accepted** | Not-synced tab keys on a null balance alone, conflating "never matched" with "matched, Tally sent no figure". 0 shops in that state today |
+| 51 | 🟡 open — **folded into step 7** | "one FAB, four pages" unified the values, not the four copies |
+| 52 | ✅ CLOSED `d88e456` | eslint walked into `analysis/.venv`; 22 problems → 0, signal verified retained |
+| 53 | ✅ CLOSED `fed0523` | bare `.mono` dead inside `.table`; scoped for all five tables at once |
+| 54 | ✅ CLOSED `fed0523` | bare `.numeric` latent; scoped alongside |
+| 55 | 🟡 open | Products commit says figures render mono *"again"* — they render mono for the first time |
+| 56 | 🟡 open | `.errorRow td` ties `.table td` on specificity and wins only on source order (line 254 vs 211). A tidy-up that moves it silently returns error rows to full ink |
+| 57 | ✅ CLOSED `5b3e5ed` | Orders "had no hover" was wrong; the shared hover is load-bearing and now pinned against deletion |
+| 58 | ✅ CLOSED `b262529` | Safari sent every click in the top region to the last retailer. Overlay removed entirely |
+| 59 | 🟡 open | No route-level role gate on `/dashboard`. Access is **intended** (owner) and RLS holds, but the Edit button renders for a role the DB refuses → raw RLS error, and a salesman landing there gets the office shell |
+| 60 | 🟡 open | `OrderDetailView.module.css`: the phone override on `.cancelAction` is dead (media block at 510 precedes the base rule at 521), so Cancel sits pushed to the far end on phone. **Pre-existing, owner-final phone territory** |
+| 61 | 🟡 open | Retailers has only `/dashboard/retailers/[id]`. Orders has had both halves all along (`/orders/[id]` + `/dashboard/orders/[id]`, chosen via `detailBase`). Salesmen are meant to see the balance and statement here |
+
+**Two of these are decisions, not defects.** 61 wants settling *before* the balance task, not after — retrofitting a second route onto a page carrying every shop's credit position is a much worse trade than adding it while the page is four fields and an Edit button. 60 is one line in phone layout the owner has declared final, so it wants an eye rather than a patch.
+
+**Step 7 (FAB consolidation) is the only work left in this run**, and it is cosmetic: the FAB bug is already fixed, so consolidating the four copies changes no pixels.
+
+---
+
+## 🟡 60 — CLOSED at 37f91a2. And the answer to 61, recorded before it is lost.
+
+**60 closed.** `.cancelAction`'s phone override moved below its base rule. Repo-wide sweep for media-before-base collisions is now clean apart from `OrdersView .searchWrap`, hand-verified as a false positive: the media rule sets `width`, the base sets `flex`/`min-width`/`display`, so they never compete.
+
+**61 — the template already exists in this codebase, and it is not "one page with role checks".** Measured:
+
+```
+OrderDetailView.tsx        1095 lines   the entire UI, shared
+order-detail-data.ts        137 lines   ORDER_DETAIL_SELECT + toOrderDetailProps, shared
+orders/[id]/page.tsx         35 lines   salesman
+dashboard/orders/[id]/…      37 lines   staff
+```
+
+The two route files run the **same query** and differ in two things only: the `role` prop they pass, and the staff one additionally reading `profiles.role` because Approve is admin-only.
+
+**The URL is not a security boundary and must not be treated as one.** The salesman page says so itself: *"Identical query to the staff workbench — RLS scopes it to his own orders (anyone else's id → no row → 404)."* The 404 comes from RLS returning nothing into `maybeSingle()`, not from the route checking anything. What the URL actually selects is:
+
+1. **The shell.** `/dashboard/*` is wrapped by `dashboard/layout.tsx` → `DashboardNav`. Salesman routes sit under the root layout and render `BottomTabBar` themselves. This is the whole of why a salesman on `/dashboard/retailers/[id]` looks wrong today: right data, wrong chrome, no way back to their app.
+2. **A `role` prop** driving show/hide *inside* the shared component, so neither route reimplements UI.
+
+**Applied to retailers this is small**, because `RetailerDetail`, the query and the RLS scoping all exist already: a ~25-line `src/app/retailers/[id]/page.tsx` rendering the same component with a role prop, and Edit made conditional on it.
+
+**That closes 59 as a side effect** — Edit stops rendering for a salesman because the component knows the role, not because a route guard blocks the page. Exactly the mechanism Orders already uses for admin-only Approve.
+
+**Recommendation: fold both into the balance task's first commit**, which is the task that gives a salesman any reason to be on that page.
+
+**Open after this:** 🟡 ㊿ (owner-accepted), 🟡 51 (step 7), 🟡 55, 🟡 56, 🟡 59, 🟡 61. No blocking items.
+
+---
+
+## Review of 8189b64 — fix(skeletons): order-detail fallback was a narrow centred column with a row running off-screen
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Fix two pre-existing faults the owner caught on a desktop screenshot — the order-detail skeleton painting as a narrow floating strip, and its action row overflowing the window.
+
+**What works — every claim independently verified:**
+
+- `OrderDetailView.module.css`'s `.page` really has **no `max-width`** (padding, flex, gap only), so the skeleton's hardcoded `maxWidth: 720, margin: "0 auto"` never matched the page it stands in for. The real page snapped out to full width the moment content arrived.
+- The overflow diagnosis is exactly right and generalises: `Skeleton`'s `width` prop **defaults to `"100%"`**, so two bare `<Skeleton/>` in a flex row each demand the whole container — 200% of it — and the second is clipped. `calc(50% - 4px)` each absorbs the 8px gap precisely.
+- The sweep found the same trap in `app/products/loading.tsx` (`width="38%"` beside a bare sibling = 138% + gap) and fixed it.
+
+**I re-ran that sweep independently** across every `*.tsx` containing `<Skeleton`. One hit came back — `products/loading.tsx` again — and it is a **false positive of my own heuristic**: the enclosing div is `flexDirection: "column"`, where a bare 100% is correct and nothing competes horizontally. Their fix is complete.
+
+The commit's explanation of *why it surfaced only now* is also correct and worth keeping: the order-row prefetch (b4e8724) made the loading boundary actually paint on click. Before that the old screen sat through the round-trip and the skeleton was rarely seen. That is the **fourth** time this run that "never ran" has been indistinguishable from "works" — after the dead `.mono`, the dead `.numeric` headers, and the dead `.cancelAction` override.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **62 `PickSkeleton` carries the identical bug and was flagged, not fixed.** `PickSkeleton.tsx:8` still has `maxWidth: 720, margin: "0 auto"`. I checked what it stands in for: `godown/[id]/loading.tsx` and `scan/[id]/loading.tsx`, both rendering `PickScreen`, whose `pick.module.css` has **no max-width or centring**. So it is wrong for the same reason and by the same amount. Flagging rather than fixing was the right call inside a commit scoped to order detail — but it is a one-line change and the diagnosis is already done.
+
+**Domain / correctness checks:** presentation only; no data, RLS, money or state-machine surface.
+
+**What I tried:** Read `.page` in `OrderDetailView.module.css` (no max-width, confirmed); read the diff; scripted an independent sweep for multiple `<Skeleton>` in a flex row lacking explicit widths and hand-checked the single hit; traced `PickSkeleton`'s two consumers to `PickScreen` and checked `pick.module.css` for a width cap (none).
+
+**Open flags (cumulative):** new 🟡 62.
+
+---
+
+## Review of ed8d30e — feat(retailers): show each shop's outstanding balance — table column + card, colour-coded
+
+**Verdict:** ✅
+
+**Phase / commit goal:** The owner's original ask — put each shop's outstanding on the retailers list, desktop column and phone card.
+
+**What works:**
+
+- **The commit's live-data claim is exact.** It states 244 owe, 325 square, 28 in credit, 2 unsynced; queried against prod: `244 · 325 · 28 · 2`, 599 active. All four states genuinely occur, so all four render paths are exercised by real data rather than assumed.
+- **Money math holds.** `formatRupees` does `Math.round(paise / 100)` into `Intl.NumberFormat("en-IN", { style: "currency" })`. No raw paise reach the screen — the standing rule.
+- **NULL stays distinct from zero.** `outstanding_paise === null` → an em dash, **uncoloured**. Neither red nor green is a claim anyone can make about a shop Tally never matched, and the comment says exactly that. This is the rule the ledger spec cares most about and the one easiest to lose.
+- **The credit case is right, and it is the subtle one.** The test is `<= 0`, not `< 0` vs `> 0` — so the 28 shops holding an advance read green alongside the square ones. A naive `< 0 = red` would have painted your **prepaid** customers as the worst debtors on the page.
+- **One helper feeds both surfaces**, so the table and the cards cannot drift — the same reasoning as the shared table grammar.
+- Colour is binary, never a threshold, so the dropped credit-limit tiers cannot creep back as a "bigger debt = redder" scale.
+- No dangling class references: every `styles.*` in the file resolves, and no CSS rule is unused. Worth noting because a mid-flight version referenced `amtSquare`/`amtCredit` against a CSS defining `amtClear`/`amtNone` — caught and fixed before committing. **`tsc` cannot catch that class**, as my own skeleton draft proved.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — paise → rupees, en-IN, verified at source. **Data honesty** — NULL ≠ 0 preserved on both surfaces. **RLS** — no new read; `outstanding_paise` was already in the shared `["retailers"]` superset.
+
+**What I tried:** Queried prod for the four-state breakdown and compared to the commit message; read `outstanding()` and `formatRupees`; scripted a used-vs-defined comparison of every `styles.*` class against the module.
+
+---
+
+## REVIEWER-authored commits on this branch — awaiting the BUILDER's review
+
+The owner asked me to write several fixes directly rather than spec them. Recording them here so they are not mistaken for reviewed work: **I have not reviewed these, and should not.**
+
+| sha | what |
+|---|---|
+| `4ffab0b` | spec amendment — step 4 became a local scoping fix after the builder's pushback |
+| `dfd61b4` | flag 58, first attempt — `position: relative` moved to the `<td>`. **Did not work** |
+| `b262529` | flag 58, second attempt — overlay removed entirely. Owner-confirmed working |
+| `ed1d661` | selection guard + the detail route's `loading.tsx` |
+| `37f91a2` | flag 60 — `.cancelAction`'s dead phone override |
+| `a1ee50e` | `?next=` deep-link survival through login, with `safeNext()` open-redirect guard |
+
+**Where a reviewer should look hardest:**
+
+- `a1ee50e`'s `safeNext()` is the only security-bearing code in the set. It is an allow-list and I tested 11 cases, but an open redirect is exactly the kind of thing that looks fine until someone finds the shape you did not think of.
+- `dfd61b4` shipped a fix that did not work, and I only learned that from the owner. Worth understanding why my reasoning was wrong before trusting the second attempt's reasoning.
+- `ed1d661`'s skeleton used **four invented CSS class names** in its first draft and `tsc` passed clean, because CSS-module keys are not typed. I caught it by grepping the stylesheet, not by compiling. Assume that check has not been done anywhere else in my commits.
+
+---
+
+## Review of fc8c4a1 — refactor(ui): one FAB stylesheet for all four pages — zero copies left
+
+**Verdict:** ✅ — step 7 complete, and with it the whole run. 🟡 51 **CLOSED**
+
+**Phase / commit goal:** The last step: collapse the four FAB copies into `src/components/ui/fab.module.css`. Nothing user-visible — the FAB *bug* was fixed by hand at d5c49cf, so all four already agreed on every value; this removes the duplication that let them drift.
+
+**What works:**
+
+- **Zero page-level FAB rules remain.** `.fab` gone from OrdersView and DepositsView, `.pFab` from ProductsPricing and RetailersQueue, along with their media rules. All four now compose `fab.fab` + exactly one variant.
+- **Both deliberate desktop behaviours survive**, which was the thing most likely to be flattened: `.desktopCorner` (Orders, Deposits) moves to `right/bottom: 32px` at 768px because the FAB is the only way to start a new order or deposit at any width; `.phoneOnly` (Products, Retailers) goes `display: none` because those pages carry a real Add button in the title row and would otherwise offer the same action twice.
+- **The variants sit AFTER the base in the same file**, and the commit explains why that is deliberate: they override base properties at equal specificity (0,1,0), so only source order decides. Splitting them across two stylesheets would make the winner depend on bundle order — the exact trap that made the retailers cards render underneath the desktop table earlier in this run. The lesson from that bug was carried forward rather than merely fixed.
+- **The stale `(60px)` comment is gone** — the number the 76px offset bug was computed from.
+- `tsc` and `eslint src` clean.
+
+**I checked the "no pixels change" claim by diffing each page's OLD rule against the new shared base**, rather than accepting it. Four small differences, and all four are correct:
+
+```
+Orders, Deposits    (were <Link>/<a>)   gain  border: none, cursor: pointer
+Products, Retailers (were <button>)     gain  text-decoration: none
+```
+
+The shared base is the **union** of what two element types need, and every added property is inert on the element that did not previously carry it — an `<a href>` has no default border and already shows a pointer; a `<button>` is not underlined. So the claim holds. The `border: none; /* it is a <button> on two pages */` comment shows this was understood, not stumbled into.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**What I tried:** Searched every module for surviving `.fab`/`.pFab` rules (none); read both variants and confirmed each reproduces its pages' previous desktop behaviour; confirmed the variants appear after the base in source order; traced all four call sites to `base + exactly one variant`; scripted a property-by-property diff of each page's pre-commit rule against the shared base and classified every difference; `tsc` (0), `eslint src` (0); confirmed the `(60px)` comment is gone.
+
+**Open flags (cumulative):** 🟡 51 ✅ CLOSED. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59, 🟡 61, 🟡 62. **No blocking items.**
+
+---
+
+## Run complete — all seven steps landed
+
+| step | outcome |
+|---|---|
+| 1 shared grammar + token | ✅ raised 🔴 53 before any page adopted it |
+| 2 Users | ✅ 12px header misalignment fixed |
+| 3 Products | ✅ |
+| 4 ImportWizard | ✅ **migration correctly refused** — would have hidden the import preview on phone |
+| 5 Orders | ✅ styles-only held; the mono figures returned |
+| 6 Retailers table + detail route | ✅ after 🔴 58 (Safari) and the both-surfaces bug |
+| 7 FAB consolidation | ✅ zero copies left |
+
+**Zero page-level `.table` or FAB copies remain.**
+
+**Seven bugs surfaced that predated this work** and were found only because copies were read side by side for the first time: `.mono` dead in all four tables; `.numeric` dead on ImportWizard's headers; Users' headers 12px out of line; Orders' hover trail; Cancel mispositioned on phone; the order-detail skeleton floating and overflowing; `PickSkeleton` carrying the same width bug (🟡 62, still open).
+
+**Two were found only by the owner clicking**, not by review: both surfaces rendering on desktop, and the Safari overlay. Both were functional, both invisible to reading, and both on a commit already signed off. The localhost loop earned its cost.
+
+---
+
+## Review of deb0417 — feat(users): phone FAB for Add, desktop keeps the button — matches Products/Retailers
+
+**Verdict:** ⚠️ accept-with-followups
+
+**Phase / commit goal:** Bring Users into line with the other two dashboard pages — hide the inline Add button on phone, offer a FAB instead.
+
+**What works — premise and execution both checked:**
+
+- **The premise is true.** Before this commit `.titleActions` was `display: flex` with **one** mention in the whole module and no breakpoint, so the button really did render at every width while Products and Retailers hid theirs. Users was the odd one out.
+- **The desktop path survives**, which was the thing this could most easily have broken: the base is now `display: none` (line 31) and the `@media (min-width: 768px)` override restoring `display: flex` sits at line 137 — **after** the base rule. Had it been written above, the media query adds no specificity, the base would have won the source-order tie, and Add would have vanished at every width. That is the exact trap that produced the `.list` bug and flag 60 in this same run; here it is on the right side of it.
+- **It consumes the shared FAB rather than starting a fifth copy** — `fab.fab` + `fab.phoneOnly`, no local `.fab`/`.pFab` rule anywhere in the module. One commit after consolidation, the first new caller took the shared file. That is the consolidation paying for itself immediately.
+- **`UserRoundPlus` really is exported** by the installed lucide-react (checked at runtime, not just in types). The commit claims it verified this; it did.
+- `tsc` and `eslint src` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **63 Three pages now show a phone FAB over content that reserves no room for it.** Measured:
+
+  ```
+  OrdersView       padding-bottom: 96px    reserves room
+  DepositsView     padding-bottom: 96px    reserves room
+  ProductsPricing  none
+  RetailersQueue   none
+  UsersAdmin       none
+  ```
+
+  So on phone the last row of Products, Retailers and Users can sit underneath the FAB. Pre-existing on the first two; **this commit adds the third instance**, since Users had no FAB before. The builder flagged it rather than fixing it, correctly — it is a phone-layout change and phone layouts are owner-final. But it is now a pattern rather than an oddity, and the fix is one declaration on each of three pages.
+
+**Domain / correctness checks:** presentation only. No data, RLS, money or state-machine surface. Mobile-first: the change is *about* the phone layout, and its one gap is 63.
+
+**What I tried:** Diffed `.titleActions` before and after (`display: flex`, 1 mention, no breakpoint → `display: none` + a 768px override); confirmed by line number that the override follows the base rather than preceding it; grepped the module for any local FAB rule (none) and the JSX for the shared import; checked `typeof lucide.UserRoundPlus` at runtime; compared `padding-bottom` across all five FAB-bearing modules; `tsc` (0), `eslint src` (0).
+
+**Open flags (cumulative):** new 🟡 63. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 (owner deferred), 🟡 61, 🟡 62. **No blocking items.**
+
+---
+
+## Review of 249ec6d — fix(ui): reserve room for the phone FAB on Products, Retailers and Users
+
+**Verdict:** ✅ — 🟡 63 **CLOSED**
+
+**Phase / commit goal:** Owner's call on flag 63 — three pages showed a phone FAB over content that reserved no room for it, so the last row could sit underneath.
+
+**What works:** All five FAB-bearing pages now agree:
+
+```
+OrdersView       base padding-bottom: 96px   desktop reset ✓
+DepositsView     base padding-bottom: 96px   desktop reset ✓
+ProductsPricing  base padding-bottom: 96px   desktop reset ✓
+RetailersQueue   base padding-bottom: 96px   desktop reset ✓
+UsersAdmin       base padding-bottom: 96px   desktop reset ✓
+```
+
+96px is the right figure and it transfers because the three pages share the shell, not because it was copied. On phone the tab bar is a **static flex child** (only `.main` scrolls), so it holds the bottom 70px; the FAB is fixed at `bottom: 86px` with a 48px min-height, spanning 86→134px from the viewport bottom — **64px above the bar's top**. 96px leaves 32px of breathing room over that, which is what Orders was tuned to.
+
+**Desktop needs no separate rule**, and this is the neat part: all three already carry `padding: 24px` in their 768px block, and the **shorthand resets `padding-bottom` automatically**. So the clearance cannot leave dead space on desktop, where two of the three hide the FAB anyway. CSS only, 24 insertions, no markup. `tsc` and `eslint src` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** phone-layout only; owner-final territory, and this was an explicit owner instruction. No data, RLS, money or state-machine surface.
+
+**What I tried:** Compared `padding-bottom` and the desktop reset across all five FAB-bearing modules; re-derived 96px from the shell geometry (70px static tab bar, FAB at `bottom: 86px` with 48px min-height) rather than accepting it as a copy; `tsc` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 63 ✅ CLOSED. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 (folded into the 61 spec — Edit hides by role, no route guard), 🟡 61 (specced, not built), 🟡 62. **No blocking items.**
+
+---
+
+## Review of 28a9303 — feat(retailers): RetailerDetail takes a role prop, and back becomes contextual
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 1 of the salesman-lens spec — teach the component that a lens exists. No route added, nothing new rendered.
+
+**What works — I checked the two things most likely to be wrong:**
+
+**1. The hydration trap is avoided, correctly and explicitly.** `previousPathname()` is client-only module state, so a render-time read would hydrate differently from the server and surface as an intermittent wrong destination rather than a crash. The read is inside `onClick`, with a comment saying why. There is also a `previous === null` early return, so a **cold load** — an empty mirror after a hard load — falls through to the plain `<Link>`. That is the case that defeats a blind `router.back()`, and it is handled.
+
+**2. "PickScreen and OrderDetailView are byte-for-byte unchanged" is true.** `contextual` defaults to `false` and only `RetailerDetail:62` sets it. `PickScreen:195` and `OrderDetailView:509` still get strict `previous === fallback`, which is right — their arrows carry labels that name a destination, and the strict check is what keeps such a label honest.
+
+Everything else the step asked for is present and correct:
+
+- `role="staff"` from the existing route, so the staff lens is unchanged.
+- Label is the bare `‹ Back` — which is what makes `contextual` sound at all. The BackLink comment now says so, and warns against setting the flag on an arrow whose label promises a screen. That is the reasoning captured where the next person will hit it.
+- `fallback={isStaff ? "/dashboard/retailers" : "/"}` — same shape `OrderDetailView:509` already uses for its three lenses, so this follows an existing idiom rather than inventing one.
+- Edit (`:85`) and the Tally ledger row (`:44`) both gated on `isStaff`. Edit hiding for the salesman is what closes 🟡 59 — the component knows the role, no route guard involved.
+- No dangling CSS class references; `tsc` and `eslint src` both clean.
+
+**The commit is also right that the lens is not a security boundary.** `retailers_select_salesman` is `active`-only, so an inactive shop returns no row and the route 404s on its own — that is RLS, not the prop.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **RLS** — unchanged; the prop gates UI only, and the DB still refuses a salesman's UPDATE via `retailers_staff_update`. **Money** — untouched. **Mobile** — no phone surface in this commit.
+
+**What I tried:** Read the `BackLink` diff specifically for a render-time `previousPathname()` call (there is none — it is in the handler); enumerated every `<BackLink>` call site to confirm only one passes `contextual`; checked the dashboard route still passes `role="staff"`; scripted a used-vs-defined CSS class comparison for `RetailerDetail`; `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 59 will close when step 2 lands and the salesman lens has a caller. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (in progress), 🟡 62.
+
+---
+
+## Review of 27ca3b6 — feat(orders): the retailer name on order detail links to the shop
+
+**Verdict:** ⚠️ — the code is right and every factual claim in the message is true; the warning is entirely about **sequencing**.
+
+**Phase / commit goal:** Step 4 of the salesman-lens spec, built **before steps 2–3**. Widens `ORDER_DETAIL_SELECT` to carry the retailer id, then makes the hero name a lens-aware link.
+
+### The one issue: a knowingly-dead href
+
+`src/app/retailers/` **does not exist** — confirmed by `ls` and `git ls-files`, both empty. So for a salesman the hero name is now a link to `/retailers/<id>`, which 404s.
+
+The commit does not hide this; it says so in capitals and gives the containment argument: the branch is unpushed, so no user can reach it. That argument holds — I verified nothing is pushed. But it holds **only while the ordering does**, so I am recording it as blocking rather than as a note:
+
+> **Step 2 must be the very next commit.** No other feature may land first, and the branch must not be pushed until `/retailers/[id]` exists. This is the one state where the run going quiet leaves the salesman strictly worse off than before the commit — he had plain text, and now has a link into a 404.
+
+Building 4 before 2 was defensible on its own terms (step 1 shipped a contextual back arrow with no second way in to exercise it), and the message attributes the reordering to the owner. That attribution is outside the repo and I cannot verify it — noted, not disputed.
+
+### Every other claim checks out — I verified each against prod rather than reading
+
+| Claim in the message | Verified |
+|---|---|
+| 2 of 192 orders sit on a deactivated shop | **exact** — 192 total, 2 on inactive |
+| both cancelled | **exact** — both `status = 'cancelled'` |
+| one salesman-owned | **exact** — 1 `salesman`, 1 `admin` |
+| `retailers_select_godown` is active-only | **exact** — `role = 'godown' AND active` |
+| `retailers_select_salesman` is active-only | **exact** — `role = 'salesman' AND active` |
+| `.heroRetailerLink` present in the stylesheet | present, `:483` + `:490` |
+| `.parentLink` is the underline precedent | present and underlined, `:408–412` |
+| `tsc --noEmit` clean, `eslint src` clean | both exit 0 |
+
+**The null-retailerId path is real, not defensive padding.** Because the salesman policy is active-only, his embed on those 2 cancelled orders resolves to null, `retailerId` is null, and the name stays unlinked text. The message is also right that such an order **already** rendered "Unknown retailer" for him from the same `?? ` fallback — this commit does not introduce that, it only stops it becoming a broken link.
+
+**Staff can never get a dead link, and that is load-bearing.** `retailers_select_staff` carries **no `active` filter**, so a deactivated shop still resolves for accountant/admin, and `dashboard/retailers/[id]/page.tsx` renders it (`maybeSingle()` → row → no `notFound()`). So the staff href is safe on exactly the rows where the salesman's is null. That asymmetry is correct and falls out of RLS rather than out of a check.
+
+**The godown decision is right.** `retailerBase` is `null` for godown, so the name stays plain text. Godown *can* read active retailers, but no godown retailer page exists — linking would point at nothing. Same class of problem as the salesman href above, and here it was handled by not linking. Worth noting the inconsistency is deliberate and documented in the code, not accidental.
+
+**The query widening is minimal and correct.** `retailers(name, …)` → `retailers(id, name, …)`, the embed type gains `id: string`, `OrderDetailData` gains `retailerId: string | null`, mapped as `row.retailers?.id ?? null`. One select serves all three order-detail routes, so all three carry the id — stated in the message and true.
+
+**Blocking issues:** One, conditional — **step 2 must land next** (above). Nothing wrong with the code as written.
+
+**Non-blocking suggestions:**
+
+- `<Link>` prefetches. Until step 2 exists, the salesman's hero link warms a route that 404s. Harmless (prefetch is a no-op in dev, and the branch is unpushed), and self-resolving — recorded only so it is not mistaken for a new problem if seen in a network panel.
+
+**Domain / correctness checks:** **RLS** — no policy touched; the three `retailers` SELECT policies verified unchanged and the lens split mirrors them exactly. **Money** — untouched. **Mobile** — considered and argued in the commit: the underline is persistent rather than `:hover`-only because a phone has no hover, matching `.parentLink`. Only the name is wrapped, so the NEW badge stays a flex sibling and the hero row's geometry is unchanged. **State machine** — untouched. **Immutable snapshots** — untouched.
+
+**What I tried:** `git show --stat` + full diff; `ls` and `git ls-files` on `src/app/retailers/` (both empty — this is what makes the href dead); `pg_policies` for all three `retailers` SELECT policies; a prod count of orders on deactivated shops, split by status and by the owning profile's role; grep for `.heroRetailerLink` and `.parentLink` in the stylesheet; read `dashboard/retailers/[id]/page.tsx` to confirm staff render an inactive shop rather than 404; `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 59 still pends step 2 (the lens now has a caller, but the route it calls does not exist). Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (in progress — steps 2 and 3 remain), 🟡 62.
+
+---
+
+## Review of 8beade3 — style(detail): one back eyebrow for both detail pages, matched headlines, no underline
+
+**Verdict:** ⚠️ — the consolidation is clean and verified; three non-blocking flags, one of which is a documentation error inside an explicitly load-bearing comment.
+
+**Phase / commit goal:** Three owner calls off side-by-side screenshots — drop the hero underline, match the two headline sizes, and collapse two divergent back eyebrows into one shared stylesheet.
+
+### The reversal is recorded exactly the way it should be
+
+This commit deletes the persistent underline that `27ca3b6` added **and defended at length** one commit earlier ("a tappable headline with no visible cue is a link nobody ever finds"). Rather than quietly dropping that reasoning, the new comment states the cost and says why it must not be undone:
+
+> *"Accepted cost, stated so nobody 'fixes' it back: on the phone there is now NO visual cue that the name is tappable… The hover tint below is desktop-only by nature and cannot be the affordance."*
+
+That is the right way to overturn a previous commit's argument — the owner saw it rendered and made a call, and the losing argument stays on the record where the next person will find it. Noted so the pattern gets repeated.
+
+The cost is real, though, so it gets a number rather than living only in a CSS comment: **🟡 64**.
+
+**🟡 64 — the linked shop name has zero affordance on the phone.** Final state is `color: inherit; text-decoration: none`, with the only cue on `:hover` → accent. On a touch screen the name is pixel-identical to plain text, so discovery is by accident. Owner-accepted and not a defect — recorded so it is not "found" again in three weeks and re-litigated from scratch. If it ever wants solving without reintroducing the marked-up look, the untried option is a trailing disclosure chevron (`›`) after the name — the standard mobile list idiom, which cues tappability without touching the type.
+
+### The shared eyebrow is clean — verified, not read
+
+- **All three classes resolve.** Enumerated every `back.*` reference across the five importing files against the definitions in `back.module.css`: `.row`, `.link`, `.label` used, same three defined, nothing dangling. This is the CSS-module trap that has bitten this project twice, and it is clear here.
+- **"No `styles.backRow`/`breadcrumb`/`backRef` survives anywhere in src" is true** — grep returns nothing.
+- **`npm run build` clean** — I ran it, not just `tsc`. Route manifest also confirms `/retailers/[id]` is still absent (step 2 outstanding; owner has taken the sequencing, so noted rather than re-flagged).
+- **Headline tokens verified:** `--text-name-size: 21px`, `--text-name-weight: 700`, `--touch-target-min: 48px` all exist and are what the commit says they are. Removing the one-off `22px/700` in favour of the tokens every other page title uses is a genuine drift fix, not a cosmetic one.
+
+**The "same y by coincidence" diagnosis is the good part of this commit.** Two independent accidents — retailer's smaller back row cancelling against its title being centred in a 48px button row — were holding the alignment together, and matching the eyebrows destroyed the cancellation. Catching that *before* shipping, rather than after a screenshot looked off, is the kind of thing that usually gets found the expensive way.
+
+### 🟡 65 — the `-10px` derivation in the comment does not compute
+
+`RetailerDetail.module.css` `.headRow` carries `margin-top: -10px` with a comment that ends *"If either the touch target or the name type scale changes, this number is what has to be re-derived."* So the derivation is explicitly meant to be re-run later — which makes an error in it consequential.
+
+The stated basis:
+
+> *"a 48px row centres its title 24px down from its own top; order detail's hero centres its first line at ~13.5px (**half a 21px line box**)"*
+
+**Half of 21 is 10.5, not 13.5.** The two halves of that sentence disagree. The `13.5` is the plausible figure — it implies a **~27px line box**, which is what a 21px font actually produces — so the resulting `-10px` (24 − 13.65 ≈ 10.35) is very likely correct. It is the *parenthetical* that is wrong: it conflates the font-size with the line box.
+
+Left as-is, anyone re-deriving from the stated basis gets `-13.5px` and moves the headline by 3.5px while believing they followed the instructions. One-word fix: `half a ~27px line box`.
+
+### 🟡 66 — that number silently depends on a font metric nobody set
+
+There is **no `line-height` anywhere in `globals.css`**, so the 27px line box comes from `normal` — i.e. from Space Grotesk's own metrics via `next/font`. `-10px` therefore depends on a value that is not written down in this codebase at all.
+
+Practical consequence: the comment lists the two things that force a re-derivation (touch target, name type scale) but misses the third and least visible one — **changing the display font**. Worth adding to that list. This also means the alignment claim is genuinely owner-verified-by-screenshot rather than reviewer-verified: I can confirm the CSS is internally coherent and every term resolves, but "the two headlines land on the same y" is a rendered-pixel fact and the side-by-side screenshots are the real check.
+
+### 🟡 67 — `next-env.d.ts` is a build artefact and should not be riding in feature commits
+
+The diff flips `./.next/dev/types/routes.d.ts` → `./.next/types/routes.d.ts`. Next rewrites that line depending on whether `next dev` or `next build` ran last — so this is not a code change, it is a fingerprint of the builder having run `npm run build` before committing (which independently corroborates that claim).
+
+It will flip straight back the next time anyone runs `npm run dev`, which is why it was already sitting dirty in the working tree at the start of this session. Left alone it produces a permanently dirty file, spurious diffs in unrelated commits, and an easy merge conflict. Decide it once — either stop committing it or pin it — rather than letting each commit carry whichever value the last command left behind.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 64, 🟡 65, 🟡 66, 🟡 67 above. 65 is a one-word fix and worth folding into the next commit that touches the file.
+
+**Domain / correctness checks:** **RLS / state machine / money / gapless sequences** — untouched, this is presentation only. **Mobile** — the central question of the commit, and handled with an explicitly stated cost (🟡 64); `min-height: var(--touch-target-min)` on `.headRow` keeps the salesman lens's band from collapsing where the Edit button is absent, which is the right instinct. **Immutable snapshots** — untouched.
+
+**What I tried:** `git show --stat` + full diff on all seven files; enumerated every `back.*` usage across the five importing files against `back.module.css`'s definitions; grepped `src/` for the three deleted class names (none survive); read the final `.heroRetailerLink` rule to confirm the affordance is genuinely gone rather than merely softened; checked `--text-name-size`, `--text-name-weight`, `--touch-target-min` in `globals.css`; grepped `globals.css` for any `line-height` (there is none — the basis of 🟡 66); recomputed the `-10px` derivation by hand (the basis of 🟡 65); `npm run build` (clean, and its route manifest confirms `/retailers/[id]` does not exist yet).
+
+**Open flags (cumulative):** New: 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67. Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 + 🟡 61 (steps 2–3 outstanding), 🟡 62.
+
+---
+
+## Review of b5df8c2 — feat(retailers): the salesman route — src/app/retailers/[id]
+
+**Verdict:** ✅ — the one thing I said I would watch for is absent, deliberately, and the reasoning is written down.
+
+**Phase / commit goal:** Step 2 of the salesman-lens spec — the route step 4's link already pointed at.
+
+### The thing I was watching for
+
+I said when this spec was handed over that the tell would be a hand-written role check in the route file, and that finding one meant the spec had been misread. **There is none.** The route is:
+
+```
+params → server client → RETAILER_SELECT → .eq("id", id) → maybeSingle() → notFound()
+```
+
+…and a comment saying why nothing more is there: *"THE URL IS NOT THE SECURITY BOUNDARY — RLS is… Writing a guard here would imply the route is what protects the data; it is not."*
+
+That is correct, and it is correct for the verified reason: `retailers_select_salesman` is `active`-only (checked in prod earlier this session), so a deactivated shop — or any id he has no business reading — returns no row and 404s on its own. Identical to how the salesman order route has always worked.
+
+**🟡 59 CLOSES here.** Edit hides because the component knows its lens, not because a route blocks the page — which was the whole point of the flag.
+
+**The dead href from `27ca3b6` is closed.** `npm run build`'s route manifest now lists `/retailers/[id]` alongside `/dashboard/retailers/[id]`. That was the blocking condition on that review; it is discharged.
+
+### The two structural changes are both improvements
+
+**`RETAILER_SELECT` extracted** to `lib/queries/retailers.ts`, used by `fetchRetailers` and both detail routes. The stated reason is the right one — *"It was about to be hand-typed a third time, which is how one lens quietly ends up missing a column."* A column present on one lens and absent on the other is exactly the class of bug that survives review, because both pages look fine in isolation.
+
+**`RetailerDetail` moved to `src/components/retailers/`** now that two routes render it, matching `OrderDetailView` in `src/components/orders/`. Git tracks it as a rename. I re-ran the used-vs-defined CSS class comparison after the move — **8 unique `styles.*` references, all resolve**; `back.row`/`back.link`/`back.label` all resolve too. A file move is precisely when a CSS-module reference goes stale silently, so this was worth checking rather than assuming.
+
+Keeping `RetailerModal` in the dashboard folder is also right and argued rather than assumed: the editor is staff-only by RLS *and* by the component, so it belongs beside the queue that opens it, and `scan/[id]` → godown's `PickScreen` is the existing precedent for the cross-folder import.
+
+`RetailerRow` now imports from `lib/queries/retailers` rather than `../page` — the type follows the select it describes, which is where it should have been.
+
+**Step 3 is disclosed as outstanding** in the message rather than left to be discovered. Reviewed separately below.
+
+### 🟡 68 — the deferred dashboard redirect is now materially easier to hit (owner-deferred, not a new ask)
+
+`src/app/dashboard/layout.tsx` reads `profiles.role` **only** to label the nav and set `isAdmin`. It does not gate. So a salesman who types `/dashboard/retailers/<id>` gets the office shell, `role="staff"`, and therefore a visible **Edit** button — which on tap reaches `retailers_staff_update`, is refused, and surfaces a raw RLS error. That is the precise failure the spec's decision 3 was written to prevent, prevented on the salesman route and still reachable one path segment away.
+
+**No data is exposed by this.** RLS still scopes rows to active shops, and `tally_ledger_name` is already on the wire for him via the picker's `fetchRetailers`. It is an affordance bug, not a leak.
+
+Recording it only because the *context changed*: before this commit the salesman had no reason to be anywhere near a retailer URL, and now he has a retailer page whose office twin differs by one segment. The owner deferred this redirect deliberately ("not annoying us right now") and that call stands — this is a note against it, not a re-ask.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 68 above.
+
+**Domain / correctness checks:** **RLS** — the load-bearing element, and correctly relied upon rather than duplicated; policy re-confirmed `active`-only. **Money** — `outstanding_paise` rides in `RETAILER_SELECT` but this commit renders nothing new. **Mobile** — the salesman lens has no dashboard shell, so it fills the viewport as `orders/[id]` does. **State machine / snapshots** — untouched.
+
+**What I tried:** Read the route in full looking specifically for a role check (none); confirmed `retailers_select_salesman` is `active`-only in prod; scripted used-vs-defined CSS class comparison across the moved component and its stylesheet (8 refs, 0 dangling); checked `back.*` resolution; `npm run build` and read the route manifest to confirm `/retailers/[id]` now exists; read `dashboard/layout.tsx` to see whether the office shell gates by role (it does not — the basis of 🟡 68); `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** **CLOSED: 🟡 59.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (step 3 next), 🟡 62, 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67, 🟡 68 (owner-deferred).
+
+---
+
+## Review of f71e4f3 — feat(retailers): loading boundaries for both retailer-detail routes
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 3 — the loading boundary the previous commit flagged as missing. Both routes get one from a single shared skeleton.
+
+**One skeleton, two lenses, and the lens rules are actually mirrored.** `RetailerDetailSkeleton` takes the same `role` union the page does. I checked the parity against the real component rather than trusting the comment:
+
+| | real `RetailerDetail` | skeleton |
+|---|---|---|
+| staff facts | Area, Phone, Tally ledger name (`:45`, `:46`, `:50–51`) | `["Area","Phone","Tally ledger name"]` |
+| salesman facts | Area, Phone | `["Area","Phone"]` |
+| Edit | `isStaff &&` (`:90`) | `isStaff &&` placeholder |
+
+Exact match on both lenses. This is what makes the skeleton worth having — a shape-matched fallback that does not jump when content lands. A shared skeleton with a role prop is also the same arrangement `OrderDetailSkeleton` already has with its two routes, so this follows the house pattern rather than inventing one.
+
+**`.headRowAction` is a real fix, and the stated reason is exactly right.** The claim is that `Skeleton` renders a `<div>` so the existing `.headRow button { margin-left: auto }` cannot reach it, leaving the placeholder bar against the title instead of hard right. Verified: that `button` rule is real, at `RetailerDetail.module.css:58`. This is the kind of detail that normally ships wrong and gets noticed as "the skeleton looks slightly off" months later.
+
+**All class references resolve** — re-ran the comparison over the new component: `page`, `headRow`, `headRowAction`, `facts`, `fact` all defined, plus `back.row`. Given this project has shipped an invented-class skeleton **once already this session**, that check was the point.
+
+**The prefetch reasoning carried over from the dashboard boundary is correct and now actually pays.** For a dynamic route the loading boundary is what `<Link>` warms — so step 4's link into `/retailers/[id]` had nothing to prefetch until this commit. The comment's warning that deleting the file "silently makes navigation feel slower without breaking anything" is worth keeping where it is.
+
+**🟡 61 CLOSES with this commit** — all four steps of the salesman-lens spec are in: role prop, route, loading boundary, entry point.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** The title placeholder is `height={26}` while `8beade3` moved the real headline to `--text-name-size` (21px, ~27px line box). Off by ~1px — below the threshold of a visible jump, noted only so the number is not mistaken for derived when someone next touches it.
+
+**Domain / correctness checks:** **RLS / money / state machine / snapshots** — untouched, this is a fallback UI. **Mobile** — the salesman boundary has no shared layout and fills the viewport, matching `orders/[id]/loading.tsx`; the staff one sits inside the dashboard shell. Both correct for their lens.
+
+**What I tried:** Read both `loading.tsx` files and the shared skeleton; compared the skeleton's per-lens fact list and Edit gate line-by-line against `RetailerDetail.tsx` (`:45`, `:46`, `:50–51`, `:90`); scripted used-vs-defined class comparison for the skeleton against `RetailerDetail.module.css` (0 dangling); confirmed `.headRow button` exists at `:58`, which is what makes `.headRowAction` necessary; `tsc --noEmit` (0), `eslint src` (0), `npm run build` (clean).
+
+**Open flags (cumulative):** **CLOSED: 🟡 61.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 62, 🟡 64 (owner-accepted), 🟡 65, 🟡 66, 🟡 67, 🟡 68 (owner-deferred).
+
+---
+
+## Review of 36cf498 — docs(retailers): fix the -10px derivation; stop next-env.d.ts riding in commits
+
+**Verdict:** ✅ — all three flags closed, and 🟡 67 resolved better than I proposed.
+
+**Phase / commit goal:** Clear REVIEWER flags 65, 66 and 67 from the review of `8beade3`. No behaviour change.
+
+**🟡 65 CLOSED.** The corrected comment keeps the `-10px` (correct, and unchanged) and fixes the basis: *"half a ~27px LINE BOX, which is what 21px type at `line-height: normal` produces."* It then names the wrong version explicitly — *"An earlier draft of this comment said 'half a 21px line box', which would re-derive to -13.5px and shift the headline 3.5px"*. That is the right shape for a correction inside a comment whose whole purpose is to be re-run later: the erroneous reasoning is the thing most likely to be independently re-invented, so recording it is worth more than silently deleting it.
+
+**🟡 66 CLOSED.** The re-derivation list is now three terms — touch target, name type scale, and the display font — with the mechanism spelled out: nothing sets a `line-height`, so the ~27px box comes from Space Grotesk's metrics via `next/font`, and swapping the face moves the headline without any number in this repo changing. The comment also now says the alignment is *"a rendered-pixel fact, confirmed by the owner on screenshots, not by the CSS"*, which is the honest limit on what any reviewer can check here.
+
+### 🟡 67 CLOSED — and the builder found the better answer
+
+My flag said to decide the policy once. The builder went and looked instead, and found the decision had **already been made and simply never enforced**: `.gitignore` has listed `next-env.d.ts` since the beginning — I verified it, **line 11** — and `.gitignore` does not apply to files git is already tracking. So the file was ignored-but-tracked, which is exactly how it ends up flipping between `./.next/dev/types/routes.d.ts` and `./.next/types/routes.d.ts` depending on whether `dev` or `build` ran last, and why it was already dirty at the start of this session.
+
+`git rm --cached` makes tracking match the repo's own stated intent rather than setting new policy. That is a materially better resolution than the one my flag suggested, and the distinction is worth naming: it is not a preference anyone has to defend later.
+
+**I verified the one way this could bite — by running it, not by reasoning about it.** Untracking a generated file breaks a fresh clone if anything typechecks before Next regenerates it. Checked:
+
+- Moved `next-env.d.ts` off disk entirely, ran `npm run build` → **compiled successfully and the file was regenerated**. The fresh-clone path works.
+- **No `.github/workflows` exists**, so there is no pipeline running `tsc --noEmit` ahead of `next build`.
+- `git status` is now clean rather than permanently showing a modified file.
+
+Residual, minor and self-healing: a developer who clones and runs `npx tsc --noEmit` before ever running `dev` or `build` will see Next type errors until they run either once. Not worth a flag.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **RLS / money / state machine / snapshots / mobile** — all untouched; this commit is one CSS comment and one index entry, exactly as the message claims.
+
+**What I tried:** Read the corrected comment in full; confirmed `.gitignore:11` carries `next-env.d.ts`; checked for CI workflows (none); **removed `next-env.d.ts` from disk and ran `npm run build` to prove regeneration** (compiled clean, file restored by Next); confirmed `git status` is clean afterwards; `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** **CLOSED: 🟡 65, 🟡 66, 🟡 67.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 62, 🟡 64 (owner-accepted — the phone affordance; owner is actively deciding the replacement), 🟡 68 (owner-deferred).
+
+---
+
+## Owner rulings 2026-08-01 — 🟡 ㊿ and 🟡 55 CLOSED
+
+Not a commit review. Recording two owner decisions so neither flag gets
+re-raised by a future sweep.
+
+**🟡 ㊿ CLOSED — WON'T FIX, by product decision.** The flag was that
+`outstanding_paise IS NULL` conflates two states: a shop the sync never matched,
+and a shop it matched where Tally returned no figure. `balance_as_of IS NOT NULL`
+would separate them.
+
+Owner 2026-08-01: **"never matched and tally sent no figure will be the same
+thing, I want it to be that way."** So the conflation is the specification, not a
+defect — both mean "we have no balance for this shop", and the office does the
+same thing about either. `balance_as_of` stays in the table; nothing needs to
+read it to tell the two apart.
+
+Re-measured in prod the same day: 599 active shops — 597 with a balance, 2 never
+matched, **0 in the middle state**. So nothing visible changes either way; this
+closes the question rather than deferring it.
+
+Do not reopen this as a "latent labelling bug". It is the intended reading.
+
+**🟡 55 CLOSED — owner: doesn't matter.** A commit-message nit ("render in
+JetBrains Mono *again*" where it was the first time). Commit messages are
+immutable and the claim misleads nobody about the code. Dropped.
+
+**Open after these:** 🟡 56, 🟡 62, 🟡 64 (owner deciding the replacement
+affordance), 🟡 68 (owner-deferred).
+
+---
+
+## Review of 062f23d — fix(pick): PickSkeleton matches PickScreen instead of jumping on load
+
+**Verdict:** ✅ — **🟡 62 CLOSED.** The fix is right, the two extra mismatches it found are real, and every number checks out. One new flag and one commit-message accuracy nit.
+
+**Phase / commit goal:** Flag 62 — the skeleton capped its width and padded its top while `PickScreen` does neither.
+
+### Every geometry claim verified against `pick.module.css`, not read
+
+I checked each number rather than trusting the list, because the whole commit is an assertion that a set of numbers match:
+
+| skeleton | `pick.module.css` | |
+|---|---|---|
+| `padding: "0 16px 96px"`, `minHeight: 100vh` | `.page:1–7` — identical, no cap, no centring | ✅ |
+| header `gap: 4`, `margin: "0 -16px"`, `padding: "8px 16px 8px 4px"`, white, 1px hairline | `.header:9–17` — identical | ✅ |
+| 48×48 back box | `.back:19–25` — `min-width`/`min-height: var(--touch-target-min)` (48px) | ✅ |
+| headInfo column, `gap: 2` | `.headInfo:32–37` — identical | ✅ |
+| camera `marginTop: 12`, `height: 280` | `.cameraWrap:57–64` — `margin: 12px 0 0`, `height: 280px` | ✅ |
+| lines `marginTop: 12`, `gap: 8`, rows `height: 64` | `.lines:130–135` + `.lineHead:149–156` (48px min-height + `8px 0` padding = 64) | ✅ |
+| submit bar fixed/0/0/0, `z-index: 20`, `gap: 12`, `padding: "12px 16px calc(12px + env(safe-area-inset-bottom))"`, white, 2px ink top | `.submitBar:255–267` — identical, including the safe-area expression | ✅ |
+
+**The "no background" decision is correct and was checked rather than assumed.** `body` in `globals.css:62–68` already paints `--color-paper`, so `.page`'s own declaration is redundant and there is nothing to flash against. Declining to copy a redundant rule — and saying why — is better than mirroring it reflexively.
+
+**The two extra findings were worth making.** The header is a full-bleed white band with a hairline and a 48px touch target (~65px tall), not two bars on bare paper; and `.submitBar` renders unconditionally, so its absence meant a heavy white band with a 2px ink rule popped in at the bottom on load. Both genuinely move on load, so fixing them inside this commit rather than filing them was the right call — the flag was "the skeleton doesn't match the screen", and these are that same defect.
+
+**Honest about what it did not do.** *"NOT visually verified — /godown/[id] and /scan/[id] need a godown login… the 'nothing shifts' check is a rendered-pixel fact and belongs to the owner."* That is the correct division: I can confirm the numbers match the stylesheet, which I have, and only a rendered screen can confirm nothing shifts.
+
+### 🟡 69 — the phantom camera block, now measured
+
+The commit says the camera approximation is *"unchanged and unfixable here"*.
+
+**"Unfixable" is right.** `.cameraWrap` only mounts for scan-required brands, and a loading boundary cannot fetch, so the route genuinely cannot know the brand before the data lands. No amount of care fixes that at the boundary.
+
+**"Unchanged" is not right** — the block went from 240px to 280px in this commit. For a pick that mounts *no* camera, the phantom block that vanishes on load therefore got **40px taller**, so that particular jump is slightly worse than before.
+
+I measured which way the trade actually falls, since the commit decided it without numbers:
+
+| | `requires_scan` | orders |
+|---|---|---|
+| LG | **true** | **91** |
+| Zebronics · Luminous · Bajaj · Other · EOL · Sargam | false | **101** |
+
+**91 vs 101 — a coin flip.** So there is no majority to favour, and both errors are the same ~292px in opposite directions: keep the block and non-scan picks jump *up*; drop it and LG picks jump *down*. Volume cannot decide this, which means it is a taste call for the owner rather than something the builder got wrong. Keeping it — sized correctly where it does exist — is a perfectly defensible resolution of a genuine tie.
+
+Recorded so the trade-off is written down with its numbers instead of being re-derived from scratch the next time someone notices the jump.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- The commit and the code comment both say *"each `.line` is a 48px touch row plus 8px of padding top and bottom"*. The composite 64px is correct, but `.line` itself is `padding: 0 12px 0` — the touch row and the vertical padding both live on its child `.lineHead`. Someone checking the claim against `.line` will find no vertical padding there and briefly doubt a number that is actually right.
+- 🟡 69 above.
+
+**Domain / correctness checks:** **RLS / money / state machine / snapshots** — untouched; presentation only, as claimed. **Mobile** — the primary surface for both these routes, and the reason the top-padding fix matters more than the width one: the 16px shove was on every screen, the width cap only on wide ones.
+
+**What I tried:** Read `pick.module.css` in full and compared all seven mirrored rules number-by-number against the new inline styles (table above); confirmed `--touch-target-min` is 48px; traced the 64px row to `.lineHead`'s `min-height` + `8px 0` padding rather than to `.line`; confirmed `body` paints `--color-paper` in `globals.css:62–68`, which is what makes the omitted background correct; queried prod for the scan-vs-no-scan order split behind 🟡 69 (91 / 101); `tsc --noEmit` (0), `eslint src` (0), `npm run build` (clean).
+
+**Open flags (cumulative):** **CLOSED: 🟡 62.** New: 🟡 69. Still open: 🟡 56, 🟡 64 (owner deciding the replacement affordance), 🟡 68 (owner-deferred). Previously closed by owner ruling: 🟡 ㊿, 🟡 55.
+
+---
+
+## Owner ruling 2026-08-01 — 🟡 69 CLOSED
+
+**🟡 69 CLOSED — WON'T FIX.** The phantom camera block in `PickSkeleton`: it
+always draws a 280px capture area, but `PickScreen` only mounts a scanner when
+`requiresScan && !allScanned`, so on a fixed-brand pick (or an LG pick already
+fully scanned) the block vanishes on load and the lines jump up ~292px.
+
+Owner 2026-08-01, after being shown the corrected framing — it is not
+route-dependent, both `/godown/[id]` and `/scan/[id]` share the skeleton, and it
+turns on which ORDER is opened — ruled it not worth fixing: **"i dont care."**
+
+That is a reasonable call and the record should say why rather than just that it
+was dropped. The block is a sub-second flash during a load; the split is 91
+scan-required orders against 101 not, so there is no majority to serve; and
+because a loading boundary cannot fetch, the only alternative is being wrong by
+the same ~292px in the opposite direction for the other half. There is no
+version of this that is right for everyone.
+
+Do not reopen unless the loading boundary gains a way to know the brand — e.g.
+the brand appearing in the route segment — which would change the constraint
+rather than the taste.
+
+**Open after this:** 🟡 56, 🟡 64 (owner deciding the replacement affordance),
+🟡 68 (owner-deferred).
+
+---
+
+## Review of 4db4faf — refactor(balance): lift the balance rule into lib/balance.ts
+
+**Verdict:** ✅ — the "byte-identical" claim is **proven**, not inspected.
+
+**Phase / commit goal:** Step 1 of the salesman-retailers spec — move the balance
+*decision* into one module so the picker row and the Retailers tab cannot each
+grow a private copy. One consumer for now; rendered output must not change.
+
+### The claim is provable, so I proved it rather than read it
+
+A refactor whose whole contract is "nothing changes" deserves an execution
+check, not a diff read. I reconstructed the old `outstanding()` verbatim from
+`4db4faf^`, called the new path (`readBalance` + the queue's state→class
+mapping), and compared both over the full meaningful input domain:
+
+```
+compared 1025 inputs — 0 mismatches
+  null     -> {"text":"—","cls":"amtNone"}
+  0        -> {"text":"₹0","cls":"amtClear"}
+  -5000    -> {"text":"-₹50","cls":"amtClear"}
+  8432000  -> {"text":"₹84,320","cls":"amtOwed"}
+```
+
+The sweep included the cases where a `<=` refactor usually breaks: `null`, `0`,
+**`-0`**, ±1, the ±49/±50 paise rounding boundaries, `MAX_SAFE_INTEGER`,
+`MIN_SAFE_INTEGER`, `NaN`, `±Infinity`, and a 1,000-point sweep across
+±500,000 paise. Zero divergence on both `text` and class.
+
+That also settles the specific risk in this shape of change — an inverted arm in
+the new ternary. `unknown → amtNone`, `clear → amtClear`, `owed → amtOwed` holds
+at every input, including the `<= 0` boundary where `clear` and `owed` meet.
+
+**Returning a semantic state rather than a class is the right call and the
+comment explains why properly:** a CSS-module class is a hashed name scoped to
+its own stylesheet, so `styles.amtOwed` is meaningless in another file. The
+*decision* is shared; each surface keeps its own visual grammar. That is what
+lets a table cell and a phone row look different without disagreeing about
+whether the shop owes money.
+
+**The old comment's claim is now honest.** `outstanding()` asserted "ONE
+definition of how a balance reads" while being the only surface with a balance —
+true by accident. The commit says so and fixes it by moving rather than by
+weakening the claim.
+
+**Verified alongside:** all three `amt*` classes still defined in
+`RetailersQueue.module.css`; no dead `formatRupees` import left behind; `tsc`
+and `eslint src` both 0.
+
+### 🟡 70 — a shop in credit renders as `-₹50`, and step 2 puts that in front of salesmen
+
+Surfaced by the harness rather than by reading: `-5000` paise renders **`-₹50`**,
+green. That is pre-existing queue behaviour and **not introduced here** — but it
+is about to propagate to two new surfaces (the picker row, the Retailers tab)
+whose reader is a salesman standing in the shop, not an accountant reading a
+ledger.
+
+28 active shops are in credit. "-₹50" in green is a minus sign that means "they
+are ahead", which reads oddly next to red amounts that mean "they owe". A ledger
+reader parses it instantly; someone scanning names for a shop to sell to may not.
+
+Not a defect and not blocking — the spec deliberately says match the queue
+exactly, and the builder did. Raising it because **step 2 is the moment to decide
+it**, while it is still one surface's convention rather than three. Options if it
+ever matters: leave it, or read credit as `₹50 in credit` on the salesman
+surfaces only. Owner's call, cheap either way.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 70 above.
+- The **"is this shop unsynced"** predicate is still written inline in two
+  places — `RetailersQueue.tsx:23` and `RetailerDetail.tsx:77`, both
+  `outstanding_paise === null`. That is a different question from "how does this
+  balance read", so leaving it out of this module is defensible. Worth knowing
+  that the *meaning of null* is now encoded in three sites, though, and the owner
+  has just fixed that meaning by ruling 🟡 ㊿ won't-fix — `readBalance` already
+  returns `state: "unknown"` for exactly this case if they should ever converge.
+
+**Domain / correctness checks:** **Money** — the central concern, and clean:
+paise in, `formatRupees` (en-IN) out, never raw, and `null` still cannot render
+as ₹0 (proven at the `null` and `0` cases above, which stay distinct). **RLS /
+state machine / snapshots** — untouched. **Mobile** — no surface changes in this
+commit; the queue renders exactly as before, which is the point.
+
+**What I tried:** Wrote a `tsx` harness importing the real `src/lib/balance.ts`,
+reconstructed the pre-refactor `outstanding()` from `4db4faf^`, and compared both
+`text` and class over 1,025 inputs spanning null, zero, negative zero, the
+rounding boundaries, the safe-integer extremes, `NaN`, `±Infinity` and a wide
+sweep — 0 mismatches; grepped `RetailersQueue.module.css` for all three `amt*`
+classes; grepped `src/` for any other hand-rolled `outstanding_paise === null` /
+`<= 0` test (found the two `isNotSynced`-style predicates noted above, no second
+copy of the reading rule); `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** New: 🟡 70 (decide at step 2). Still open: 🟡 56,
+🟡 64 (owner deferred the chevron decision), 🟡 68 (owner-deferred). Closed by
+owner ruling this session: 🟡 ㊿, 🟡 55, 🟡 69.
+
+---
+
+## Review of eaa4ea0 — feat(retailers): shared RetailerList — the picker row gains the balance
+
+**Verdict:** ✅ — all four flagged traps handled, the seam is in the right place, and one solution is better than what the spec asked for.
+
+**Phase / commit goal:** Step 2 — extract search + sectioning + rows into a shared `RetailerList`, and give the Quick Order picker the new row (name + balance on line 1, area + NEW on line 2).
+
+### The four traps — each checked, each clear
+
+**1. `align-items` — handled, and better than specified.** The spec said `flex-start`; the build uses **`baseline`**. That is the more correct answer: `.body` is a flex *column*, so its baseline derives from its first item, which means the amount aligns to the **shop name's baseline** rather than to box tops. With the amount and the name at different font sizes, `flex-start` would have left them visibly off by a couple of pixels. Taking the better option rather than the specified one, silently and correctly, is the right call.
+
+**2. `min-width: 0` — present.** `.body { flex: 1; min-width: 0 }`, and `.name` keeps `overflow/text-overflow/white-space`. This is what stops a 44-character shop name pushing the amount off the row.
+
+**3. The desktop width cap — present.** `.content` gains `max-width: 480px; width: 100%; margin: 0 auto`. Narrower than the 560–640px I suggested, which is a defensible call rather than a miss: it keeps the flow reading as a phone flow on a wide screen instead of a stretched one.
+
+**4. Line 2's condition — correct.** `Boolean(retailer.area) || !retailer.verified`, with a comment naming the failure it avoids. Keyed on the area alone, a quick-added shop would have silently lost its NEW badge.
+
+### The seam is in the right place — measured, per the spec's own test
+
+`PickRetailer` went **200 → 160 lines**, and the extraction is complete rather than partial: grepping the file for `matches`, `localeCompare`, `recentIdSet`, `sectionLabel` and `noResults` finds **no second copy** of any of them. What remains is quick-add state, the quick-add form, the clash card and the `FlowHeader` — exactly what the spec said stays.
+
+**`readBalance` is used, not re-implemented** — the whole point of step 1, and it held under the first surface that could have forked it.
+
+**The tap behaviour is enforced by the type system, not by a comment:**
+
+```ts
+type TapBehaviour =
+  | { onSelect: (retailer: RetailerRow) => void; href?: never }
+  | { href: (retailer: RetailerRow) => string; onSelect?: never };
+```
+
+A union with `never` makes "one or the other, never both" a compile error. That is materially better than a prop pair plus a comment asking nicely, and it is the kind of thing that stops a future caller passing both and getting undefined behaviour.
+
+**The `emptyState` slot keeps quick-add out of the shared component** while still letting the picker offer *"+ Add it as a new shop"* seeded with the live query. The component never learns what quick-add is — it just hands back the query.
+
+### Scope discipline held
+
+**The admin retailers card was NOT touched** — `git show --stat` for `src/app/dashboard/retailers/` is empty and the `No area/phone on file` string is still there. The owner had not decided that question when this commit was written, and the builder correctly did not decide it for them. (It has since been decided; it belongs in a later commit.)
+
+**Verified alongside:** 12 `styles.*` refs in `RetailerList`, 8 in `PickRetailer`, **0 dangling** in either — the CSS-module trap that has bitten this project twice. `PickRetailer.module.css` has **no dead rules** left behind: every retired class (`.retailerRow`, `.retailerName`, `.retailerMeta`, `.newTag`) was removed rather than orphaned. `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**The density question was handed back, as instructed** — the commit message ends by naming the 41%-red problem and saying to judge it by eye rather than pre-emptively softening it. That is the correct disposal of a taste call.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- **The `href` branch of `RetailerList` is unexercised.** `<RetailerList` appears at exactly one call site, and it passes `onSelect`. So the `<Link>` path — and with it the whole reason the component is shared — has never rendered. It is three lines and hard to get wrong, but it is untested code until step 3 wires the tab, and step 3 is where a mistake in it will surface. Worth an explicit look there rather than assuming the symmetric branch works because the other one does.
+- 🟡 70 (credit renders as `-₹50`) is unchanged here, as the owner deferred it pending a conversation. Step 2 has now shipped that reading to a second surface, which is what 70 predicted — still one-line to change in `readBalance`.
+
+**Domain / correctness checks:** **Money** — `readBalance` only; no raw paise, no second formatting path, and `null` still cannot render as ₹0. **RLS** — untouched; no query change, and the picker already received `outstanding_paise`. **State machine / snapshots / gapless** — untouched. **Mobile** — the primary surface here, and the reason traps 1 and 2 mattered: both defects would have shown on a phone first. The desktop cap is the deliberate side-effect decision the spec asked to be made and stated.
+
+**What I tried:** Read `RetailerList.tsx` and its stylesheet in full; checked `.row` for `align-items` (baseline, not center) and `.body` for `min-width: 0`; checked `.content` for the width cap; verified the line-2 condition against the spec's `area || !verified`; measured `PickRetailer` before/after from `eaa4ea0^` (200 → 160) and grepped it for every piece of the extracted logic to confirm no duplicate survived; scripted used-vs-defined CSS class comparison on both files (20 refs, 0 dangling) and a reverse check for orphaned rules (none); confirmed `src/app/dashboard/retailers/` is untouched; `tsc` (0), `eslint src` (0), `npm run build` (clean).
+
+**Open flags (cumulative):** 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending a conversation). Closed this session by owner ruling: 🟡 ㊿, 🟡 55, 🟡 69.
+
+---
+
+## Review of 5bf4fa7 — style(retailers): shrink the NEW tag on the shared retailer row
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Owner note on the picker screenshot — the NEW tag reads too big and too thick. 10px → 9px, padding `2px 6px` → `1px 5px`.
+
+**The commit's factual claim is the part worth checking, and it holds exactly.** It says every *other* NEW badge in the app is filled amber at 9px/700 with `2px 6px` padding, so 9px is not an arbitrary shrink but the existing standard. Verified across all four stylesheets that define one:
+
+| | |
+|---|---|
+| `RetailersQueue.module.css .newBadge` | 9px / 700 / `2px 6px` / filled amber |
+| `OrdersView.module.css .newBadge` | 9px / 700 / `2px 6px` / filled amber |
+| `OrderDetailView.module.css .newBadge` | 9px / 700 / `2px 6px` / filled amber |
+| `RetailerList.module.css .newTag` | now 9px / 700 / `1px 5px` / **outlined** |
+
+So the type size is now uniform across all four, and this row's outline is the only remaining difference — which the commit keeps deliberately, with a reason: an outline is the lighter of the two treatments and lighter was the ask, and it sits beside grey 12px area text on line 2 rather than against a heading, where a solid amber block would out-shout the line it belongs to. That is a considered choice rather than an inconsistency left lying around.
+
+**Checking whether it was a shared standard before changing it** is the right instinct and is what stops a one-screen tweak silently forking a convention. `PickRetailer.module.css` no longer defines `.newTag` at all — correctly retired in `eaa4ea0` rather than orphaned.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Presentation only; no data, RLS, money or state-machine surface. **Mobile** — the only surface this renders on today.
+
+**What I tried:** Enumerated every `.newBadge`/`.newTag` definition in `src/**/*.css` and compared font-size, weight, padding, fill and border (table above); confirmed `PickRetailer.module.css` retains no `.newTag`; `tsc --noEmit` (0), `eslint src` (0).
+
+---
+
+## Review of c4c9172 — feat(retailers): drop the "No area/phone on file" placeholder from the phone cards
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Owner decision — a placeholder shown on 97% of cards is texture, not information. Render the meta line only when there is something real in it.
+
+**Every number in the commit message is exact.** It cites 604 of 623 shops and 19 that matter; I re-queried prod and got precisely that:
+
+```
+all_retailers 623 · placeholder_would_show 604 · real_meta 19
+```
+
+Worth noting for the record that my own review of this decision quoted 622/604/18 a few hours earlier. That is **not drift** — a retailer was added in between. Both figures were correct when taken.
+
+**It handles all three shapes of the line, which is the thing to get right here.** The owner made the point explicitly: the second line is area *and* phone, and though they currently arrive together, either may appear alone in future. `[r.area, r.phone].filter(Boolean).join(" · ")` already covered that, and the new guard keys on the joined result rather than on `area`:
+
+```jsx
+const meta = [r.area, r.phone].filter(Boolean).join(" · ");
+…
+{meta && <p className={styles.rowMeta}>{meta}</p>}
+```
+
+So area-only, phone-only and both all render; only genuinely-empty suppresses the line. Measured today: **14 have both, 5 area-only, 0 phone-only** — so the phone-only branch is unexercised in production but correctly written for the day it is not.
+
+**No reserved height, no vertical centring** — the card shrinks to one line, which was the point. Reserving whitespace for nothing is the thing being removed, and on a 623-row list the density is the whole win.
+
+**The removed string survives only in the explanatory comment** (`:251`), not in any render path — checked, single occurrence.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **RLS / money / state machine** — untouched. **Mobile** — this is the phone-card branch specifically, and the desktop table is unaffected. **Consistency** — this now matches `RetailerList`'s own line-2 rule, so the picker, the coming Retailers tab and the office cards all read the same way, which was the stated reason for doing it in this run rather than later.
+
+**What I tried:** Read the diff; re-queried prod for the exact counts (623 / 604 / 19 — matching the message) plus the area-only, phone-only and both splits to confirm the guard covers all three; grepped for any surviving render path using the old string (comment only); `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending a conversation).
+
+---
+
+## Note — REVIEWER-authored change at owner request (2026-08-01)
+
+Not a review. Recording that `OrderDetailView.tsx` changed **without a BUILDER
+commit**, so the change is not mistaken for drift.
+
+Owner 2026-08-01 asked for the **"Waiting for the godown to scan serials."** line
+to be removed, and explicitly asked the REVIEWER to make the edit directly rather
+than route it through the BUILDER. Done in `style(orders)` below.
+
+**Why it was safe to remove rather than reword.** `.waitLine` had exactly two
+call sites: this one, and the backorder provenance line ("Backorder of ORD-…"),
+which is not a status hint at all. So this was the **only** status carrying such
+a line — `pending_approval`, `ready_to_bill`, `billed`, `dispatched` and
+`cancelled` never had one. Removing it makes the screen consistent instead of
+leaving a single status as the odd one out, and the `Pending scan` chip in the
+header already carries the same information.
+
+`.waitLine` itself is retained and still used by the backorder line, so the rule
+is not orphaned.
+
+Verified: the string survives only inside the explanatory comment, no render path;
+`.waitLine` still referenced at `OrderDetailView.tsx:663`; `tsc --noEmit` 0,
+`eslint src` 0, `npm run build` clean.
+
+The standing rule still holds for everything else — the REVIEWER does not edit
+BUILDER code unless the owner directs it, as they did here.
+
+---
+
+## Review of 14b024c — style(retailers): drop the row's 48px floor — sized by content instead
+
+**Verdict:** ❌ — **not for what this commit changed**, which is correct and well
+diagnosed, but because tracing its own "three screens" claim uncovered a live
+`₹NaN` regression introduced two commits earlier in `eaa4ea0` (which I passed).
+
+### First, the change itself is right, and the diagnosis is the good part
+
+The owner reported three things — rows too tall, one- and two-line rows nearly
+identical, name and amount looking top-aligned — and the commit correctly
+identifies them as **one cause**, not three preferences.
+
+`min-height: 48px` with `align-items: baseline` is the culprit. Baseline-aligned
+flex items are positioned as a group and that group sits flush to the cross-axis
+start, so a one-line row whose content is ~37px had no way to fill a 48px box:
+content at the top, ~11px of dead space beneath. That is exactly the
+"top-aligned" appearance, and it also squeezed one-line (48px) against two-line
+(54px) — the six pixels that read as "almost no difference".
+
+**I passed `align-items: baseline` in the `eaa4ea0` review and called it better
+than the `flex-start` I had specified.** It *was* better in isolation. What I did
+not do was consider it against the `min-height` sitting three lines above it. The
+owner found the result by looking at it.
+
+Numbers verified by computation, not taken on trust: `--text-body-size: 13px`,
+`.row` padding `10px 4px`, so one line ≈ 10 + ~17 + 10 = **37px** and two lines ≈
+10 + 17 + 2 + ~15 + 10 = **54px**. Both match the message.
+
+### 🟡 71 — the touch target, and the stated remedy does not reach it
+
+37px is below `--touch-target-min` (48px), which every other tappable thing in
+this app respects. The commit is honest about this and names it an accepted
+owner call; the row is full-width so only the vertical target shrinks. The
+failure mode is worth stating plainly: **a mis-tap here picks the wrong SHOP for
+an order or a deposit.**
+
+The commit names the right knob — padding, not `min-height`, since `min-height`
+reintroduces the dead space — but **its arithmetic falls short**: it suggests
+13px padding for "~43px", and 43px is still under 48. To actually reach the floor
+the padding needs to be **~15.5px** (15.5 + 17 + 15.5 ≈ 48), which would also
+keep the one/two-line difference visible (48 vs ~64) because padding scales both
+rows equally.
+
+So the trade is real rather than a missed solution — the owner asked for shorter
+rows and 48px is the accessibility floor — but if mis-taps ever appear, the
+number to reach for is 15–16px, not 13px.
+
+### ❌ BLOCKING — the deposits retailer picker renders `₹NaN` in red on every row
+
+The commit's claim that three screens share `RetailerList` is **correct**, and I
+was wrong to doubt it: I grepped for `<RetailerList` call sites, found one, and
+nearly filed the claim as drift. `DepositFlow.tsx:132` renders `PickRetailer`
+directly, so deposits reaches `RetailerList` transitively. Tracing that is what
+found this.
+
+**The deposits flow runs its own retailer query and it is missing the column:**
+
+```
+deposits/new/page.tsx:31   .select("id, name, area, verified")
+deposits/new/page.tsx:86   retailers={(retailerRows ?? []) as RetailerOption[]}
+```
+
+`RetailerOption = RetailerRow`, which declares `outstanding_paise: number | null`
+— so the **`as` cast tells TypeScript a column is there that the query never
+fetched.** At runtime it is `undefined`, and `undefined === null` is false, so
+`readBalance` falls through to the `owed` arm and formats `undefined`. Proven by
+execution:
+
+```
+deposits row  -> {"state":"owed","text":"₹NaN"}
+null (normal) -> {"state":"unknown","text":"—"}
+0    (normal) -> {"state":"clear","text":"₹0"}
+```
+
+Every row of the deposit flow's shop step shows **`₹NaN` in red** — 623 rows
+claiming an unreadable debt, on the screen a salesman uses to record money he has
+just collected.
+
+**Introduced by `eaa4ea0`, not by this commit** — the moment `RetailerList`
+started reading `outstanding_paise`, the one caller that did not fetch it broke.
+I passed `eaa4ea0` and missed it, because I checked direct `<RetailerList`
+renderers rather than everything that transitively mounts it. Contained only
+because the branch is unpushed.
+
+**The fix is one line**, and it is the exact thing `RETAILER_SELECT` was
+extracted for in `b5df8c2`, whose own message predicted this: *"It was about to
+be hand-typed a third time, which is how one lens quietly ends up missing a
+column."*
+
+```
+deposits/new/page.tsx:31
+  .select("id, name, area, verified")  ->  .select(RETAILER_SELECT)
+```
+
+**Also drop the `as RetailerOption[]` cast** if it can be dropped, or the next
+missing column will hide the same way. The cast is what turned a type error into
+a runtime `NaN`.
+
+Worth checking the same way: `PickRetailer`'s quick-add insert also does
+`.select("id, name, area, verified")`. That path calls `onSelect` immediately
+rather than rendering a row, so it does not produce a visible `NaN` today — but
+it is the same shape of hole.
+
+### One more thing this commit carries that its message does not mention
+
+`14b024c` also contains the `OrderDetailView.tsx` waitLine removal. **That is my
+doing, not the BUILDER's:** the REVIEWER made that edit at the owner's request,
+ran `tsc`/`eslint`/`build` before committing, and in that window this commit's
+whole-working-tree add swept it up. Recorded so it is not read as an unrelated
+change smuggled into a style commit. The REVIEWER's own commit message has been
+amended to match what it actually contains.
+
+**Blocking issues:** the `₹NaN` regression above. One line, and it must land
+before this branch is pushed.
+
+**Non-blocking suggestions:** 🟡 71 above.
+
+**Domain / correctness checks:** **Money** — the blocking issue *is* a money
+display defect: a fabricated amount rendered as fact. **Mobile** — the only
+surface for all three affected screens. **RLS / state machine** — untouched.
+
+**What I tried:** Verified the row-height arithmetic from `--text-body-size` and
+`.row`'s padding (37/54, matching); computed the padding actually needed to reach
+48px (~15.5px, versus the 13px the message suggests); traced every renderer of
+`RetailerList` including transitive ones (`DepositFlow:132` → `PickRetailer` →
+`RetailerList`); read the deposits retailer query and its cast; **executed
+`readBalance` against a deposits-shaped row and captured the `₹NaN`**; confirmed
+the `OrderDetailView` change appears exactly once and `.waitLine` is still used;
+`tsc --noEmit` 0 and `eslint src` 0 — neither catches this, which is the point.
+
+**Open flags (cumulative):** New: 🟡 71. Still open: 🟡 56, 🟡 64 (owner
+deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
+
+---
+
+## Review of f6dc8e5 — fix(deposits): the deposit picker fetched no balance and rendered ₹NaN
+
+**Verdict:** ✅ — **the blocking issue from `14b024c` is CLEARED**, and the fix is a sweep rather than a spot repair.
+
+**Phase / commit goal:** The one-line fix for the `₹NaN` regression: `/deposits/new` hand-typed its retailer select, omitted `outstanding_paise`, and cast the result to a type that promised it.
+
+**The fix is the right one.** `.select(RETAILER_SELECT)`, and `RETAILER_SELECT` is confirmed to carry the column: `"id, name, area, phone, verified, active, tally_ledger_name, outstanding_paise"`. So the value the picker reads now exists, `=== null` behaves, and the `owed`/`₹NaN` arm is unreachable for these rows.
+
+### The sweep claim is the valuable part, and it verifies exactly
+
+The commit says it looked for the same lie everywhere rather than fixing only the reported site: four casts to `RetailerOption`/`RetailerRow` exist, the other three already sit on `RETAILER_SELECT` queries, and this was the only hand-typed retailers select feeding a cast. Checked independently:
+
+| cast | its query |
+|---|---|
+| `deposits/new/page.tsx:93` | `RETAILER_SELECT` (fixed here) |
+| `dashboard/retailers/[id]/page.tsx:20` | `RETAILER_SELECT` |
+| `retailers/[id]/page.tsx:23` | `RETAILER_SELECT` |
+| `lib/queries/retailers.ts:43` | `RETAILER_SELECT` |
+
+And a separate grep for every `from("retailers").select(…)` in `src/` returns **four call sites, all four using `RETAILER_SELECT`** — there is no hand-typed retailers select left anywhere. Every cast in the codebase is now truthful, which is a stronger result than fixing the one screen that broke.
+
+**The quick-add exemption also checks out.** `PickRetailer`'s insert still does `.select("id, name, area, verified")`, but its result is consumed as `onSelect({ id: data.id, name: data.name, area: data.area })` into `SelectedRetailer { id, name, area }` — a three-field type that never becomes a `RetailerRow` and never reaches `readBalance`. Verified against both the call and the interface. Correctly identified as the same *shape* of hole without the same consequence, and correctly left alone.
+
+**Declining to switch to `fetchRetailers()` is good judgment.** That would have deleted the cast outright, which is tempting — but it `throw`s on error where this page currently degrades to an empty list. Changing failure behaviour is not something a blocking fix should smuggle in. Naming the tradeoff instead of taking it silently is the right call.
+
+**Blocking issues:** None. The one from `14b024c` is cleared.
+
+**Non-blocking suggestions:** None. The `as RetailerOption[]` cast survives, but it is now truthful and the commit explains why removing it belongs in separate work.
+
+**Domain / correctness checks:** **Money** — a fabricated amount is no longer rendered as fact; `null` still reads `—` and `0` still reads `₹0`. **RLS** — the select widens the columns fetched, all of which `authenticated` already holds column-level SELECT on and all of which the salesman already receives elsewhere; no policy involved. **Mobile** — the affected surface.
+
+**What I tried:** Confirmed `RETAILER_SELECT` contains `outstanding_paise`; independently enumerated every cast to `RetailerOption`/`RetailerRow` (4) and every `from("retailers").select(…)` (4) and cross-checked that all four use the constant — no hand-typed select remains; traced the quick-add insert to `onSelect` and read `SelectedRetailer`'s shape to confirm it cannot reach `readBalance`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+---
+
+## Review of c1939ba — docs(retailers): the row-height remedy needs ~15.5px, not 13px
+
+**Verdict:** ✅ — **🟡 71 CLOSED.**
+
+**Phase / commit goal:** Correct the arithmetic in `.row`'s comment, which offered 13px of padding as the remedy if 37px rows start causing mis-taps.
+
+Comment only; no rule changed and nothing renders differently — verified from the diff, which touches five lines of a CSS comment and nothing else.
+
+The correction is right: `10 + 17 + 10 = 37`, so clearing the 48px floor needs **+5.5px a side, ~15.5px**, and the 13px previously offered reaches only ~43px — still under the target it was meant to restore. The new text names that shortfall explicitly rather than just substituting the number, which is what stops 13px being offered again by someone who remembers a figure but not why it changed. Same discipline as the `-10px` correction in `36cf498`.
+
+**The 37px itself is unchanged and remains the owner's accepted call** — 🟡 71 was never about reversing that, only about the remedy being unusable as written.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Nothing renders differently; no data, money, RLS or state-machine surface.
+
+**What I tried:** Read the diff (comment-only, one rule's block); re-derived 37px from `--text-body-size: 13px` and `.row`'s `10px 4px` padding and confirmed ~15.5px is what reaches 48.
+
+**Open flags (cumulative):** **CLOSED: 🟡 71.** Still open: 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
+
+---
+
+## Review of 953b62c — feat(retailers): the salesman Retailers tab
+
+**Verdict:** ✅ — step 3 lands the spec as written, and the one thing I have been waiting three commits to see actually works.
+
+**Phase / commit goal:** The final step — `/retailers` list route, the 4th tab, and the `RetailerDetail` fallback.
+
+### The `href` branch renders for the first time, and it is right
+
+I flagged this twice: every previous render of `RetailerList` went through `onSelect`, so the `<Link>` path — the entire reason the component is shared — had never executed. It now has a caller:
+
+```tsx
+<RetailerList retailers={retailers} recentRetailerIds={recentRetailerIds}
+              href={(r) => `/retailers/${r.id}`} />
+```
+
+`npm run build` registers `/retailers` and `/retailers/[id]` together, so the rows point at a route that exists. The discriminated union from `eaa4ea0` did its job: this call site could not have passed both props.
+
+### Everything the spec settled is present, and the checks were run rather than assumed
+
+| spec decision | verified |
+|---|---|
+| Tab order `Products · Orders · Retailers · Deposits`, `Store` icon | exact — `/products` Tag, `/` ReceiptText, `/retailers` **Store**, `/deposits` Wallet |
+| Tab home has **NO back arrow** | the only `BackLink` occurrence in the route is a **comment explaining its absence**; nothing renders one |
+| Mirror `/products` for the shell | auth → `getQueryClient()` → prefetch → `TopStrip` / `BottomTabBar` / `HydrationBoundary` |
+| Share the `["retailers"]` cache | same key, `fetchRetailers`, no new query and no new privilege |
+| All active shops, no "his shops" filter | page adds no filter; RLS scopes it, and the comment says why a `my shops` list would be a fiction |
+| No quick-add, no FAB | neither present |
+| `RetailerDetail` fallback `/` → `/retailers` | `fallback={isStaff ? "/dashboard/retailers" : "/retailers"}` |
+
+RECENT is derived from the same `orders` query shape `new-order/page.tsx` uses, so the picker and the tab lead with the same shops rather than two different ideas of "recent".
+
+**CSS references all resolve** — the two apparent danglings were artifacts of my own grep (`shell.module` from the import path) and a comment, not real. Confirmed by reading both.
+
+**The loading boundary shape-matches** — `padding: 16 / flex column / gap: 16` in the skeleton against `RetailersBrowse.module.css`'s `.page { padding: 16px; display: flex; flex-direction: column; gap: 16px }`. Identical values, so no jump. This is the flag-62 defect class and it is clear here.
+
+### 🟡 72 — `tab-shell.module.css` is shared by name but has one consumer
+
+The new file is byte-identical (comment included) to `.page`/`.content` in `src/app/page.module.css` and `src/app/products/products.module.css`, and to `.page`/`.scroll` in `src/app/deposits/deposits.module.css`. **Verified all three** — each has the `position: fixed; inset: 0` block with the same 2026-07-24 keyboard/URL-bar rationale, and deposits does name its scroller `.scroll` exactly as the file's note says.
+
+So today the count is **four copies, not one** — the shared file prevents a fifth rather than removing any.
+
+**The commit is completely straight about this,** and its disposal is right: it says three copies exist, names them, says adopting the shared file in each is a one-import change with no visual difference, and explains the deferral — those are live screens and this commit was about a new route. Doing risky migration work in the wrong commit is worse than leaving a documented note.
+
+Flagged only so it lives somewhere tracked rather than solely in a CSS comment. The failure mode if it is forgotten is specific: someone needing this shell finds `products.module.css` first and copies *that*, and the count goes to five.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- The skeleton hard-codes its four layout values inline rather than importing `RetailersBrowse.module.css`. They match today — checked — but a change to the real page's padding will not follow, and the skeleton silently stops matching. Importing the same stylesheet would make that structural rather than remembered.
+- A **staff** user who navigates to `/retailers` gets the salesman lens over `retailers_select_staff`, which has no `active` predicate — so they would see the 23 deactivated shops with no chip to distinguish them. Staff have their own page and no link points here for them, so this is a curiosity rather than a defect; noted alongside 🟡 68, which is the same family.
+
+**Domain / correctness checks:** **RLS** — the load-bearing element again, and correctly relied upon rather than duplicated: no filter is written, and the comment says the URL is not what scopes the rows. **Money** — balances render through `readBalance` via the shared row; nothing new. **Mobile** — the entire surface; the tab shell is the fixed-viewport pattern the other three salesman tabs already use. **State machine / snapshots** — untouched.
+
+**What I tried:** Read the route, the browse component, the loading boundary and the tab bar in full; confirmed the `href` branch has a real caller and that `npm run build` registers both `/retailers` and `/retailers/[id]`; checked the tab order and icon against `DashboardNav`'s `Store`; grepped the route for `BackLink` and confirmed the single hit is a comment; verified the fallback change; diffed `tab-shell.module.css` against all three existing copies including deposits' `.scroll` naming; compared the skeleton's inline layout values against `RetailersBrowse.module.css`; scripted used-vs-defined class checks on both new files; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 72. Still open: 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred).
+
+---
+
+## 🟡 64 CLOSED — REVIEWER-authored at owner request (2026-08-01)
+
+Not a review. Recording that `OrderDetailView` changed again without a BUILDER
+commit — `5287b5f`, the trailing chevron on the hero shop name — so it is not
+read as drift.
+
+**The flag was:** `8beade3` removed the hero link's underline (owner: it made the
+headline look marked-up), leaving `color: inherit; text-decoration: none` with
+the only cue on `:hover`. A phone has no hover, so the name was pixel-identical
+to plain text and the link was discoverable only by accident.
+
+**The fix keeps both things the owner wanted.** A chevron cues "this goes
+somewhere" without touching the type, so the headline stays a headline. It also
+satisfies the app's own glyph rule — *"the glyph NEVER carries meaning alone; it
+always sits beside its text label"* — because the shop name is its label.
+
+Owner chose the surface and direction from three options: **order detail,
+trailing**. The alternative considered and rejected was chevrons on the list
+rows, which would have had to be LEADING (the balance owns the right edge there)
+and would have added a left inset to all 623 rows to cue something the whole row
+already does.
+
+**Two details that are load-bearing rather than decorative:**
+
+- The chevron is **grey**, not ink. Lucide strokes with `currentColor` and the
+  link sets `color: inherit`, so left alone it renders full ink and weighs as
+  much as the headline — reintroducing the marked-up look the underline was
+  removed for. It takes the accent on hover through its own rule, since having
+  its own colour means it does not inherit the link's.
+- It is **inside** the `<Link>`, so it is part of the tap target rather than a
+  decoration beside it.
+
+**Godown is deliberately unchanged:** `retailerBase` is null for that lens, so it
+renders the plain-text branch and gets no chevron. There is no godown retailer
+page for it to point at, and a cue promising navigation that does not exist is
+worse than no cue.
+
+Verified: `.heroRetailerLink` has one call site, so the blast radius is a single
+element; the NEW badge remains a flex sibling so the hero row's geometry is
+untouched; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open after this:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending
+a conversation), 🟡 72.
+
+---
+
+## Review of b22772e — feat(orders): the shop's outstanding balance on order detail
+
+**Verdict:** ✅ — correct, well-argued, and it reuses the shared rule rather than forking it. One factual error in a comment, and a pre-existing gap it accidentally exposes.
+
+**Phase / commit goal:** Put the shop's live ledger balance on order detail, under the retailer name.
+
+### What is right, and why the reasoning matters
+
+**It uses `readBalance`.** Fourth surface, still no private copy — which is what step 1 of the retailers run was for. Red owed / green clear / uncoloured unknown, identical to the queue, the picker and the tab.
+
+**Three judgement calls that are each argued rather than assumed:**
+
+- **Labelled "Outstanding", not a bare figure.** The reasoning is exactly right: this page already carries a large money number (the order total), so an unlabelled amount under the shop name reads as one of the order's figures. The label is what makes it a fact about the *shop*.
+- **"as of" is shown.** Everything else on this page is a frozen snapshot of the order; this one number is live and moves between visits. Naming the sync date is what stops it being read as the balance *at order time* — a genuinely dangerous misreading on a page an admin uses to approve credit.
+- **Hidden on the godown lens.** "A picking screen, and what a shop owes has nothing to do with putting boxes on a van." Correct, and consistent with godown getting no retailer link either.
+
+**The query widening is minimal and its privilege claim is true.** `retailers(… outstanding_paise, balance_as_of)`, and I verified `authenticated` holds column-level SELECT on **`balance_as_of`** as well as `outstanding_paise` — the commit asserts both, and both hold. No DB work, no new privilege.
+
+**All five new CSS classes resolve**; `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+### 🟡 73 — the skeleton comment's godown claim is false, and what it points at is real
+
+The new skeleton bar carries this caveat:
+
+> *"Note it is hidden on the GODOWN lens, which shares this skeleton — so godown briefly shows one bar too many."*
+
+**Godown does not share this skeleton.** `OrderDetailSkeleton` is rendered by exactly two files — `orders/[id]/loading.tsx` and `dashboard/orders/[id]/loading.tsx`. `src/app/godown/orders/[id]/` contains **`page.tsx` and nothing else**.
+
+So the accepted cost being documented does not exist. Harmless in itself — but the comment tells a future reader that godown is served by this file, which is the sort of thing someone later relies on without rechecking.
+
+**The real finding is underneath it: the godown order-detail route has no loading boundary at all.** That matters for the reason this run has already established twice — for a dynamic route the loading boundary is *what `<Link>` prefetches*, so godown's taps into order detail warm nothing and pay full latency. Godown is the one role that opens order detail all day.
+
+Two things follow, and they are cheap:
+
+1. Fix the comment.
+2. If a `godown/orders/[id]/loading.tsx` is added, the "no role prop" argument reverses — the route knows its lens **statically**, so `<OrderDetailSkeleton role="godown" />` needs no data and no guessing. The prop is worth it the moment there is a third caller.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 73 above. Also, `retailerOutstandingPaise` now conflates two states — an unsynced shop and an embed that resolved to nothing (a deactivated shop on the salesman lens). The commit documents the choice, and it is defensible: exactly **1 of 194** orders can hit it (salesman-owned, cancelled, deactivated shop), and that order already renders "Unknown retailer" for the name, so the reader is not misled about anything material.
+
+**Domain / correctness checks:** **Money** — paise via `readBalance`/`formatRupees`; `null` renders "not in the last sync", never ₹0. **RLS** — no policy touched; the columns ride an existing embed the salesman already reads elsewhere. **Immutable snapshots** — the one place this page shows something *live* rather than frozen, and it says so on screen. **Mobile** — placed under the name rather than to its right precisely because shop names run to 44 characters.
+
+**What I tried:** Read the full diff; confirmed `readBalance` is imported and used rather than reimplemented; queried `information_schema.column_privileges` for `balance_as_of` (SELECT present for `authenticated`); checked all five new CSS classes resolve; enumerated every renderer of `OrderDetailSkeleton` (two, neither godown) and listed `src/app/godown/orders/[id]/` (page only) — the basis of 🟡 73; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 73. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (owner deferred), 🟡 72.
+
+---
+
+## Review of 94c73ab — refactor(orders): Dr./Cr. balance, and cut what the hero says twice
+
+**Verdict:** ✅ — every claim in the message is literally true, including the two prod figures. One consequence worth a decision.
+
+**Phase / commit goal:** Owner 2026-08-02 — the order-detail hero reads the balance in ledger terms, and stops repeating what history and the status chip already say.
+
+### The subtle detail is the one they got right
+
+`Cr.` takes the **absolute value**, because `formatRupees(-4500000)` is `-₹45,000` and *"Cr. -₹45,000"* states the opposite of what it means. That is the kind of thing that ships wrong and reads plausibly for months. Verified in the code — `balance.paise !== null && balance.paise < 0 ? \`Cr. ${formatRupees(Math.abs(balance.paise))}\`` — and the guard is explicitly null-safe rather than relying on `Math.abs(null)` being 0.
+
+**A square ₹0 gets neither word**, which is right: it is not a debit or a credit. It stays bare and green with the other nothing-to-chase balances.
+
+**Both prod figures cited are exact.** Queried: `max(outstanding_paise) = 167823400` (₹16,78,234) and `min = -50000000` (₹5,00,000 credit). The commit quotes both as its worked examples and both match to the paise.
+
+### `readBalance` gaining `paise` is the right shape
+
+The state union stays three-wide and colour stays keyed on it. Splitting `clear` into zero-vs-credit would have forced `RetailersQueue` and `RetailerList` to learn a fourth case for no benefit on those surfaces. Carrying the raw value instead lets **one** surface write finer copy without re-deriving the rule — additive, and no existing consumer changes behaviour. Confirmed from the diff: the two return statements gained `paise` and nothing else moved.
+
+### Verified rather than trusted
+
+- **Dead CSS, both directions.** All eight deleted rules (`.actions .card .header .meta .metaMono .ref .retailerName .splitRow`) return **0 references** in the component; and every `styles.*` key still referenced resolves in the stylesheet. Deleting CSS is where a module silently loses a class, so the reverse check is the one that matters.
+- **"`tallyBillNo` had exactly one render site" is true.** Two occurrences: the type declaration at `:113` and the single render at `:653`. Keeping the bill number while dropping the rest of that byline is correct — it is what the office reads back into Tally, and `describeEvent` does print "Billed by …" in HISTORY verbatim.
+- `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**The stated cost is honest**: on a phone, who billed it and when moves into HISTORY. On desktop nothing leaves the screen because `.body` goes `row` at 768px.
+
+### 🟡 74 — the wording now differs across the four surfaces
+
+`Dr.`/`Cr.` is written in `OrderDetailView.tsx:355`, not in `lib/balance.ts`. So the same shop in credit now reads:
+
+| surface | credit renders as |
+|---|---|
+| order detail | **Cr. ₹45,000** |
+| retailers queue · Quick Order picker · Retailers tab | **-₹45,000** |
+
+This is defensible as a density choice — `Dr.` on 623 list rows is noise, and colour already carries direction there. It is recorded because of what it means for an open flag:
+
+**🟡 70 is now only half closed.** That flag was raised specifically about a credit rendering as a bare `-₹45,000`, and the surface the owner cared about — the salesman's picker, where he decides whether to take an order — still shows exactly that. The 28 shops in credit read one way on the detail page and another in every list.
+
+Worth a deliberate decision rather than drift. Note the middle option: a list row could drop the minus and show `₹45,000` in green, compact and unambiguous — though that makes colour load-bearing on its own, which the minus currently hedges.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 74 above. The shared module now owns the *rule* and the *state* but not the *wording*, which is a real seam — worth a line in `balance.ts` saying so, since its comment still reads as though it is the single source of how a balance appears.
+
+**Domain / correctness checks:** **Money** — the centre of this commit and handled carefully: absolute value on the Cr. branch, ₹0 unlabelled, `null` still "not in the last sync" and never ₹0. **RLS / state machine / snapshots** — untouched. **Mobile** — the stated cost is phone-only and was measured against the 768px breakpoint rather than assumed.
+
+**What I tried:** Read the full diff; located the Dr./Cr. formatting and confirmed it is order-detail-only, then checked what the other three surfaces render (the basis of 🟡 74); queried prod for `max`/`min` `outstanding_paise` and matched both against the commit's worked examples; scripted the dead-CSS check in both directions (8 deleted → 0 refs; all remaining refs resolve); traced both `tallyBillNo` occurrences to confirm one render site; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 74. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (**half closed** — detail page done, lists unchanged), 🟡 72, 🟡 73.
+
+---
+
+## Review of dedf766 — style(orders): group the hero, quiet the balance's date, drop the empty notes block
+
+**Verdict:** ✅ — no issues, and the CSS technique is the right one for a reason this log has a standing flag about.
+
+**Phase / commit goal:** Owner review of the rendered screen — three of five recommendations taken, two declined and said so.
+
+### The grouping is done the order-independent way
+
+The seam between THE SHOP and THIS ORDER is carried by adjacent-sibling selectors:
+
+```css
+.heroBalance + .heroMeta,
+.heroBalance + .byline { margin-top: 5px; }
+```
+
+Specificity is **(0,2,0)** against a bare `.byline`'s **(0,1,0)**, so it wins **regardless of source order**. That is exactly the property 🟡 56 exists because `.errorRow td` lacks — that rule ties `.table td` and is correct only because it happens to appear later in the file. Same problem, and here it is solved properly rather than by luck. Worth stating plainly since the two sit in the same codebase.
+
+It is in fact belt-and-braces: `.byline`'s old `margin-top: 2px` was **removed**, so there is no competing declaration left to beat. Verified — `.byline` now declares only font, size and colour, and `.heroMeta` declares no margin either, exactly as the commit claims.
+
+**The arithmetic reconciles.** The message says an 8px seam; the CSS declares `margin-top: 5px`. Both are right — `.hero` is `gap: 3px`, so 3 + 5 = 8. The commit describes the visible seam and the rule declares the increment.
+
+**Choosing sibling selectors over a wrapper div is the correct call and the reason given is sound:** every line in the second group is conditional — the balance is hidden on godown, the meta line needs an area/phone/salesman, the bill number only exists once billed. A wrapper would have had to be conditionally rendered on the OR of its children to avoid contributing a stray gap. With siblings, whichever line lands first takes the seam and an absent group leaves no seam to mark.
+
+### The empty notes block
+
+`{order.notes.trim().length > 0 && (…)}` — so a note still renders when there is one, and a **whitespace-only** note hides too, which `order.notes ||` would not have caught. Same rule the retailer cards took two commits earlier, and the same justification: a labelled section whose entire content is "there is nothing here" is furniture, and its *appearance* is the more useful signal.
+
+Checked before hiding, per the message: this view never edits notes — the Quick Order flow owns that, and the other `.notesLabel`/`.notesInput` uses are the bill-number, dispatch-remark and cancel-reason sheets. So nothing is lost but the placeholder.
+
+**The balance line's date** drops from 11px to the same 13px, with weight and colour doing the separating instead of size + a dot + colour. Three devices for one job reduced to one. The owner's call and the better one — at a single size the line reads as a sentence rather than a figure with a footnote.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the balance's rendering is untouched; only its type size and the date's treatment change. **RLS / state machine / snapshots** — untouched. **Mobile** — the hero is the above-the-fold block on a phone, which is what the grouping is for; the conditional-line reasoning matters most there, where every absent line would otherwise leave a gap.
+
+**What I tried:** Read the diff; computed the specificity of both sibling rules against the bare `.byline` and confirmed `.byline` no longer declares a margin at all (so the rule does not even need to win); confirmed `.heroMeta` declares no margin; reconciled the stated 8px seam against `.hero`'s `gap: 3px` plus the declared 5px; read the notes guard and confirmed `.trim()` covers whitespace-only notes; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of b239a3c — style(orders): the bill number moves under the status chip
+
+**Verdict:** ✅ — clean, and it caught its own orphan. One consequence it did not mention, which touches earlier deliberate work.
+
+**Phase / commit goal:** Owner 2026-08-02 asked to see the version `dedf766` had declined. "Billed" and the number Tally gave it are one fact, so they sit together.
+
+### It cleaned up after itself, which is the part I was going to check
+
+`dedf766` added `.heroBalance + .byline` one commit earlier. Moving the bill number out of the hero would have left that selector pointing at a class the file no longer renders — a dead rule created by the very commit before it.
+
+The builder found it first: `.byline` and that half of the grouping rule are both deleted, with a comment where the rule was saying where it went. Verified independently, both directions — **every `styles.*` reference resolves, and no rule in the stylesheet is unused.** The two surviving `byline` mentions in the component are comments, not render sites.
+
+**`back.module.css` is untouched** — confirmed from the diff, which changes exactly two files, both `OrderDetailView.*`. That matters because that stylesheet is shared with retailer detail, and the claim is what keeps this commit from reaching another page.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**The cost is stated before it is paid**, including the zero-cost alternative (bill number on the same line, between the ref and the chip). That is the right way to present a taste call.
+
+### 🟡 75 — this narrows the headline alignment `8beade3` deliberately established
+
+The commit describes the cost as within-page: on a billed order the corner is two lines, so "the shop name sits a few pixels lower than on an unbilled order."
+
+There is a second consequence it does not mention. `8beade3` spent real effort making order detail's shop name land on the **same y as retailer detail's**, and `RetailerDetail.module.css` still carries the `margin-top: -10px` derived from it. That comment states its assumption explicitly:
+
+> *"Everything above is now identical — 16px padding, a **24px back band**, a 16px gap — so pulling this row up by the ~10px difference lands the two headlines together."*
+
+A two-line corner is taller than 24px, so on a **billed** order that premise no longer holds and the two headlines diverge. The alignment now survives only for unbilled orders.
+
+The same comment lists **three** things that force a re-derivation — touch target, name type scale, display font. This adds a fourth it does not name: **order detail's back band growing past its floor.** Left unrecorded, the next person re-deriving `-10px` will do it from an assumption that is now conditionally false.
+
+Not blocking, and arguably not even wrong — the two pages are only ever seen side by side in screenshots, which is how the owner reviewed them. But it should be a decision rather than an accident, and the `-10px` comment should name the new trigger.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 75 above. If the two-line corner does grate, the commit's own alternative — the number on the same line — restores both the single-line band and the cross-page alignment at once.
+
+**Domain / correctness checks:** **Money** — the bill number is an identifier, not an amount; mono at 11px is right for something read back into Tally character by character, matching how order refs and serials are already treated. **RLS / state machine / snapshots** — untouched. **Mobile** — the growth lands in the back band, which is above the fold on a phone, so the shift is most visible exactly where the hero matters most.
+
+**What I tried:** Read the diff; confirmed `back.module.css` is not among the changed files (so retailer detail cannot be affected); traced both surviving `byline` mentions in the component to comments; scripted the dead-class sweep in both directions (every `styles.*` resolves; no unused rule); re-read `8beade3`'s `-10px` derivation comment and checked its stated 24px assumption against a two-line corner — the basis of 🟡 75; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 75. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of 521920c — Revert "style(orders): the bill number moves under the status chip"
+
+**Verdict:** ✅ — **🟡 75 CLOSED.** The revert is exact and the tree is consistent.
+
+**Phase / commit goal:** Undo `b239a3c`. The bill number returns to the hero.
+
+**The revert is byte-exact, which is the thing worth checking on a revert.** `git diff dedf766 HEAD -- src/components/orders/` produces **nothing** — the tree is identical to the pre-move state, not merely similar. A hand-rolled undo is where a stray line survives; this is a true `git revert` and nothing was left behind.
+
+**Consistent afterwards, both directions:** every `styles.*` reference resolves and no rule in the stylesheet is unused. That matters here specifically because `b239a3c` had *deleted* `.byline` and half of the grouping rule — a revert has to bring both back, and it did, matched to their render sites.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+### 🟡 75 CLOSED
+
+It existed only because a two-line back corner broke the 24px assumption behind `RetailerDetail`'s `margin-top: -10px`, narrowing the cross-page headline alignment to unbilled orders. With the corner back to one line that premise holds again for every order, and the `-10px` comment's three stated re-derivation triggers are complete once more. No edit needed — the flag is closed by the geometry returning, not by a fix.
+
+**Worth keeping on the record:** the alternative `b239a3c` proposed in its own message — the bill number on the same line, between the ref and the chip — is still untried, and it is the one shape that gets "Billed and its number are one fact" without a second line. If the pairing is ever wanted again, that is where to start rather than re-attempting the stacked version.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Presentation only; nothing touched money, RLS, the state machine or snapshots. **Mobile** — the back band returns to one line, so the hero sits where it did on every other screen.
+
+**What I tried:** `git diff dedf766 HEAD -- src/components/orders/` to confirm the revert is exact rather than approximate (empty); scripted the dead-class sweep in both directions after the revert restored `.byline` and the grouping rule; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** **CLOSED: 🟡 75.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of 16842f9 — style(orders): Dr/Cr without the full stops
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Drop the full stops — `Dr.`/`Cr.` → `Dr`/`Cr`.
+
+**The reasoning is the right kind.** Not "the textbook says so" but *"Tally prints them bare, and Tally is the system this office reads all day"* — matching the system of record over a style guide. That is the same instinct behind translating `Rcpt G Type` into "Receipt" earlier in this run: the app should speak the office's language, and the office's language is whatever Tally shows them.
+
+**Scope is unchanged** — the strings live at `OrderDetailView.tsx:360` and `:362` only, so this is still order-detail-only and **🟡 74 stands exactly as it was**: a credit reads `Cr ₹45,000` here and `-₹45,000` in the queue, the picker and the tab.
+
+**One claim I cannot check from the repo, stated plainly:** that Tally prints `Dr`/`Cr` without stops. Nothing in `retailer_ledger_entries` carries the marker — the sync stores `debit_paise`/`credit_paise` as numbers and the voucher types hold no Dr/Cr text — so there is no evidence either way in this codebase. It matches standard Tally output as far as I know it, and the owner reads those screens daily, so it is their call to confirm rather than mine to verify.
+
+**The note left for later is the valuable part of this commit.** Tally puts the marker **after** the figure (`22,134.00 Dr`); this app leads with it. The commit says so, explains why it chose differently (it reads better beside a shop name, and matches the app's label-first habit elsewhere), and records that reversing it is a one-line change. That is a real difference from the system of record, deliberately taken and written down where the next person will find it.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the worked examples still cover the real prod extremes (₹16,78,234 owed, ₹5,00,000 credit), both of which I verified against prod at `94c73ab`; `₹0` still takes neither marker and `null` still reads "not in the last sync". Nothing else touched.
+
+**What I tried:** Read the diff; grepped for the `Dr`/`Cr` template literals to confirm the change is confined to the two lines in `OrderDetailView` and has not reached `lib/balance.ts` or any list surface; checked `retailer_ledger_entries` carries no Dr/Cr text that could corroborate the Tally-formatting claim (it does not — the markers are implied by the debit/credit columns); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of 46e89ee — style(orders): the Dr/Cr marker moves after the figure, as Tally prints it
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Trailing marker — `₹84,320 Dr` — which is the change `16842f9`'s own note said was one line away.
+
+**The line has now converged on Tally's exact convention**, over four commits on the same hero line: the balance appears (`b22772e`), takes ledger markers (`94c73ab`), loses the full stops (`16842f9`), and now puts the marker where Tally puts it. Each step was owner-driven off a rendered screen and each recorded the next option; this one closes the note the previous one left. Worth saying because the sequence looks like churn in a log and is not — it is a line being fitted to the system of record one observation at a time.
+
+**The legibility claim checks out.** The line ends `… Dr as of 01 Aug` — two trailing phrases — and the commit argues they stay separable because they sit on the weight split already in place. Verified: `balanceText` is `` `${balance.text} Dr` ``, so "Dr" is inside the string that renders in `.heroBalance` (**600**, coloured), while "as of 01 Aug" renders in `.heroBalanceLabel` (**400**, `--color-locked`). The two words are distinguished by weight and colour, not by a separator — which is consistent with `dedf766` deleting the "·" for doing no work.
+
+**The two things most likely to break in a reorder are both intact:** `Cr` still takes the **absolute value** (`-₹45,000 Cr` would state the opposite), and a square **₹0 still takes neither marker**, falling through to `balance.text`.
+
+**The commit flags 🟡 74 itself** — noting the wording lives in `OrderDetailView`, not `lib/balance.ts`, so the queue, picker and tab still read `-₹45,000`. Acknowledging an open reviewer flag rather than quietly leaving it is the right habit; it stays open and unifying it remains its own change.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — worked examples still span the real prod extremes (₹16,78,234 owed, ₹5,00,000 credit), both verified against prod at `94c73ab`; `null` still reads "not in the last sync", never ₹0. Nothing else touched.
+
+**What I tried:** Read the diff; confirmed `Dr` is concatenated into the coloured 600 span rather than the grey 400 one, and checked both classes' declared weights — the basis of the legibility claim; re-checked the absolute-value branch and the ₹0 fall-through survive the reorder; confirmed the change is still confined to `OrderDetailView` and has not reached `lib/balance.ts`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.

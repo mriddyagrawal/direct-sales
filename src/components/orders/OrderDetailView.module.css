@@ -5,43 +5,19 @@
   gap: 16px;
 }
 
-.breadcrumb {
-  font-family: var(--font-figures);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--color-locked);
-}
+/* `.breadcrumb` lived here; it is `back.module.css` now — shared with retailer
+   detail so the two back eyebrows cannot drift (owner 2026-08-01). */
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.ref {
-  font-family: var(--font-figures);
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
+/* The bill number — the second line of the ORDER group, so it takes the hero's
+   own 3px rhythm. The old `margin-top: 2px` is gone: it dated from when this
+   line carried the whole billed byline and needed lifting off the meta line,
+   and it now only fights the grouping above. When the bill number is the
+   group's FIRST line (an order with no area, phone or salesman to show), the
+   `.heroBalance + .byline` rule gives it the 8px seam instead. */
 .byline {
   font-family: var(--font-structure);
   font-size: 12px;
   color: var(--color-locked);
-  margin-top: 2px;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.actions > a {
-  display: contents;
 }
 
 .error {
@@ -251,32 +227,6 @@
   gap: 8px;
 }
 
-.card {
-  padding: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-}
-
-.retailerName {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
-.meta {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-locked);
-}
-
-.metaMono {
-  font-family: var(--font-figures);
-  font-size: 12px;
-  color: var(--color-locked);
-}
-
 .newBadge {
   margin-left: 6px;
   padding: 2px 6px;
@@ -435,25 +385,7 @@
 }
 
 /* Orders-UI revamp (spec §3): back-eyebrow + retailer hero + action rows. */
-.backRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.backRow .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.backRef {
-  font-family: var(--font-figures);
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--color-ink);
-}
+/* `.backRow` / `.backRef` lived here — both moved to back.module.css. */
 
 .hero {
   display: flex;
@@ -461,14 +393,111 @@
   gap: 3px;
 }
 
+/* The page headline. It was a one-off 22px/700; it now reads the same tokens
+   every other page title uses (21px/700), so the order's shop name and the
+   retailer page's shop name are the same size — owner 2026-08-01, they sit at
+   the same place on the two screens and the 1px size gap was the only tell. */
 .heroRetailer {
   font-family: var(--font-structure);
-  font-size: 22px;
-  font-weight: 700;
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
   color: var(--color-ink);
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* The hero name links to the shop (2026-08-01). NO underline — owner call,
+   2026-08-01: the headline reads as a headline, and the grey rule under it
+   made the page look marked-up rather than clean.
+   Accepted cost, stated so nobody "fixes" it back: on the phone there is now
+   NO visual cue that the name is tappable, because there is no hover to carry
+   one. Discovery is by trying it, or from the retailer page it lands on. The
+   hover tint below is desktop-only by nature and cannot be the affordance. */
+.heroRetailerLink {
+  color: inherit;
+  text-decoration: none;
+  /* inline-flex so the chevron sits ON the name's line and inside the tap
+     target, rather than wrapping to its own. `align-items: center` centres an
+     18px glyph against 21px type; the 2px gap keeps it close enough to read as
+     part of the name rather than as a separate control. */
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The chevron is the AFFORDANCE, not part of the headline, so it is grey while
+   the name is ink. Lucide strokes with currentColor, which the link sets to
+   `inherit` — left alone the glyph would come out full ink and weigh as much as
+   the type, which is the "marked-up" look the underline was removed for.
+   `flex-shrink: 0` so a long shop name never squashes it. */
+.heroRetailerLink svg {
+  color: var(--color-locked);
+  flex-shrink: 0;
+}
+
+.heroRetailerLink:hover {
+  color: var(--color-accent);
+}
+
+/* The chevron follows the hover rather than staying grey — it has its own
+   colour above, so it does NOT inherit the rule on the link. */
+.heroRetailerLink:hover svg {
+  color: var(--color-accent);
+}
+
+/* The shop's balance, on its own line under the name (owner 2026-08-01).
+   13px, down from 15px (owner 2026-08-02: keep the colour, lose the size) —
+   the body size, so it sits with the meta line beneath it and lets the 21px
+   shop name stay the loudest thing in the hero. Colour and weight do the work
+   now, not scale. */
+.heroBalance {
+  font-family: var(--font-figures);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+}
+
+/* "as of 31 Jul" and "not in the last sync" — the quiet parts. SAME SIZE as the
+   figure (owner 2026-08-02), separated by WEIGHT and colour alone: 400 grey
+   against the figure's 600 colour. The line previously mixed 13px, 11px and a
+   "·" separator, which is three devices doing one job — at one size it reads as
+   a single sentence, and the dot is redundant once the weight changes. */
+.heroBalanceLabel {
+  font-weight: 400;
+  color: var(--color-locked);
+}
+
+/* The hero is two GROUPS, not four lines (owner 2026-08-02): the SHOP (name +
+   its balance) and then THIS ORDER (who booked it, its bill number). The 3px
+   flex gap is the within-group rhythm; this adds 5px on top of it — 8px — at
+   the seam between them.
+
+   Adjacent-sibling selectors rather than a wrapper div, because the lines are
+   each conditional: the balance is hidden on the godown lens, the meta line
+   needs an area/phone/salesman to exist, and the bill number only exists once
+   billed. Whichever line lands first in the second group takes the gap, and
+   when the balance is absent there is no seam to mark. A wrapper would have to
+   be conditionally rendered on the OR of its children to avoid contributing a
+   stray gap of its own. */
+.heroBalance + .heroMeta,
+.heroBalance + .byline {
+  margin-top: 5px;
+}
+
+/* Same three tones as the office ledger and the salesman's lists — one meaning
+   per colour across every surface that shows a balance. */
+.balanceOwed {
+  color: var(--color-error);
+}
+
+.balanceClear {
+  color: var(--color-processed);
+}
+
+/* Not in the last sync: UNcoloured on purpose. Red or green would each be a
+   claim we cannot make about a shop Tally never matched. */
+.balanceNone {
+  color: var(--color-locked);
 }
 
 .heroMeta {
@@ -495,14 +524,6 @@
 }
 
 /* Approved override on staff: Mark billed (blue) | Scan (white), equal halves. */
-.splitRow {
-  display: flex;
-  gap: 8px;
-}
-
-.splitRow > * {
-  flex: 1;
-}
 
 /* Mobile: the secondaries split the row into EQUAL parts (mockup 7c) —
    Edit · Share · Cancel each a third. Desktop keeps content-width buttons
@@ -511,15 +532,23 @@
   .secondaries > * {
     flex: 1;
   }
-
-  .cancelAction {
-    margin-left: 0;
-  }
 }
 
 /* Cancel sits red at the FAR END of the secondaries row (spec §3). */
 .cancelAction {
   margin-left: auto;
+}
+
+/* Phone: the three buttons already share the row equally via `flex: 1` above,
+   so the auto margin must go or Cancel is shoved off the far end.
+   MUST stay BELOW the base rule. A media query adds no specificity, so while
+   this lived in the block above it tied `.cancelAction` at (0,1,0) and lost the
+   source-order tie — the override was dead and Cancel sat pushed right on phone
+   the whole time. (REVIEWER flag 60; same trap as the Retailers .list bug.) */
+@media (max-width: 767px) {
+  .cancelAction {
+    margin-left: 0;
+  }
 }
 
 /* Spec §3 ITEMS — brand shape. */
@@ -595,7 +624,6 @@
   font-size: 12px;
   color: var(--color-locked);
 }
-
 
 /* Primary + secondaries as one block: vertical gap == the 8px horizontal
    gap between the row's buttons. */

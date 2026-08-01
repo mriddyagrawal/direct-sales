@@ -4,12 +4,25 @@
   min-height: 100vh;
 }
 
+/* Capped and centred, matching DepositFlow's .content (480px) — the other
+   salesman flow, and the picker's own sibling since DepositFlow reuses this
+   very component.
+
+   The cap is not cosmetic here (spec trap 3). Staff reach this picker from the
+   dashboard FAB on a desktop, where the flow has never had a width limit. Today
+   the right-hand slot of a row is empty on 97% of rows so nobody notices; now
+   that every row carries a balance on the right, an uncapped row puts a canyon
+   between the name and the number across a 1400px window. This stylesheet is
+   imported by exactly one file, so the cap cannot leak anywhere else. */
 .content {
   flex: 1;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .row {
@@ -21,61 +34,12 @@
   flex: 1;
 }
 
-.sectionLabel {
-  font-family: var(--font-figures);
-  font-size: var(--text-section-label-size);
-  letter-spacing: var(--text-section-label-tracking);
-  text-transform: uppercase;
-  color: var(--color-locked);
-  margin-bottom: 4px;
-}
-
-.retailerRow {
-  width: 100%;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 4px;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--color-hairline);
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.retailerName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  /* Owner feedback: the names are the scan target — full ink, semibold. */
-  color: var(--color-ink);
-  font-weight: 600;
-}
-
-.retailerMeta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  color: var(--color-locked);
-  font-size: 12px;
-}
-
-.newTag {
-  font-family: var(--font-figures);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--color-amber);
-  border: 1px solid var(--color-amber);
-  border-radius: var(--radius);
-  padding: 2px 6px;
-}
+/* `.sectionLabel`, `.retailerRow`, `.retailerName`, `.retailerMeta` and
+   `.newTag` lived here. All five moved to RetailerList.module.css with the
+   list itself — deleted rather than left behind, so there is no second copy to
+   drift. `.retailerMeta` in particular is gone for good: it was the row's
+   right-hand sibling with `flex-shrink: 0`, and that slot belongs to the
+   balance now. The area moved to line 2. */
 
 .empty {
   display: flex;

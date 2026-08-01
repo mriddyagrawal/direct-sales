@@ -176,7 +176,43 @@ so `.numeric` is simply unused there — that is fine, not an omission.)
 
 **3 — Migrate Products.**
 
-**4 — Migrate ImportWizard.**
+**4 — ImportWizard: scope its `.mono` and `.numeric` IN PLACE. Do not migrate it.**
+*(Amended 2026-08-01 after the builder pushed back and the REVIEWER verified the
+pushback. The original step said "migrate"; that was wrong, and it was wrong
+because of an error in this spec — see below.)*
+
+Adopting the grammar here would be a **functional regression, not a restyle**.
+The canonical `.table` starts at `display: none` and only becomes `display: table`
+at 768px. ImportWizard's `.table` has no `display: none`, the wizard is a phone
+surface (it has its own `@media (max-width: 767px)` block and goes full-screen
+there), and the preview sits in an `overflow-x: auto` scroller. Migrating it
+verbatim would make the import preview **invisible on phone** — you would pick a
+file and have nothing to check before applying.
+
+It is also the same class of object the spec already excluded for Deposits: no
+table `border-top` (the two in that file are on the modal panel), no zebra, no
+40px rows (30px `th` / 34px `td`), symmetric `padding: 0 10px`, `white-space:
+nowrap`. A wide dense preview grid in a modal, not a page ledger.
+
+**Correction to the drift table above:** it lists ImportWizard's
+`thead th padding-right: 12px` as "yes". That is wrong — it has `padding: 0 10px`.
+The REVIEWER wrote that row from a `grep` for the property rather than reading the
+rule, and the builder caught it.
+
+What to actually fix here, in one small commit:
+
+- `.mono` is dead, same as everywhere else — `.table td` sets `font-family` at
+  (0,1,1) and a bare `.mono` is (0,1,0). The ROW and TALLY NAME columns are not
+  mono.
+- **`.numeric` is dead too, and here it is NOT latent.** Elsewhere a bare
+  `.numeric` survives because `.table td` sets no `text-align`. In this file
+  `.table thead th` **explicitly sets `text-align: left`** at (0,1,2), and
+  ImportWizard has no `.table thead th.numeric` rule — so the **ROW and PRICE
+  headers are left-aligned over right-aligned values right now**. Products and
+  Orders both carry that scoped rule locally; this file never did.
+
+Scope both to `.table td.mono` / `.table td.numeric`, and add
+`.table thead th.numeric`. Page-local, no shared import, no risk to the phone flow.
 
 **5 — Migrate Orders.** Last: busiest page, and the one whose grey visibly
 changes. Do **not** touch its `onMouseEnter` prefetch or `.rowSelected` logic in
@@ -188,7 +224,8 @@ this step — styles only.
 
 ## Step 6 in detail
 
-**Keep the phone cards exactly as they are.** Phone layouts are owner-final.
+**The phone cards need no change here** — this task is the desktop table. If you
+find otherwise, say so rather than silently adjusting them.
 
 **Add the desktop table** using the shared grammar, mirroring the columns the
 cards already show. The badges (`NEW` / `NOT SYNCED` / `DEACTIVATED`) currently

@@ -1,0 +1,11 @@
+/* The list's own inset inside the scrolling middle of the tab shell. The
+   picker gets this from PickRetailer's .content; here it belongs to the page,
+   because the shell deliberately owns no padding (the Orders home's shared
+   view brings its own too). Same 16px and the same 16px column gap as the
+   picker, so the two screens' lists sit identically. */
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

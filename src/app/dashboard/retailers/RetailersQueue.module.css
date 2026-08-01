@@ -1,5 +1,13 @@
 .page {
   padding: 16px;
+  /* Clearance for the phone FAB — the last row must never sit under it. The
+     shell's tab bar is a static 70px flex child, the FAB is fixed at
+     bottom: 86px with min-height 48px (86→134px up from the viewport floor),
+     so 96px leaves ~32px of breathing room above it. Same shell, same offset,
+     same bar on Orders/Products/Retailers/Users, so the number transfers.
+     Desktop needs nothing: the 768px block re-declares `padding: 24px`, and
+     the shorthand resets padding-bottom, so this cannot leave dead space. */
+  padding-bottom: 96px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -24,32 +32,6 @@
   display: none;
 }
 
-.pFab {
-  position: fixed;
-  right: 16px;
-  /* 70px bottom bar + 16px breathing room, matching the Orders FAB (the
-     owner-final phone layout, so it is the reference). The 76px this and
-     Products carried was a fossil of the office bar's old 60px height —
-     DashboardNav raised it to 70px for salesman-bar parity and the FAB offsets
-     were never updated, leaving both sitting 10px low. */
-  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 0 18px;
-  background: var(--color-accent);
-  color: var(--color-white);
-  border: none;
-  border-radius: 24px;
-  font-family: var(--font-structure);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
-}
-
 @media (min-width: 768px) {
   /* House rule: 16px on the phone, 24px on desktop (Orders/Products/Users all
      do this; this page and Deposits had simply never got the override). */
@@ -59,10 +41,6 @@
 
   .addDesktop {
     display: block;
-  }
-
-  .pFab {
-    display: none;
   }
 }
 
@@ -142,6 +120,52 @@
   gap: 8px;
 }
 
+/* Desktop shows the table (the shared grammar switches itself on at 768px), so
+   the phone cards step aside — same split as Orders/Products/Users.
+   MUST sit after the .list rule above: a media query adds no specificity, so
+   when this lived higher in the file the later `display: flex` won the
+   source-order tie and BOTH the table and the cards rendered on desktop. */
+@media (min-width: 768px) {
+  .list {
+    display: none;
+  }
+}
+
+/* ⚠️ NO absolutely-positioned overlay here, deliberately. Read this before
+   reintroducing a "stretched link".
+
+   REVIEWER flag 58, reproduced twice in desktop Safari on 2026-08-01. The
+   pattern was `.rowLink::after { position: absolute; inset: 0 }` anchored to a
+   `position: relative` ancestor. WebKit does not establish a containing block
+   for `position: relative` on table elements — NOT on a <tr>, and NOT on a
+   <td> either; the second attempt moved it one element down and failed
+   identically. With nothing else positioned above it (.shell is
+   `position: fixed` on phone but `static` at desktop), all ~599 overlays
+   resolved against the INITIAL containing block: one viewport-sized box at the
+   top of the document. They stacked there, the last row in DOM order swallowed
+   every click in that region, and the real rows underneath never saw hover.
+
+   The lesson is not "pick a different ancestor" — Blink and Gecko position all
+   of these fine, so any element you choose will test clean in Chrome and fail
+   in Safari. Do not guess at an ancestor a third time. The fix is to have no
+   overlay at all:
+
+     - the NAME cell's anchor is `display: block`, so it fills the cell and is
+       a normal click target with no positioning involved;
+     - the REST of the row is an onClick on the <tr> (see the JSX).
+
+   Between them the whole row responds, and nothing depends on how an engine
+   treats `position` on table internals. The handler is safe: no onMouseEnter
+   and no state, so it cannot reproduce the Orders hover trail, which came from
+   setSelectedIndex firing on hover. */
+.rowLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Phone card. It is an <a> now (was a div+onClick) — kill the UA link styling;
+   every child sets its own colour, so `inherit` is belt-and-braces. */
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -154,6 +178,8 @@
   border-radius: var(--radius);
   text-align: left;
   cursor: pointer;
+  color: inherit;
+  text-decoration: none;
 }
 
 .rowDeactivated {
@@ -177,6 +203,32 @@
 .rowMeta {
   font-family: var(--font-structure);
   font-size: 12px;
+  color: var(--color-locked);
+}
+
+/* Phone card amount — mirrors the Orders card's amount: mono, a step larger
+   than the meta line, pinned to the card's right edge and never shrinking. */
+.rowAmount {
+  flex-shrink: 0;
+  font-family: var(--font-figures);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Balance states (owner 2026-08-01). Binary, never threshold-based — the
+   credit-limit tiers were dropped on purpose and must not creep back in as a
+   "large amount = redder" scale. */
+.amtOwed {
+  color: var(--color-error);
+}
+
+.amtClear {
+  color: var(--color-processed);
+}
+
+/* Not in the last sync: an em dash, deliberately UNcoloured — red and green
+   would each be a claim we cannot make about a shop Tally never matched. */
+.amtNone {
   color: var(--color-locked);
 }
 

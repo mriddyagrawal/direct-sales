@@ -10,15 +10,19 @@ const initialState: LoginState = { error: null };
 
 interface LoginFormProps {
   deactivated: boolean;
+  /** Path the guard intercepted, carried through the sign-in. Validated
+      server-side in actions.ts (safeNext) — never trusted from here. */
+  next?: string;
 }
 
-export function LoginForm({ deactivated }: LoginFormProps) {
+export function LoginForm({ deactivated, next }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(signInWithUsername, initialState);
 
   const error = state.error ?? (deactivated ? "This account has been deactivated. Call the office." : null);
 
   return (
     <form action={formAction} className={styles.form}>
+      {next && <input type="hidden" name="next" value={next} />}
       {error && <p className={styles.errorStrip}>{error}</p>}
       <Field
         label="Username"

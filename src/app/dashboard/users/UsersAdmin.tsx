@@ -2,10 +2,14 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { UserRoundPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Glyph } from "@/components/ui/Glyph";
 import { UserModal } from "./UserModal";
 import { setUserActive } from "./actions";
 import type { UserRow } from "./page";
+import fab from "@/components/ui/fab.module.css";
+import table from "@/components/ui/table.module.css";
 import styles from "./UsersAdmin.module.css";
 
 type ModalState = { mode: "add" } | { mode: "edit"; user: UserRow } | null;
@@ -21,7 +25,8 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 // Mirrors ProductsPricing: desktop table + mobile cards, row-click opens the
-// edit modal, "+ Add user" opens the add modal, and the inline Active toggle
+// edit modal, Add (desktop button / phone FAB) opens the add modal, and the
+// inline Active toggle
 // uses the same useOptimistic overlay + busy-Set + router.refresh() pattern —
 // but writes through the setUserActive Server Action (service-role, gated),
 // never a client supabase call. Renders straight from the `users` prop (㉜🅐):
@@ -87,14 +92,15 @@ export function UsersAdmin({ users, callerId }: { users: UserRow[]; callerId: st
         </span>
         <div className={styles.titleActions}>
           <Button variant="primary" onClick={() => setModal({ mode: "add" })}>
-            + Add user
+            <Glyph icon={UserRoundPlus} />
+            Add
           </Button>
         </div>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
 
-      <table className={styles.table}>
+      <table className={table.table}>
         <thead>
           <tr>
             <th>USERNAME</th>
@@ -108,13 +114,13 @@ export function UsersAdmin({ users, callerId }: { users: UserRow[]; callerId: st
           {displayUsers.map((u) => (
             <tr
               key={u.id}
-              className={`${styles.clickable} ${!u.active ? styles.rowInactive : ""}`}
+              className={`${table.clickable} ${!u.active ? styles.rowInactive : ""}`}
               onClick={() => setModal({ mode: "edit", user: u })}
             >
-              <td className={`${styles.mono} ${styles.cellName}`}>{u.username ?? "—"}</td>
-              <td className={styles.cellMeta}>{u.full_name}</td>
-              <td className={styles.cellMeta}>{ROLE_LABEL[u.role] ?? u.role}</td>
-              <td className={`${styles.mono} ${styles.cellMeta}`}>{u.email || "—"}</td>
+              <td className={`${table.mono} ${table.cellName}`}>{u.username ?? "—"}</td>
+              <td className={table.cellMeta}>{u.full_name}</td>
+              <td className={table.cellMeta}>{ROLE_LABEL[u.role] ?? u.role}</td>
+              <td className={`${table.mono} ${table.cellMeta}`}>{u.email || "—"}</td>
               <td onClick={(e) => e.stopPropagation()}>{activeToggle(u)}</td>
             </tr>
           ))}
@@ -146,6 +152,14 @@ export function UsersAdmin({ users, callerId }: { users: UserRow[]; callerId: st
           </div>
         ))}
       </div>
+
+      {/* Phone FAB — same entry point as the desktop button (Products /
+          Retailers pattern). The shared fab.module.css hides it at 768px,
+          where .titleActions takes over. */}
+      <button type="button" className={`${fab.fab} ${fab.phoneOnly}`} onClick={() => setModal({ mode: "add" })}>
+        <Glyph icon={UserRoundPlus} />
+        Add
+      </button>
 
       {modal && (
         <UserModal

@@ -3,18 +3,27 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, Truck, Undo2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, Truck, Undo2, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { SharePdfButton } from "@/components/SharePdfButton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { getOrderStatusTag } from "@/lib/order-status";
-import { formatOrderTimestamp, formatOrderTime, formatHistoryDayHeader, formatRupees, istDateKey } from "@/lib/format";
+import {
+  formatOrderTimestamp,
+  formatOrderTime,
+  formatHistoryDayHeader,
+  formatRupees,
+  formatShortDate,
+  istDateKey,
+} from "@/lib/format";
+import { readBalance } from "@/lib/balance";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
 import { cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder, stepBackOrder } from "@/lib/order-rpcs";
 import { BackLink } from "@/components/BackLink";
+import back from "@/components/ui/back.module.css";
 import styles from "./OrderDetailView.module.css";
 
 interface OrderItemRow {
@@ -110,10 +119,17 @@ export interface OrderDetailData {
   parentOrderRef: string | null;
   salesmanName: string;
   processedByName: string | null;
+  // Null when the retailers embed resolved to nothing; the hero name then
+  // stays plain text rather than linking somewhere that does not exist.
+  retailerId: string | null;
   retailerName: string;
   retailerArea: string | null;
   retailerPhone: string | null;
   retailerVerified: boolean;
+  // The shop's CURRENT ledger balance (nightly Tally sync), plus when that sync
+  // last matched it. Null = never matched — "not in the last sync", never ₹0.
+  retailerOutstandingPaise: number | null;
+  retailerBalanceAsOf: string | null;
   brandName: string | null;
   showModel: boolean;
   approvedAt: string | null;
@@ -308,6 +324,44 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   // return the ref as a link so it's tappable, mirroring the "Backorder of"
   // header link. Returns null for every non-linkable event (plain describeEvent).
   const detailBase = isStaff ? "/dashboard/orders" : isGodown ? "/godown/orders" : "/orders";
+  // The shop behind this order, per lens — same idiom as detailBase above.
+  // GODOWN GETS NO LINK: it can read active retailers (retailers_select_godown)
+  // but there is no godown retailer page, so its hero name stays plain text
+  // rather than pointing at a route that does not exist.
+  const retailerBase = isStaff ? "/dashboard/retailers" : isGodown ? null : "/retailers";
+  const retailerHref =
+    retailerBase && order.retailerId ? `${retailerBase}/${order.retailerId}` : null;
+  // The office ledger's rule, shared — red owed, green clear (₹0 and credit
+  // both), uncoloured when the sync never matched the shop. Binary, never a
+  // threshold: the colour does not depend on HOW much is owed.
+  const balance = readBalance(order.retailerOutstandingPaise);
+  const balanceClass =
+    balance.state === "unknown"
+      ? styles.balanceNone
+      : balance.state === "clear"
+        ? styles.balanceClear
+        : styles.balanceOwed;
+  // Dr/Cr instead of an "Outstanding" label (owner 2026-08-02) — the ledger
+  // words the office already thinks in, and they carry the direction, which is
+  // what the label was really for: this page has a big order total on it, and
+  // "Dr" makes clear the figure is the SHOP's ledger, not the order's money.
+  //
+  // TRAILING, and with no full stops — "₹22,134 Dr", exactly as Tally prints
+  // it (owner 2026-08-02). Both halves of that are the same argument: Tally is
+  // the system this office reads all day, so the app matching it beats the app
+  // being internally tidy. An earlier version led with the marker and said in
+  // the code that reversing it was a one-line change; this is that change.
+  //
+  // Cr takes the ABSOLUTE value: formatRupees(-4500000) is "-₹45,000", and
+  // "-₹45,000 Cr" would say the opposite of what it means. A square ₹0 gets
+  // NEITHER marker — it is not a debit or a credit, it is nothing owed either
+  // way — and stays green with the other nothing-to-chase balances.
+  const balanceText =
+    balance.state === "owed"
+      ? `${balance.text} Dr`
+      : balance.paise !== null && balance.paise < 0
+        ? `${formatRupees(Math.abs(balance.paise))} Cr`
+        : balance.text;
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
     const d = (e.details ?? {}) as Record<string, unknown>;
@@ -505,10 +559,10 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
       {/* Back-eyebrow (spec §3): ‹ REF on the left, status chip on the right.
           A TRUE back (instant router-cache restore) with the role's list as
           the no-history fallback — see BackLink. */}
-      <div className={styles.backRow}>
-        <BackLink fallback={isStaff ? "/dashboard" : isGodown ? "/godown" : "/"} className={styles.breadcrumb}>
+      <div className={back.row}>
+        <BackLink fallback={isStaff ? "/dashboard" : isGodown ? "/godown" : "/"} className={back.link}>
           <Glyph icon={ChevronLeft} />
-          <span className={styles.backRef}>{order.orderRef}</span>
+          <span className={back.label}>{order.orderRef}</span>
         </BackLink>
         <StatusTag tone={statusTag.tone} label={statusTag.label} sublabel={statusTag.sublabel} />
       </div>
@@ -518,9 +572,62 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           timeline byline. */}
       <div className={styles.hero}>
         <p className={styles.heroRetailer}>
-          {order.retailerName}
+          {/* The headline is the way into the shop (owner 2026-08-01). Only
+              the NAME is the link — the NEW badge stays a sibling, so the
+              flex row is unchanged.
+
+              The chevron is the affordance (owner 2026-08-01, REVIEWER 🟡 64).
+              The underline this used to carry was removed for looking
+              marked-up, which left the name tappable with NO cue at all on a
+              phone — hover is desktop-only and cannot be one. A trailing
+              disclosure chevron cues "this goes somewhere" without touching the
+              type, and it satisfies the app's glyph rule (never icon-only) by
+              sitting beside the name that labels it.
+
+              INSIDE the link deliberately: it is part of the tap target and
+              follows the hover colour. The godown lens has no retailerHref, so
+              it renders the plain-text branch and gets no chevron — correct,
+              since there is no godown retailer page to go to. */}
+          {retailerHref ? (
+            <Link href={retailerHref} className={styles.heroRetailerLink}>
+              {order.retailerName}
+              <Glyph icon={ChevronRight} />
+            </Link>
+          ) : (
+            order.retailerName
+          )}
           {!order.retailerVerified && <span className={styles.newBadge}>NEW</span>}
         </p>
+
+        {/* The shop's outstanding balance, directly under the name and in
+            colour (owner 2026-08-01). NOT at the right of the name, which is
+            the grammar the retailer lists use — shop names run to 44
+            characters and would squeeze it.
+
+            LABELLED, deliberately: this page already carries a big money
+            figure (the order total), so a bare amount under the shop name
+            would be read as one of the order's numbers. The label is what
+            makes it a fact about the SHOP.
+
+            "as of" is here because everything else on this page is a frozen
+            snapshot of the order, while this one number is live and moves
+            between visits. Naming the sync date stops it being misread as the
+            balance at the time of the order.
+
+            Hidden on the GODOWN lens: that is a picking screen, and what a
+            shop owes has nothing to do with putting boxes on a van. */}
+        {!isGodown && (
+          <p className={styles.heroBalance}>
+            <span className={balanceClass}>{balanceText}</span>
+            {balance.state !== "unknown" && order.retailerBalanceAsOf && (
+              <span className={styles.heroBalanceLabel}> as of {formatShortDate(order.retailerBalanceAsOf)}</span>
+            )}
+            {balance.state === "unknown" && (
+              <span className={styles.heroBalanceLabel}> not in the last sync</span>
+            )}
+          </p>
+        )}
+
         {(() => {
           // Salesman gets the minimal meta; staff AND godown get the fuller
           // area · phone · salesman (godown is a read-only staff-like lens).
@@ -531,21 +638,22 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           const meta = metaParts.filter(Boolean).join(" · ");
           return meta ? <p className={styles.heroMeta}>{meta}</p> : null;
         })()}
-        {/* Billed byline: when + who + the Tally bill number. `Bill #` only
-            renders when present, so the pre-existing billed orders (null bill
-            no) show the byline without it. */}
-        {(order.status === "billed" || order.status === "dispatched") && order.processedAt && (
-          <p className={styles.byline}>
-            billed {formatOrderTimestamp(order.processedAt, now)}
-            {order.processedByName ? ` by ${order.processedByName}` : ""}
-            {order.tallyBillNo ? ` · Bill #${order.tallyBillNo}` : ""}
-            {order.status === "dispatched" && order.dispatchedAt
-              ? ` · dispatched ${formatOrderTimestamp(order.dispatchedAt, now)}${
-                  order.dispatchedByName ? ` by ${order.dispatchedByName}` : ""
-                }${order.dispatchNote ? ` · ${order.dispatchNote}` : ""}`
-              : ""}
-          </p>
-        )}
+        {/* The Tally bill number, and ONLY that (owner cleanup 2026-08-02).
+            This line used to read "billed 14:27 by Uma Nishad · Bill #LG/0172 ·
+            dispatched 16:02 by … · <note>", every clause of which HISTORY
+            already prints verbatim — checked against describeEvent, which
+            renders "14:27 Billed by Uma Nishad" and
+            "16:02 Dispatched by … · <note>". The status chip above states the
+            stage a third time.
+
+            The bill number is the exception: it appears NOWHERE else on this
+            page or in the history, and it is what the office reads back into
+            Tally, so it stays and is now the whole line.
+
+            Cost, stated: on a PHONE, who billed it and when is now a scroll
+            away in HISTORY. On desktop nothing moves out of sight — the rail
+            is side by side at 768px, so history was always on screen. */}
+        {order.tallyBillNo && <p className={styles.byline}>Bill #{order.tallyBillNo}</p>}
       </div>
 
       {/* Admin note (RED) — a held-stage flag from the admin, visible to
@@ -612,22 +720,27 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           (order.status === "billed" && role === "salesman")) && (
           <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="primary" />
         )}
+      {/* Mark billed removed from the Pending-scan screen (owner 2026-07-12):
+          every order must reach ready_to_bill via the godown pick first. The
+          approved→billed path stays dormant in process_order in case we
+          restore the shortcut later.
+
+          A "Waiting for the godown to scan serials." line used to sit above this
+          button; removed at the owner's request 2026-08-01. The Pending scan
+          chip in the header already says it, and it was the only status carrying
+          such a line — the others (pending_approval, ready_to_bill, billed,
+          dispatched, cancelled) never had one, so removing it makes the screen
+          consistent rather than leaving one status the odd one out. `.waitLine`
+          itself stays: the backorder provenance line below still uses it. */}
       {isStaff && order.status === "approved" && (
-        <>
-          <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
-          {/* Mark billed removed from the Pending-scan screen (owner 2026-07-12):
-              every order must reach ready_to_bill via the godown pick first. The
-              approved→billed path stays dormant in process_order in case we
-              restore the shortcut later. */}
-          <Button
-            variant="secondary"
-            loading={navPending && navTarget === `/scan/${order.id}`}
-            onClick={() => navigate(`/scan/${order.id}`)}
-          >
-            <Glyph icon={ScanBarcode} />
-            Scan
-          </Button>
-        </>
+        <Button
+          variant="secondary"
+          loading={navPending && navTarget === `/scan/${order.id}`}
+          onClick={() => navigate(`/scan/${order.id}`)}
+        >
+          <Glyph icon={ScanBarcode} />
+          Scan
+        </Button>
       )}
       {/* Backorder: the remainder split off a partial pick. Its salesman or an
           admin can edit the quantities (secondaries) then Punch it back into
@@ -932,10 +1045,18 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         </div>
 
         <div className={styles.rail}>
-          <div className={styles.notesBox}>
-            <p className={styles.notesLabel}>NOTES FROM THE FIELD</p>
-            <p className={styles.notesText}>{order.notes || "— no notes —"}</p>
-          </div>
+          {/* Rendered only when the salesman actually wrote something (owner
+              2026-08-02). It used to fall back to "— no notes —", so a labelled
+              section appeared on every order to say nothing. Now the section
+              APPEARING is the signal. Same rule the retailer cards adopted, and
+              read-only either way — this view never edits notes (the Quick
+              Order flow owns that), so nothing is hidden but the placeholder. */}
+          {order.notes.trim().length > 0 && (
+            <div className={styles.notesBox}>
+              <p className={styles.notesLabel}>NOTES FROM THE FIELD</p>
+              <p className={styles.notesText}>{order.notes}</p>
+            </div>
+          )}
 
           <div>
             <p className={styles.sectionLabel}>HISTORY</p>

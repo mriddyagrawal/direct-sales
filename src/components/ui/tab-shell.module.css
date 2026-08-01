@@ -1,0 +1,30 @@
+/* The salesman TAB shell — a fixed full-viewport column whose middle scrolls
+   between a TopStrip and a BottomTabBar.
+
+   NOTE for whoever touches this next: three pages already carry their own copy
+   of these two rules — src/app/page.module.css (Orders home),
+   src/app/products/products.module.css, and src/app/deposits/deposits.module.css
+   (which calls the scroller `.scroll` rather than `.content`). They are
+   otherwise identical, comment included. This file exists so the Retailers tab
+   does not become a FOURTH copy; adopting it in those three is a one-import
+   change each with no visual difference, and worth doing — it was left out of
+   the Retailers commit only because they are live screens and that commit was
+   about a new route. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  /* Pinned to the viewport (owner repro 2026-07-24, same fix as the
+     dashboard shell): a plain 100dvh box can transiently exceed the VISIBLE
+     screen (keyboard/URL-bar/zoom) and then the document scrolls the whole
+     box — ribbons slide. fixed+inset:0 makes that impossible. */
+  position: fixed;
+  inset: 0;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}

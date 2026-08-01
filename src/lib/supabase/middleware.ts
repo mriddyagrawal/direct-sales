@@ -59,6 +59,18 @@ export async function updateSession(request: NextRequest) {
     if (isLoginRoute) return supabaseResponse;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    // Remember where they were going, so a shared link (WhatsApp, an email)
+    // survives the login instead of dumping them on their role's home to hunt
+    // for it themselves.
+    //
+    // Search params are DROPPED rather than carried. Two reasons: cloning the
+    // URL keeps the original query, so login was already receiving whatever
+    // was on the incoming request; and Next's own prefetches arrive as
+    // `?_rsc=…`, which is meaningless to replay. Path only is the honest
+    // subset — no current deep link needs a query to make sense.
+    const target = request.nextUrl.pathname;
+    url.search = "";
+    if (target !== "/") url.searchParams.set("next", target);
     return redirectWithCookies(url);
   }
 

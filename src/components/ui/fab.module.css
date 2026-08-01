@@ -1,0 +1,61 @@
+/* The floating action button, in one place. Four pages had a copy of this —
+   Orders (`New order`), Deposits (`New deposit`), Products and Retailers
+   (`Add`) — and they drifted three ways before being re-aligned by hand on
+   2026-08-01: two sat 10px low on a stale offset, three were missing the
+   shadow, one had shrunk to the 13px body token. Nothing here is a new value;
+   this file exists so the next divergence cannot happen silently.
+
+   Usage — always the base plus exactly ONE variant:
+
+       import fab from "@/components/ui/fab.module.css";
+       <Link className={`${fab.fab} ${fab.desktopCorner}`}>      // Orders, Deposits
+       <button className={`${fab.fab} ${fab.phoneOnly}`}>        // Products, Retailers
+
+   Both variants live in THIS file on purpose. They set the same properties as
+   the base at the same specificity (0,1,0), so only source order decides the
+   winner — keeping them here makes that order deterministic. Split across two
+   stylesheets it would depend on bundle order, which is exactly the trap that
+   made the retailers cards render under the desktop table. */
+
+.fab {
+  position: fixed;
+  right: 16px;
+  /* 70px bottom bar + 16px. Orders is the reference (owner-final phone
+     layout). The 76px that Products and Retailers used to carry was computed
+     against the office bar's OLD 60px height; DashboardNav later raised it to
+     70px for salesman-bar parity and the offsets never followed. */
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  background: var(--color-accent);
+  color: var(--color-white);
+  border: none; /* it is a <button> on two pages */
+  border-radius: 24px;
+  font-family: var(--font-structure);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none; /* it is an <a> on the other two */
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
+}
+
+/* Orders and Deposits: the FAB is the ONLY way to start a new order or
+   deposit at any width, so it survives on desktop and moves to the corner. */
+@media (min-width: 768px) {
+  .desktopCorner {
+    right: 32px;
+    bottom: 32px;
+  }
+}
+
+/* Products and Retailers: those pages have a real Add button in the title row
+   on desktop, so showing the FAB too would offer the same action twice. */
+@media (min-width: 768px) {
+  .phoneOnly {
+    display: none;
+  }
+}

@@ -85,7 +85,11 @@ a 404 and nobody can test the step.
   need a migration, stop and ask the owner.
 - Money is stored in **paise**. Nothing in this task renders an amount, but if
   that changes: convert to rupees and format `en-IN`, never show raw paise.
-- **Phone layouts are owner-final.** Keep the Retailers phone cards as they are.
+- **Think about the phone.** A desktop change usually has a phone counterpart —
+  work out what it is, decide deliberately, and say what you decided. No negative
+  side effects: nothing on the phone should degrade because a desktop edit did
+  not consider it. A phone bug is a bug and gets fixed. The one settled piece is
+  the **Orders** phone layout (sticky chips, tuned padding) — do not redesign it.
 - Deposits' table is **out of scope** — it is a deliberately different object.
 
 ## One thing that will look wrong on localhost and is not

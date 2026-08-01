@@ -31,6 +31,12 @@
   --text-body-weight: 500;
   --text-section-label-size: 10px;
   --text-section-label-tracking: 0.08em;
+  /* Dense table headers track tighter than section labels (0.06em vs 0.08em).
+     All four tables already hardcoded 0.06em, so this documents an existing
+     sub-convention rather than changing anything: --text-section-label-tracking
+     is used in ~21 places, every one a section label in a form or flow, and
+     adopting it here would visibly loosen four table headers for no benefit. */
+  --text-table-head-tracking: 0.06em;
 
   /* Layout & interaction constants (spec §2) */
   --radius: 2px;

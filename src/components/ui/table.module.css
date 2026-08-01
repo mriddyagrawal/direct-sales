@@ -1,0 +1,114 @@
+/* The canonical desktop table grammar (S8): 2px top rule, mono uppercase
+   headers, 40px zebra rows, hairline separators, muted metadata, bold names.
+   Hidden on phone — every page that uses this renders cards instead below
+   768px.
+
+   SHARE THE STYLESHEET, NOT THE MARKUP. There is deliberately no <DataTable>
+   component: the tables differ in columns, cell classes and row semantics, and
+   that abstraction rots. Each page keeps its own <table> and imports this:
+
+       import table from "@/components/ui/table.module.css";
+       <table className={table.table}>
+
+   Page-specific column widths stay in the page's own module and compose
+   alongside:  className={`${table.cellMeta} ${styles.wide}`}
+
+   This is Products' block verbatim with three drift fixes folded in (spec
+   docs/specs/table-standardization-and-retailer-detail.md): the header's
+   padding-right (which Users was missing, leaving its headers 12px out of
+   line with their own values), the meta-cell grey (Orders hardcoded a lighter
+   #747b88 than the token), and the row hover (Orders had none). */
+
+.table {
+  display: none; /* phone: cards render instead */
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 2px solid var(--color-ink);
+}
+
+.table thead th {
+  text-align: left;
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-table-head-tracking);
+  color: var(--color-locked);
+  height: 32px;
+  /* Match the body cells' 12px right padding so each header sits over its
+     column's values, not 12px off. */
+  padding-right: 12px;
+  border-bottom: 2px solid var(--color-ink);
+}
+
+/* Numeric headers right-align over their right-aligned values. Scoped as
+   `.table thead th.numeric` on purpose: a bare `.numeric` (0,1,0) loses the
+   specificity fight with `.table thead th` (0,1,2) and silently never
+   applies. */
+.table thead th.numeric {
+  text-align: right;
+}
+
+.table tbody tr {
+  height: 40px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.table tbody tr:nth-child(even) {
+  background: rgba(20, 24, 31, 0.02);
+}
+
+/* Row-scoped, so this module fully owns clickable-ROW behaviour. A page's own
+   `.clickable` (e.g. a phone card) stays that page's business — different
+   element, not drift. */
+.table tbody tr.clickable {
+  cursor: pointer;
+}
+
+.table tbody tr.clickable:hover {
+  background: rgba(29, 78, 216, 0.05);
+}
+
+.table td {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  padding-right: 12px;
+}
+
+/* Column hierarchy: metadata recedes, the name is the primary scan target.
+   Scoped as `.table td.cellX` so the extra class beats `.table td`'s own
+   colour — a bare `.cellMeta` loses 0,1,0 vs 0,1,1 and never applies. */
+.table td.cellMeta {
+  color: var(--color-locked);
+  font-weight: 400;
+}
+
+.table td.cellName {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* BOTH scoped as `.table td.x` for the same reason the two rules above are.
+   A bare `.mono` (0,1,0) LOSES to `.table td` (0,1,1), which sets
+   font-family — so an unscoped `.mono` never reaches a cell at all. That is a
+   live bug in the four page-level copies this file replaces: Orders' refs,
+   timestamps and totals have been rendering in Space Grotesk, not JetBrains
+   Mono, against the design spec's mono-figures rule.
+
+   A bare `.numeric` happens to work today only because `.table td` sets no
+   text-align — it would die silently the moment anyone added one. Scoped now
+   rather than left as a trap.
+
+   (Caught by the REVIEWER on step 1, before any page had adopted the file.) */
+.table td.numeric {
+  text-align: right;
+}
+
+.table td.mono {
+  font-family: var(--font-figures);
+}
+
+@media (min-width: 768px) {
+  .table {
+    display: table;
+  }
+}

@@ -161,7 +161,11 @@ cards need them and they must not drift.
 - Small atomic commits, accurate messages (the REVIEWER verifies claims literally).
 - Money is stored in **paise**; if any of this work renders a balance, convert to
   rupees and format `en-IN`. Do not render raw paise.
-- Phone Orders layout is owner-final — scope any table/layout tweaks to desktop.
+- **Think about the phone.** A desktop change usually has a phone counterpart —
+  work out what it is, decide deliberately, and say what you decided. No negative
+  side effects: nothing on the phone should degrade because a desktop edit did
+  not consider it. A phone bug is a bug and gets fixed. The one settled piece is
+  the **Orders** phone layout (sticky chips, tuned padding) — do not redesign it.
 - RLS is row-level, not column-level: a salesman who can insert a retailer can
   set `tally_ledger_name` on it. No policy change needed.
 

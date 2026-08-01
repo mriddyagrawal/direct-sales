@@ -1,5 +1,13 @@
 .page {
   padding: 16px;
+  /* Clearance for the phone FAB — the last row must never sit under it. The
+     shell's tab bar is a static 70px flex child, the FAB is fixed at
+     bottom: 86px with min-height 48px (86→134px up from the viewport floor),
+     so 96px leaves ~32px of breathing room above it. Same shell, same offset,
+     same bar on Orders/Products/Retailers/Users, so the number transfers.
+     Desktop needs nothing: the 768px block re-declares `padding: 24px`, and
+     the shorthand resets padding-bottom, so this cannot leave dead space. */
+  padding-bottom: 96px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -111,14 +119,6 @@
   border-color: var(--color-accent);
 }
 
-.clickable {
-  cursor: pointer;
-}
-
-.table tbody tr.clickable:hover {
-  background: rgba(29, 78, 216, 0.05);
-}
-
 .error {
   font-family: var(--font-structure);
   font-size: 12px;
@@ -132,70 +132,15 @@
   padding: 24px 0;
 }
 
-/* Desktop ledger — same S8 grammar as OrdersList (hairlines, mono figures,
-   muted metadata, bold display name). Hidden on mobile in favour of cards. */
-.table {
-  display: none;
-  width: 100%;
-  border-collapse: collapse;
-  border-top: 2px solid var(--color-ink);
-}
-
-.table thead th {
-  text-align: left;
-  font-family: var(--font-figures);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--color-locked);
-  height: 32px;
-  /* Match the body cells' 12px right padding so each header sits over its
-     column's values (esp. the right-aligned #/PRICE/STOCK), not 12px off. */
-  padding-right: 12px;
-  border-bottom: 2px solid var(--color-ink);
-}
-
-/* #/PRICE/STOCK headers right-align over their right-aligned values — the
-   header's .numeric class alone loses to `.table thead th` on specificity. */
-.table thead th.numeric {
-  text-align: right;
-}
-
-.table tbody tr {
-  height: 40px;
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.table tbody tr:nth-child(even) {
-  background: rgba(20, 24, 31, 0.02);
-}
-
-.table td {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  color: var(--color-ink);
-  padding-right: 12px;
-}
-
+/* Phone list only — the desktop table's mono/pointer now come from the shared
+   grammar (.table td.mono / .table tbody tr.clickable). These stay because the
+   phone rows are divs and spans, not table cells. */
 .mono {
   font-family: var(--font-figures);
 }
 
-.numeric {
-  text-align: right;
-}
-
-/* Column hierarchy: metadata (#, brand, category, tally) recedes; the display
-   name is the primary scan target. Scoped as `.table td.cellX` so the extra
-   class beats `.table td`'s own color on specificity (a bare `.cellMeta`
-   loses 0,1,0 vs 0,1,1 and silently never applies). */
-.table td.cellMeta {
-  color: var(--color-locked);
-  font-weight: 400;
-}
-
-.table td.cellName {
-  color: var(--color-ink);
-  font-weight: 600;
+.clickable {
+  cursor: pointer;
 }
 
 .tbd {
@@ -503,32 +448,6 @@
   color: var(--color-locked);
 }
 
-/* Phone FAB (admin) — the one Add entry point, above the fixed bottom tab bar
-   (60px). Same pill voice as the New Order / deposits FABs. */
-.pFab {
-  position: fixed;
-  right: 16px;
-  /* 70px bottom bar + 16px, matching the Orders FAB. Was 76px — a fossil of
-     the office bar's old 60px height (DashboardNav raised it to 70px for
-     salesman-bar parity; the FAB offset never followed), so it sat 10px low. */
-  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  padding: 0 18px;
-  background: var(--color-accent);
-  color: var(--color-white);
-  border: none;
-  border-radius: 24px;
-  font-family: var(--font-structure);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25);
-}
-
 /* Add chooser — the ProductModal responsive pattern: bottom sheet on phone,
    centered flat panel on desktop (owner 2026-07-24). */
 .chooserScrim {
@@ -647,15 +566,7 @@
     display: block;
   }
 
-  .table {
-    display: table;
-  }
-
   .phone {
-    display: none;
-  }
-
-  .pFab {
     display: none;
   }
 

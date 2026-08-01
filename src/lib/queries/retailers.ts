@@ -27,10 +27,17 @@ export interface RetailerRow {
   outstanding_paise: number | null;
 }
 
+// The column list, once. Both retailer-detail routes (staff and salesman) read
+// a single row with exactly these columns, and the list builder below reads
+// many — one RetailerRow shape means one select, the same way
+// ORDER_DETAIL_SELECT serves all three order-detail routes. Three hand-typed
+// copies of a column list is how a lens quietly ends up missing a field.
+export const RETAILER_SELECT = "id, name, area, phone, verified, active, tally_ledger_name, outstanding_paise";
+
 export async function fetchRetailers(supabase: SupabaseClient<Database>): Promise<RetailerRow[]> {
   const { data, error } = await supabase
     .from("retailers")
-    .select("id, name, area, phone, verified, active, tally_ledger_name, outstanding_paise")
+    .select(RETAILER_SELECT)
     .order("name", { ascending: true });
   if (error) throw error;
   return (data ?? []) as RetailerRow[];
