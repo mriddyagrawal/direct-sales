@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/Skeleton";
 import back from "@/components/ui/back.module.css";
-import styles from "./RetailerDetail.module.css";
+import styles from "@/components/retailers/RetailerDetail.module.css";
 
 // Retailer detail loading boundary.
 //

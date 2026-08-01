@@ -8,8 +8,13 @@ import { BackLink } from "@/components/BackLink";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { StatusTag } from "@/components/ui/StatusTag";
-import { RetailerModal } from "../RetailerModal";
-import type { RetailerRow } from "../page";
+// The editor stays where the queue that also opens it lives. It is staff-only
+// by RLS (retailers_staff_update is accountant/admin) and by this component —
+// the salesman lens never renders it — so it belongs with the dashboard, not
+// in shared components. Same cross-folder shape as scan/[id] reaching for
+// godown's PickScreen.
+import { RetailerModal } from "@/app/dashboard/retailers/RetailerModal";
+import type { RetailerRow } from "@/lib/queries/retailers";
 import back from "@/components/ui/back.module.css";
 import styles from "./RetailerDetail.module.css";
 
