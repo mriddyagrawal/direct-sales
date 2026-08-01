@@ -6058,3 +6058,27 @@ Nothing was left dead.
 **Open flags (cumulative):** new 🟡 57. 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54 ✅ CLOSED. 51 folded into step 7.
 
 **Next-commit suggestion:** step 6 (Retailers) — the only step with new markup rather than a migration, and the first to add a route.
+
+---
+
+## Review of 5b3e5ed — docs(orders): correct the .rowSelected comment + pin flag 57 (hover is load-bearing)
+
+**Verdict:** ✅ — 🟡 57 **CLOSED**
+
+**Phase / commit goal:** Close the flag raised on the previous commit: the `.rowSelected` comment claimed the state was "NOT hover", and the shared hover rule it now sits beside looks deletable.
+
+**What works:** Both halves, cleanly. One file, 13 insertions, 3 deletions, comment-only — no selector, value or markup touched. `tsc` and `eslint src` still exit 0, and the rule the comment protects (`.table tbody tr.clickable:hover`) is confirmed still present in the shared grammar.
+
+The correction is honest rather than quiet: it states that the earlier comment was wrong, says what is actually true (selection is driven by arrow keys **and** `onMouseEnter`, so it paints on hover through React), and attributes the correction and date. A future reader gets the amended fact *and* the fact that it was amended, which is worth more than a silently-rewritten line.
+
+The flag-57 pin does the job it needs to do — it names the exact tempting deletion, explains why the rule is not redundant despite being outranked on the same row, and states the consequence in observable terms ("the tint goes back to chasing the cursor"). That is the right shape for a warning: it survives someone who does not know the history, because it tells them what they will break rather than merely asking them not to.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**What I tried:** Read the full diff (comment lines only); `tsc --noEmit` (0), `eslint src` (0); confirmed `.table tbody tr.clickable:hover` still exists in `src/components/ui/table.module.css`.
+
+**Open flags (cumulative):** 🟡 57 ✅ CLOSED. 🟡 55, 🟡 56, 🟡 ㊿ open — all three are documentation/latent-fragility notes, none gating. 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
+
+**Process note:** second time in this run a flag has been closed in the very next commit (53 at fed0523, 57 here), and once the builder stopped mid-step to contest a spec instruction that measurement showed was wrong (step 4). The loop is doing what it is for.
