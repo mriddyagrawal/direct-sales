@@ -52,6 +52,32 @@ Checked in every review where the commit touches the relevant surface:
 - **Mobile-first Quick Order:** stepper flow works one-handed, sticky cart total is correct, search filters live — checked in a real browser/viewport, not by reading JSX.
 - **Tally export (Phase 2+):** XML validates against Tally's import schema; only LOCKED orders export; re-export is idempotent (no duplicate vouchers).
 
+### ⚠️ History rewrite boundary — 2026-08-01
+
+**Most `## Review of <sha>` headers below point at commits that no longer exist.**
+
+On 2026-08-01 the repository's history was rewritten (`git filter-repo`) to purge
+real customer data — 606 shop names, per-shop balances, a phone number — from a
+**public** GitHub repo. Every commit was rewritten, so every sha changed:
+**135 of 234 review-block shas in this file no longer resolve.**
+
+Nothing in this log was lost. The review *text* is intact and still accurate; only
+the sha references dangle. `git show <sha>` on a pre-rewrite block will fail.
+
+Consequences for the REVIEWER's normal method:
+
+- **"Review everything since the last reviewed sha" is broken across the boundary.**
+  Anchor on subject lines instead, or on any sha at or after `fd0f16e`
+  (`chore(privacy): keep real customer data out of a public repo`), which is the
+  first commit written by the rewrite.
+- Blocks written **from `fd0f16e` onward** have live shas and behave normally.
+- A pre-boundary sha can still be located by its commit subject, which the rewrite
+  preserved verbatim along with all author and committer dates.
+
+The pre-rewrite history survives in two local backups made before the run:
+`~/Documents/GitHub/direct-sales-backup-20260801.git` and `.bundle`. They contain
+the unredacted customer data and must stay off any public remote.
+
 ### Watcher / cadence mechanics
 
 Two triggers wake the REVIEWER:
@@ -5683,3 +5709,128 @@ The ONE approved DB object, exactly as specced: user FK cascade, `endpoint` uniq
 *(3ddd665 — the ANALYTICS AGENT prompt — is my own planner-side commit, not builder code; not self-reviewed.)*
 
 **Open flags (cumulative):** 🟡 ㊹ traffic-light confirm · ㊺ notify's ⚠️ stock flag fires on NULL stock_at_order (LG cards over-flag; one-char fix, MCP now reconnected so it's unblocked) · ㊻ R6 clear-on-open runs on mount only + iOS `WindowClient.navigate` fallback · **NEW ㊼ prefetch unverified on prod** · **NEW ㊽ per-row prefetch fan-out on long lists** · ㊷ ㉛ ⑯ ⑬ ⑭ ⑦ ⑧ ⑨ carried · browse/catalog payload dedupe → Bajaj perf pass. Still owed: notifications real-device acceptance pass (build-order commit 4).
+
+---
+
+## Review of 186895c — chore(types): sync DB types with prod + carry tally_ledger_name on the shared retailers query
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Regenerate `database.types.ts` against prod and widen the shared `["retailers"]` query so both consuming surfaces get `tally_ledger_name`.
+
+**What works:** `src/lib/queries/retailers.ts:27` adds `tally_ledger_name` and `outstanding_paise` to `RetailerRow`, and the `select` at :33 fetches them. Correctly done in the **shared superset builder** (spec D12/D4b) rather than per-surface, so the office modal and the Quick Order picker cannot drift apart. `npx tsc --noEmit` exits 0.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** `balance_as_of` is not carried, though it is the discriminator between "matched, Tally sent no figure" and "never matched" — the balance UI will need it. Cheap to add now, one more column on a ~600-row fetch.
+
+**What I tried:** `npx tsc --noEmit` (exit 0); read the query builder; confirmed against `information_schema.columns` that the generated types match prod's `retailers` shape.
+
+**Next-commit suggestion:** none — this is the right foundation for the rest.
+
+---
+
+## Review of 8a738f1 — feat(retailers): shared identity rules — norm(), blank-ledger-name resolution, save-error mapping
+
+**Verdict:** ⚠️ accept-with-followups
+
+**Phase / commit goal:** One module, `src/lib/retailer-identity.ts`, holding the rules both retailer forms need, so a client-side duplicate check cannot drift from the database's unique indexes.
+
+**What works:** The design is right and the reasoning in the file header is the correct reasoning. `resolveTallyLedgerName` (:27) implements the owner's rule exactly — blank stores the **shop name, never null** — and critically **preserves an existing value on edit** (:30-31), which is the rename-safety the whole change exists for. `mapRetailerSaveError` (:40) maps the two owned constraint names and **returns anything else as-is** (:47) rather than swallowing unknown errors behind a friendly guess — exactly right. `findNameClash` correctly excludes the row being edited.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **㊾ `norm()` does not mirror the indexes "exactly", and the doc comment says it does.** Proven by execution:
+
+  ```
+  input        norm() (JS)   DB expression
+  "\tShop A"   "shop a"      " shop a"     ← leading space survives in the DB
+  ```
+
+  Postgres `btrim(x)` with one argument strips **spaces only**, not tabs or newlines, so a leading tab survives `btrim` and is then converted to a leading space by the `\s+` collapse. JS `.trim()` removes it outright. `\s` also differs on NBSP (JS matches it, Postgres ARE does not), which is reachable by paste from Excel.
+
+  Impact is small and well-contained: the divergence makes the **client stricter** than the DB, so the failure mode is a false duplicate warning, and layer 2 (`mapRetailerSaveError`) already covers the opposite direction. **The fix is to soften the comment, not to chase the edge case** — a comment claiming "mirrors BOTH unique indexes exactly" will be trusted by the next person who touches either side. Say what it actually mirrors and name the tab/NBSP edge.
+
+**Domain / correctness checks:** Money math — n/a. RLS — n/a (client helpers only; the DB indexes are the real enforcement and exist, verified). Immutable snapshots — n/a.
+
+**What I tried:** Ran `norm()` in node over 6 inputs and the DB expression over the same 6 via `execute_sql`; diffed the results (5 agree, 1 diverges as above). Read all 59 lines. `npx tsc --noEmit` exit 0.
+
+**Open flags (cumulative):** new 🟡 ㊾.
+
+**Next-commit suggestion:** correct the doc comment on `norm()`.
+
+---
+
+## Review of 264a8ac / f3288ee / e0556c7 / c3b4f71 — the retailer Tally-link UI (office modal, quick-add, office Add, Not-synced tab)
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Surface `tally_ledger_name` on both retailer forms, warn on duplicate names, give the office a way to add a shop, and surface shops the sync missed.
+
+**What works — and this is the strongest possible verification, the live outcome:** the feature was used in production today and closed its own loop. At the time of the previous review cycle 8 active retailers had no Tally link; the four spelling variants (`Manoharmusic`→`Manohermusic`, `… (Rm)`→`… (Rm) NET`, `YASH MOBILE`→`YASH MOBILE LG`, `Balaji sales sakti`→`Balaji Sales Skt Om`) were resolved **through this UI**, the ledger sync re-ran at 2026-08-01 15:42 IST, and prod now reads:
+
+```
+active retailers   599
+linked             597
+still unsynced     Test Retailer | Test Retailer 2
+```
+
+Every real shop is linked. The two remaining are test fixtures. That is the feature working end-to-end on real data, without anyone renaming a shop in either system — which is precisely what the override column was for.
+
+`c3b4f71`'s Not-synced detection (`RetailersQueue.tsx:19`) correctly keys on `outstanding_paise === null` rather than `=== 0`, preserving the "known clear" vs "unknown" distinction the ledger spec requires.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **㊿ Not-synced uses `outstanding_paise === null` alone, which conflates two states.** `_apply_ledger` writes `balance_as_of` for a **matched** shop even when Tally returned no figure — so "matched, Tally said nothing" and "never matched at all" both read as null balance and are indistinguishable here. `balance_as_of IS NOT NULL` separates them. Currently 0 shops are in the middle state so nothing is visibly wrong, but the tab will mislabel the first one that appears.
+- e0556c7's office Add is a genuinely new capability, beyond the spec I wrote. No objection — it was the obvious gap — but it means the Add path is unreviewed against any written intent.
+
+**Domain / correctness checks:** RLS — unchanged; retailers already had accountant+admin ALL, and RLS is row-level so a salesman able to insert can set `tally_ledger_name` (no policy change needed, correctly none made). Money math — n/a, no amounts rendered yet. Immutable snapshots — untouched.
+
+**What I tried:** Queried prod for link counts before/after; confirmed the 4 variants resolved and the sync re-ran (`max(balance_as_of)` = 2026-08-01 10:12 UTC); read the diffs; `npx tsc --noEmit` and `npx eslint src` both exit 0. **Not verified:** the actual browser interaction — the one-tap duplicate rescue and the modal's inline warning were read, not clicked. A browser pass is still owed on those two.
+
+**Open flags (cumulative):** new 🟡 ㊿; 🟡 ㊾ open.
+
+---
+
+## Review of b59ce7b / d5c49cf / 3df9a87 — the desktop-standardisation pass (heading tokens, FAB, 24px padding)
+
+**Verdict:** ⚠️ accept-with-followups
+
+**Phase / commit goal:** Fix the drift found in the 2026-08-01 audit — Deposits' hardcoded heading, the FAB's four drifted copies and its wrong bottom offset, and inconsistent desktop page padding.
+
+**What works:** The FAB offset fix is **correct and verified**. All four now read identically:
+
+```
+bottom: calc(86px + env(safe-area-inset-bottom, 0px))
+font-size: 14px
+box-shadow: 0 4px 14px rgba(20, 24, 31, 0.25)
+```
+
+That is 70px of bottom bar + 16px, matching Orders. The previous 76px on Products and Retailers was a fossil of the office nav's old 60px height — the builder's comment says so explicitly and it is accurate. Deposits' heading now goes through the type tokens. `tsc` and `eslint src` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **51 The commit subject "one FAB, four pages" overstates what landed.** There is still no shared FAB — it is four copies that now happen to agree, in four CSS modules. The values were unified; the duplication that caused the drift was not. That is a fine intermediate step, but the subject reads as consolidation and a future reader will believe it. This is the same shape as the table grammar, and `docs/specs/table-standardization-and-retailer-detail.md` explicitly scopes the FAB to its own later pass — so the honest subject was "same values in four places, consolidation still pending".
+- 🟡 **52 `eslint.config.mjs` does not ignore `analysis/`.** The config replaces `eslint-config-next`'s default ignores with an explicit list (`.next`, `out`, `build`, `design`, `archive`) and omits `analysis/`, so a bare `npx eslint` walks into `analysis/.venv/lib/python3.9/site-packages/matplotlib/.../mpl.js` and reports **5 errors + 17 warnings** from a vendored matplotlib bundle. `npx eslint src` is clean, so nothing is actually wrong with the app — but "✖ 22 problems" on every run trains everyone to ignore the output, and a real error in `src/` would land in that noise unseen. One line: add `"analysis/**"` to `globalIgnores`.
+
+**What I tried:** Extracted and compared the `.fab`/`.pFab` blocks across all four modules post-change; confirmed all three properties now agree; confirmed `DashboardNav.module.css:26` is `height: 70px` so 86 = 70 + 16 is right; `npx tsc --noEmit` exit 0; `npx eslint` (22 problems, all outside `src`) vs `npx eslint src` (clean). **Not verified:** visual rendering at a real phone viewport.
+
+**Open flags (cumulative):** new 🟡 51, 🟡 52; 🟡 ㊾, 🟡 ㊿ open.
+
+**Next-commit suggestion:** the `analysis/**` ignore — one line, and it restores lint as a usable signal before the six-step table refactor starts generating real lint pressure.
+
+---
+
+## Review of 189fc8e / 2b2f77b / b6c26ca / c76bd14 — the four merges
+
+**Verdict:** ✅
+
+Each is a clean `--no-ff` merge of a reviewed feature branch into `main` with no conflicts and no content beyond the branch tips reviewed above. `npx tsc --noEmit` and `npx eslint src` are clean at `main`'s tip.
+
+**One process note, non-blocking:** all four branches were merged straight to `main` on a product that is live and in use. That was acceptable for additive UI, but `docs/specs/table-standardization-and-retailer-detail.md` requires branch-per-step for the refactor that follows, because it touches four pages people are working in. Flagging so the change of discipline is deliberate rather than a surprise.
