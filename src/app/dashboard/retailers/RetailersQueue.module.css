@@ -1,5 +1,13 @@
 .page {
   padding: 16px;
+  /* Clearance for the phone FAB — the last row must never sit under it. The
+     shell's tab bar is a static 70px flex child, the FAB is fixed at
+     bottom: 86px with min-height 48px (86→134px up from the viewport floor),
+     so 96px leaves ~32px of breathing room above it. Same shell, same offset,
+     same bar on Orders/Products/Retailers/Users, so the number transfers.
+     Desktop needs nothing: the 768px block re-declares `padding: 24px`, and
+     the shorthand resets padding-bottom, so this cannot leave dead space. */
+  padding-bottom: 96px;
   display: flex;
   flex-direction: column;
   gap: 12px;
