@@ -6870,3 +6870,103 @@ rather than the taste.
 
 **Open after this:** 🟡 56, 🟡 64 (owner deciding the replacement affordance),
 🟡 68 (owner-deferred).
+
+---
+
+## Review of 4db4faf — refactor(balance): lift the balance rule into lib/balance.ts
+
+**Verdict:** ✅ — the "byte-identical" claim is **proven**, not inspected.
+
+**Phase / commit goal:** Step 1 of the salesman-retailers spec — move the balance
+*decision* into one module so the picker row and the Retailers tab cannot each
+grow a private copy. One consumer for now; rendered output must not change.
+
+### The claim is provable, so I proved it rather than read it
+
+A refactor whose whole contract is "nothing changes" deserves an execution
+check, not a diff read. I reconstructed the old `outstanding()` verbatim from
+`4db4faf^`, called the new path (`readBalance` + the queue's state→class
+mapping), and compared both over the full meaningful input domain:
+
+```
+compared 1025 inputs — 0 mismatches
+  null     -> {"text":"—","cls":"amtNone"}
+  0        -> {"text":"₹0","cls":"amtClear"}
+  -5000    -> {"text":"-₹50","cls":"amtClear"}
+  8432000  -> {"text":"₹84,320","cls":"amtOwed"}
+```
+
+The sweep included the cases where a `<=` refactor usually breaks: `null`, `0`,
+**`-0`**, ±1, the ±49/±50 paise rounding boundaries, `MAX_SAFE_INTEGER`,
+`MIN_SAFE_INTEGER`, `NaN`, `±Infinity`, and a 1,000-point sweep across
+±500,000 paise. Zero divergence on both `text` and class.
+
+That also settles the specific risk in this shape of change — an inverted arm in
+the new ternary. `unknown → amtNone`, `clear → amtClear`, `owed → amtOwed` holds
+at every input, including the `<= 0` boundary where `clear` and `owed` meet.
+
+**Returning a semantic state rather than a class is the right call and the
+comment explains why properly:** a CSS-module class is a hashed name scoped to
+its own stylesheet, so `styles.amtOwed` is meaningless in another file. The
+*decision* is shared; each surface keeps its own visual grammar. That is what
+lets a table cell and a phone row look different without disagreeing about
+whether the shop owes money.
+
+**The old comment's claim is now honest.** `outstanding()` asserted "ONE
+definition of how a balance reads" while being the only surface with a balance —
+true by accident. The commit says so and fixes it by moving rather than by
+weakening the claim.
+
+**Verified alongside:** all three `amt*` classes still defined in
+`RetailersQueue.module.css`; no dead `formatRupees` import left behind; `tsc`
+and `eslint src` both 0.
+
+### 🟡 70 — a shop in credit renders as `-₹50`, and step 2 puts that in front of salesmen
+
+Surfaced by the harness rather than by reading: `-5000` paise renders **`-₹50`**,
+green. That is pre-existing queue behaviour and **not introduced here** — but it
+is about to propagate to two new surfaces (the picker row, the Retailers tab)
+whose reader is a salesman standing in the shop, not an accountant reading a
+ledger.
+
+28 active shops are in credit. "-₹50" in green is a minus sign that means "they
+are ahead", which reads oddly next to red amounts that mean "they owe". A ledger
+reader parses it instantly; someone scanning names for a shop to sell to may not.
+
+Not a defect and not blocking — the spec deliberately says match the queue
+exactly, and the builder did. Raising it because **step 2 is the moment to decide
+it**, while it is still one surface's convention rather than three. Options if it
+ever matters: leave it, or read credit as `₹50 in credit` on the salesman
+surfaces only. Owner's call, cheap either way.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 70 above.
+- The **"is this shop unsynced"** predicate is still written inline in two
+  places — `RetailersQueue.tsx:23` and `RetailerDetail.tsx:77`, both
+  `outstanding_paise === null`. That is a different question from "how does this
+  balance read", so leaving it out of this module is defensible. Worth knowing
+  that the *meaning of null* is now encoded in three sites, though, and the owner
+  has just fixed that meaning by ruling 🟡 ㊿ won't-fix — `readBalance` already
+  returns `state: "unknown"` for exactly this case if they should ever converge.
+
+**Domain / correctness checks:** **Money** — the central concern, and clean:
+paise in, `formatRupees` (en-IN) out, never raw, and `null` still cannot render
+as ₹0 (proven at the `null` and `0` cases above, which stay distinct). **RLS /
+state machine / snapshots** — untouched. **Mobile** — no surface changes in this
+commit; the queue renders exactly as before, which is the point.
+
+**What I tried:** Wrote a `tsx` harness importing the real `src/lib/balance.ts`,
+reconstructed the pre-refactor `outstanding()` from `4db4faf^`, and compared both
+`text` and class over 1,025 inputs spanning null, zero, negative zero, the
+rounding boundaries, the safe-integer extremes, `NaN`, `±Infinity` and a wide
+sweep — 0 mismatches; grepped `RetailersQueue.module.css` for all three `amt*`
+classes; grepped `src/` for any other hand-rolled `outstanding_paise === null` /
+`<= 0` test (found the two `isNotSynced`-style predicates noted above, no second
+copy of the reading rule); `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** New: 🟡 70 (decide at step 2). Still open: 🟡 56,
+🟡 64 (owner deferred the chevron decision), 🟡 68 (owner-deferred). Closed by
+owner ruling this session: 🟡 ㊿, 🟡 55, 🟡 69.
