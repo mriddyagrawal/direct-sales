@@ -7562,3 +7562,47 @@ Checked before hiding, per the message: this view never edits notes — the Quic
 **What I tried:** Read the diff; computed the specificity of both sibling rules against the bare `.byline` and confirmed `.byline` no longer declares a margin at all (so the rule does not even need to win); confirmed `.heroMeta` declares no margin; reconciled the stated 8px seam against `.hero`'s `gap: 3px` plus the declared 5px; read the notes guard and confirmed `.trim()` covers whitespace-only notes; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
+
+---
+
+## Review of b239a3c — style(orders): the bill number moves under the status chip
+
+**Verdict:** ✅ — clean, and it caught its own orphan. One consequence it did not mention, which touches earlier deliberate work.
+
+**Phase / commit goal:** Owner 2026-08-02 asked to see the version `dedf766` had declined. "Billed" and the number Tally gave it are one fact, so they sit together.
+
+### It cleaned up after itself, which is the part I was going to check
+
+`dedf766` added `.heroBalance + .byline` one commit earlier. Moving the bill number out of the hero would have left that selector pointing at a class the file no longer renders — a dead rule created by the very commit before it.
+
+The builder found it first: `.byline` and that half of the grouping rule are both deleted, with a comment where the rule was saying where it went. Verified independently, both directions — **every `styles.*` reference resolves, and no rule in the stylesheet is unused.** The two surviving `byline` mentions in the component are comments, not render sites.
+
+**`back.module.css` is untouched** — confirmed from the diff, which changes exactly two files, both `OrderDetailView.*`. That matters because that stylesheet is shared with retailer detail, and the claim is what keeps this commit from reaching another page.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**The cost is stated before it is paid**, including the zero-cost alternative (bill number on the same line, between the ref and the chip). That is the right way to present a taste call.
+
+### 🟡 75 — this narrows the headline alignment `8beade3` deliberately established
+
+The commit describes the cost as within-page: on a billed order the corner is two lines, so "the shop name sits a few pixels lower than on an unbilled order."
+
+There is a second consequence it does not mention. `8beade3` spent real effort making order detail's shop name land on the **same y as retailer detail's**, and `RetailerDetail.module.css` still carries the `margin-top: -10px` derived from it. That comment states its assumption explicitly:
+
+> *"Everything above is now identical — 16px padding, a **24px back band**, a 16px gap — so pulling this row up by the ~10px difference lands the two headlines together."*
+
+A two-line corner is taller than 24px, so on a **billed** order that premise no longer holds and the two headlines diverge. The alignment now survives only for unbilled orders.
+
+The same comment lists **three** things that force a re-derivation — touch target, name type scale, display font. This adds a fourth it does not name: **order detail's back band growing past its floor.** Left unrecorded, the next person re-deriving `-10px` will do it from an assumption that is now conditionally false.
+
+Not blocking, and arguably not even wrong — the two pages are only ever seen side by side in screenshots, which is how the owner reviewed them. But it should be a decision rather than an accident, and the `-10px` comment should name the new trigger.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 75 above. If the two-line corner does grate, the commit's own alternative — the number on the same line — restores both the single-line band and the cross-page alignment at once.
+
+**Domain / correctness checks:** **Money** — the bill number is an identifier, not an amount; mono at 11px is right for something read back into Tally character by character, matching how order refs and serials are already treated. **RLS / state machine / snapshots** — untouched. **Mobile** — the growth lands in the back band, which is above the fold on a phone, so the shift is most visible exactly where the hero matters most.
+
+**What I tried:** Read the diff; confirmed `back.module.css` is not among the changed files (so retailer detail cannot be affected); traced both surviving `byline` mentions in the component to comments; scripted the dead-class sweep in both directions (every `styles.*` resolves; no unused rule); re-read `8beade3`'s `-10px` derivation comment and checked its stated 24px assumption against a two-line corner — the basis of 🟡 75; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 75. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed), 🟡 72, 🟡 73, 🟡 74.
