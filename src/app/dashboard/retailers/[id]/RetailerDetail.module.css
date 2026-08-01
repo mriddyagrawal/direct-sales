@@ -1,0 +1,89 @@
+.page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.backRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.breadcrumb {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  color: var(--color-locked);
+  text-decoration: none;
+}
+
+.breadcrumb:hover {
+  color: var(--color-accent);
+}
+
+.tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.headRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.title {
+  font-family: var(--font-structure);
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
+  color: var(--color-ink);
+}
+
+/* The Edit button sits hard right, by its own auto margin — the same
+   mechanism the queue and Products use, so a third element could be added
+   later without stranding anything mid-row. */
+.headRow button {
+  margin-left: auto;
+}
+
+/* Label-over-value facts; the balance and statement land under these next. */
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 2px solid var(--color-ink);
+}
+
+.fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.factLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-table-head-tracking);
+  text-transform: uppercase;
+  color: var(--color-locked);
+}
+
+.factValue {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+  text-align: right;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: 24px;
+  }
+}

@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { createClient } from "@/lib/supabase/client";
 import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
+import Link from "next/link";
 import { RetailerModal } from "./RetailerModal";
+import table from "@/components/ui/table.module.css";
 import styles from "./RetailersQueue.module.css";
 
 type FilterTab = "all" | "pending" | "notSynced" | "verified" | "deactivated";
@@ -18,10 +20,16 @@ type FilterTab = "all" | "pending" | "notSynced" | "verified" | "deactivated";
 // signal that means "missed"; 0 is a real, square balance.
 const isNotSynced = (r: RetailerRow) => r.active && r.outstanding_paise === null;
 
-// S11 — the retailers ledger. Row-click opens the RetailerModal (the same
-// window shape as the Products page — owner call 2026-07-11); saving an
-// unverified shop verifies it (fixing the spelling IS the verification act).
-// Activate/deactivate lives inside the modal now, like Products.
+// S11 — the retailers ledger. Desktop renders the shared table grammar; phone
+// keeps its cards (owner-final). A row opens the DETAIL page (2026-08-01) —
+// it no longer opens the edit modal in place.
+//
+// RetailerModal is deliberately NOT retired: it is the ONE editor, now reached
+// from exactly two intentional places — Add on this page, Edit on the detail
+// page — instead of from an accidental row tap. One editor means one copy of
+// the save rules (blank ledger name -> shop name, rename safety, duplicate
+// guard). Saving an unverified shop still verifies it (fixing the spelling IS
+// the verification act), and activate/deactivate still lives inside it.
 //
 // review flag ㉜(🅐), cache edition: render straight from the QUERY CACHE
 // (["retailers"], seeded by the page's HydrationBoundary; the same cache
@@ -39,7 +47,6 @@ export function RetailersQueue() {
   // Default tab is ALL (owner call 2026-07-11) — pending-verification is one
   // tap away, not the landing view.
   const [tab, setTab] = useState<FilterTab>("all");
-  const [editing, setEditing] = useState<RetailerRow | null>(null);
   // Office ADD (owner 2026-08-01) — until now the only way to create a shop
   // anywhere was the salesman's quick-add mid-order, so every new shop was
   // named by someone with no access to Tally. Same modal, no `retailer` prop.
@@ -137,39 +144,73 @@ export function RetailersQueue() {
                 : "No shops in this view."}
         </div>
       ) : (
-        <div className={styles.list}>
-          {filtered.map((r) => {
-            const needsVerification = r.active && !r.verified;
-            const isDeactivated = !r.active;
-            return (
-              <div
-                key={r.id}
-                className={`${styles.row} ${styles.rowClickable} ${isDeactivated ? styles.rowDeactivated : ""}`}
-                onClick={() => setEditing(r)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setEditing(r);
-                  }
-                }}
-              >
-                <div className={styles.rowInfo}>
-                  <p className={styles.rowName}>
-                    {r.name}
-                    {needsVerification && <span className={styles.newBadge}>NEW</span>}
+        <>
+          {/* DESKTOP. Navigation is a real <a> in the name cell stretched over
+              the whole row (.rowLink::after), NOT a <tr onClick>: one anchor
+              gives prefetch, keyboard focus, middle-click and open-in-new-tab
+              with no click handler and no re-render. The badges move out of
+              the name and become their own STATUS column, so names left-align
+              instead of starting at a different x on every row. */}
+          <table className={table.table}>
+            <thead>
+              <tr>
+                <th>NAME</th>
+                <th>AREA</th>
+                <th>PHONE</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr
+                  key={r.id}
+                  className={`${table.clickable} ${styles.linkRow} ${!r.active ? styles.rowDeactivated : ""}`}
+                >
+                  <td className={table.cellName}>
+                    <Link href={`/dashboard/retailers/${r.id}`} className={styles.rowLink}>
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className={table.cellMeta}>{r.area || "—"}</td>
+                  <td className={`${table.mono} ${table.cellMeta}`}>{r.phone || "—"}</td>
+                  <td>
+                    {r.active && !r.verified && <span className={styles.newBadge}>NEW</span>}
                     {isNotSynced(r) && <span className={styles.notSyncedBadge}>NOT SYNCED</span>}
-                    {isDeactivated && <span className={styles.deactivatedBadge}>DEACTIVATED</span>}
-                  </p>
-                  <p className={styles.rowMeta}>
-                    {[r.area, r.phone].filter(Boolean).join(" · ") || "No area/phone on file"}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                    {!r.active && <span className={styles.deactivatedBadge}>DEACTIVATED</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* PHONE — unchanged layout (owner-final), now a real <Link> instead
+              of a div+onClick that opened the modal in place. */}
+          <div className={styles.list}>
+            {filtered.map((r) => {
+              const needsVerification = r.active && !r.verified;
+              const isDeactivated = !r.active;
+              return (
+                <Link
+                  key={r.id}
+                  href={`/dashboard/retailers/${r.id}`}
+                  className={`${styles.row} ${styles.rowClickable} ${isDeactivated ? styles.rowDeactivated : ""}`}
+                >
+                  <div className={styles.rowInfo}>
+                    <p className={styles.rowName}>
+                      {r.name}
+                      {needsVerification && <span className={styles.newBadge}>NEW</span>}
+                      {isNotSynced(r) && <span className={styles.notSyncedBadge}>NOT SYNCED</span>}
+                      {isDeactivated && <span className={styles.deactivatedBadge}>DEACTIVATED</span>}
+                    </p>
+                    <p className={styles.rowMeta}>
+                      {[r.area, r.phone].filter(Boolean).join(" · ") || "No area/phone on file"}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Phone FAB — the same entry point as the desktop button. */}
@@ -189,19 +230,6 @@ export function RetailersQueue() {
         />
       )}
 
-      {editing && (
-        <RetailerModal
-          retailer={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            // D7: the same ["retailers"] cache feeds the Quick Order picker —
-            // a rename/verify reaches the salesman without a reload.
-            void queryClient.invalidateQueries({ queryKey: ["retailers"] });
-            router.refresh();
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -57,6 +57,12 @@
     padding: 24px;
   }
 
+  /* Desktop shows the table (shared grammar switches itself on at 768px), so
+     the phone cards step aside — same split as Orders/Products/Users. */
+  .list {
+    display: none;
+  }
+
   .addDesktop {
     display: block;
   }
@@ -142,6 +148,29 @@
   gap: 8px;
 }
 
+/* The stretched-link pattern (spec 2026-08-01): the anchor lives in the NAME
+   cell but its ::after covers the whole row, so the entire row is clickable
+   without a <tr onClick>. Keeps prefetch, focus, middle-click and
+   open-in-new-tab; costs no click handler and no re-render.
+   Anything interactive added to a row later needs `position: relative` to sit
+   above this overlay. */
+.linkRow {
+  position: relative;
+}
+
+.rowLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+/* Phone card. It is an <a> now (was a div+onClick) — kill the UA link styling;
+   every child sets its own colour, so `inherit` is belt-and-braces. */
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -154,6 +183,8 @@
   border-radius: var(--radius);
   text-align: left;
   cursor: pointer;
+  color: inherit;
+  text-decoration: none;
 }
 
 .rowDeactivated {
