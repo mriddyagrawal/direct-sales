@@ -7027,3 +7027,68 @@ A union with `never` makes "one or the other, never both" a compile error. That 
 **What I tried:** Read `RetailerList.tsx` and its stylesheet in full; checked `.row` for `align-items` (baseline, not center) and `.body` for `min-width: 0`; checked `.content` for the width cap; verified the line-2 condition against the spec's `area || !verified`; measured `PickRetailer` before/after from `eaa4ea0^` (200 → 160) and grepped it for every piece of the extracted logic to confirm no duplicate survived; scripted used-vs-defined CSS class comparison on both files (20 refs, 0 dangling) and a reverse check for orphaned rules (none); confirmed `src/app/dashboard/retailers/` is untouched; `tsc` (0), `eslint src` (0), `npm run build` (clean).
 
 **Open flags (cumulative):** 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending a conversation). Closed this session by owner ruling: 🟡 ㊿, 🟡 55, 🟡 69.
+
+---
+
+## Review of 5bf4fa7 — style(retailers): shrink the NEW tag on the shared retailer row
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Owner note on the picker screenshot — the NEW tag reads too big and too thick. 10px → 9px, padding `2px 6px` → `1px 5px`.
+
+**The commit's factual claim is the part worth checking, and it holds exactly.** It says every *other* NEW badge in the app is filled amber at 9px/700 with `2px 6px` padding, so 9px is not an arbitrary shrink but the existing standard. Verified across all four stylesheets that define one:
+
+| | |
+|---|---|
+| `RetailersQueue.module.css .newBadge` | 9px / 700 / `2px 6px` / filled amber |
+| `OrdersView.module.css .newBadge` | 9px / 700 / `2px 6px` / filled amber |
+| `OrderDetailView.module.css .newBadge` | 9px / 700 / `2px 6px` / filled amber |
+| `RetailerList.module.css .newTag` | now 9px / 700 / `1px 5px` / **outlined** |
+
+So the type size is now uniform across all four, and this row's outline is the only remaining difference — which the commit keeps deliberately, with a reason: an outline is the lighter of the two treatments and lighter was the ask, and it sits beside grey 12px area text on line 2 rather than against a heading, where a solid amber block would out-shout the line it belongs to. That is a considered choice rather than an inconsistency left lying around.
+
+**Checking whether it was a shared standard before changing it** is the right instinct and is what stops a one-screen tweak silently forking a convention. `PickRetailer.module.css` no longer defines `.newTag` at all — correctly retired in `eaa4ea0` rather than orphaned.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Presentation only; no data, RLS, money or state-machine surface. **Mobile** — the only surface this renders on today.
+
+**What I tried:** Enumerated every `.newBadge`/`.newTag` definition in `src/**/*.css` and compared font-size, weight, padding, fill and border (table above); confirmed `PickRetailer.module.css` retains no `.newTag`; `tsc --noEmit` (0), `eslint src` (0).
+
+---
+
+## Review of c4c9172 — feat(retailers): drop the "No area/phone on file" placeholder from the phone cards
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Owner decision — a placeholder shown on 97% of cards is texture, not information. Render the meta line only when there is something real in it.
+
+**Every number in the commit message is exact.** It cites 604 of 623 shops and 19 that matter; I re-queried prod and got precisely that:
+
+```
+all_retailers 623 · placeholder_would_show 604 · real_meta 19
+```
+
+Worth noting for the record that my own review of this decision quoted 622/604/18 a few hours earlier. That is **not drift** — a retailer was added in between. Both figures were correct when taken.
+
+**It handles all three shapes of the line, which is the thing to get right here.** The owner made the point explicitly: the second line is area *and* phone, and though they currently arrive together, either may appear alone in future. `[r.area, r.phone].filter(Boolean).join(" · ")` already covered that, and the new guard keys on the joined result rather than on `area`:
+
+```jsx
+const meta = [r.area, r.phone].filter(Boolean).join(" · ");
+…
+{meta && <p className={styles.rowMeta}>{meta}</p>}
+```
+
+So area-only, phone-only and both all render; only genuinely-empty suppresses the line. Measured today: **14 have both, 5 area-only, 0 phone-only** — so the phone-only branch is unexercised in production but correctly written for the day it is not.
+
+**No reserved height, no vertical centring** — the card shrinks to one line, which was the point. Reserving whitespace for nothing is the thing being removed, and on a 623-row list the density is the whole win.
+
+**The removed string survives only in the explanatory comment** (`:251`), not in any render path — checked, single occurrence.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **RLS / money / state machine** — untouched. **Mobile** — this is the phone-card branch specifically, and the desktop table is unaffected. **Consistency** — this now matches `RetailerList`'s own line-2 rule, so the picker, the coming Retailers tab and the office cards all read the same way, which was the stated reason for doing it in this run rather than later.
+
+**What I tried:** Read the diff; re-queried prod for the exact counts (623 / 604 / 19 — matching the message) plus the area-only, phone-only and both splits to confirm the guard covers all three; grepped for any surviving render path using the old string (comment only); `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending a conversation).
