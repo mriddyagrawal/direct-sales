@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
+import { ChevronLeft, Pencil } from "lucide-react";
 import { BackLink } from "@/components/BackLink";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { RetailerModal } from "../RetailerModal";
 import type { RetailerRow } from "../page";
+import back from "@/components/ui/back.module.css";
 import styles from "./RetailerDetail.module.css";
 
 // The edit entry point moved HERE from the row click (spec 2026-08-01).
@@ -48,7 +49,7 @@ export function RetailerDetail({
 
   return (
     <div className={styles.page}>
-      <div className={styles.backRow}>
+      <div className={back.row}>
         {/* CONTEXTUAL back, and the label is why that is sound: reduced to the
             bare word "Back", the arrow promises no particular screen, so
             "return to where you came from" cannot break a promise. The
@@ -57,13 +58,12 @@ export function RetailerDetail({
             back would dump them on the retailers list every time.
             `href` stays the lens default so SSR, cmd-click and no-JS still
             land somewhere real; the salesman has no retailers list, so his is
-            the salesman home. */}
-        <BackLink
-          contextual
-          fallback={isStaff ? "/dashboard/retailers" : "/"}
-          className={styles.breadcrumb}
-        >
-          ‹ Back
+            the salesman home.
+            Chrome comes from the SHARED back stylesheet — identical glyph,
+            size and placement to order detail (owner 2026-08-01). */}
+        <BackLink contextual fallback={isStaff ? "/dashboard/retailers" : "/"} className={back.link}>
+          <Glyph icon={ChevronLeft} />
+          <span className={back.label}>Back</span>
         </BackLink>
         {/* Tones match the queue's badges: amber NEW, accent NOT SYNCED, grey
             DEACTIVATED — same signal, same colour, two surfaces. */}

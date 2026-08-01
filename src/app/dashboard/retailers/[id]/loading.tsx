@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/Skeleton";
+import back from "@/components/ui/back.module.css";
 import styles from "./RetailerDetail.module.css";
 
 // Retailer detail loading boundary.
@@ -21,10 +22,13 @@ import styles from "./RetailerDetail.module.css";
 export default function Loading() {
   return (
     <div className={styles.page}>
-      <div className={styles.backRow}>
-        {/* Sized for the real label, which is now the bare word "Back"
-            (‹ Back), not the old "‹ Retailers". */}
-        <Skeleton width={48} height={13} />
+      {/* Same shared band the real page uses, so the 24px floor and the
+          headline's compensating pull-up apply here too — the skeleton must
+          occupy the real layout or the title jumps when content lands. */}
+      <div className={back.row}>
+        {/* Sized for the real affordance: an 18px chevron + the word "Back"
+            in 17px mono, not the old 12px "‹ Retailers". */}
+        <Skeleton width={66} height={18} />
       </div>
       <div className={styles.headRow}>
         <Skeleton width="min(340px, 70%)" height={26} />

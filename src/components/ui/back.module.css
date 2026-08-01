@@ -1,0 +1,57 @@
+/* THE back eyebrow — one definition, every detail page.
+   Order detail set this shape (orders-ui spec §3: a chevron glyph + a mono
+   label on the left, the page's status on the right) and retailer detail had
+   grown a second, smaller copy of the idea: 12px grey text reading
+   "‹ Retailers", no glyph. Owner 2026-08-01: the two must look identical.
+   Sharing the STYLESHEET is how this project fixed the same problem for
+   tables and FABs — four drifted copies each — so there is no third copy to
+   drift here either.
+
+   Import as `back` alongside the page's own module:
+     <div className={back.row}>
+       <BackLink className={back.link}><Glyph icon={ChevronLeft} />
+         <span className={back.label}>Back</span></BackLink>
+       …whatever the page pins to the right…
+     </div> */
+
+/* The band. min-height is load-bearing: order detail always has a StatusTag
+   here (~23px) while retailer detail's badges are conditional, so without a
+   floor the retailer headline shifted down ~7px on any shop that happened to
+   carry a badge. Fixed height = the headline lands in the same place on every
+   shop, and on both pages. */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+/* The link itself is the small grey part — it sizes the CHEVRON, which
+   inherits currentColor and the font metrics around it. */
+.link {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-figures);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-locked);
+  text-decoration: none;
+}
+
+/* The label is the loud part — ink, 17px mono. On order detail it is the
+   order ref; on retailer detail it is the bare word "Back". */
+.label {
+  font-family: var(--font-figures);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* Desktop affordance only — the phone has no hover, which is why nothing
+   load-bearing may live here. */
+.link:hover .label {
+  color: var(--color-accent);
+}

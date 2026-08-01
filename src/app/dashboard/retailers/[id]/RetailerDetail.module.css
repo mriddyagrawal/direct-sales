@@ -1,27 +1,16 @@
+/* gap matches order detail's .page exactly (16px, not the old 14px) — the two
+   screens stack the same way, so their headlines land on the same y. See
+   .headRow for the rest of that arithmetic. */
 .page {
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
-.backRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.breadcrumb {
-  font-family: var(--font-figures);
-  font-size: 12px;
-  color: var(--color-locked);
-  text-decoration: none;
-}
-
-.breadcrumb:hover {
-  color: var(--color-accent);
-}
+/* `.backRow` and `.breadcrumb` lived here. Both are back.module.css now,
+   shared with order detail (owner 2026-08-01: same glyph, same font, same
+   size, same placement, phone and desktop). */
 
 .tags {
   display: flex;
@@ -29,11 +18,31 @@
   gap: 6px;
 }
 
+/* The shop name must land on the SAME y as the shop name on order detail
+   (owner 2026-08-01 — it already did, by coincidence, and the coincidence
+   broke the moment the back eyebrow above grew to match order detail's).
+   Made deliberate, in two parts:
+
+   min-height  the Edit button is 48px (--touch-target-min), so THIS row is
+               48px on the staff lens. The salesman lens has no Edit button
+               and would collapse to the title's own ~27px line box, putting
+               his headline 10px higher than everyone else's. Pinning the
+               floor means one band height for both lenses.
+
+   margin-top  a 48px row centres its title 24px down from its own top; order
+               detail's hero centres its first line at ~13.5px (half a 21px
+               line box). Everything above is now identical — 16px padding,
+               a 24px back band, a 16px gap — so pulling this row up by the
+               ~10px difference lands the two headlines together.
+               If either the touch target or the name type scale changes, this
+               number is what has to be re-derived. */
 .headRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 10px;
+  min-height: var(--touch-target-min);
+  margin-top: -10px;
 }
 
 .title {

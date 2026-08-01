@@ -5,13 +5,8 @@
   gap: 16px;
 }
 
-.breadcrumb {
-  font-family: var(--font-figures);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--color-locked);
-}
+/* `.breadcrumb` lived here; it is `back.module.css` now — shared with retailer
+   detail so the two back eyebrows cannot drift (owner 2026-08-01). */
 
 .header {
   display: flex;
@@ -435,25 +430,7 @@
 }
 
 /* Orders-UI revamp (spec §3): back-eyebrow + retailer hero + action rows. */
-.backRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.backRow .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.backRef {
-  font-family: var(--font-figures);
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--color-ink);
-}
+/* `.backRow` / `.backRef` lived here — both moved to back.module.css. */
 
 .hero {
   display: flex;
@@ -461,34 +438,34 @@
   gap: 3px;
 }
 
+/* The page headline. It was a one-off 22px/700; it now reads the same tokens
+   every other page title uses (21px/700), so the order's shop name and the
+   retailer page's shop name are the same size — owner 2026-08-01, they sit at
+   the same place on the two screens and the 1px size gap was the only tell. */
 .heroRetailer {
   font-family: var(--font-structure);
-  font-size: 22px;
-  font-weight: 700;
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
   color: var(--color-ink);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* The hero name links to the shop (2026-08-01). It keeps the headline's ink
-   and weight — it is the headline first and a link second — so the whole
-   affordance rides on the underline.
-
-   That underline is PERSISTENT, not hover-only: the phone has no hover, and a
-   tappable headline with no visible cue is a link nobody ever finds. Same
-   reason .parentLink above is underlined; only the colour differs, because
-   that one points at another order and this one IS the heading. Hairline
-   underline so it reads as a quiet affordance, accent on hover. */
+/* The hero name links to the shop (2026-08-01). NO underline — owner call,
+   2026-08-01: the headline reads as a headline, and the grey rule under it
+   made the page look marked-up rather than clean.
+   Accepted cost, stated so nobody "fixes" it back: on the phone there is now
+   NO visual cue that the name is tappable, because there is no hover to carry
+   one. Discovery is by trying it, or from the retailer page it lands on. The
+   hover tint below is desktop-only by nature and cannot be the affordance. */
 .heroRetailerLink {
   color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--color-hairline);
-  text-underline-offset: 4px;
+  text-decoration: none;
 }
 
 .heroRetailerLink:hover {
-  text-decoration-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .heroMeta {
