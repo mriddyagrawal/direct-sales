@@ -6446,3 +6446,35 @@ The shared base is the **union** of what two element types need, and every added
 **What I tried:** Diffed `.titleActions` before and after (`display: flex`, 1 mention, no breakpoint → `display: none` + a 768px override); confirmed by line number that the override follows the base rather than preceding it; grepped the module for any local FAB rule (none) and the JSX for the shared import; checked `typeof lucide.UserRoundPlus` at runtime; compared `padding-bottom` across all five FAB-bearing modules; `tsc` (0), `eslint src` (0).
 
 **Open flags (cumulative):** new 🟡 63. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 (owner deferred), 🟡 61, 🟡 62. **No blocking items.**
+
+---
+
+## Review of 249ec6d — fix(ui): reserve room for the phone FAB on Products, Retailers and Users
+
+**Verdict:** ✅ — 🟡 63 **CLOSED**
+
+**Phase / commit goal:** Owner's call on flag 63 — three pages showed a phone FAB over content that reserved no room for it, so the last row could sit underneath.
+
+**What works:** All five FAB-bearing pages now agree:
+
+```
+OrdersView       base padding-bottom: 96px   desktop reset ✓
+DepositsView     base padding-bottom: 96px   desktop reset ✓
+ProductsPricing  base padding-bottom: 96px   desktop reset ✓
+RetailersQueue   base padding-bottom: 96px   desktop reset ✓
+UsersAdmin       base padding-bottom: 96px   desktop reset ✓
+```
+
+96px is the right figure and it transfers because the three pages share the shell, not because it was copied. On phone the tab bar is a **static flex child** (only `.main` scrolls), so it holds the bottom 70px; the FAB is fixed at `bottom: 86px` with a 48px min-height, spanning 86→134px from the viewport bottom — **64px above the bar's top**. 96px leaves 32px of breathing room over that, which is what Orders was tuned to.
+
+**Desktop needs no separate rule**, and this is the neat part: all three already carry `padding: 24px` in their 768px block, and the **shorthand resets `padding-bottom` automatically**. So the clearance cannot leave dead space on desktop, where two of the three hide the FAB anyway. CSS only, 24 insertions, no markup. `tsc` and `eslint src` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** phone-layout only; owner-final territory, and this was an explicit owner instruction. No data, RLS, money or state-machine surface.
+
+**What I tried:** Compared `padding-bottom` and the desktop reset across all five FAB-bearing modules; re-derived 96px from the shell geometry (70px static tab bar, FAB at `bottom: 86px` with 48px min-height) rather than accepting it as a copy; `tsc` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 63 ✅ CLOSED. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 (folded into the 61 spec — Edit hides by role, no route guard), 🟡 61 (specced, not built), 🟡 62. **No blocking items.**
