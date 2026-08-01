@@ -59,6 +59,13 @@
   margin-left: auto;
 }
 
+/* The skeleton's Edit placeholder. It needs its own class because Skeleton
+   renders a <div>, so the `button` rule above does not reach it and the bar
+   would sit against the title instead of hard right. */
+.headRowAction {
+  margin-left: auto;
+}
+
 /* Label-over-value facts; the balance and statement land under these next. */
 .facts {
   display: flex;
