@@ -6278,3 +6278,80 @@ The two route files run the **same query** and differ in two things only: the `r
 **Recommendation: fold both into the balance task's first commit**, which is the task that gives a salesman any reason to be on that page.
 
 **Open after this:** 🟡 ㊿ (owner-accepted), 🟡 51 (step 7), 🟡 55, 🟡 56, 🟡 59, 🟡 61. No blocking items.
+
+---
+
+## Review of 8189b64 — fix(skeletons): order-detail fallback was a narrow centred column with a row running off-screen
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Fix two pre-existing faults the owner caught on a desktop screenshot — the order-detail skeleton painting as a narrow floating strip, and its action row overflowing the window.
+
+**What works — every claim independently verified:**
+
+- `OrderDetailView.module.css`'s `.page` really has **no `max-width`** (padding, flex, gap only), so the skeleton's hardcoded `maxWidth: 720, margin: "0 auto"` never matched the page it stands in for. The real page snapped out to full width the moment content arrived.
+- The overflow diagnosis is exactly right and generalises: `Skeleton`'s `width` prop **defaults to `"100%"`**, so two bare `<Skeleton/>` in a flex row each demand the whole container — 200% of it — and the second is clipped. `calc(50% - 4px)` each absorbs the 8px gap precisely.
+- The sweep found the same trap in `app/products/loading.tsx` (`width="38%"` beside a bare sibling = 138% + gap) and fixed it.
+
+**I re-ran that sweep independently** across every `*.tsx` containing `<Skeleton`. One hit came back — `products/loading.tsx` again — and it is a **false positive of my own heuristic**: the enclosing div is `flexDirection: "column"`, where a bare 100% is correct and nothing competes horizontally. Their fix is complete.
+
+The commit's explanation of *why it surfaced only now* is also correct and worth keeping: the order-row prefetch (b4e8724) made the loading boundary actually paint on click. Before that the old screen sat through the round-trip and the skeleton was rarely seen. That is the **fourth** time this run that "never ran" has been indistinguishable from "works" — after the dead `.mono`, the dead `.numeric` headers, and the dead `.cancelAction` override.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **62 `PickSkeleton` carries the identical bug and was flagged, not fixed.** `PickSkeleton.tsx:8` still has `maxWidth: 720, margin: "0 auto"`. I checked what it stands in for: `godown/[id]/loading.tsx` and `scan/[id]/loading.tsx`, both rendering `PickScreen`, whose `pick.module.css` has **no max-width or centring**. So it is wrong for the same reason and by the same amount. Flagging rather than fixing was the right call inside a commit scoped to order detail — but it is a one-line change and the diagnosis is already done.
+
+**Domain / correctness checks:** presentation only; no data, RLS, money or state-machine surface.
+
+**What I tried:** Read `.page` in `OrderDetailView.module.css` (no max-width, confirmed); read the diff; scripted an independent sweep for multiple `<Skeleton>` in a flex row lacking explicit widths and hand-checked the single hit; traced `PickSkeleton`'s two consumers to `PickScreen` and checked `pick.module.css` for a width cap (none).
+
+**Open flags (cumulative):** new 🟡 62.
+
+---
+
+## Review of ed8d30e — feat(retailers): show each shop's outstanding balance — table column + card, colour-coded
+
+**Verdict:** ✅
+
+**Phase / commit goal:** The owner's original ask — put each shop's outstanding on the retailers list, desktop column and phone card.
+
+**What works:**
+
+- **The commit's live-data claim is exact.** It states 244 owe, 325 square, 28 in credit, 2 unsynced; queried against prod: `244 · 325 · 28 · 2`, 599 active. All four states genuinely occur, so all four render paths are exercised by real data rather than assumed.
+- **Money math holds.** `formatRupees` does `Math.round(paise / 100)` into `Intl.NumberFormat("en-IN", { style: "currency" })`. No raw paise reach the screen — the standing rule.
+- **NULL stays distinct from zero.** `outstanding_paise === null` → an em dash, **uncoloured**. Neither red nor green is a claim anyone can make about a shop Tally never matched, and the comment says exactly that. This is the rule the ledger spec cares most about and the one easiest to lose.
+- **The credit case is right, and it is the subtle one.** The test is `<= 0`, not `< 0` vs `> 0` — so the 28 shops holding an advance read green alongside the square ones. A naive `< 0 = red` would have painted your **prepaid** customers as the worst debtors on the page.
+- **One helper feeds both surfaces**, so the table and the cards cannot drift — the same reasoning as the shared table grammar.
+- Colour is binary, never a threshold, so the dropped credit-limit tiers cannot creep back as a "bigger debt = redder" scale.
+- No dangling class references: every `styles.*` in the file resolves, and no CSS rule is unused. Worth noting because a mid-flight version referenced `amtSquare`/`amtCredit` against a CSS defining `amtClear`/`amtNone` — caught and fixed before committing. **`tsc` cannot catch that class**, as my own skeleton draft proved.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — paise → rupees, en-IN, verified at source. **Data honesty** — NULL ≠ 0 preserved on both surfaces. **RLS** — no new read; `outstanding_paise` was already in the shared `["retailers"]` superset.
+
+**What I tried:** Queried prod for the four-state breakdown and compared to the commit message; read `outstanding()` and `formatRupees`; scripted a used-vs-defined comparison of every `styles.*` class against the module.
+
+---
+
+## REVIEWER-authored commits on this branch — awaiting the BUILDER's review
+
+The owner asked me to write several fixes directly rather than spec them. Recording them here so they are not mistaken for reviewed work: **I have not reviewed these, and should not.**
+
+| sha | what |
+|---|---|
+| `4ffab0b` | spec amendment — step 4 became a local scoping fix after the builder's pushback |
+| `dfd61b4` | flag 58, first attempt — `position: relative` moved to the `<td>`. **Did not work** |
+| `b262529` | flag 58, second attempt — overlay removed entirely. Owner-confirmed working |
+| `ed1d661` | selection guard + the detail route's `loading.tsx` |
+| `37f91a2` | flag 60 — `.cancelAction`'s dead phone override |
+| `a1ee50e` | `?next=` deep-link survival through login, with `safeNext()` open-redirect guard |
+
+**Where a reviewer should look hardest:**
+
+- `a1ee50e`'s `safeNext()` is the only security-bearing code in the set. It is an allow-list and I tested 11 cases, but an open redirect is exactly the kind of thing that looks fine until someone finds the shape you did not think of.
+- `dfd61b4` shipped a fix that did not work, and I only learned that from the owner. Worth understanding why my reasoning was wrong before trusting the second attempt's reasoning.
+- `ed1d661`'s skeleton used **four invented CSS class names** in its first draft and `tsc` passed clean, because CSS-module keys are not typed. I caught it by grepping the stylesheet, not by compiling. Assume that check has not been done anywhere else in my commits.
