@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { createClient } from "@/lib/supabase/client";
 import { fetchRetailers, type RetailerRow } from "@/lib/queries/retailers";
+import { formatRupees } from "@/lib/format";
 import Link from "next/link";
 import { RetailerModal } from "./RetailerModal";
 import table from "@/components/ui/table.module.css";
@@ -19,6 +20,24 @@ type FilterTab = "all" | "pending" | "notSynced" | "verified" | "deactivated";
 // Deactivated shops are excluded — nobody is chasing those. NULL is the only
 // signal that means "missed"; 0 is a real, square balance.
 const isNotSynced = (r: RetailerRow) => r.active && r.outstanding_paise === null;
+
+// ONE definition of how a balance reads, so the table and the phone cards can
+// never disagree. POSITIVE means the shop owes us (set by the nightly sync).
+//
+// Owner 2026-08-01: red when they owe, green when they don't, an em dash when
+// we don't know. Note this is a BINARY state test, not a threshold — colour
+// never depends on HOW much is owed, so it does not reintroduce the
+// credit-limit tiers that were deliberately dropped on 2026-07-31.
+//
+// NULL is "not in the last sync" and must NEVER render as ₹0 — 0 is a real,
+// square balance and gets the green ₹0. Hence the dash, uncoloured: red or
+// green would both be claims we cannot make about an unsynced shop.
+function outstanding(r: RetailerRow): { text: string; cls: string } {
+  if (r.outstanding_paise === null) return { text: "—", cls: styles.amtNone };
+  // ≤ 0 = nothing to chase: square, or in credit because they paid ahead.
+  if (r.outstanding_paise <= 0) return { text: formatRupees(r.outstanding_paise), cls: styles.amtClear };
+  return { text: formatRupees(r.outstanding_paise), cls: styles.amtOwed };
+}
 
 // S11 — the retailers ledger. Desktop renders the shared table grammar; phone
 // keeps its cards (owner-final). A row opens the DETAIL page (2026-08-01) —
@@ -177,6 +196,7 @@ export function RetailersQueue() {
                 <th>NAME</th>
                 <th>AREA</th>
                 <th>PHONE</th>
+                <th className={table.numeric}>OUTSTANDING</th>
                 <th>STATUS</th>
               </tr>
             </thead>
@@ -206,6 +226,13 @@ export function RetailersQueue() {
                   </td>
                   <td className={table.cellMeta}>{r.area || "—"}</td>
                   <td className={`${table.mono} ${table.cellMeta}`}>{r.phone || "—"}</td>
+                  {/* The colour lives on a SPAN, not the <td>: `.table td`
+                      sets its own `color` at (0,1,1), which a bare page-module
+                      class on the cell would lose to. The span inherits
+                      nothing that competes. */}
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    <span className={outstanding(r).cls}>{outstanding(r).text}</span>
+                  </td>
                   <td>
                     {r.active && !r.verified && <span className={styles.newBadge}>NEW</span>}
                     {isNotSynced(r) && <span className={styles.notSyncedBadge}>NOT SYNCED</span>}
@@ -239,6 +266,10 @@ export function RetailersQueue() {
                       {[r.area, r.phone].filter(Boolean).join(" · ") || "No area/phone on file"}
                     </p>
                   </div>
+                  {/* Right edge of the card, opposite the name — the same
+                      place the Orders card puts its amount, so the two lists
+                      scan the same way. */}
+                  <span className={`${styles.rowAmount} ${outstanding(r).cls}`}>{outstanding(r).text}</span>
                 </Link>
               );
             })}

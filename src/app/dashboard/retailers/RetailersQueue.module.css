@@ -228,6 +228,32 @@
   color: var(--color-locked);
 }
 
+/* Phone card amount — mirrors the Orders card's amount: mono, a step larger
+   than the meta line, pinned to the card's right edge and never shrinking. */
+.rowAmount {
+  flex-shrink: 0;
+  font-family: var(--font-figures);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Balance states (owner 2026-08-01). Binary, never threshold-based — the
+   credit-limit tiers were dropped on purpose and must not creep back in as a
+   "large amount = redder" scale. */
+.amtOwed {
+  color: var(--color-error);
+}
+
+.amtClear {
+  color: var(--color-processed);
+}
+
+/* Not in the last sync: an em dash, deliberately UNcoloured — red and green
+   would each be a claim we cannot make about a shop Tally never matched. */
+.amtNone {
+  color: var(--color-locked);
+}
+
 .newBadge {
   padding: 2px 6px;
   background: var(--color-amber);
