@@ -6843,3 +6843,30 @@ Recorded so the trade-off is written down with its numbers instead of being re-d
 **What I tried:** Read `pick.module.css` in full and compared all seven mirrored rules number-by-number against the new inline styles (table above); confirmed `--touch-target-min` is 48px; traced the 64px row to `.lineHead`'s `min-height` + `8px 0` padding rather than to `.line`; confirmed `body` paints `--color-paper` in `globals.css:62–68`, which is what makes the omitted background correct; queried prod for the scan-vs-no-scan order split behind 🟡 69 (91 / 101); `tsc --noEmit` (0), `eslint src` (0), `npm run build` (clean).
 
 **Open flags (cumulative):** **CLOSED: 🟡 62.** New: 🟡 69. Still open: 🟡 56, 🟡 64 (owner deciding the replacement affordance), 🟡 68 (owner-deferred). Previously closed by owner ruling: 🟡 ㊿, 🟡 55.
+
+---
+
+## Owner ruling 2026-08-01 — 🟡 69 CLOSED
+
+**🟡 69 CLOSED — WON'T FIX.** The phantom camera block in `PickSkeleton`: it
+always draws a 280px capture area, but `PickScreen` only mounts a scanner when
+`requiresScan && !allScanned`, so on a fixed-brand pick (or an LG pick already
+fully scanned) the block vanishes on load and the lines jump up ~292px.
+
+Owner 2026-08-01, after being shown the corrected framing — it is not
+route-dependent, both `/godown/[id]` and `/scan/[id]` share the skeleton, and it
+turns on which ORDER is opened — ruled it not worth fixing: **"i dont care."**
+
+That is a reasonable call and the record should say why rather than just that it
+was dropped. The block is a sub-second flash during a load; the split is 91
+scan-required orders against 101 not, so there is no majority to serve; and
+because a loading boundary cannot fetch, the only alternative is being wrong by
+the same ~292px in the opposite direction for the other half. There is no
+version of this that is right for everyone.
+
+Do not reopen unless the loading boundary gains a way to know the brand — e.g.
+the brand appearing in the route segment — which would change the constraint
+rather than the taste.
+
+**Open after this:** 🟡 56, 🟡 64 (owner deciding the replacement affordance),
+🟡 68 (owner-deferred).
