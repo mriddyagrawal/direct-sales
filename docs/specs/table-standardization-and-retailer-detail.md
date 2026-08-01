@@ -224,7 +224,8 @@ this step — styles only.
 
 ## Step 6 in detail
 
-**Keep the phone cards exactly as they are.** Phone layouts are owner-final.
+**Keep the phone cards exactly as they are** — this task is a desktop table.
+See the phone rule under Constraints: settled is not the same as untouchable.
 
 **Add the desktop table** using the shared grammar, mirroring the columns the
 cards already show. The badges (`NEW` / `NOT SYNCED` / `DEACTIVATED`) currently

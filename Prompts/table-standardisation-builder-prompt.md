@@ -85,7 +85,25 @@ a 404 and nobody can test the step.
   need a migration, stop and ask the owner.
 - Money is stored in **paise**. Nothing in this task renders an amount, but if
   that changes: convert to rupees and format `en-IN`, never show raw paise.
-- **Phone layouts are owner-final.** Keep the Retailers phone cards as they are.
+- **Phone: settled is not the same as untouchable.** (Owner 2026-08-01, correcting
+  a rule the REVIEWER had inflated.) What was actually decided is narrow: the
+  **Orders** phone layout — sticky chips, tuned padding — is an owner decision
+  and is not to be redesigned. That got restated slightly wider across several
+  documents until it read as "never change a phone screen", and it cost a real
+  hesitation on a real bug: flag 63, where the last row sat underneath the FAB
+  on three pages, was left unfixed on those grounds until the owner overrode it.
+
+  The rule to work to:
+  - **A phone bug is a bug.** Fix it. Nothing about the phone is exempt from
+    correctness.
+  - **Desktop work must not change the phone as a side effect.** Touching a
+    desktop table should leave the phone cards byte-identical unless you meant
+    otherwise.
+  - **But a desktop change usually HAS a phone counterpart.** Decide about it
+    deliberately and say what you decided. "Desktop-only" is a choice to state,
+    not a default to assume.
+
+  For this task that still means: keep the Retailers phone cards as they are.
 - Deposits' table is **out of scope** — it is a deliberately different object.
 
 ## One thing that will look wrong on localhost and is not

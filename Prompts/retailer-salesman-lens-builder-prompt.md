@@ -81,7 +81,23 @@ Check this before designing the link, not after.
 - Money is stored in **paise**. Use `formatRupees` (en-IN); never render raw
   paise. `outstanding_paise === null` must read **"not in the last sync"**,
   never ₹0 — 0 is a real, square balance and the two are different facts.
-- **Phone layouts are owner-final.**
+- **Phone: settled is not the same as untouchable.** (Owner 2026-08-01, correcting
+  a rule the REVIEWER had inflated.) What was actually decided is narrow: the
+  **Orders** phone layout — sticky chips, tuned padding — is an owner decision
+  and is not to be redesigned. That got restated slightly wider across several
+  documents until it read as "never change a phone screen", and it cost a real
+  hesitation on a real bug: flag 63, where the last row sat underneath the FAB
+  on three pages, was left unfixed on those grounds until the owner overrode it.
+
+  The rule to work to:
+  - **A phone bug is a bug.** Fix it. Nothing about the phone is exempt from
+    correctness.
+  - **Desktop work must not change the phone as a side effect.** Touching a
+    desktop table should leave the phone cards byte-identical unless you meant
+    otherwise.
+  - **But a desktop change usually HAS a phone counterpart.** Decide about it
+    deliberately and say what you decided. "Desktop-only" is a choice to state,
+    not a default to assume.
 - Reuse `src/components/ui/table.module.css` and `fab.module.css` if either is
   needed; do not start a new copy. Four table copies and four FAB copies were
   just consolidated, and every one had drifted.
