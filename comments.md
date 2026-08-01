@@ -6124,3 +6124,34 @@ The flag-57 pin does the job it needs to do — it names the exact tempting dele
 **Open flags (cumulative):** new 🟡 58, 🟡 59. 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
 
 **Next-commit suggestion:** step 7 (FAB consolidation) — but 58 wants a Safari click first, since it is the only thing in this run that could be functionally broken rather than visually off.
+
+---
+
+## Review of 9bdf2e5 — fix(retailers): desktop showed BOTH the table and the cards — source-order bug
+
+**Verdict:** ✅ — and a **REVIEWER miss** recorded below
+
+**Phase / commit goal:** Fix a functional bug in step 6 that the owner found on localhost: on desktop the new table and the phone cards both rendered.
+
+**What works:** Correct diagnosis and correct fix. `.list { display: none }` sat in a media block near the top of the file while the base `.list { display: flex }` is ~90 lines below. **A media query adds no specificity**, so at an equal (0,1,0) the later base rule won the source-order tie and the cards never stepped aside. Moved into its own `@media (min-width: 768px)` block immediately after the base rule, with a comment explaining why it has to live there. CSS only, phone unaffected either way.
+
+*(Note: this landed twice as `9854352` then `9bdf2e5` — identical trees, an amend. Reviewing the surviving sha.)*
+
+**🔴 REVIEWER MISS — recording it, because the log is only worth having if it records its own failures.** I reviewed `ce69eed` as ⚠️ with two flags and did not catch this. It is a **visible, functional** bug on the page the step exists to build, and the owner found it by clicking, not me by reading.
+
+Worse, I had raised **flag 56 one step earlier** about precisely this trap — `.errorRow td` in ImportWizard winning on source order alone. I identified the class of bug in someone else's file and then failed to check the new file for it.
+
+The reason is diagnosable: I audited step 6 as a set of *rules in isolation* — is the stretched link on the right element, is `tally_ledger_name` absent from the list, does RLS hold — and never asked the whole-file question, **"are the two surfaces mutually exclusive?"** A per-rule review cannot see a source-order bug by construction.
+
+**Corrective action taken:** swept **every** `*.module.css` in the repo for the same shape — a selector whose media-query rule appears *before* its base rule — then hand-checked each hit for a shared property, since selector overlap alone is not enough.
+
+- `OrdersView .searchWrap` (media 153 / base 205) — **false positive**: media sets `width`, base sets `flex`/`min-width`/`display`. No shared property, the override survives.
+- `OrderDetailView .cancelAction` — **real, and pre-existing in a file this branch never touched**. See flag 60.
+
+**Non-blocking suggestions:**
+
+- 🟡 **60 `OrderDetailView.module.css`: the phone override on `.cancelAction` is dead.** Line 510 opens `@media (max-width: 767px)`; line 515 sets `.cancelAction { margin-left: 0 }`; line 521 — outside and after — sets `.cancelAction { margin-left: auto }`. Equal specificity, later wins, so **`margin-left: auto` applies on phone too** and Cancel is pushed to the far end of the secondaries row where the phone block wanted it flush. Same one-line fix as this commit: move the media block below the base rule. Phone layouts are owner-final, so this is worth a look before it is changed.
+
+**What I tried:** Read the diff and confirmed the media block now follows the base rule; scripted a repo-wide sweep for media-before-base selector collisions across every module; hand-verified both hits for shared properties; identified the enclosing media query for the surviving hit by line number.
+
+**Open flags (cumulative):** new 🟡 60. 🟡 58 (needs a Safari click), 🟡 59, 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54, 🟡 57 ✅ CLOSED.
