@@ -462,9 +462,32 @@
 .heroRetailerLink {
   color: inherit;
   text-decoration: none;
+  /* inline-flex so the chevron sits ON the name's line and inside the tap
+     target, rather than wrapping to its own. `align-items: center` centres an
+     18px glyph against 21px type; the 2px gap keeps it close enough to read as
+     part of the name rather than as a separate control. */
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The chevron is the AFFORDANCE, not part of the headline, so it is grey while
+   the name is ink. Lucide strokes with currentColor, which the link sets to
+   `inherit` — left alone the glyph would come out full ink and weigh as much as
+   the type, which is the "marked-up" look the underline was removed for.
+   `flex-shrink: 0` so a long shop name never squashes it. */
+.heroRetailerLink svg {
+  color: var(--color-locked);
+  flex-shrink: 0;
 }
 
 .heroRetailerLink:hover {
+  color: var(--color-accent);
+}
+
+/* The chevron follows the hover rather than staying grey — it has its own
+   colour above, so it does NOT inherit the rule on the link. */
+.heroRetailerLink:hover svg {
   color: var(--color-accent);
 }
 

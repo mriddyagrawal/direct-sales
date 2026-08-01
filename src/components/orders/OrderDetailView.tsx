@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, Truck, Undo2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Copy, Pencil, ScanBarcode, Send, Stamp, Truck, Undo2, X } from "lucide-react";
 import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -531,10 +531,24 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         <p className={styles.heroRetailer}>
           {/* The headline is the way into the shop (owner 2026-08-01). Only
               the NAME is the link — the NEW badge stays a sibling, so the
-              flex row is unchanged. */}
+              flex row is unchanged.
+
+              The chevron is the affordance (owner 2026-08-01, REVIEWER 🟡 64).
+              The underline this used to carry was removed for looking
+              marked-up, which left the name tappable with NO cue at all on a
+              phone — hover is desktop-only and cannot be one. A trailing
+              disclosure chevron cues "this goes somewhere" without touching the
+              type, and it satisfies the app's glyph rule (never icon-only) by
+              sitting beside the name that labels it.
+
+              INSIDE the link deliberately: it is part of the tap target and
+              follows the hover colour. The godown lens has no retailerHref, so
+              it renders the plain-text branch and gets no chevron — correct,
+              since there is no godown retailer page to go to. */}
           {retailerHref ? (
             <Link href={retailerHref} className={styles.heroRetailerLink}>
               {order.retailerName}
+              <Glyph icon={ChevronRight} />
             </Link>
           ) : (
             order.retailerName
