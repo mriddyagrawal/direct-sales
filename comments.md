@@ -6478,3 +6478,37 @@ UsersAdmin       base padding-bottom: 96px   desktop reset ✓
 **What I tried:** Compared `padding-bottom` and the desktop reset across all five FAB-bearing modules; re-derived 96px from the shell geometry (70px static tab bar, FAB at `bottom: 86px` with 48px min-height) rather than accepting it as a copy; `tsc` (0), `eslint src` (0).
 
 **Open flags (cumulative):** 🟡 63 ✅ CLOSED. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59 (folded into the 61 spec — Edit hides by role, no route guard), 🟡 61 (specced, not built), 🟡 62. **No blocking items.**
+
+---
+
+## Review of 28a9303 — feat(retailers): RetailerDetail takes a role prop, and back becomes contextual
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Step 1 of the salesman-lens spec — teach the component that a lens exists. No route added, nothing new rendered.
+
+**What works — I checked the two things most likely to be wrong:**
+
+**1. The hydration trap is avoided, correctly and explicitly.** `previousPathname()` is client-only module state, so a render-time read would hydrate differently from the server and surface as an intermittent wrong destination rather than a crash. The read is inside `onClick`, with a comment saying why. There is also a `previous === null` early return, so a **cold load** — an empty mirror after a hard load — falls through to the plain `<Link>`. That is the case that defeats a blind `router.back()`, and it is handled.
+
+**2. "PickScreen and OrderDetailView are byte-for-byte unchanged" is true.** `contextual` defaults to `false` and only `RetailerDetail:62` sets it. `PickScreen:195` and `OrderDetailView:509` still get strict `previous === fallback`, which is right — their arrows carry labels that name a destination, and the strict check is what keeps such a label honest.
+
+Everything else the step asked for is present and correct:
+
+- `role="staff"` from the existing route, so the staff lens is unchanged.
+- Label is the bare `‹ Back` — which is what makes `contextual` sound at all. The BackLink comment now says so, and warns against setting the flag on an arrow whose label promises a screen. That is the reasoning captured where the next person will hit it.
+- `fallback={isStaff ? "/dashboard/retailers" : "/"}` — same shape `OrderDetailView:509` already uses for its three lenses, so this follows an existing idiom rather than inventing one.
+- Edit (`:85`) and the Tally ledger row (`:44`) both gated on `isStaff`. Edit hiding for the salesman is what closes 🟡 59 — the component knows the role, no route guard involved.
+- No dangling CSS class references; `tsc` and `eslint src` both clean.
+
+**The commit is also right that the lens is not a security boundary.** `retailers_select_salesman` is `active`-only, so an inactive shop returns no row and the route 404s on its own — that is RLS, not the prop.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **RLS** — unchanged; the prop gates UI only, and the DB still refuses a salesman's UPDATE via `retailers_staff_update`. **Money** — untouched. **Mobile** — no phone surface in this commit.
+
+**What I tried:** Read the `BackLink` diff specifically for a render-time `previousPathname()` call (there is none — it is in the handler); enumerated every `<BackLink>` call site to confirm only one passes `contextual`; checked the dashboard route still passes `role="staff"`; scripted a used-vs-defined CSS class comparison for `RetailerDetail`; `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 59 will close when step 2 lands and the salesman lens has a caller. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (in progress), 🟡 62.
