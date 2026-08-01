@@ -5,16 +5,22 @@
   gap: 12px;
 }
 
+/* Same shape as Products' titleRow: wrap, baseline, and the action group
+   pushed right by its OWN auto margin rather than the parent's space-between.
+   The auto margin is what survives a third child — Products has a count
+   between the title and its buttons, and space-between would strand it in the
+   middle of the row. */
 .titleRow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 10px;
 }
 
 /* One Add entry point per form factor (Products pattern): the inline button on
    desktop, the FAB on the phone — never both, or the phone shows it twice. */
 .addDesktop {
+  margin-left: auto;
   display: none;
 }
 

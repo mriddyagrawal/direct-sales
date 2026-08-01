@@ -22,8 +22,11 @@
 
 .title {
   font-family: var(--font-structure);
-  font-size: 20px;
-  font-weight: 700;
+  /* The tokens Orders/Products/Retailers/Users all use. This page had them
+     hardcoded at 20px/700 — a pixel off everywhere else, and outside the type
+     scale, so a future token change would have skipped it. */
+  font-size: var(--text-name-size);
+  font-weight: var(--text-name-weight);
   color: var(--color-ink);
 }
 
