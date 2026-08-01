@@ -632,22 +632,27 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           (order.status === "billed" && role === "salesman")) && (
           <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="primary" />
         )}
+      {/* Mark billed removed from the Pending-scan screen (owner 2026-07-12):
+          every order must reach ready_to_bill via the godown pick first. The
+          approved→billed path stays dormant in process_order in case we
+          restore the shortcut later.
+
+          A "Waiting for the godown to scan serials." line used to sit above this
+          button; removed at the owner's request 2026-08-01. The Pending scan
+          chip in the header already says it, and it was the only status carrying
+          such a line — the others (pending_approval, ready_to_bill, billed,
+          dispatched, cancelled) never had one, so removing it makes the screen
+          consistent rather than leaving one status the odd one out. `.waitLine`
+          itself stays: the backorder provenance line below still uses it. */}
       {isStaff && order.status === "approved" && (
-        <>
-          <p className={styles.waitLine}>Waiting for the godown to scan serials.</p>
-          {/* Mark billed removed from the Pending-scan screen (owner 2026-07-12):
-              every order must reach ready_to_bill via the godown pick first. The
-              approved→billed path stays dormant in process_order in case we
-              restore the shortcut later. */}
-          <Button
-            variant="secondary"
-            loading={navPending && navTarget === `/scan/${order.id}`}
-            onClick={() => navigate(`/scan/${order.id}`)}
-          >
-            <Glyph icon={ScanBarcode} />
-            Scan
-          </Button>
-        </>
+        <Button
+          variant="secondary"
+          loading={navPending && navTarget === `/scan/${order.id}`}
+          onClick={() => navigate(`/scan/${order.id}`)}
+        >
+          <Glyph icon={ScanBarcode} />
+          Scan
+        </Button>
       )}
       {/* Backorder: the remainder split off a partial pick. Its salesman or an
           admin can edit the quantities (secondaries) then Punch it back into

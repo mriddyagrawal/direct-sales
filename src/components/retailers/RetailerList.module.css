@@ -21,9 +21,24 @@
 
    `text-decoration: none` is here because this class is worn by a <button> on
    the picker and an <a> on the Retailers tab. */
+/* NO min-height (owner 2026-08-01). It was `min-height: 48px`, the app's touch
+   target, and combined with `align-items: baseline` that produced the bug the
+   owner saw: a one-line row's content has no way to fill 48px, so the name and
+   amount sat at the TOP of the box with ~11px of dead space beneath, and a
+   one-line row measured 48px against a two-line row's 54px — six pixels apart,
+   which is why "there is almost no difference".
+
+   Sized by content now: ~37px on one line, ~54px on two. The difference is
+   visible, and there is no dead space left to top-align against.
+
+   ACCEPTED COST, owner's explicit call after being told the floor: 37px is
+   below the 48px --touch-target-min every other tappable thing in this app
+   respects. The row is full-width so only the VERTICAL target shrinks, and a
+   mis-tap here picks the wrong SHOP for an order. If that starts happening,
+   the knob is this rule's padding — 13px would put it back at ~43px — not
+   min-height, which reintroduces the dead space. */
 .row {
   width: 100%;
-  min-height: 48px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
