@@ -6783,3 +6783,63 @@ immutable and the claim misleads nobody about the code. Dropped.
 
 **Open after these:** 🟡 56, 🟡 62, 🟡 64 (owner deciding the replacement
 affordance), 🟡 68 (owner-deferred).
+
+---
+
+## Review of 062f23d — fix(pick): PickSkeleton matches PickScreen instead of jumping on load
+
+**Verdict:** ✅ — **🟡 62 CLOSED.** The fix is right, the two extra mismatches it found are real, and every number checks out. One new flag and one commit-message accuracy nit.
+
+**Phase / commit goal:** Flag 62 — the skeleton capped its width and padded its top while `PickScreen` does neither.
+
+### Every geometry claim verified against `pick.module.css`, not read
+
+I checked each number rather than trusting the list, because the whole commit is an assertion that a set of numbers match:
+
+| skeleton | `pick.module.css` | |
+|---|---|---|
+| `padding: "0 16px 96px"`, `minHeight: 100vh` | `.page:1–7` — identical, no cap, no centring | ✅ |
+| header `gap: 4`, `margin: "0 -16px"`, `padding: "8px 16px 8px 4px"`, white, 1px hairline | `.header:9–17` — identical | ✅ |
+| 48×48 back box | `.back:19–25` — `min-width`/`min-height: var(--touch-target-min)` (48px) | ✅ |
+| headInfo column, `gap: 2` | `.headInfo:32–37` — identical | ✅ |
+| camera `marginTop: 12`, `height: 280` | `.cameraWrap:57–64` — `margin: 12px 0 0`, `height: 280px` | ✅ |
+| lines `marginTop: 12`, `gap: 8`, rows `height: 64` | `.lines:130–135` + `.lineHead:149–156` (48px min-height + `8px 0` padding = 64) | ✅ |
+| submit bar fixed/0/0/0, `z-index: 20`, `gap: 12`, `padding: "12px 16px calc(12px + env(safe-area-inset-bottom))"`, white, 2px ink top | `.submitBar:255–267` — identical, including the safe-area expression | ✅ |
+
+**The "no background" decision is correct and was checked rather than assumed.** `body` in `globals.css:62–68` already paints `--color-paper`, so `.page`'s own declaration is redundant and there is nothing to flash against. Declining to copy a redundant rule — and saying why — is better than mirroring it reflexively.
+
+**The two extra findings were worth making.** The header is a full-bleed white band with a hairline and a 48px touch target (~65px tall), not two bars on bare paper; and `.submitBar` renders unconditionally, so its absence meant a heavy white band with a 2px ink rule popped in at the bottom on load. Both genuinely move on load, so fixing them inside this commit rather than filing them was the right call — the flag was "the skeleton doesn't match the screen", and these are that same defect.
+
+**Honest about what it did not do.** *"NOT visually verified — /godown/[id] and /scan/[id] need a godown login… the 'nothing shifts' check is a rendered-pixel fact and belongs to the owner."* That is the correct division: I can confirm the numbers match the stylesheet, which I have, and only a rendered screen can confirm nothing shifts.
+
+### 🟡 69 — the phantom camera block, now measured
+
+The commit says the camera approximation is *"unchanged and unfixable here"*.
+
+**"Unfixable" is right.** `.cameraWrap` only mounts for scan-required brands, and a loading boundary cannot fetch, so the route genuinely cannot know the brand before the data lands. No amount of care fixes that at the boundary.
+
+**"Unchanged" is not right** — the block went from 240px to 280px in this commit. For a pick that mounts *no* camera, the phantom block that vanishes on load therefore got **40px taller**, so that particular jump is slightly worse than before.
+
+I measured which way the trade actually falls, since the commit decided it without numbers:
+
+| | `requires_scan` | orders |
+|---|---|---|
+| LG | **true** | **91** |
+| Zebronics · Luminous · Bajaj · Other · EOL · Sargam | false | **101** |
+
+**91 vs 101 — a coin flip.** So there is no majority to favour, and both errors are the same ~292px in opposite directions: keep the block and non-scan picks jump *up*; drop it and LG picks jump *down*. Volume cannot decide this, which means it is a taste call for the owner rather than something the builder got wrong. Keeping it — sized correctly where it does exist — is a perfectly defensible resolution of a genuine tie.
+
+Recorded so the trade-off is written down with its numbers instead of being re-derived from scratch the next time someone notices the jump.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- The commit and the code comment both say *"each `.line` is a 48px touch row plus 8px of padding top and bottom"*. The composite 64px is correct, but `.line` itself is `padding: 0 12px 0` — the touch row and the vertical padding both live on its child `.lineHead`. Someone checking the claim against `.line` will find no vertical padding there and briefly doubt a number that is actually right.
+- 🟡 69 above.
+
+**Domain / correctness checks:** **RLS / money / state machine / snapshots** — untouched; presentation only, as claimed. **Mobile** — the primary surface for both these routes, and the reason the top-padding fix matters more than the width one: the 16px shove was on every screen, the width cap only on wide ones.
+
+**What I tried:** Read `pick.module.css` in full and compared all seven mirrored rules number-by-number against the new inline styles (table above); confirmed `--touch-target-min` is 48px; traced the 64px row to `.lineHead`'s `min-height` + `8px 0` padding rather than to `.line`; confirmed `body` paints `--color-paper` in `globals.css:62–68`, which is what makes the omitted background correct; queried prod for the scan-vs-no-scan order split behind 🟡 69 (91 / 101); `tsc --noEmit` (0), `eslint src` (0), `npm run build` (clean).
+
+**Open flags (cumulative):** **CLOSED: 🟡 62.** New: 🟡 69. Still open: 🟡 56, 🟡 64 (owner deciding the replacement affordance), 🟡 68 (owner-deferred). Previously closed by owner ruling: 🟡 ㊿, 🟡 55.
