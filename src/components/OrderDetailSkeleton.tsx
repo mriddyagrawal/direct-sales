@@ -19,6 +19,12 @@ export function OrderDetailSkeleton() {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <Skeleton width={140} height={22} />
         <Skeleton width={220} height={28} />
+        {/* The shop's balance line, added to the hero 2026-08-01. Without a bar
+            for it the hero grew by ~20px on arrival and the actions jumped.
+            Note it is hidden on the GODOWN lens, which shares this skeleton —
+            so godown briefly shows one bar too many. Untyped by design: this
+            component takes no role, and a prop for one bar is not worth it. */}
+        <Skeleton width={190} height={20} />
         <Skeleton width={160} height={14} />
       </div>
 

@@ -491,6 +491,41 @@
   color: var(--color-accent);
 }
 
+/* The shop's balance, on its own line under the name (owner 2026-08-01). The
+   AMOUNT is 15px figures/600 — the same weight the office phone card gives a
+   balance — so it reads a step above the grey meta line beneath it without
+   competing with the 21px shop name above it. */
+.heroBalance {
+  font-family: var(--font-figures);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* "Outstanding", "· as of 31 Jul", "not in the last sync" — the quiet parts.
+   Dropped to the meta line's size and colour so the coloured figure is the
+   only thing that carries. */
+.heroBalanceLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-locked);
+}
+
+/* Same three tones as the office ledger and the salesman's lists — one meaning
+   per colour across every surface that shows a balance. */
+.balanceOwed {
+  color: var(--color-error);
+}
+
+.balanceClear {
+  color: var(--color-processed);
+}
+
+/* Not in the last sync: UNcoloured on purpose. Red or green would each be a
+   claim we cannot make about a shop Tally never matched. */
+.balanceNone {
+  color: var(--color-locked);
+}
+
 .heroMeta {
   font-family: var(--font-structure);
   font-size: 13px;

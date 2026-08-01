@@ -10,7 +10,15 @@ import { Glyph } from "@/components/ui/Glyph";
 import { SharePdfButton } from "@/components/SharePdfButton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { getOrderStatusTag } from "@/lib/order-status";
-import { formatOrderTimestamp, formatOrderTime, formatHistoryDayHeader, formatRupees, istDateKey } from "@/lib/format";
+import {
+  formatOrderTimestamp,
+  formatOrderTime,
+  formatHistoryDayHeader,
+  formatRupees,
+  formatShortDate,
+  istDateKey,
+} from "@/lib/format";
+import { readBalance } from "@/lib/balance";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
 import { cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder, stepBackOrder } from "@/lib/order-rpcs";
@@ -118,6 +126,10 @@ export interface OrderDetailData {
   retailerArea: string | null;
   retailerPhone: string | null;
   retailerVerified: boolean;
+  // The shop's CURRENT ledger balance (nightly Tally sync), plus when that sync
+  // last matched it. Null = never matched — "not in the last sync", never ₹0.
+  retailerOutstandingPaise: number | null;
+  retailerBalanceAsOf: string | null;
   brandName: string | null;
   showModel: boolean;
   approvedAt: string | null;
@@ -319,6 +331,16 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   const retailerBase = isStaff ? "/dashboard/retailers" : isGodown ? null : "/retailers";
   const retailerHref =
     retailerBase && order.retailerId ? `${retailerBase}/${order.retailerId}` : null;
+  // The office ledger's rule, shared — red owed, green clear (₹0 and credit
+  // both), uncoloured when the sync never matched the shop. Binary, never a
+  // threshold: the colour does not depend on HOW much is owed.
+  const balance = readBalance(order.retailerOutstandingPaise);
+  const balanceClass =
+    balance.state === "unknown"
+      ? styles.balanceNone
+      : balance.state === "clear"
+        ? styles.balanceClear
+        : styles.balanceOwed;
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
     const d = (e.details ?? {}) as Record<string, unknown>;
@@ -555,6 +577,40 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           )}
           {!order.retailerVerified && <span className={styles.newBadge}>NEW</span>}
         </p>
+
+        {/* The shop's outstanding balance, directly under the name and in
+            colour (owner 2026-08-01). NOT at the right of the name, which is
+            the grammar the retailer lists use — shop names run to 44
+            characters and would squeeze it.
+
+            LABELLED, deliberately: this page already carries a big money
+            figure (the order total), so a bare amount under the shop name
+            would be read as one of the order's numbers. The label is what
+            makes it a fact about the SHOP.
+
+            "as of" is here because everything else on this page is a frozen
+            snapshot of the order, while this one number is live and moves
+            between visits. Naming the sync date stops it being misread as the
+            balance at the time of the order.
+
+            Hidden on the GODOWN lens: that is a picking screen, and what a
+            shop owes has nothing to do with putting boxes on a van. */}
+        {!isGodown && (
+          <p className={styles.heroBalance}>
+            <span className={styles.heroBalanceLabel}>Outstanding</span>{" "}
+            <span className={balanceClass}>{balance.text}</span>
+            {balance.state !== "unknown" && order.retailerBalanceAsOf && (
+              <span className={styles.heroBalanceLabel}>
+                {" "}
+                · as of {formatShortDate(order.retailerBalanceAsOf)}
+              </span>
+            )}
+            {balance.state === "unknown" && (
+              <span className={styles.heroBalanceLabel}> not in the last sync</span>
+            )}
+          </p>
+        )}
+
         {(() => {
           // Salesman gets the minimal meta; staff AND godown get the fuller
           // area · phone · salesman (godown is a read-only staff-like lens).
