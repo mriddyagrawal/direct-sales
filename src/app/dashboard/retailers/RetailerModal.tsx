@@ -116,10 +116,17 @@ export function RetailerModal({ retailer, onClose, onSaved }: RetailerModalProps
           <Field label="Area" value={area} onChange={(e) => setArea(e.target.value)} />
           <Field label="Phone" value={phone} inputMode="tel" onChange={(e) => setPhone(e.target.value)} />
 
+          {/* Name only — no area. The clash IS on the name, so the name alone
+              identifies the shop, and most shop names already end in their
+              location ("Aakash electronic Rampur"), which made appending the
+              area read as a stutter: "…Rampur · Rampur already uses this name"
+              (owner 2026-08-01). The echoed name still earns its place: the
+              match is on the NORMALISED name, so this shows the existing
+              spelling, which may differ in case or spacing from what's typed. */}
           {nameClash && (
             <p className={styles.warning}>
-              “{nameClash.name}”{nameClash.area ? ` · ${nameClash.area}` : ""} already uses this name. Two shops
-              can’t share one name — saving will be refused.
+              A shop is already named “{nameClash.name}”. Two shops can’t share one name — this save will be
+              refused.
             </p>
           )}
 
