@@ -57,12 +57,6 @@
     padding: 24px;
   }
 
-  /* Desktop shows the table (shared grammar switches itself on at 768px), so
-     the phone cards step aside — same split as Orders/Products/Users. */
-  .list {
-    display: none;
-  }
-
   .addDesktop {
     display: block;
   }
@@ -146,6 +140,17 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Desktop shows the table (the shared grammar switches itself on at 768px), so
+   the phone cards step aside — same split as Orders/Products/Users.
+   MUST sit after the .list rule above: a media query adds no specificity, so
+   when this lived higher in the file the later `display: flex` won the
+   source-order tie and BOTH the table and the cards rendered on desktop. */
+@media (min-width: 768px) {
+  .list {
+    display: none;
+  }
 }
 
 /* The stretched-link pattern (spec 2026-08-01): the anchor lives in the NAME
