@@ -6355,3 +6355,56 @@ The owner asked me to write several fixes directly rather than spec them. Record
 - `a1ee50e`'s `safeNext()` is the only security-bearing code in the set. It is an allow-list and I tested 11 cases, but an open redirect is exactly the kind of thing that looks fine until someone finds the shape you did not think of.
 - `dfd61b4` shipped a fix that did not work, and I only learned that from the owner. Worth understanding why my reasoning was wrong before trusting the second attempt's reasoning.
 - `ed1d661`'s skeleton used **four invented CSS class names** in its first draft and `tsc` passed clean, because CSS-module keys are not typed. I caught it by grepping the stylesheet, not by compiling. Assume that check has not been done anywhere else in my commits.
+
+---
+
+## Review of fc8c4a1 — refactor(ui): one FAB stylesheet for all four pages — zero copies left
+
+**Verdict:** ✅ — step 7 complete, and with it the whole run. 🟡 51 **CLOSED**
+
+**Phase / commit goal:** The last step: collapse the four FAB copies into `src/components/ui/fab.module.css`. Nothing user-visible — the FAB *bug* was fixed by hand at d5c49cf, so all four already agreed on every value; this removes the duplication that let them drift.
+
+**What works:**
+
+- **Zero page-level FAB rules remain.** `.fab` gone from OrdersView and DepositsView, `.pFab` from ProductsPricing and RetailersQueue, along with their media rules. All four now compose `fab.fab` + exactly one variant.
+- **Both deliberate desktop behaviours survive**, which was the thing most likely to be flattened: `.desktopCorner` (Orders, Deposits) moves to `right/bottom: 32px` at 768px because the FAB is the only way to start a new order or deposit at any width; `.phoneOnly` (Products, Retailers) goes `display: none` because those pages carry a real Add button in the title row and would otherwise offer the same action twice.
+- **The variants sit AFTER the base in the same file**, and the commit explains why that is deliberate: they override base properties at equal specificity (0,1,0), so only source order decides. Splitting them across two stylesheets would make the winner depend on bundle order — the exact trap that made the retailers cards render underneath the desktop table earlier in this run. The lesson from that bug was carried forward rather than merely fixed.
+- **The stale `(60px)` comment is gone** — the number the 76px offset bug was computed from.
+- `tsc` and `eslint src` clean.
+
+**I checked the "no pixels change" claim by diffing each page's OLD rule against the new shared base**, rather than accepting it. Four small differences, and all four are correct:
+
+```
+Orders, Deposits    (were <Link>/<a>)   gain  border: none, cursor: pointer
+Products, Retailers (were <button>)     gain  text-decoration: none
+```
+
+The shared base is the **union** of what two element types need, and every added property is inert on the element that did not previously carry it — an `<a href>` has no default border and already shows a pointer; a `<button>` is not underlined. So the claim holds. The `border: none; /* it is a <button> on two pages */` comment shows this was understood, not stumbled into.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None.
+
+**What I tried:** Searched every module for surviving `.fab`/`.pFab` rules (none); read both variants and confirmed each reproduces its pages' previous desktop behaviour; confirmed the variants appear after the base in source order; traced all four call sites to `base + exactly one variant`; scripted a property-by-property diff of each page's pre-commit rule against the shared base and classified every difference; `tsc` (0), `eslint src` (0); confirmed the `(60px)` comment is gone.
+
+**Open flags (cumulative):** 🟡 51 ✅ CLOSED. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 59, 🟡 61, 🟡 62. **No blocking items.**
+
+---
+
+## Run complete — all seven steps landed
+
+| step | outcome |
+|---|---|
+| 1 shared grammar + token | ✅ raised 🔴 53 before any page adopted it |
+| 2 Users | ✅ 12px header misalignment fixed |
+| 3 Products | ✅ |
+| 4 ImportWizard | ✅ **migration correctly refused** — would have hidden the import preview on phone |
+| 5 Orders | ✅ styles-only held; the mono figures returned |
+| 6 Retailers table + detail route | ✅ after 🔴 58 (Safari) and the both-surfaces bug |
+| 7 FAB consolidation | ✅ zero copies left |
+
+**Zero page-level `.table` or FAB copies remain.**
+
+**Seven bugs surfaced that predated this work** and were found only because copies were read side by side for the first time: `.mono` dead in all four tables; `.numeric` dead on ImportWizard's headers; Users' headers 12px out of line; Orders' hover trail; Cancel mispositioned on phone; the order-detail skeleton floating and overflowing; `PickSkeleton` carrying the same width bug (🟡 62, still open).
+
+**Two were found only by the owner clicking**, not by review: both surfaces rendering on desktop, and the Safari overlay. Both were functional, both invisible to reading, and both on a commit already signed off. The localhost loop earned its cost.
