@@ -6752,3 +6752,34 @@ Residual, minor and self-healing: a developer who clones and runs `npx tsc --noE
 **What I tried:** Read the corrected comment in full; confirmed `.gitignore:11` carries `next-env.d.ts`; checked for CI workflows (none); **removed `next-env.d.ts` from disk and ran `npm run build` to prove regeneration** (compiled clean, file restored by Next); confirmed `git status` is clean afterwards; `tsc --noEmit` (0), `eslint src` (0).
 
 **Open flags (cumulative):** **CLOSED: 🟡 65, 🟡 66, 🟡 67.** Still open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 62, 🟡 64 (owner-accepted — the phone affordance; owner is actively deciding the replacement), 🟡 68 (owner-deferred).
+
+---
+
+## Owner rulings 2026-08-01 — 🟡 ㊿ and 🟡 55 CLOSED
+
+Not a commit review. Recording two owner decisions so neither flag gets
+re-raised by a future sweep.
+
+**🟡 ㊿ CLOSED — WON'T FIX, by product decision.** The flag was that
+`outstanding_paise IS NULL` conflates two states: a shop the sync never matched,
+and a shop it matched where Tally returned no figure. `balance_as_of IS NOT NULL`
+would separate them.
+
+Owner 2026-08-01: **"never matched and tally sent no figure will be the same
+thing, I want it to be that way."** So the conflation is the specification, not a
+defect — both mean "we have no balance for this shop", and the office does the
+same thing about either. `balance_as_of` stays in the table; nothing needs to
+read it to tell the two apart.
+
+Re-measured in prod the same day: 599 active shops — 597 with a balance, 2 never
+matched, **0 in the middle state**. So nothing visible changes either way; this
+closes the question rather than deferring it.
+
+Do not reopen this as a "latent labelling bug". It is the intended reading.
+
+**🟡 55 CLOSED — owner: doesn't matter.** A commit-message nit ("render in
+JetBrains Mono *again*" where it was the first time). Commit messages are
+immutable and the claim misleads nobody about the code. Dropped.
+
+**Open after these:** 🟡 56, 🟡 62, 🟡 64 (owner deciding the replacement
+affordance), 🟡 68 (owner-deferred).
