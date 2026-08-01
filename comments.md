@@ -5873,3 +5873,47 @@ column, drop it as a co-equal form field. Measured 596 of 599 identical to `name
 column is what keeps a rename from silently re-pointing a shop's ledger link.
 Spec amended: the Tally name becomes a collapsed disclosure that auto-expands only
 when it differs.
+
+---
+
+## Review of 323dcb7 — feat(ui): add the shared table grammar + --text-table-head-tracking token
+
+**Verdict:** ⚠️ accept-with-followups — **fix flag 53 before step 2**
+
+**Phase / commit goal:** Step 1 of `docs/specs/table-standardization-and-retailer-detail.md` — create `src/components/ui/table.module.css` and the new token, imported by nothing, changing no pixels.
+
+**What works:** Everything the step asked for. Token is `0.06em` at `globals.css:39`, **not** a reuse of the 0.08em section-label token — the trap the spec called out. Header `font-size` moved to `var(--text-section-label-size)` (also 10px, so a genuine no-op). All three drift fixes are folded in: `padding-right: 12px` on `thead th` (Users' bug), `cellMeta` on `var(--color-locked)` (Orders' lighter hardcoded grey), and `tr.clickable:hover` at `0.05`. Two files touched, 101 insertions, **nothing imports it** and the branch is **not pushed** — both as instructed. Commit message is accurate and unusually complete; it states plainly that no pixels change, which is true.
+
+The two specificity comments are genuinely good work: the author noticed that a bare `.numeric` (0,1,0) loses to `.table thead th` (0,1,2) and scoped both it and `.cellMeta`/`.cellName` correctly.
+
+**Blocking issues (fix in the next commit, before step 2):**
+
+- 🔴 **53 `.mono` is dead inside `.table`, and this file is about to enshrine that for five tables.** Bottom of `table.module.css`:
+
+  ```css
+  .mono { font-family: var(--font-figures); }    /* (0,1,0) */
+  ```
+
+  against, twenty lines above it:
+
+  ```css
+  .table td { font-family: var(--font-structure); ... }   /* (0,1,1) */
+  ```
+
+  `.table td` wins, so `.mono` never applies to a cell. This is **the exact trap the author documented twice in this very file**, reintroduced at the bottom of it.
+
+  It is **pre-existing, not newly caused**: Orders, Products and Users all have the same bare `.mono` against the same `.table td`, so `<td className={styles.mono}>` has never rendered in JetBrains Mono on any of them — the Orders desktop table's order ref, timestamp and total are all in Space Grotesk today (`OrdersView.tsx:544,545,555`). That contradicts the design spec, which calls for mono figures on a shared right edge.
+
+  Fix is one line — scope it `.table td.mono` — and it must land **now**, while the file has no importers. After step 2 it is live on Users; by step 5 it is on Orders where it is most visible; and the new Retailers table would inherit it in step 6.
+
+**Non-blocking suggestions:**
+
+- 🟡 **54 bare `.numeric` is latent, not live.** `.table td` does not set `text-align`, so `(0,1,0)` currently wins by default and right-aligned cells do work. It breaks silently the moment anyone adds `text-align` to `.table td`. Scope it `.table td.numeric` alongside 53 for consistency with the header rule right above it.
+
+**Domain / correctness checks:** Money math — n/a here, but 53 touches how money *renders*: the totals column is one of the cells losing its mono face. Immutable snapshots / RLS / state machine — untouched.
+
+**What I tried:** Read the whole file; compared `.table td` across all three existing modules (identical, all set `font-family`); confirmed `--font-structure` = Space Grotesk and `--font-figures` = JetBrains Mono at `globals.css:23-24`, so the difference is visible not theoretical; grepped Orders for any rule that would rescue `.mono` (there is none, one bare rule at :293); confirmed `styles.mono` is used on three `<td>`s in Orders; verified no importers and that the branch is absent from origin.
+
+**Open flags (cumulative):** new 🔴 53, 🟡 54. 🟡 ㊿ open (owner-accepted). ㊾, 52 closed at d88e456. 51 folded into step 7.
+
+**Next-commit suggestion:** scope `.mono` and `.numeric` to `.table td.…` before touching Users. One line each, and it converts a five-table bug into a five-table fix at zero extra cost.
