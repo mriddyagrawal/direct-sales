@@ -7419,3 +7419,52 @@ untouched; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open after this:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending
 a conversation), 🟡 72.
+
+---
+
+## Review of b22772e — feat(orders): the shop's outstanding balance on order detail
+
+**Verdict:** ✅ — correct, well-argued, and it reuses the shared rule rather than forking it. One factual error in a comment, and a pre-existing gap it accidentally exposes.
+
+**Phase / commit goal:** Put the shop's live ledger balance on order detail, under the retailer name.
+
+### What is right, and why the reasoning matters
+
+**It uses `readBalance`.** Fourth surface, still no private copy — which is what step 1 of the retailers run was for. Red owed / green clear / uncoloured unknown, identical to the queue, the picker and the tab.
+
+**Three judgement calls that are each argued rather than assumed:**
+
+- **Labelled "Outstanding", not a bare figure.** The reasoning is exactly right: this page already carries a large money number (the order total), so an unlabelled amount under the shop name reads as one of the order's figures. The label is what makes it a fact about the *shop*.
+- **"as of" is shown.** Everything else on this page is a frozen snapshot of the order; this one number is live and moves between visits. Naming the sync date is what stops it being read as the balance *at order time* — a genuinely dangerous misreading on a page an admin uses to approve credit.
+- **Hidden on the godown lens.** "A picking screen, and what a shop owes has nothing to do with putting boxes on a van." Correct, and consistent with godown getting no retailer link either.
+
+**The query widening is minimal and its privilege claim is true.** `retailers(… outstanding_paise, balance_as_of)`, and I verified `authenticated` holds column-level SELECT on **`balance_as_of`** as well as `outstanding_paise` — the commit asserts both, and both hold. No DB work, no new privilege.
+
+**All five new CSS classes resolve**; `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+### 🟡 73 — the skeleton comment's godown claim is false, and what it points at is real
+
+The new skeleton bar carries this caveat:
+
+> *"Note it is hidden on the GODOWN lens, which shares this skeleton — so godown briefly shows one bar too many."*
+
+**Godown does not share this skeleton.** `OrderDetailSkeleton` is rendered by exactly two files — `orders/[id]/loading.tsx` and `dashboard/orders/[id]/loading.tsx`. `src/app/godown/orders/[id]/` contains **`page.tsx` and nothing else**.
+
+So the accepted cost being documented does not exist. Harmless in itself — but the comment tells a future reader that godown is served by this file, which is the sort of thing someone later relies on without rechecking.
+
+**The real finding is underneath it: the godown order-detail route has no loading boundary at all.** That matters for the reason this run has already established twice — for a dynamic route the loading boundary is *what `<Link>` prefetches*, so godown's taps into order detail warm nothing and pay full latency. Godown is the one role that opens order detail all day.
+
+Two things follow, and they are cheap:
+
+1. Fix the comment.
+2. If a `godown/orders/[id]/loading.tsx` is added, the "no role prop" argument reverses — the route knows its lens **statically**, so `<OrderDetailSkeleton role="godown" />` needs no data and no guessing. The prop is worth it the moment there is a third caller.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 73 above. Also, `retailerOutstandingPaise` now conflates two states — an unsynced shop and an embed that resolved to nothing (a deactivated shop on the salesman lens). The commit documents the choice, and it is defensible: exactly **1 of 194** orders can hit it (salesman-owned, cancelled, deactivated shop), and that order already renders "Unknown retailer" for the name, so the reader is not misled about anything material.
+
+**Domain / correctness checks:** **Money** — paise via `readBalance`/`formatRupees`; `null` renders "not in the last sync", never ₹0. **RLS** — no policy touched; the columns ride an existing embed the salesman already reads elsewhere. **Immutable snapshots** — the one place this page shows something *live* rather than frozen, and it says so on screen. **Mobile** — placed under the name rather than to its right precisely because shop names run to 44 characters.
+
+**What I tried:** Read the full diff; confirmed `readBalance` is imported and used rather than reimplemented; queried `information_schema.column_privileges` for `balance_as_of` (SELECT present for `authenticated`); checked all five new CSS classes resolve; enumerated every renderer of `OrderDetailSkeleton` (two, neither godown) and listed `src/app/godown/orders/[id]/` (page only) — the basis of 🟡 73; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 73. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (owner deferred), 🟡 72.
