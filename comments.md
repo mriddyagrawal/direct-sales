@@ -6512,3 +6512,54 @@ Everything else the step asked for is present and correct:
 **What I tried:** Read the `BackLink` diff specifically for a render-time `previousPathname()` call (there is none — it is in the handler); enumerated every `<BackLink>` call site to confirm only one passes `contextual`; checked the dashboard route still passes `role="staff"`; scripted a used-vs-defined CSS class comparison for `RetailerDetail`; `tsc --noEmit` (0), `eslint src` (0).
 
 **Open flags (cumulative):** 🟡 59 will close when step 2 lands and the salesman lens has a caller. Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (in progress), 🟡 62.
+
+---
+
+## Review of 27ca3b6 — feat(orders): the retailer name on order detail links to the shop
+
+**Verdict:** ⚠️ — the code is right and every factual claim in the message is true; the warning is entirely about **sequencing**.
+
+**Phase / commit goal:** Step 4 of the salesman-lens spec, built **before steps 2–3**. Widens `ORDER_DETAIL_SELECT` to carry the retailer id, then makes the hero name a lens-aware link.
+
+### The one issue: a knowingly-dead href
+
+`src/app/retailers/` **does not exist** — confirmed by `ls` and `git ls-files`, both empty. So for a salesman the hero name is now a link to `/retailers/<id>`, which 404s.
+
+The commit does not hide this; it says so in capitals and gives the containment argument: the branch is unpushed, so no user can reach it. That argument holds — I verified nothing is pushed. But it holds **only while the ordering does**, so I am recording it as blocking rather than as a note:
+
+> **Step 2 must be the very next commit.** No other feature may land first, and the branch must not be pushed until `/retailers/[id]` exists. This is the one state where the run going quiet leaves the salesman strictly worse off than before the commit — he had plain text, and now has a link into a 404.
+
+Building 4 before 2 was defensible on its own terms (step 1 shipped a contextual back arrow with no second way in to exercise it), and the message attributes the reordering to the owner. That attribution is outside the repo and I cannot verify it — noted, not disputed.
+
+### Every other claim checks out — I verified each against prod rather than reading
+
+| Claim in the message | Verified |
+|---|---|
+| 2 of 192 orders sit on a deactivated shop | **exact** — 192 total, 2 on inactive |
+| both cancelled | **exact** — both `status = 'cancelled'` |
+| one salesman-owned | **exact** — 1 `salesman`, 1 `admin` |
+| `retailers_select_godown` is active-only | **exact** — `role = 'godown' AND active` |
+| `retailers_select_salesman` is active-only | **exact** — `role = 'salesman' AND active` |
+| `.heroRetailerLink` present in the stylesheet | present, `:483` + `:490` |
+| `.parentLink` is the underline precedent | present and underlined, `:408–412` |
+| `tsc --noEmit` clean, `eslint src` clean | both exit 0 |
+
+**The null-retailerId path is real, not defensive padding.** Because the salesman policy is active-only, his embed on those 2 cancelled orders resolves to null, `retailerId` is null, and the name stays unlinked text. The message is also right that such an order **already** rendered "Unknown retailer" for him from the same `?? ` fallback — this commit does not introduce that, it only stops it becoming a broken link.
+
+**Staff can never get a dead link, and that is load-bearing.** `retailers_select_staff` carries **no `active` filter**, so a deactivated shop still resolves for accountant/admin, and `dashboard/retailers/[id]/page.tsx` renders it (`maybeSingle()` → row → no `notFound()`). So the staff href is safe on exactly the rows where the salesman's is null. That asymmetry is correct and falls out of RLS rather than out of a check.
+
+**The godown decision is right.** `retailerBase` is `null` for godown, so the name stays plain text. Godown *can* read active retailers, but no godown retailer page exists — linking would point at nothing. Same class of problem as the salesman href above, and here it was handled by not linking. Worth noting the inconsistency is deliberate and documented in the code, not accidental.
+
+**The query widening is minimal and correct.** `retailers(name, …)` → `retailers(id, name, …)`, the embed type gains `id: string`, `OrderDetailData` gains `retailerId: string | null`, mapped as `row.retailers?.id ?? null`. One select serves all three order-detail routes, so all three carry the id — stated in the message and true.
+
+**Blocking issues:** One, conditional — **step 2 must land next** (above). Nothing wrong with the code as written.
+
+**Non-blocking suggestions:**
+
+- `<Link>` prefetches. Until step 2 exists, the salesman's hero link warms a route that 404s. Harmless (prefetch is a no-op in dev, and the branch is unpushed), and self-resolving — recorded only so it is not mistaken for a new problem if seen in a network panel.
+
+**Domain / correctness checks:** **RLS** — no policy touched; the three `retailers` SELECT policies verified unchanged and the lens split mirrors them exactly. **Money** — untouched. **Mobile** — considered and argued in the commit: the underline is persistent rather than `:hover`-only because a phone has no hover, matching `.parentLink`. Only the name is wrapped, so the NEW badge stays a flex sibling and the hero row's geometry is unchanged. **State machine** — untouched. **Immutable snapshots** — untouched.
+
+**What I tried:** `git show --stat` + full diff; `ls` and `git ls-files` on `src/app/retailers/` (both empty — this is what makes the href dead); `pg_policies` for all three `retailers` SELECT policies; a prod count of orders on deactivated shops, split by status and by the owning profile's role; grep for `.heroRetailerLink` and `.parentLink` in the stylesheet; read `dashboard/retailers/[id]/page.tsx` to confirm staff render an inactive shop rather than 404; `tsc --noEmit` (0), `eslint src` (0).
+
+**Open flags (cumulative):** 🟡 59 still pends step 2 (the lens now has a caller, but the route it calls does not exist). Open: 🟡 ㊿ (owner-accepted), 🟡 55, 🟡 56, 🟡 61 (in progress — steps 2 and 3 remain), 🟡 62.
