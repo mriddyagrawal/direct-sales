@@ -6248,3 +6248,33 @@ Flags run ㊾ (49) → 61. **There is no 62.** No 🔴 blocking items open.
 **Two of these are decisions, not defects.** 61 wants settling *before* the balance task, not after — retrofitting a second route onto a page carrying every shop's credit position is a much worse trade than adding it while the page is four fields and an Edit button. 60 is one line in phone layout the owner has declared final, so it wants an eye rather than a patch.
 
 **Step 7 (FAB consolidation) is the only work left in this run**, and it is cosmetic: the FAB bug is already fixed, so consolidating the four copies changes no pixels.
+
+---
+
+## 🟡 60 — CLOSED at 37f91a2. And the answer to 61, recorded before it is lost.
+
+**60 closed.** `.cancelAction`'s phone override moved below its base rule. Repo-wide sweep for media-before-base collisions is now clean apart from `OrdersView .searchWrap`, hand-verified as a false positive: the media rule sets `width`, the base sets `flex`/`min-width`/`display`, so they never compete.
+
+**61 — the template already exists in this codebase, and it is not "one page with role checks".** Measured:
+
+```
+OrderDetailView.tsx        1095 lines   the entire UI, shared
+order-detail-data.ts        137 lines   ORDER_DETAIL_SELECT + toOrderDetailProps, shared
+orders/[id]/page.tsx         35 lines   salesman
+dashboard/orders/[id]/…      37 lines   staff
+```
+
+The two route files run the **same query** and differ in two things only: the `role` prop they pass, and the staff one additionally reading `profiles.role` because Approve is admin-only.
+
+**The URL is not a security boundary and must not be treated as one.** The salesman page says so itself: *"Identical query to the staff workbench — RLS scopes it to his own orders (anyone else's id → no row → 404)."* The 404 comes from RLS returning nothing into `maybeSingle()`, not from the route checking anything. What the URL actually selects is:
+
+1. **The shell.** `/dashboard/*` is wrapped by `dashboard/layout.tsx` → `DashboardNav`. Salesman routes sit under the root layout and render `BottomTabBar` themselves. This is the whole of why a salesman on `/dashboard/retailers/[id]` looks wrong today: right data, wrong chrome, no way back to their app.
+2. **A `role` prop** driving show/hide *inside* the shared component, so neither route reimplements UI.
+
+**Applied to retailers this is small**, because `RetailerDetail`, the query and the RLS scoping all exist already: a ~25-line `src/app/retailers/[id]/page.tsx` rendering the same component with a role prop, and Edit made conditional on it.
+
+**That closes 59 as a side effect** — Edit stops rendering for a salesman because the component knows the role, not because a route guard blocks the page. Exactly the mechanism Orders already uses for admin-only Approve.
+
+**Recommendation: fold both into the balance task's first commit**, which is the task that gives a salesman any reason to be on that page.
+
+**Open after this:** 🟡 ㊿ (owner-accepted), 🟡 51 (step 7), 🟡 55, 🟡 56, 🟡 59, 🟡 61. No blocking items.
