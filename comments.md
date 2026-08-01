@@ -7468,3 +7468,56 @@ Two things follow, and they are cheap:
 **What I tried:** Read the full diff; confirmed `readBalance` is imported and used rather than reimplemented; queried `information_schema.column_privileges` for `balance_as_of` (SELECT present for `authenticated`); checked all five new CSS classes resolve; enumerated every renderer of `OrderDetailSkeleton` (two, neither godown) and listed `src/app/godown/orders/[id]/` (page only) — the basis of 🟡 73; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 73. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (owner deferred), 🟡 72.
+
+---
+
+## Review of 94c73ab — refactor(orders): Dr./Cr. balance, and cut what the hero says twice
+
+**Verdict:** ✅ — every claim in the message is literally true, including the two prod figures. One consequence worth a decision.
+
+**Phase / commit goal:** Owner 2026-08-02 — the order-detail hero reads the balance in ledger terms, and stops repeating what history and the status chip already say.
+
+### The subtle detail is the one they got right
+
+`Cr.` takes the **absolute value**, because `formatRupees(-4500000)` is `-₹45,000` and *"Cr. -₹45,000"* states the opposite of what it means. That is the kind of thing that ships wrong and reads plausibly for months. Verified in the code — `balance.paise !== null && balance.paise < 0 ? \`Cr. ${formatRupees(Math.abs(balance.paise))}\`` — and the guard is explicitly null-safe rather than relying on `Math.abs(null)` being 0.
+
+**A square ₹0 gets neither word**, which is right: it is not a debit or a credit. It stays bare and green with the other nothing-to-chase balances.
+
+**Both prod figures cited are exact.** Queried: `max(outstanding_paise) = 167823400` (₹16,78,234) and `min = -50000000` (₹5,00,000 credit). The commit quotes both as its worked examples and both match to the paise.
+
+### `readBalance` gaining `paise` is the right shape
+
+The state union stays three-wide and colour stays keyed on it. Splitting `clear` into zero-vs-credit would have forced `RetailersQueue` and `RetailerList` to learn a fourth case for no benefit on those surfaces. Carrying the raw value instead lets **one** surface write finer copy without re-deriving the rule — additive, and no existing consumer changes behaviour. Confirmed from the diff: the two return statements gained `paise` and nothing else moved.
+
+### Verified rather than trusted
+
+- **Dead CSS, both directions.** All eight deleted rules (`.actions .card .header .meta .metaMono .ref .retailerName .splitRow`) return **0 references** in the component; and every `styles.*` key still referenced resolves in the stylesheet. Deleting CSS is where a module silently loses a class, so the reverse check is the one that matters.
+- **"`tallyBillNo` had exactly one render site" is true.** Two occurrences: the type declaration at `:113` and the single render at `:653`. Keeping the bill number while dropping the rest of that byline is correct — it is what the office reads back into Tally, and `describeEvent` does print "Billed by …" in HISTORY verbatim.
+- `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**The stated cost is honest**: on a phone, who billed it and when moves into HISTORY. On desktop nothing leaves the screen because `.body` goes `row` at 768px.
+
+### 🟡 74 — the wording now differs across the four surfaces
+
+`Dr.`/`Cr.` is written in `OrderDetailView.tsx:355`, not in `lib/balance.ts`. So the same shop in credit now reads:
+
+| surface | credit renders as |
+|---|---|
+| order detail | **Cr. ₹45,000** |
+| retailers queue · Quick Order picker · Retailers tab | **-₹45,000** |
+
+This is defensible as a density choice — `Dr.` on 623 list rows is noise, and colour already carries direction there. It is recorded because of what it means for an open flag:
+
+**🟡 70 is now only half closed.** That flag was raised specifically about a credit rendering as a bare `-₹45,000`, and the surface the owner cared about — the salesman's picker, where he decides whether to take an order — still shows exactly that. The 28 shops in credit read one way on the detail page and another in every list.
+
+Worth a deliberate decision rather than drift. Note the middle option: a list row could drop the minus and show `₹45,000` in green, compact and unambiguous — though that makes colour load-bearing on its own, which the minus currently hedges.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 74 above. The shared module now owns the *rule* and the *state* but not the *wording*, which is a real seam — worth a line in `balance.ts` saying so, since its comment still reads as though it is the single source of how a balance appears.
+
+**Domain / correctness checks:** **Money** — the centre of this commit and handled carefully: absolute value on the Cr. branch, ₹0 unlabelled, `null` still "not in the last sync" and never ₹0. **RLS / state machine / snapshots** — untouched. **Mobile** — the stated cost is phone-only and was measured against the 768px breakpoint rather than assumed.
+
+**What I tried:** Read the full diff; located the Dr./Cr. formatting and confirmed it is order-detail-only, then checked what the other three surfaces render (the basis of 🟡 74); queried prod for `max`/`min` `outstanding_paise` and matched both against the commit's worked examples; scripted the dead-CSS check in both directions (8 deleted → 0 refs; all remaining refs resolve); traced both `tallyBillNo` occurrences to confirm one render site; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 74. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (**half closed** — detail page done, lists unchanged), 🟡 72, 🟡 73.
