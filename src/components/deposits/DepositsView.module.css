@@ -10,6 +10,16 @@
   padding-bottom: 96px; /* room for the FAB */
 }
 
+/* House rule: 16px on the phone, 24px on desktop. The bottom stays 96px —
+   unlike Products/Retailers this page keeps its FAB on desktop, so the last
+   row still needs clearance to sit above it. */
+@media (min-width: 768px) {
+  .wrap {
+    padding: 24px;
+    padding-bottom: 96px;
+  }
+}
+
 .title {
   font-family: var(--font-structure);
   font-size: 20px;
@@ -438,7 +448,10 @@
   text-decoration: none;
 }
 
-@media (min-width: 1024px) {
+/* 768px, not 1024px: Orders moves its FAB to the desktop corner at the same
+   breakpoint every other layout switches on, and there was no reason for this
+   one to wait an extra 256px (owner 2026-08-01). */
+@media (min-width: 768px) {
   .fab {
     right: 32px;
     bottom: 32px;

@@ -40,6 +40,12 @@
 }
 
 @media (min-width: 768px) {
+  /* House rule: 16px on the phone, 24px on desktop (Orders/Products/Users all
+     do this; this page and Deposits had simply never got the override). */
+  .page {
+    padding: 24px;
+  }
+
   .addDesktop {
     display: block;
   }
