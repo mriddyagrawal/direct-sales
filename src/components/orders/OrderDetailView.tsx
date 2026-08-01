@@ -614,10 +614,7 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           <p className={styles.heroBalance}>
             <span className={balanceClass}>{balanceText}</span>
             {balance.state !== "unknown" && order.retailerBalanceAsOf && (
-              <span className={styles.heroBalanceLabel}>
-                {" "}
-                · as of {formatShortDate(order.retailerBalanceAsOf)}
-              </span>
+              <span className={styles.heroBalanceLabel}> as of {formatShortDate(order.retailerBalanceAsOf)}</span>
             )}
             {balance.state === "unknown" && (
               <span className={styles.heroBalanceLabel}> not in the last sync</span>
@@ -1042,10 +1039,18 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         </div>
 
         <div className={styles.rail}>
-          <div className={styles.notesBox}>
-            <p className={styles.notesLabel}>NOTES FROM THE FIELD</p>
-            <p className={styles.notesText}>{order.notes || "— no notes —"}</p>
-          </div>
+          {/* Rendered only when the salesman actually wrote something (owner
+              2026-08-02). It used to fall back to "— no notes —", so a labelled
+              section appeared on every order to say nothing. Now the section
+              APPEARING is the signal. Same rule the retailer cards adopted, and
+              read-only either way — this view never edits notes (the Quick
+              Order flow owns that), so nothing is hidden but the placeholder. */}
+          {order.notes.trim().length > 0 && (
+            <div className={styles.notesBox}>
+              <p className={styles.notesLabel}>NOTES FROM THE FIELD</p>
+              <p className={styles.notesText}>{order.notes}</p>
+            </div>
+          )}
 
           <div>
             <p className={styles.sectionLabel}>HISTORY</p>

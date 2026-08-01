@@ -8,11 +8,16 @@
 /* `.breadcrumb` lived here; it is `back.module.css` now — shared with retailer
    detail so the two back eyebrows cannot drift (owner 2026-08-01). */
 
+/* The bill number — the second line of the ORDER group, so it takes the hero's
+   own 3px rhythm. The old `margin-top: 2px` is gone: it dated from when this
+   line carried the whole billed byline and needed lifting off the meta line,
+   and it now only fights the grouping above. When the bill number is the
+   group's FIRST line (an order with no area, phone or salesman to show), the
+   `.heroBalance + .byline` rule gives it the 8px seam instead. */
 .byline {
   font-family: var(--font-structure);
   font-size: 12px;
   color: var(--color-locked);
-  margin-top: 2px;
 }
 
 .error {
@@ -452,13 +457,31 @@
   font-weight: 600;
 }
 
-/* "· as of 31 Jul" and "not in the last sync" — the quiet parts. A step down
-   again in size and dropped to grey, so the coloured Dr./Cr. figure is the only
-   thing on the line that carries. */
+/* "as of 31 Jul" and "not in the last sync" — the quiet parts. SAME SIZE as the
+   figure (owner 2026-08-02), separated by WEIGHT and colour alone: 400 grey
+   against the figure's 600 colour. The line previously mixed 13px, 11px and a
+   "·" separator, which is three devices doing one job — at one size it reads as
+   a single sentence, and the dot is redundant once the weight changes. */
 .heroBalanceLabel {
-  font-size: 11px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-locked);
+}
+
+/* The hero is two GROUPS, not four lines (owner 2026-08-02): the SHOP (name +
+   its balance) and then THIS ORDER (who booked it, its bill number). The 3px
+   flex gap is the within-group rhythm; this adds 5px on top of it — 8px — at
+   the seam between them.
+
+   Adjacent-sibling selectors rather than a wrapper div, because the lines are
+   each conditional: the balance is hidden on the godown lens, the meta line
+   needs an area/phone/salesman to exist, and the bill number only exists once
+   billed. Whichever line lands first in the second group takes the gap, and
+   when the balance is absent there is no seam to mark. A wrapper would have to
+   be conditionally rendered on the OR of its children to avoid contributing a
+   stray gap of its own. */
+.heroBalance + .heroMeta,
+.heroBalance + .byline {
+  margin-top: 5px;
 }
 
 /* Same three tones as the office ledger and the salesman's lists — one meaning
