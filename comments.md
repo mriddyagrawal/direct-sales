@@ -7092,3 +7092,32 @@ So area-only, phone-only and both all render; only genuinely-empty suppresses th
 **What I tried:** Read the diff; re-queried prod for the exact counts (623 / 604 / 19 — matching the message) plus the area-only, phone-only and both splits to confirm the guard covers all three; grepped for any surviving render path using the old string (comment only); `tsc --noEmit` (0), `eslint src` (0).
 
 **Open flags (cumulative):** 🟡 56, 🟡 64 (owner deferred), 🟡 68 (owner-deferred), 🟡 70 (owner deferred pending a conversation).
+
+---
+
+## Note — REVIEWER-authored change at owner request (2026-08-01)
+
+Not a review. Recording that `OrderDetailView.tsx` changed **without a BUILDER
+commit**, so the change is not mistaken for drift.
+
+Owner 2026-08-01 asked for the **"Waiting for the godown to scan serials."** line
+to be removed, and explicitly asked the REVIEWER to make the edit directly rather
+than route it through the BUILDER. Done in `style(orders)` below.
+
+**Why it was safe to remove rather than reword.** `.waitLine` had exactly two
+call sites: this one, and the backorder provenance line ("Backorder of ORD-…"),
+which is not a status hint at all. So this was the **only** status carrying such
+a line — `pending_approval`, `ready_to_bill`, `billed`, `dispatched` and
+`cancelled` never had one. Removing it makes the screen consistent instead of
+leaving a single status as the odd one out, and the `Pending scan` chip in the
+header already carries the same information.
+
+`.waitLine` itself is retained and still used by the backorder line, so the rule
+is not orphaned.
+
+Verified: the string survives only inside the explanatory comment, no render path;
+`.waitLine` still referenced at `OrderDetailView.tsx:663`; `tsc --noEmit` 0,
+`eslint src` 0, `npm run build` clean.
+
+The standing rule still holds for everything else — the REVIEWER does not edit
+BUILDER code unless the owner directs it, as they did here.
