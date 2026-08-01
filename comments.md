@@ -6028,3 +6028,33 @@ Nothing was left dead.
 **Open flags (cumulative):** new 🟡 56. 🟡 55, 🟡 ㊿ open. 🔴 53, 🟡 54 ✅ CLOSED at fed0523. 51 folded into step 7.
 
 **Next-commit suggestion:** Orders (step 5) — the last of the four copies, and the loudest pixel change in the run: its refs, timestamps and totals all gain their mono face at once.
+
+---
+
+## Review of 893ef4f — refactor(orders): adopt the shared table grammar — last of the four copies
+
+**Verdict:** ⚠️ accept-with-followups (message accuracy only; the code is right)
+
+**Phase / commit goal:** Step 5 — Orders migrates, leaving zero page-level `.table` copies.
+
+**What works:** Zero `.table` rules remain in any of the three migrated modules. `tsc` and `eslint src` exit 0. Phone cards untouched — **0** card lines in the diff.
+
+**The step's one hard constraint held.** It required styles-only, and I verified that independently rather than accepting the self-review: the TSX diff contains **no** line mentioning `prefetch`, `onMouseEnter`, `setSelectedIndex`, `router.push`, `safeIndex` or the `rowSelected` expression. Every change is a `styles.x` → `table.x` swap plus the import. `.rowSelected` stays local at 0.06 with `!important` and a comment explaining that it is keyboard-selection state, not hover — exactly as specced.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:**
+
+- 🟡 **57 "Rows gain a hover tint … Orders had none" is wrong, and the truth is more interesting.** Orders **did** tint on hover — via JavaScript, not CSS. `onMouseEnter` sets `selectedIndex`, so the hovered row becomes the selected row and picks up `.rowSelected` at 0.06. The owner observed exactly this on 2026-08-01 and described its lag ("fades in and out, like a trail"). So the claim is inaccurate twice over: there was a hover tint, and the new 0.05 one is largely **masked** on the same row by the `!important` 0.06.
+
+  **But the real effect is better than the commit claims, and it must not be tidied away.** Because `table.clickable` is now on every row, CSS `:hover` paints at 0.05 **immediately** — compositor, no JS — and React then deepens it to 0.06 when the state catches up. A 0.01 alpha step is imperceptible, so what the owner will see is the tint arriving *instantly* instead of trailing the cursor through a re-render queue. **The migration accidentally fixed the hover lag on the busiest page in the app.**
+
+  The risk this creates: the hover rule now looks redundant to anyone reading the CSS (`.rowSelected` outranks it on the same row, so why is it there?). Removing it as dead weight would silently restore the trail. Worth a comment on the Orders side saying the shared hover is what makes the tint feel instant.
+
+**Domain / correctness checks:** Money math — TOTAL changes face only; `formatRupees` untouched, values unchanged. State machine / RLS / snapshots — no logic in the diff at all, verified by grep. Mobile-first — phone cards provably untouched.
+
+**What I tried:** Grepped the TSX diff for every logic identifier the step forbade changing (none present); read the full class-swap diff; confirmed `.rowSelected` retains `!important` and 0.06; read `rowClasses` to confirm `table.clickable` is unconditional and `.rowSelected` conditional, which is what produces the layering above; `grep -c '^\.table'` → 0 across all three migrated modules; `tsc` (0), `eslint src` (0); counted card lines in the diff (0).
+
+**Open flags (cumulative):** new 🟡 57. 🟡 55, 🟡 56, 🟡 ㊿ open. 🔴 53, 🟡 54 ✅ CLOSED. 51 folded into step 7.
+
+**Next-commit suggestion:** step 6 (Retailers) — the only step with new markup rather than a migration, and the first to add a route.
