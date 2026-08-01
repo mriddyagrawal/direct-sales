@@ -5,10 +5,29 @@
 // rejects, and the user sees a raw constraint error instead of a warning.
 
 /**
- * Mirrors BOTH unique indexes on `retailers` exactly:
+ * Tracks the two unique indexes on `retailers`:
  *   lower(regexp_replace(btrim(<col>), '\s+', ' ', 'g'))
  * i.e. trim the ends, collapse every internal whitespace run to one space,
- * lowercase. Any change here must be made in the DB index too.
+ * lowercase. Any change here must be considered against the DB index too.
+ *
+ * NOT byte-identical to that expression, and the gap is deliberate. Postgres
+ * `btrim(x)` with one argument strips SPACES only, so a leading tab survives it
+ * and then becomes a leading space when `\s+` collapses — while JS `.trim()`
+ * removes it outright. `\s` also differs on NBSP: JS matches it, Postgres's ARE
+ * does not, and NBSP arrives easily via paste from Excel. Measured 2026-08-01:
+ *
+ *   "\tShop A"   ->   norm() "shop a"   |   DB " shop a"
+ *
+ * So this can be STRICTER than the index: it may flag a clash the database would
+ * actually accept. That direction is the safe one — the user sees a warning
+ * instead of a surprise — and the opposite direction is caught by
+ * mapRetailerSaveError below.
+ *
+ * Do NOT "fix" this by copying btrim's space-only behaviour. That would stop the
+ * form trimming tabs and newlines, which is worse for a name a human typed. The
+ * database is the odd one here; closing the gap properly means an index rebuilt
+ * on btrim(x, E' \t\n\r'), which is a migration and not worth it for input this
+ * rare.
  */
 export function norm(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
