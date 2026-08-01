@@ -35,8 +35,11 @@
    below the 48px --touch-target-min every other tappable thing in this app
    respects. The row is full-width so only the VERTICAL target shrinks, and a
    mis-tap here picks the wrong SHOP for an order. If that starts happening,
-   the knob is this rule's padding — 13px would put it back at ~43px — not
-   min-height, which reintroduces the dead space. */
+   the knob is this rule's padding — NOT min-height, which reintroduces the
+   dead space. To actually clear the 48px floor it takes ~15.5px (10 + 17 + 10
+   is 37, so +5.5 each side); 13px only reaches ~43px, which is still under it.
+   (REVIEWER 🟡 71 — an earlier version of this comment offered the 13px
+   without saying it falls short.) */
 .row {
   width: 100%;
   display: flex;
