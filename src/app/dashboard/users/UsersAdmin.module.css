@@ -24,9 +24,13 @@
   color: var(--color-locked);
 }
 
+/* One Add entry point per form factor, matching Products and Retailers: the
+   inline button on desktop, the FAB on phone — never both. This row used to
+   show its button at every width, so the phone had an inline "+ Add user"
+   where the other two dashboard pages had a FAB. */
 .titleActions {
   margin-left: auto;
-  display: flex;
+  display: none;
   gap: 8px;
 }
 
@@ -128,6 +132,10 @@
 @media (min-width: 768px) {
   .page {
     padding: 24px;
+  }
+
+  .titleActions {
+    display: flex;
   }
 
   .cards {
