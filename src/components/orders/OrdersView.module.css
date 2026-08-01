@@ -238,81 +238,11 @@
   padding: 24px 0;
 }
 
-.table {
-  display: none;
-  width: 100%;
-  border-collapse: collapse;
-  /* The folder-tab strip's baseline (.filterTabActive overlaps this by
-     ~1px) — without an explicit top rule here, the active tab would have
-     nothing to visually connect to. */
-  border-top: 2px solid var(--color-ink);
-}
-
-.table thead th {
-  text-align: left;
-  font-family: var(--font-figures);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--color-locked);
-  height: 32px;
-  /* 12px right padding on every cell (headers + body, below) spaces the
-     columns so TOTAL and STATUS stop colliding, and keeps each header aligned
-     with its column's values. Desktop only — the table is display:none on
-     phone (cards render instead). */
-  padding-right: 12px;
-  border-bottom: 2px solid var(--color-ink);
-}
-
-/* TOTAL header right-aligns over its right-aligned amounts — the header's
-   .numeric class alone loses to `.table thead th` on specificity. */
-.table thead th.numeric {
-  text-align: right;
-}
-
-.table tbody tr {
-  height: 40px;
-  border-bottom: 1px solid var(--color-hairline);
-  cursor: pointer;
-}
-
-.table tbody tr:nth-child(even) {
-  background: rgba(20, 24, 31, 0.02);
-}
-
+/* Keyboard-selection state, NOT hover — deliberately kept at 0.06 and NOT
+   unified with the shared grammar's 0.05 hover (spec, 2026-08-01): the two
+   should not look identical. !important still beats the shared zebra stripe. */
 .rowSelected {
   background: rgba(29, 78, 216, 0.06) !important;
-}
-
-.table td {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  color: var(--color-ink);
-  padding-right: 12px;
-}
-
-.mono {
-  font-family: var(--font-figures);
-}
-
-.numeric {
-  text-align: right;
-}
-
-/* Column weight/color hierarchy (S8 desktop ledger) — SUBMITTED + SALESMAN
-   recede as metadata; RETAILER is the primary scan target. REF/TOTAL are
-   unstyled here on purpose (stay full-ink via .mono/.table td).
-   Scoped as `.table td.cellX` (not just `.cellX`) so the extra class beats
-   `.table td`'s own color rule on specificity — a bare `.cellMeta { color }`
-   loses that fight (0,1,0 vs 0,1,1) and silently never applies, which is
-   why the table read as one flat color before this fix. */
-.table td.cellMeta {
-  color: #747b88;
-  font-weight: 400;
-}
-
-.table td.cellRetailer {
-  color: var(--color-ink);
-  font-weight: 600;
 }
 
 .newBadge {
@@ -443,10 +373,9 @@
     margin-bottom: 0;
   }
 
-  .table {
-    display: table;
-  }
-
+  /* `.table { display: table }` lived here; the shared grammar owns that
+     breakpoint now. `.cards` stays local — hiding the phone cards is this
+     page's business, not the table's. */
   .cards {
     display: none;
   }
