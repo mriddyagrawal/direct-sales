@@ -8,9 +8,12 @@ export default function Loading() {
   return (
     <div className={styles.page}>
       <div className={styles.content} style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Explicit width on the second one: Skeleton defaults to 100%, so a
+            bare <Skeleton/> beside the 38% one asked for 138% + the gap and
+            overflowed the row. Same bug as OrderDetailSkeleton's action row. */}
         <div style={{ display: "flex", gap: 8 }}>
           <Skeleton width="38%" height={44} />
-          <Skeleton height={44} />
+          <Skeleton width="calc(62% - 8px)" height={44} />
         </div>
         <Skeleton width={140} height={12} />
         <Skeleton height={36} />

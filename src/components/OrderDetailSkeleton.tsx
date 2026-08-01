@@ -5,7 +5,13 @@ import { Skeleton } from "@/components/ui/Skeleton";
 // instantly. Layout is inline — a throwaway skeleton earns no CSS module.
 export function OrderDetailSkeleton() {
   return (
-    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16, maxWidth: 720, margin: "0 auto", width: "100%" }} aria-hidden>
+    // Container mirrors OrderDetailView.module.css `.page` — padding 16, flex
+    // column, gap 16, and NO max-width. It used to carry `maxWidth: 720,
+    // margin: "0 auto"`, which the real page has never had: on desktop the
+    // skeleton painted as a narrow centred strip and the order then snapped
+    // out to full width. Invisible until the order-row prefetch made the
+    // boundary actually paint on click (owner repro 2026-08-01).
+    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16, width: "100%" }} aria-hidden>
       {/* Back eyebrow */}
       <Skeleton width={96} height={14} />
 
@@ -16,10 +22,13 @@ export function OrderDetailSkeleton() {
         <Skeleton width={160} height={14} />
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons. Widths are EXPLICIT: Skeleton defaults to width 100%,
+          so two bare <Skeleton/>s in a flex row each demanded the full
+          container — 200% of it — and the second ran off the right edge of the
+          window. calc(50% - 4px) each exactly absorbs the 8px gap. */}
       <div style={{ display: "flex", gap: 8 }}>
-        <Skeleton height={44} />
-        <Skeleton height={44} />
+        <Skeleton width="calc(50% - 4px)" height={44} />
+        <Skeleton width="calc(50% - 4px)" height={44} />
       </div>
 
       {/* Items table: header + 4 line rows */}
