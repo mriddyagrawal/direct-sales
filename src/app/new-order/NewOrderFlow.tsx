@@ -213,6 +213,13 @@ export function NewOrderFlow({ recentRetailerIds, editOrder, salesmanId, detailB
   // Quick Order already scrolled by the same amount — no ribbon, no search bar,
   // and the first products cut off. A route change would have done this for
   // free; a state change does not.
+  //
+  // EVERY step, including BACKWARD ones — owner-decided 2026-08-02, after the
+  // consequence was put to them explicitly: Review's back returns to the
+  // products list at the TOP, not at the row you were on when you left it.
+  // They prefer that. So this is deliberate, not an oversight of the forward
+  // case, and it should not be "fixed" into a forward-only reset or a
+  // remembered per-step position without asking them first.
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
