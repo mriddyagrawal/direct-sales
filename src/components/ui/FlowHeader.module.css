@@ -1,27 +1,45 @@
-/* 10px of vertical padding, not 16 (owner 2026-08-02: the ribbon was too big).
-   Measured rather than guessed: at 16px this band was ~66px — an 18px title
-   over a 10px subtitle plus 32px of padding — against the 50-60px that the
-   sticky-header guidance gives as the phone ceiling. At 10px it lands ~54px,
-   inside that range, and it is the only band on the picker.
-   Horizontal padding stays 16px: that is the app's page inset, and the title
-   must line up with the content beneath it. */
+/* 6px of vertical padding (owner 2026-08-02, second pass — still too big at
+   10). The arithmetic, corrected: the previous round claimed ~54px by adding
+   padding to the TITLE stack, but `.back` carried `min-height: 44px`, and the
+   row is as tall as its tallest child — so the band was really ~65px and the
+   title stack was never the floor. The button is 36px now and the titles
+   (~23px title + 2 + ~13px subtitle = ~38px) genuinely set the height:
+
+     6 + 38 + 6 + 1px border = ~51px   with a subtitle (picker, Quick Order)
+     6 + 23 + 6 + 1px border = ~36px   without one (Review, deposits)
+
+   ~51px sits at the bottom of the 50-60px band the sticky-header guidance
+   gives for a phone.
+
+   HORIZONTAL padding stays 16px and should not be cut: it is the app's page
+   inset, so it is what lines the shop name up with the search bar and the
+   product rows underneath. Trimming it would save nothing vertically and
+   misalign the column.
+
+   Next lever, if this is still too tall: drop the AREA subtitle from the Quick
+   Order ribbon, which takes it to ~36px. That is a content decision, not a
+   spacing one. */
 .header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 6px 16px;
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-white);
 }
 
-/* 40x44 rather than 48x48 (owner 2026-08-02: it took too much space). The
-   ribbon has a shop name to fit and the glyph inside is 18px, so 48 wide was
-   mostly empty box. Height stays near the touch minimum because this is the
-   most-tapped control on the flow; WIDTH is what was reclaimed — and it sits at
-   the screen edge, where a thumb landing left of it still hits. */
+/* 40x36, down from the original 48x48 (owner 2026-08-02, two passes). The
+   glyph inside is 18px, so most of that box was empty — and the HEIGHT was the
+   hidden reason the ribbon would not slim below ~65px: a flex row is as tall as
+   its tallest child, so a 44px button held the band open no matter what the
+   padding did. At 36 the title stack sets the height instead.
+
+   Accepted cost, consistent with the 37px retailer rows: 36px is under the 48px
+   --touch-target-min. It sits at the screen edge, where a thumb landing left of
+   it still lands on it, and the full 40x36 is tappable, not just the glyph. */
 .back {
   min-width: 40px;
-  min-height: 44px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
