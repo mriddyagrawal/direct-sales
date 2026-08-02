@@ -1,3 +1,5 @@
+import { ChevronLeft } from "lucide-react";
+import { Glyph } from "@/components/ui/Glyph";
 import styles from "./FlowHeader.module.css";
 
 interface FlowHeaderProps {
@@ -19,8 +21,12 @@ interface FlowHeaderProps {
 export function FlowHeader({ title, subtitle, trailing, onBack }: FlowHeaderProps) {
   return (
     <div className={styles.header}>
+      {/* lucide ChevronLeft, the app's back glyph everywhere else (order
+          detail and retailer detail both use it via back.module.css). This was
+          a literal "←" at 20px in a 48-wide box — a different mark, twice the
+          weight, eating 48px of a ribbon that has a shop name to fit. */}
       <button type="button" className={styles.back} onClick={onBack} aria-label="Back">
-        ←
+        <Glyph icon={ChevronLeft} />
       </button>
       <div className={styles.titles}>
         <span className={styles.title}>{title}</span>

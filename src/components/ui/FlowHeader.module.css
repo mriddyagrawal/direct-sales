@@ -1,21 +1,25 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 16px;
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-white);
 }
 
+/* 40x44 rather than 48x48 (owner 2026-08-02: it took too much space). The
+   ribbon has a shop name to fit and the glyph inside is 18px, so 48 wide was
+   mostly empty box. Height stays near the touch minimum because this is the
+   most-tapped control on the flow; WIDTH is what was reclaimed — and it sits at
+   the screen edge, where a thumb landing left of it still hits. */
 .back {
-  min-width: 48px;
-  min-height: 48px;
+  min-width: 40px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: none;
   border: none;
-  font-size: 20px;
   color: var(--color-ink);
   cursor: pointer;
   padding: 0;
@@ -25,7 +29,7 @@
      the title block's center). Vertical centering is now purely
      align-items:center on .header, so the arrow sits dead-center of the
      one- or two-line title on every page. */
-  margin: 0 0 0 -12px;
+  margin: 0 0 0 -10px;
   flex-shrink: 0;
 }
 

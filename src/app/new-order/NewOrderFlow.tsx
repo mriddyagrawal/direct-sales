@@ -207,6 +207,16 @@ export function NewOrderFlow({ recentRetailerIds, editOrder, salesmanId, detailB
   const [reasonSheetOpen, setReasonSheetOpen] = useState(false);
   const [reasonText, setReasonText] = useState("");
 
+  // Every step starts at the top (owner repro 2026-08-02). The flow's steps are
+  // React state, not routes, so nothing resets the DOCUMENT scroll between
+  // them: scrolling halfway down the retailer list and tapping a shop opened
+  // Quick Order already scrolled by the same amount — no ribbon, no search bar,
+  // and the first products cut off. A route change would have done this for
+  // free; a state change does not.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
+
   // Reopen-the-app resilience (acceptance criterion #2): if a draft was left
   // mid-cart, resume it directly instead of forcing a re-pick through S3. A
   // single dispatch applies every piece of resumed state atomically.

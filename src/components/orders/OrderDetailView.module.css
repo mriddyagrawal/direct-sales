@@ -484,8 +484,28 @@
   margin-top: 5px;
 }
 
-/* Same three tones as the office ledger and the salesman's lists — one meaning
-   per colour across every surface that shows a balance. */
+/* RED HERE, and that is deliberate (owner 2026-08-02) — this page does NOT
+   follow the salesman's lists, which show owed in blue.
+
+   The old comment claimed "one meaning per colour across every surface that
+   shows a balance". That stopped being true the moment RetailerList went blue,
+   and it was describing an invariant, so leaving it would have invited someone
+   to "restore" a consistency that is no longer wanted.
+
+   THE RULE, so a new surface knows which side it falls on — it is about how
+   many shops are on screen at once, not who is looking:
+
+     MANY shops listed together  -> BLUE   (picker, Retailers tab)
+         A column of red down a list of the whole market reads, to a shopkeeper
+         standing beside the salesman, as "this man is owed money by everyone".
+
+     ONE shop, already being dealt with -> RED   (this page, the Quick Order
+         ribbon's own shop, the office ledger)
+         A single figure about the shop you are already in is a fact that shop
+         already knows, and red is doing its normal job.
+
+   Green and the em dash are unchanged everywhere: nothing to chase is nothing
+   to chase, and unknown is unknown. */
 .balanceOwed {
   color: var(--color-error);
 }
