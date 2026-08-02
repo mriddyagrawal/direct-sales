@@ -7861,3 +7861,34 @@ Raising it as one flag rather than two because the pattern is the point: the exc
 **What I tried:** Read the diff and the new spec doc; confirmed the flow document-scrolls (`.page` is `min-height: 100vh`) so `window.scrollTo` is the right instrument, and noted where it would not be; enumerated `FlowHeader`'s callers against the claimed four; measured the new back box (40×44) against `--touch-target-min` and counted the token's 11 surviving honest usages to check whether it is being abandoned (it is not) — the basis of 🟡 79; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** **CLOSED: 🟡 76, 🟡 77.** New: 🟡 78, 🟡 79. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73.
+
+---
+
+## Owner ruling 2026-08-02 — 🟡 79 CLOSED
+
+**🟡 79 CLOSED — owner-accepted.** The two sub-48px touch targets in the
+salesman's ordering path stay as they are: the `RetailerList` row at ~37px and
+`FlowHeader`'s back at 40×44. Owner 2026-08-02: *"79 is fine."*
+
+Recording why it is a reasonable call rather than just that it was waved through,
+so a future sweep does not re-raise it:
+
+- **44px is a real standard**, not an improvised number — it is the iOS HIG
+  minimum. `--touch-target-min: 48px` follows Material, and both are defensible
+  floors; the flow's back arrow sits between them, not below everything.
+- **The back arrow is edge-anchored**, so a thumb landing left of it still hits.
+  Its effective target is wider than its box.
+- **The row height was sized by content at the owner's explicit request**
+  (🟡 71, also closed) — the 48px floor there was producing dead space and making
+  one- and two-line rows indistinguishable, which was the actual reported problem.
+- **The token is not eroding.** 11 rules across godown, deposits, the users
+  modal, `Field` and `Button` still honour it, and both exceptions document
+  themselves in their own stylesheets.
+
+**Reopen only on evidence, not on principle:** if wrong shops actually start
+getting picked in the field, the knob is the row's **padding** (~15.5px reaches
+48 — see 🟡 71's correction), never `min-height`, which reintroduces the dead
+space the floor was removed for.
+
+**Open after this:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed),
+🟡 72, 🟡 73, 🟡 78 (owner decision parked).
