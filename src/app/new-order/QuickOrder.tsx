@@ -5,6 +5,7 @@ import { FlowHeader } from "@/components/ui/FlowHeader";
 import { Stepper } from "@/components/ui/Stepper";
 import { KeypadSheet } from "@/components/ui/KeypadSheet";
 import { formatRupees, formatShortDate } from "@/lib/format";
+import { ledgerText, readBalance } from "@/lib/balance";
 import { cartLineCount, cartTotalPaise } from "@/lib/cart";
 import { parsePricePaise } from "@/lib/price";
 import {
@@ -31,6 +32,10 @@ interface QuickOrderProps {
   products: ProductOption[];
   retailerName: string;
   retailerArea: string | null;
+  // The shop's live ledger balance (nightly Tally sync), shown in the ribbon so
+  // the salesman knows what they owe WITHOUT leaving the order he is writing.
+  // Undefined only if the shop is missing from the cached retailers list.
+  retailerOutstandingPaise?: number | null;
   items: Record<string, number>;
   prices?: Record<string, number>; // entered unit prices (paise) for manual/LG lines
   snapshotPrices?: Record<string, number>;
@@ -45,6 +50,16 @@ interface QuickOrderProps {
   onBack: () => void;
 }
 
+// Ribbon balance colour. BLUE for owed, not the office ledger's red — the
+// salesman is standing in front of the shopkeeper with this screen open, and
+// red reads as an accusation across the counter. Matches RetailerList, which
+// made the same call for the same reason; RetailersQueue (office) keeps red.
+function balanceClass(paise: number | null): string {
+  const { state } = readBalance(paise);
+  if (state === "unknown") return styles.headerBalanceNone;
+  return state === "clear" ? styles.headerBalanceClear : styles.headerBalanceOwed;
+}
+
 // S4 — the hero screen. Brand▸Category grouped dense list, sticky client-side
 // search, sticky split cart bar.
 //
@@ -56,6 +71,7 @@ export function QuickOrder({
   products,
   retailerName,
   retailerArea,
+  retailerOutstandingPaise,
   items,
   prices,
   snapshotPrices,
@@ -326,7 +342,27 @@ export function QuickOrder({
 
   return (
     <div className={styles.page} ref={pageRef}>
-      <FlowHeader title={retailerName} subtitle={retailerArea ?? undefined} onBack={onBack} />
+      <FlowHeader
+        title={retailerName}
+        subtitle={retailerArea ?? undefined}
+        onBack={onBack}
+        trailing={
+          // Same ledger rendering as order detail's hero, via the shared
+          // ledgerText — "₹84,320 Dr". NO "as of" date here (owner
+          // 2026-08-02): the ribbon is glanced at mid-conversation, and the
+          // sync date is an audit detail that belongs on the order, not in the
+          // middle of writing one.
+          //
+          // Undefined means the shop was not in the cached list at all, which
+          // is a different thing from an unsynced shop — render nothing rather
+          // than an em dash that would claim Tally missed it.
+          retailerOutstandingPaise === undefined ? undefined : (
+            <span className={`${styles.headerBalance} ${balanceClass(retailerOutstandingPaise)}`}>
+              {ledgerText(readBalance(retailerOutstandingPaise))}
+            </span>
+          )
+        }
+      />
       <div className={styles.searchBar} ref={searchBarRef}>
         <div className={styles.searchRow}>
           {multiBrand && (

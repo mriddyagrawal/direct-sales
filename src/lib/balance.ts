@@ -47,3 +47,18 @@ export function readBalance(paise: number | null): BalanceReading {
   if (paise <= 0) return { state: "clear", text: formatRupees(paise), paise };
   return { state: "owed", text: formatRupees(paise), paise };
 }
+
+// The LEDGER rendering — "₹84,320 Dr", as Tally prints it: marker trailing, no
+// full stops (owner 2026-08-02). Lives here rather than in a view because it is
+// now on two screens (order detail's hero and the Quick Order ribbon) and a
+// second private copy is how the two start disagreeing.
+//
+// Cr takes the ABSOLUTE value: formatRupees(-4500000) is "-₹45,000", and
+// "-₹45,000 Cr" states the opposite of what it means. A square ₹0 takes NEITHER
+// marker — it is not a debit or a credit — and an unknown balance stays the
+// bare em dash.
+export function ledgerText(reading: BalanceReading): string {
+  if (reading.state === "owed") return `${reading.text} Dr`;
+  if (reading.paise !== null && reading.paise < 0) return `${formatRupees(Math.abs(reading.paise))} Cr`;
+  return reading.text;
+}

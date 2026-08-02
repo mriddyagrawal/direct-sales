@@ -130,9 +130,23 @@
 
 /* Colours map lib/balance.ts's states. Binary, never a threshold — the colour
    never depends on HOW much is owed (credit-limit tiers were deliberately
-   dropped 2026-07-31). Same three tones as the office ledger, on purpose. */
+   dropped 2026-07-31).
+
+   OWED IS BLUE HERE, NOT RED, and this is the one place the salesman's surfaces
+   deliberately diverge from the office ledger (owner 2026-08-02). The reason is
+   physical, not aesthetic: the salesman opens this list standing in front of a
+   shopkeeper, and a screen of red reads to that shopkeeper as "this man is
+   owed money by the whole market" — which is not a conversation anyone wants
+   started. Blue states the same fact without the alarm.
+
+   RetailersQueue keeps RED. It is an office screen with no customer looking
+   over it, and there the alarm is the point.
+
+   Note this changes nothing about WHAT is legible: the figures are still there
+   and still readable by anyone looking. Blue removes the impression, not the
+   information. */
 .amtOwed {
-  color: var(--color-error);
+  color: var(--color-accent);
 }
 
 .amtClear {

@@ -370,12 +370,22 @@ export function NewOrderFlow({ recentRetailerIds, editOrder, salesmanId, detailB
     return null;
   }
 
+  // The shop's balance for the Quick Order ribbon, read from the SAME
+  // ["retailers"] cache the picker renders from rather than threaded through
+  // the reducer. Two reasons: the reducer would need it on three actions
+  // (select, resume-on-mount, admin retailer-change) plus the localStorage
+  // draft, and a resumed draft would then carry a balance frozen at whenever
+  // it was saved. `undefined` when the shop is not in the cached list — a
+  // different fact from an unsynced shop, and the ribbon renders nothing.
+  const retailerBalancePaise = retailers.find((r) => r.id === cart.retailerId)?.outstanding_paise;
+
   if (step === "order") {
     return (
       <QuickOrder
         products={products}
         retailerName={cart.retailerName}
         retailerArea={retailerArea}
+        retailerOutstandingPaise={retailerBalancePaise}
         items={cart.items}
         prices={cart.prices ?? {}}
         snapshotPrices={isEdit ? editOrder!.snapshotPrices : undefined}

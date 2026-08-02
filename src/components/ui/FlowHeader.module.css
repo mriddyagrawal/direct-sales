@@ -34,6 +34,17 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  /* Take the slack, so the trailing slot sits hard right rather than beside
+     the title. Combined with min-width: 0 above, a long shop name ellipsises
+     instead of shoving the balance off the ribbon. */
+  flex: 1;
+}
+
+/* Right-hand slot (Quick Order's balance). Never shrinks — the title is the
+   elastic thing here, not the figure. */
+.trailing {
+  flex-shrink: 0;
+  text-align: right;
 }
 
 .title {

@@ -451,3 +451,31 @@
   border: none;
   cursor: pointer;
 }
+
+/* Ribbon balance (the FlowHeader trailing slot). Figures font at the body
+   size, semibold — the same weight the order-detail hero gives it, so the two
+   read as the same fact in two places. */
+.headerBalance {
+  font-family: var(--font-figures);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* BLUE for owed, not red (owner 2026-08-02). This screen is open on the
+   salesman's phone while he stands at the counter, so red reads as an
+   accusation to the shopkeeper across it. Same call as RetailerList; the
+   office queue keeps red, where the alarm is the point. */
+.headerBalanceOwed {
+  color: var(--color-accent);
+}
+
+.headerBalanceClear {
+  color: var(--color-processed);
+}
+
+/* Not in the last sync — uncoloured, because neither owed nor clear is a claim
+   we can make about a shop Tally never matched. */
+.headerBalanceNone {
+  color: var(--color-locked);
+}

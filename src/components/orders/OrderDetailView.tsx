@@ -18,7 +18,7 @@ import {
   formatShortDate,
   istDateKey,
 } from "@/lib/format";
-import { readBalance } from "@/lib/balance";
+import { ledgerText, readBalance } from "@/lib/balance";
 import { nowMs } from "@/lib/cart";
 import { describeEvent, type OrderEventRow } from "@/lib/order-events";
 import { cancelOrder, processOrder, approveOrder, punchOrder, setAdminComment, dispatchOrder, stepBackOrder } from "@/lib/order-rpcs";
@@ -346,22 +346,10 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
   // what the label was really for: this page has a big order total on it, and
   // "Dr" makes clear the figure is the SHOP's ledger, not the order's money.
   //
-  // TRAILING, and with no full stops — "₹22,134 Dr", exactly as Tally prints
-  // it (owner 2026-08-02). Both halves of that are the same argument: Tally is
-  // the system this office reads all day, so the app matching it beats the app
-  // being internally tidy. An earlier version led with the marker and said in
-  // the code that reversing it was a one-line change; this is that change.
-  //
-  // Cr takes the ABSOLUTE value: formatRupees(-4500000) is "-₹45,000", and
-  // "-₹45,000 Cr" would say the opposite of what it means. A square ₹0 gets
-  // NEITHER marker — it is not a debit or a credit, it is nothing owed either
-  // way — and stays green with the other nothing-to-chase balances.
-  const balanceText =
-    balance.state === "owed"
-      ? `${balance.text} Dr`
-      : balance.paise !== null && balance.paise < 0
-        ? `${formatRupees(Math.abs(balance.paise))} Cr`
-        : balance.text;
+  // "₹22,134 Dr", as Tally prints it. The rendering moved into lib/balance.ts
+  // when the Quick Order ribbon became its second caller — one definition, so
+  // the two screens cannot start disagreeing about how a credit reads.
+  const balanceText = ledgerText(balance);
   function backorderEventLink(e: OrderEventRow): { prefix: string; ref: string; href: string } | null {
     if (e.action !== "backordered") return null;
     const d = (e.details ?? {}) as Record<string, unknown>;
