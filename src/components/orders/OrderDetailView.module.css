@@ -492,17 +492,19 @@
    and it was describing an invariant, so leaving it would have invited someone
    to "restore" a consistency that is no longer wanted.
 
-   THE RULE, so a new surface knows which side it falls on — it is about how
-   many shops are on screen at once, not who is looking:
+   WHERE OWED IS BLUE, and where it is red — the current assignment, which is
+   fact rather than inference:
 
-     MANY shops listed together  -> BLUE   (picker, Retailers tab)
-         A column of red down a list of the whole market reads, to a shopkeeper
-         standing beside the salesman, as "this man is owed money by everyone".
+     BLUE  Quick Order picker · Retailers tab · Quick Order ribbon
+     RED   this page (order detail) · the office retailers queue
 
-     ONE shop, already being dealt with -> RED   (this page, the Quick Order
-         ribbon's own shop, the office ledger)
-         A single figure about the shop you are already in is a fact that shop
-         already knows, and red is doing its normal job.
+   Note it is NOT "how many shops are on screen": the ribbon shows exactly one
+   and is blue. The line that fits all five is the SCREEN'S JOB — the surfaces
+   you are working ON while the phone is out and the shopkeeper is beside you
+   (choosing a shop, browsing shops, writing the order) are blue; the surfaces
+   you READ (an order's record, the office ledger) are red. A new balance
+   surface should be placed by that test, and the placement is the owner's call
+   either way.
 
    Green and the em dash are unchanged everywhere: nothing to chase is nothing
    to chase, and unknown is unknown. */
