@@ -7948,3 +7948,62 @@ Same discipline on Products: stacking the ribbon on the already-pinned search ba
 **What I tried:** Read the message and full diff; grepped every `.headerBalanceOwed` definition (one, unchanged) and dumped this commit's complete CSS diff to confirm no colour line was touched — the basis of 🟡 80; confirmed `ledgerText` is gone from `QuickOrder` so the wording half did ship; verified `sticky` is opt-in and `PickRetailer` is its only caller; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 80. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked, and 🟡 80 is the same question).
+
+---
+
+## Review of 79c578f + 17f8787 — the ribbon goes red, then slims properly
+
+**Verdicts:** `79c578f` ⚠️ · `17f8787` ✅ — **🟡 80 CLOSED.** Reviewed together because the second corrects an arithmetic error in the first.
+
+### 🟡 80 CLOSED — and the diagnosis of why it happened is the valuable part
+
+`.headerBalanceOwed` is now `var(--color-error)`. Verified by reading the rule out, not from the message.
+
+The commit explains the original miss precisely rather than quietly fixing it:
+
+> *"The edit was a scripted find-and-replace whose pattern did not match the comment above the rule, so it replaced nothing… The script printed its success message regardless, and I did not check the file after."*
+
+And names it as a repeat — *"the second time a scripted replace has silently no-opped in this repo (the FAB shadow, earlier in this branch)"*. **The lesson is worth keeping beyond this commit: after a scripted edit, read the target back, because a no-op looks exactly like a success.** This is also why a REVIEWER reads the diff rather than the message; the message asserted a change that was not in it.
+
+**The duplicate removal is clean** — `.searchBarShop`/`.searchBarShopName` gone from the component (0 refs) and from the stylesheet, with a comment where they were rather than dead rules left behind.
+
+### ⚠️ `79c578f`'s height claim was wrong, and the builder found it first
+
+It claimed padding `16px → 10px` took the band from ~66px to **~54px**. Checked at that commit's own state:
+
+```
+.header  padding: 10px 16px
+.back    min-height: 44px
+```
+
+A flex row is as tall as its tallest child, so the band was `44 + 10 + 10 + 1px border = ~65px` — **the 44px button was the floor and the padding never touched it.** The claim was off by ~11px and the change bought almost nothing.
+
+`17f8787` diagnoses exactly this and fixes it properly by taking `.back` to 36px so the title stack sets the height. Catching your own wrong arithmetic one commit later is the system working.
+
+### `17f8787` is right where it matters, and repeats the same error where it does not
+
+**With a subtitle** (picker, Quick Order) the arithmetic checks out: titles are `~23px title + 2px gap + ~13px subtitle ≈ 38px`, the button is 36px, so `max(36, 38) + 6 + 6 + 1 = ~51px`. Correct, and inside the 50–60px guidance.
+
+**Without a subtitle** (Review, deposits) the commit says:
+
+> *"6 + 23 + 6 + 1px border = ~36px"*
+
+That adds the padding to the **titles** (23px) and forgets the button is 36px — so it is once again not the tallest child that was measured. Real figure: `max(36, 23) + 6 + 6 + 1 = ~49px`. **This is the identical mistake the same commit exists to fix**, repeated one paragraph later on the other case.
+
+Harmless to the outcome — 49px is under the ceiling, which is the right side to be wrong on — but it will mislead whoever next tries to slim Review's header and finds 13px they cannot account for.
+
+### 🟡 79's closure rationale is now partly invalid — worth knowing, not reversing
+
+I closed 🟡 79 recording that *"44px is a real standard… the iOS HIG minimum"* as part of why the back arrow's size was reasonable. It is now **36px**, under both Material's 48 and the iOS 44 I cited. The edge-anchoring argument still stands and the full 40×36 is tappable, and the owner's "79 is fine" was a judgement about the direction — but the specific standard I leaned on no longer covers this control. Recorded so the closure is not read as endorsing 36.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** the `~36px` figure in `17f8787`'s message and comment should read ~49px. And 🟡 79's note above.
+
+**Domain / correctness checks:** **Money** — only the ribbon's colour changed; the figure still goes through `readBalance`. **Mobile** — the whole subject, measured against published thresholds throughout, which is why the arithmetic errors are worth flagging rather than shrugging at: the numbers are the argument.
+
+**What I tried:** Read `.headerBalanceOwed` out of the file rather than trusting the message (now `--color-error`); confirmed `.searchBarShop` survives only as a comment; reconstructed `79c578f`'s own `.header`/`.back` geometry from that commit's blob and computed the real band height (~65px, not the claimed ~54px); recomputed both cases for `17f8787` (~51px with a subtitle — correct; ~49px without — not the claimed ~36px); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** **CLOSED: 🟡 80.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
