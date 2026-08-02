@@ -7892,3 +7892,59 @@ space the floor was removed for.
 
 **Open after this:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed),
 🟡 72, 🟡 73, 🟡 78 (owner decision parked).
+
+---
+
+## Review of 26c609e — fix(flow): pin the picker's header, keep the shop visible on products, red ribbon without Dr/Cr
+
+**Verdict:** ⚠️ — the research is the best-argued work in this run and two of three changes are right. **The third did not ship: the ribbon is still blue.**
+
+### 🟡 80 — "RIBBON — red for owed" is in the message and not in the diff
+
+The commit states it twice:
+
+> *"RIBBON — red for owed, and no Dr/Cr."*
+> *"…so the real alarm colour comes back."*
+
+**It did not happen.** `.headerBalanceOwed` is defined exactly once, at `QuickOrder.module.css:469`, and it is still `var(--color-accent)` — blue (`#1d4ed8`). This commit's entire diff to that stylesheet is **20 added lines**, all of them the new `.searchBarShop` / `.searchBarShopName` classes. Nothing touched the ribbon's colour.
+
+The **other half of the claim did ship**: `ledgerText` is gone from `QuickOrder`, which now imports `readBalance` alone, so a credit reads `-₹45,000` on the ribbon exactly as on the picker and the tab.
+
+So the ribbon today is **blue, without Dr/Cr** — half of what the message describes. The owner may reasonably believe otherwise, which is the actual harm here.
+
+### The rule the commit argues for is better than the one currently in the code
+
+And this matters more than the miss. The commit proposes:
+
+> *"The colour split is about what LEAKS, not which screen it is. A LIST exposes every OTHER shop's balance to whoever is looking over the salesman's shoulder… This ribbon shows only the shop being served, who already knows what they owe."*
+
+That is a **better rule than the one I wrote into `.balanceOwed`'s comment in `df1d250`** ("worked-on surfaces are blue, read surfaces are red"). Mine was reverse-engineered from where the colours happened to land; theirs derives from what the colour is *for*. It also explains order detail's red — which the owner declared intentional (🟡 76) without giving a reason — and this is that reason.
+
+**But the code currently matches my rule, not theirs**, precisely because the ribbon stayed blue. So:
+
+- If the ribbon **goes red**, the "what leaks" rule is correct and `.balanceOwed`'s comment must be rewritten to it.
+- If the ribbon **stays blue**, the message's rationale is wrong and should not be left standing as the recorded reason.
+
+Either way one of the two is now misleading. **This wants an owner decision, not a silent fix**, because it is the same question 🟡 78 parked.
+
+### What did ship is well done
+
+**The research was used to overrule the builder's own proposal.** NN/g's ceiling for a persistent header is ~10% of viewport, turning negative past ~15%. They measured: `FlowHeader` alone is ~66px (~8% of a 780px phone) — fits. Header **plus** the search field is ~126px (~16%) — past the line, so the pinning they had proposed was dropped. Proposing something, measuring, and killing your own proposal is the behaviour worth reinforcing.
+
+Same discipline on Products: stacking the ribbon on the already-pinned search bar would be ~150px (~19%) permanently above a list whose job is scanning products, so instead the shop name and balance move **into** the band that is already pinned, for ~16px.
+
+**Sticky is opt-in, not the `FlowHeader` default**, and the reason is concrete: Quick Order pins its own search bar, and two bands fighting for `top: 0` is how that screen breaks. Verified — `PickRetailer:133` is the only caller passing `sticky`; Review and the deposits flow pass nothing.
+
+**The remaining gap is named rather than hidden:** the back button is still lost on scroll on Products, show-on-scroll-up is what the research points at, and it needs a scroll listener on the most-used screen in the app — so it is deferred to its own change. Correct call.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None — nothing is broken. 🟡 80 is a message/code mismatch, not a defect.
+
+**Non-blocking suggestions:** 🟡 80 above, and it needs resolving one way or the other before `.balanceOwed`'s comment is trusted.
+
+**Domain / correctness checks:** **Money** — the ribbon's figure still goes through `readBalance`; only its wording changed. **RLS / state machine / snapshots** — untouched. **Mobile** — the whole subject, and measured against published thresholds rather than eyeballed.
+
+**What I tried:** Read the message and full diff; grepped every `.headerBalanceOwed` definition (one, unchanged) and dumped this commit's complete CSS diff to confirm no colour line was touched — the basis of 🟡 80; confirmed `ledgerText` is gone from `QuickOrder` so the wording half did ship; verified `sticky` is opt-in and `PickRetailer` is its only caller; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 80. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked, and 🟡 80 is the same question).
