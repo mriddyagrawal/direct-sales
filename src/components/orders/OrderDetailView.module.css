@@ -492,19 +492,31 @@
    and it was describing an invariant, so leaving it would have invited someone
    to "restore" a consistency that is no longer wanted.
 
-   WHERE OWED IS BLUE, and where it is red — the current assignment, which is
-   fact rather than inference:
+   WHERE OWED IS BLUE, and where it is red:
 
-     BLUE  Quick Order picker · Retailers tab · Quick Order ribbon
-     RED   this page (order detail) · the office retailers queue
+     BLUE  Quick Order picker · Retailers tab
+     RED   this page (order detail) · Quick Order ribbon · office queue
 
-   Note it is NOT "how many shops are on screen": the ribbon shows exactly one
-   and is blue. The line that fits all five is the SCREEN'S JOB — the surfaces
-   you are working ON while the phone is out and the shopkeeper is beside you
-   (choosing a shop, browsing shops, writing the order) are blue; the surfaces
-   you READ (an order's record, the office ledger) are red. A new balance
-   surface should be placed by that test, and the placement is the owner's call
-   either way.
+   THE TEST IS WHAT LEAKS — not which screen it is, and not how many shops are
+   on it. Two questions, and blue needs BOTH a yes:
+
+     1. Does this surface show OTHER shops' balances?
+     2. Is a customer likely to be looking at it?
+
+   A LIST answers yes to both: a shopkeeper reading over the salesman's shoulder
+   sees the whole market's debts, which is not a conversation anyone wants
+   started. Blue removes that impression — though not the information, which is
+   still legible to anyone looking.
+
+   Everything else is red. The ribbon and this page show only the shop being
+   SERVED, who already knows what they owe, so there is nothing to soften. The
+   office queue lists every shop but has no customer in the room, and there the
+   alarm is the point.
+
+   (An earlier version of this comment said the line was "worked-on surfaces vs
+   read surfaces". That fitted where the colours happened to sit on 2026-08-02
+   and stopped fitting the moment the ribbon went red in 79c578f — a screen you
+   are actively working on, in red. The leak test is the one that survives.)
 
    Green and the em dash are unchanged everywhere: nothing to chase is nothing
    to chase, and unknown is unknown. */
