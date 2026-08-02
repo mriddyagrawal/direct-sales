@@ -8007,3 +8007,40 @@ I closed 🟡 79 recording that *"44px is a real standard… the iOS HIG minimum
 **What I tried:** Read `.headerBalanceOwed` out of the file rather than trusting the message (now `--color-error`); confirmed `.searchBarShop` survives only as a comment; reconstructed `79c578f`'s own `.header`/`.back` geometry from that commit's blob and computed the real band height (~65px, not the claimed ~54px); recomputed both cases for `17f8787` (~51px with a subtitle — correct; ~49px without — not the claimed ~36px); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** **CLOSED: 🟡 80.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 3f407da — docs(new-order): the scroll-to-top on BACK is the owner's call, not an oversight
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Record that `useEffect(… window.scrollTo(0,0) …, [step])` firing on **backward** steps is intentional, after the builder raised it as a regression and the owner ruled otherwise.
+
+**Comment-only, verified** — every added line in the diff is a comment, one file, seven insertions.
+
+**The "566-product list" figure is correct, and I checked it the wrong way first.** My initial test — `active AND price_paise IS NOT NULL` — returned **0 orderable Bajaj products**, which would have made the number meaningless. That test is wrong. `products_select_salesman` is:
+
+```sql
+role = 'salesman' AND active
+  AND (price_paise IS NOT NULL OR brand.pricing_mode = 'manual')
+```
+
+Bajaj is `pricing_mode: manual`, so all **566** of its active products are visible to a salesman with no price set — the price is typed per line. The commit's figure is exact. (LG, also manual, is longer still at 612, so the argument is if anything understated.)
+
+Recording the false start because it is the second time today that checking saved a wrong claim — the other being my own balance-colour rule. A filter that looks obviously right can encode a rule the database does not have.
+
+**The pattern here is the right one.** The builder raised a real regression, the owner looked at the rendered consequence and preferred it, and it is recorded **at the effect** rather than in a commit message nobody will find — including the specific changes that are now wrong to make unasked:
+
+> *"…should not be 'fixed' into a forward-only reset or a remembered per-step position without asking them first."*
+
+Naming the tempting fixes is what makes this comment do work. A bare "this is intentional" invites someone to improve it anyway.
+
+**Worth stating plainly what the owner accepted**, since the comment does: returning from Review lands the products list at the **top**, not at the row you left. On a 566-row list that is a real cost, paid knowingly.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** Nothing renders differently; no data, money, RLS or state-machine surface.
+
+**What I tried:** Confirmed the diff is comment-only; tested the 566 figure against `price_paise IS NOT NULL` (wrong — returns 0), then read `products_select_salesman` and found the `pricing_mode = 'manual'` disjunct that makes 566 correct; cross-checked Bajaj's `pricing_mode` and active count (manual, 566) and LG's (manual, 612).
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
