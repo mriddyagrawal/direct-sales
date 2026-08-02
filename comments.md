@@ -8044,3 +8044,46 @@ Naming the tempting fixes is what makes this comment do work. A bare "this is in
 **What I tried:** Confirmed the diff is comment-only; tested the 566 figure against `price_paise IS NOT NULL` (wrong — returns 0), then read `products_select_salesman` and found the `pricing_mode = 'manual'` disjunct that makes 566 correct; cross-checked Bajaj's `pricing_mode` and active count (manual, 566) and LG's (manual, 612).
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 66eb406 — fix(flow): back button up to 44x44 — 36 was too small to hit
+
+**Verdict:** ✅ — and the comment it leaves behind is now the most reliable thing in this file.
+
+**Phase / commit goal:** Owner used the rendered screen and found 36px too small. `.back` goes 40×36 → **44×44**.
+
+**The arithmetic is correct at last, and I checked it rather than took it.** With `.header` at `padding: 6px 16px`:
+
+```
+.back            44px          ← tallest child, both cases
+titles w/ sub    ~38px         (18px title ≈23 line box + 2 gap + 10px sub ≈13)
+titles w/o sub   ~23px
+band = max(44, 38) + 6 + 6 + 1px border = ~57px   on every screen
+```
+
+~57px sits inside the 50–60px the sticky-header guidance gives for a phone, and down from the ~65px this started at. **So the touch target came back without returning to the size the owner rejected** — those two were never actually in conflict, because the 65px band was 44px button *plus* 10px padding, and the padding is 6px now.
+
+**The derived consequence in the comment is the valuable part**, and it checks out:
+
+> *"The subtitle is free — it fits inside the button's height — which also means dropping the AREA line would NOT make the band shorter."*
+
+38px < 44px, so the subtitle sits inside the button's shadow. That kills the "next lever" an earlier version of this comment had proposed — dropping the area subtitle from the Quick Order ribbon — which would have cost content and saved **zero** pixels. Catching a proposed optimisation that does nothing, before anyone builds it, is worth more than the fix itself.
+
+**Both earlier arithmetic errors are named in place**, not quietly overwritten:
+
+> *"Two earlier versions of this comment got that wrong in opposite directions — first adding padding to the title stack and claiming ~54px when the band was ~65px, then repeating the same slip for the no-subtitle case."*
+
+That is the right treatment for a number that has now been wrong twice: state the rule (*the row is as tall as its tallest child*), state what it yields, and record the specific way people keep getting it wrong.
+
+**On 🟡 79:** I noted when reviewing `17f8787` that the closure's rationale had stopped covering this control, because I had cited 44px as the iOS HIG minimum and the button had gone to 36. At 44×44 that rationale applies again exactly. Still under this app's own `--touch-target-min` of 48 — which the comment says out loud, along with what the extra 4px would cost — but 44 is a published floor rather than an improvised number, which is what 79 was closed on.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Mobile** — the entire subject, and the sequence is worth noting as a whole: 48×48 → 40×36 → 44×44, each step driven by the owner using the actual screen. Three passes looks like churn in a log and is not; it is a trade being tuned against a real thumb, which no build could have settled. **Money / RLS / state machine / snapshots** — untouched.
+
+**What I tried:** Recomputed the band from the current `.header` and `.back` rules for both the subtitle and no-subtitle cases (57px in each, matching); verified the "subtitle is free" claim by comparing the title stack (~38px) against the button (44px); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
