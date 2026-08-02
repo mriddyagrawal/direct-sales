@@ -11,6 +11,11 @@ interface FlowHeaderProps {
   // header — the title already truncates, so a long shop name yields space to
   // it rather than pushing it off.
   trailing?: React.ReactNode;
+  // Opt-in, per screen — NOT the default. A screen that already pins something
+  // of its own (Quick Order's search bar) would end up with two bands fighting
+  // for top: 0, and the stack would blow past the ~10% of viewport that
+  // persistent headers should stay under.
+  sticky?: boolean;
   onBack: () => void;
 }
 
@@ -18,9 +23,9 @@ interface FlowHeaderProps {
 // (design spec §3). No step language anywhere — the header's job is just
 // navigation (the bottom tab bar hides during the order-taking flow) and,
 // on S4, confirming which shop the order is for.
-export function FlowHeader({ title, subtitle, trailing, onBack }: FlowHeaderProps) {
+export function FlowHeader({ title, subtitle, trailing, sticky = false, onBack }: FlowHeaderProps) {
   return (
-    <div className={styles.header}>
+    <div className={sticky ? `${styles.header} ${styles.sticky}` : styles.header}>
       {/* lucide ChevronLeft, the app's back glyph everywhere else (order
           detail and retailer detail both use it via back.module.css). This was
           a literal "←" at 20px in a 48-wide box — a different mark, twice the

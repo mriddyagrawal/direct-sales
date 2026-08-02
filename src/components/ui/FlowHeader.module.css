@@ -68,3 +68,15 @@
   text-transform: uppercase;
   color: var(--color-locked);
 }
+
+/* Opt-in sticky (PickRetailer). Measured before adopting: this header is ~66px
+   — 16px padding either side of an 18px title over a 10px subtitle — which is
+   ~8% of a 780px phone viewport, inside the ~10% that NN/g gives as the ceiling
+   for a persistent header. That budget is also why the picker's SEARCH field is
+   deliberately NOT pinned under it: the pair would be ~126px, about 16%, and
+   the guidance turns negative past ~15%. */
+.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}

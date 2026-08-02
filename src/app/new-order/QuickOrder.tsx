@@ -5,7 +5,7 @@ import { FlowHeader } from "@/components/ui/FlowHeader";
 import { Stepper } from "@/components/ui/Stepper";
 import { KeypadSheet } from "@/components/ui/KeypadSheet";
 import { formatRupees, formatShortDate } from "@/lib/format";
-import { ledgerText, readBalance } from "@/lib/balance";
+import { readBalance } from "@/lib/balance";
 import { cartLineCount, cartTotalPaise } from "@/lib/cart";
 import { parsePricePaise } from "@/lib/price";
 import {
@@ -50,10 +50,14 @@ interface QuickOrderProps {
   onBack: () => void;
 }
 
-// Ribbon balance colour. BLUE for owed, not the office ledger's red — the
-// salesman is standing in front of the shopkeeper with this screen open, and
-// red reads as an accusation across the counter. Matches RetailerList, which
-// made the same call for the same reason; RetailersQueue (office) keeps red.
+// Ribbon balance colour. RED for owed here, unlike the LIST surfaces
+// (RetailerList) which went blue (owner 2026-08-02).
+//
+// The distinction is what leaks, not what screen it is. A list shows every
+// OTHER shop's balance, and a wall of red in front of a shopkeeper reads as
+// "this man collects from the whole market" — hence blue there. This ribbon
+// shows only the balance of the shop being served, which that shopkeeper
+// already knows, so the salesman gets the real alarm colour back.
 function balanceClass(paise: number | null): string {
   const { state } = readBalance(paise);
   if (state === "unknown") return styles.headerBalanceNone;
@@ -347,23 +351,42 @@ export function QuickOrder({
         subtitle={retailerArea ?? undefined}
         onBack={onBack}
         trailing={
-          // Same ledger rendering as order detail's hero, via the shared
-          // ledgerText — "₹84,320 Dr". NO "as of" date here (owner
-          // 2026-08-02): the ribbon is glanced at mid-conversation, and the
-          // sync date is an audit detail that belongs on the order, not in the
-          // middle of writing one.
+          // The bare figure — NO Dr/Cr and no "as of" (owner 2026-08-02).
+          // ledgerText() stays in lib/balance.ts for order detail and whatever
+          // comes next; this screen is deliberately out of that standard. The
+          // ribbon is glanced at mid-conversation while writing an order, and
+          // the markers and the sync date are both audit detail. A credit
+          // reads "-₹45,000" here, exactly as it does on the picker and the
+          // Retailers tab, so all three list-ish surfaces agree.
           //
           // Undefined means the shop was not in the cached list at all, which
           // is a different thing from an unsynced shop — render nothing rather
           // than an em dash that would claim Tally missed it.
           retailerOutstandingPaise === undefined ? undefined : (
             <span className={`${styles.headerBalance} ${balanceClass(retailerOutstandingPaise)}`}>
-              {ledgerText(readBalance(retailerOutstandingPaise))}
+              {readBalance(retailerOutstandingPaise).text}
             </span>
           )
         }
       />
       <div className={styles.searchBar} ref={searchBarRef}>
+        {/* Which shop this order is for, kept visible while the ribbon above
+            scrolls away. Deliberately a LINE inside the band that is already
+            pinned rather than pinning the ribbon too: the ribbon is ~66px and
+            this bar is ~88px, so stacking them would put ~150px — about 19% of
+            a phone viewport — of permanent furniture above a list whose whole
+            job is scanning products. Persistent headers want to stay near 10%.
+            This costs ~16px and carries the two facts that actually go missing.
+            The ribbon still shows them at rest; that overlap is the price of
+            not pinning it. */}
+        <p className={styles.searchBarShop}>
+          <span className={styles.searchBarShopName}>{retailerName}</span>
+          {retailerOutstandingPaise !== undefined && (
+            <span className={balanceClass(retailerOutstandingPaise)}>
+              {readBalance(retailerOutstandingPaise).text}
+            </span>
+          )}
+        </p>
         <div className={styles.searchRow}>
           {multiBrand && (
             <select

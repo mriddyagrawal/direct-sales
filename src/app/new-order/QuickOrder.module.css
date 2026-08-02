@@ -479,3 +479,23 @@
 .headerBalanceNone {
   color: var(--color-locked);
 }
+
+/* The shop reminder inside the sticky search band — the one thing that goes
+   missing when the ribbon scrolls away. Quiet by design: it is a reminder, not
+   a heading, and the products underneath are the scan target. */
+.searchBarShop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.searchBarShopName {
+  font-family: var(--font-structure);
+  font-weight: 600;
+  color: var(--color-locked);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -126,7 +126,11 @@ export function PickRetailer({ retailers, recentRetailerIds, salesmanId, onSelec
 
   return (
     <div className={styles.page}>
-      <FlowHeader title="Select retailer" onBack={onBack} />
+      {/* Sticky here and nowhere else in the flow: this screen pins nothing
+          else, so the header is the only persistent band and stays inside the
+          ~10% viewport budget. Scrolling a 599-shop list used to take the
+          title and the back arrow with it. */}
+      <FlowHeader title="Select retailer" onBack={onBack} sticky />
       <div className={styles.content}>
         <RetailerList
           retailers={retailers}
