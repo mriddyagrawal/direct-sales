@@ -1,24 +1,24 @@
-/* 6px of vertical padding (owner 2026-08-02, second pass — still too big at
-   10). The arithmetic, corrected: the previous round claimed ~54px by adding
-   padding to the TITLE stack, but `.back` carried `min-height: 44px`, and the
-   row is as tall as its tallest child — so the band was really ~65px and the
-   title stack was never the floor. The button is 36px now and the titles
-   (~23px title + 2 + ~13px subtitle = ~38px) genuinely set the height:
+/* 6px of vertical padding, down from the original 16.
 
-     6 + 38 + 6 + 1px border = ~51px   with a subtitle (picker, Quick Order)
-     6 + 23 + 6 + 1px border = ~36px   without one (Review, deposits)
+   THE ARITHMETIC, and read this before changing any number here: the row is as
+   tall as its TALLEST CHILD, and that is `.back` (44px), not the title stack
+   (~38px with a subtitle, ~23px without). Two earlier versions of this comment
+   got that wrong in opposite directions — first adding padding to the title
+   stack and claiming ~54px when the band was ~65px, then repeating the same
+   slip for the no-subtitle case. So:
 
-   ~51px sits at the bottom of the 50-60px band the sticky-header guidance
-   gives for a phone.
+     6 + 44 + 6 + 1px border = ~57px   EVERY screen, subtitle or not
+
+   ~57px is inside the 50-60px the sticky-header guidance gives for a phone, and
+   down from ~65px where this started. The subtitle is free — it fits inside the
+   button's height — which also means dropping the AREA line would NOT make the
+   band shorter. The only lever left is the button, and it just went UP to 44
+   because 36 was too small to hit.
 
    HORIZONTAL padding stays 16px and should not be cut: it is the app's page
    inset, so it is what lines the shop name up with the search bar and the
-   product rows underneath. Trimming it would save nothing vertically and
-   misalign the column.
-
-   Next lever, if this is still too tall: drop the AREA subtitle from the Quick
-   Order ribbon, which takes it to ~36px. That is a content decision, not a
-   spacing one. */
+   product rows underneath. Trimming it saves nothing vertically and misaligns
+   the column. */
 .header {
   display: flex;
   align-items: center;
@@ -28,18 +28,20 @@
   background: var(--color-white);
 }
 
-/* 40x36, down from the original 48x48 (owner 2026-08-02, two passes). The
-   glyph inside is 18px, so most of that box was empty — and the HEIGHT was the
-   hidden reason the ribbon would not slim below ~65px: a flex row is as tall as
-   its tallest child, so a 44px button held the band open no matter what the
-   padding did. At 36 the title stack sets the height instead.
+/* 44x44 (owner 2026-08-02, third pass — 36 was too small for fingers, and they
+   said so after actually using it).
 
-   Accepted cost, consistent with the 37px retailer rows: 36px is under the 48px
-   --touch-target-min. It sits at the screen edge, where a thumb landing left of
-   it still lands on it, and the full 40x36 is tappable, not just the glyph. */
+   The history is worth keeping, because this is a trade being tuned rather than
+   indecision: 48x48 originally (too wide — it ate the shop name), then 40x36
+   (band slimmed to ~51px, but the target got hard to hit), now 44x44 — Apple's
+   recommended minimum and the widely-cited floor for a fingertip.
+
+   Being the tallest child again, this sets the band height (see .header). Still
+   under this app's own --touch-target-min of 48px, which would cost another
+   4px of band; 44 is where the owner landed. */
 .back {
-  min-width: 40px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
