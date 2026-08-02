@@ -462,12 +462,13 @@
   white-space: nowrap;
 }
 
-/* BLUE for owed, not red (owner 2026-08-02). This screen is open on the
-   salesman's phone while he stands at the counter, so red reads as an
-   accusation to the shopkeeper across it. Same call as RetailerList; the
-   office queue keeps red, where the alarm is the point. */
+/* RED for owed (owner 2026-08-02) — unlike RetailerList, which went blue.
+   The split is about what LEAKS, not which screen it is: a LIST shows every
+   OTHER shop's balance to whoever is looking over the salesman's shoulder,
+   while this ribbon shows only the shop being served, who already knows what
+   they owe. So the real alarm colour belongs here. */
 .headerBalanceOwed {
-  color: var(--color-accent);
+  color: var(--color-error);
 }
 
 .headerBalanceClear {
@@ -480,22 +481,6 @@
   color: var(--color-locked);
 }
 
-/* The shop reminder inside the sticky search band — the one thing that goes
-   missing when the ribbon scrolls away. Quiet by design: it is a reminder, not
-   a heading, and the products underneath are the scan target. */
-.searchBarShop {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 11px;
-}
-
-.searchBarShopName {
-  font-family: var(--font-structure);
-  font-weight: 600;
-  color: var(--color-locked);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* `.searchBarShop` / `.searchBarShopName` lived here — the shop reminder inside
+   the sticky band. Deleted with the markup (owner 2026-08-02: duplication),
+   not left behind as dead rules. */

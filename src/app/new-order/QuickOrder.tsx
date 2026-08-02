@@ -370,23 +370,13 @@ export function QuickOrder({
         }
       />
       <div className={styles.searchBar} ref={searchBarRef}>
-        {/* Which shop this order is for, kept visible while the ribbon above
-            scrolls away. Deliberately a LINE inside the band that is already
-            pinned rather than pinning the ribbon too: the ribbon is ~66px and
-            this bar is ~88px, so stacking them would put ~150px — about 19% of
-            a phone viewport — of permanent furniture above a list whose whole
-            job is scanning products. Persistent headers want to stay near 10%.
-            This costs ~16px and carries the two facts that actually go missing.
-            The ribbon still shows them at rest; that overlap is the price of
-            not pinning it. */}
-        <p className={styles.searchBarShop}>
-          <span className={styles.searchBarShopName}>{retailerName}</span>
-          {retailerOutstandingPaise !== undefined && (
-            <span className={balanceClass(retailerOutstandingPaise)}>
-              {readBalance(retailerOutstandingPaise).text}
-            </span>
-          )}
-        </p>
+        {/* No shop reminder here, deliberately (owner 2026-08-02). A line
+            repeating the shop name and balance directly under the ribbon that
+            already shows both read as pure duplication at rest, which is worse
+            than what it bought while scrolled. The ribbon owns those two facts.
+            The open question this leaves is the BACK button, which still
+            scrolls away — show-on-scroll-up is the answer there, not a second
+            copy of the header's content. */}
         <div className={styles.searchRow}>
           {multiBrand && (
             <select

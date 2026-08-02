@@ -1,8 +1,15 @@
+/* 10px of vertical padding, not 16 (owner 2026-08-02: the ribbon was too big).
+   Measured rather than guessed: at 16px this band was ~66px — an 18px title
+   over a 10px subtitle plus 32px of padding — against the 50-60px that the
+   sticky-header guidance gives as the phone ceiling. At 10px it lands ~54px,
+   inside that range, and it is the only band on the picker.
+   Horizontal padding stays 16px: that is the app's page inset, and the title
+   must line up with the content beneath it. */
 .header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-white);
 }
