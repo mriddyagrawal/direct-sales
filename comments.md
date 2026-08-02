@@ -7739,3 +7739,61 @@ things here were only ever checked that way:
 
 **Open at the merge:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 (half closed),
 🟡 72, 🟡 73, 🟡 74. None blocking; all owner decisions rather than builder work.
+
+---
+
+## Review of da74a48 — feat(orders): blue on the salesman's lists, and the shop's balance in the Quick Order ribbon
+
+**Verdict:** ⚠️ — the feature is right and the reasoning behind it is the best in this run, but the new rule is applied to two of the three salesman surfaces and one comment now states the opposite of the truth.
+
+**Committed to `main` directly, and NOT pushed** — `origin/main` is still `f87c9d5`, local is `da74a48`. So this is not live, and there is a window to adjust before it is.
+
+### 🟡 74 is NARROWED — the wording is shared now
+
+`ledgerText(reading)` moves into `lib/balance.ts` and `OrderDetailView`'s inline expression is deleted. Two callers today — the hero and the new ribbon — and the stated reason is exactly right: *"a second private copy is how the two start disagreeing."* The absolute-value guard and the bare `₹0` came with it.
+
+74 does not close: the list surfaces still render `balance.text` directly, so a credit is `₹45,000 Cr` on order detail and in the ribbon, `-₹45,000` in the queue, the picker and the tab.
+
+### The reason recorded here is worth keeping
+
+> *"The salesman opens this list standing in front of a shopkeeper, and a screen of red reads to that shopkeeper as 'this man is owed money by the whole market'."*
+
+That is a physical constraint on the product, not a taste, and it is the kind of thing that gets re-litigated every year unless it is written down where the code is. It is, now. The commit is also honest about the limit — *"blue removes the impression, not the information"* — rather than implying it is a privacy control.
+
+### 🟡 76 — the rule is applied to two of the three salesman surfaces
+
+Blue now means "owed" on the **picker**, the **Retailers tab** and the **Quick Order ribbon**. It does **not** on **order detail** — `.balanceOwed` is still `var(--color-error)`, and `OrderDetailView.module.css` was not touched by this commit.
+
+But `/orders/[id]` is a salesman surface. He opens his own order in the shop, on the same phone, in front of the same shopkeeper — and that page shows the balance in red. The argument that justified the change covers it exactly as well as it covers the picker.
+
+Either the page should go blue with the others, or the rule is narrower than stated and should say so — something like "the browsing surfaces, where a whole column of red is the problem" versus "one figure on one order". That is a defensible distinction, but it is not the one written down, and right now the difference looks accidental rather than chosen.
+
+### 🟡 77 — a comment now states the opposite of the truth
+
+`OrderDetailView.module.css:487-488` still reads:
+
+> *"Same three tones as the office ledger and the salesman's lists — one meaning per colour across every surface that shows a balance."*
+
+Both halves are now false: the salesman's lists are blue, and colour no longer means one thing across every surface. `RetailerList.module.css`'s equivalent comment was rewritten thoroughly in this commit; this one was missed.
+
+This matters more than a stale comment usually does, because it describes an **invariant**, and the next person to read it may well "restore" the consistency it promises — in either direction, on either surface.
+
+### The ribbon's data path is the right call
+
+It reads the balance from the `["retailers"]` cache by `cart.retailerId` rather than threading it through the flow reducer. The reason given holds: the reducer route means three actions plus the localStorage draft, and **a resumed draft would show a balance frozen at whenever it was saved** — which is the one thing a live figure must never do. Reading from the cache means it is always current.
+
+`undefined` (shop absent from the cached list) renders nothing, distinct from an unsynced shop's em dash. Correctly separated.
+
+**`FlowHeader`'s new `trailing` slot** takes the slack in the titles column so a long shop name ellipsises rather than shoving the figure off the ribbon — the same `min-width: 0` lesson as the picker row. Every other caller passes nothing.
+
+**Blast radius checked:** `ledgerText` has two call sites; `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 76 and 🟡 77 above. Also: blue here is `--color-accent`, whose own token comment reserves it for *"editable status, primary action fill, focus, selection"*. It now also means "this shop owes money" on three screens. That is the same overload `--color-error` took for balances on 2026-08-01 and it is survivable — but the token comment is the place that should say so, or the next person reads the token as still reserved.
+
+**Domain / correctness checks:** **Money** — `readBalance` + the now-shared `ledgerText`; absolute value on Cr, bare `₹0`, em dash for unknown, no raw paise. **RLS** — no query change; the ribbon reads a cache the picker already populates. **Immutable snapshots** — deliberately avoided for this figure, and the reasoning is recorded. **Mobile** — the entire subject of the commit.
+
+**What I tried:** Read the full diff and message; confirmed `ledgerText` is shared and has exactly two call sites; checked which token the blue is (`--color-accent`) against its declared reservation; **checked whether order detail moved too — it did not, `.balanceOwed` is still `--color-error` and its stylesheet is not in the commit** (🟡 76); grepped for surviving claims that colour is uniform across surfaces and found the stale pair at `OrderDetailView.module.css:487-488` (🟡 77); confirmed `origin/main` is still `f87c9d5` so this is unpushed; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 76, 🟡 77. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (both **narrowed** — wording now shared between order detail and the ribbon, lists still bare), 🟡 72, 🟡 73.
