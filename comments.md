@@ -7797,3 +7797,67 @@ It reads the balance from the `["retailers"]` cache by `cart.retailerId` rather 
 **What I tried:** Read the full diff and message; confirmed `ledgerText` is shared and has exactly two call sites; checked which token the blue is (`--color-accent`) against its declared reservation; **checked whether order detail moved too — it did not, `.balanceOwed` is still `--color-error` and its stylesheet is not in the commit** (🟡 76); grepped for surviving claims that colour is uniform across surfaces and found the stale pair at `OrderDetailView.module.css:487-488` (🟡 77); confirmed `origin/main` is still `f87c9d5` so this is unpushed; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 76, 🟡 77. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (both **narrowed** — wording now shared between order detail and the ribbon, lists still bare), 🟡 72, 🟡 73.
+
+---
+
+## 🟡 76 and 🟡 77 CLOSED — owner ruling + df1d250
+
+**🟡 76 CLOSED — WON'T FIX, intentional.** Order detail shows owed in **red**
+while the picker, the Retailers tab and the Quick Order ribbon show it in blue.
+Owner 2026-08-02: *"order detail being red is intentional."* Not an oversight
+from `da74a48` and not to be "fixed" into consistency.
+
+**🟡 77 CLOSED** — the stale invariant is gone (`df1d250`, REVIEWER-authored at
+the owner's request). `.balanceOwed`'s comment claimed *"one meaning per colour
+across every surface that shows a balance"*, which both halves of stopped being
+true when the lists went blue. Replaced with the actual assignment.
+
+**Recorded while writing it, because my first draft of that comment was wrong:**
+the line is **not** "how many shops are on screen". The Quick Order ribbon shows
+exactly one shop and is blue. The test that fits all five surfaces is the
+screen's **job** — the ones worked ON with the phone out and the shopkeeper
+beside you (choosing a shop, browsing, writing the order) are blue; the ones
+**read** (an order's record, the office ledger) are red.
+
+---
+
+## Review of 25c9912 — fix(flow): the app's back glyph in the flow ribbon, and every step starts at the top
+
+**Verdict:** ✅ — both fixes are correct, and one of them is a bug that only a real device would have surfaced.
+
+**The scroll fix is the valuable half.** The flow's steps are React state, not routes, so nothing reset the document scroll between them: scrolling halfway down the retailer list and tapping a shop opened Quick Order **already scrolled by the same amount** — no ribbon, no search, first products cut off. A route change does this for free; a state change does not.
+
+`useEffect(() => window.scrollTo(0, 0), [step])` is the right instrument **for this flow specifically**, and I checked rather than assumed: `PickRetailer.module.css`'s `.page` is `min-height: 100vh`, so the **document** scrolls here. The salesman's tab shells are the opposite — `position: fixed; inset: 0` with an inner scroller — and `window.scrollTo` would do nothing there. Correct because the flow is not one of those, which is worth knowing before this pattern is copied.
+
+**The glyph unification is right:** `FlowHeader` was a literal `←` at 20px while every other back in the app is lucide `ChevronLeft` via `back.module.css`. Four screens wear this header — the picker, Quick Order, Review, the deposits flow — and I confirmed those are exactly the four callers. Godown's `PickScreen` keeps its own `‹` and is untouched, correctly, as it was not in the report.
+
+**The builder left the numbering to me** on the parked privacy decision — *"Deliberately NOT a numbered review flag — numbering is the REVIEWER's."* That is the right boundary, and it gets 🟡 78 below.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+### 🟡 78 — the parked balance-privacy decision
+
+`docs/specs/balance-privacy-on-salesman-screens.md` records it: only the **list** surfaces expose *other* shops' balances; the ribbon and order detail show the shop being served, which that shopkeeper already knows. The blue that shipped in `da74a48` removes the impression, **not the information**. The doc argues for a single header toggle over a per-row eye — on the grounds that a per-row reveal happens in front of exactly the person it hides from, which is a good argument.
+
+Numbered so it sits in the ledger with everything else rather than only in a spec file. Owner decision, not builder work.
+
+### 🟡 79 — two sub-48px touch targets, both on the salesman's most-tapped controls
+
+`--touch-target-min: 48px` is **not** decorative — 11 rules across godown, deposits, the users modal, `Field` and `Button` still honour it. But it now has two documented exceptions, and they are next to each other in one journey:
+
+| | size | what it is |
+|---|---|---|
+| `RetailerList` row | **~37px** | the tap that chooses which **shop** an order or deposit is for |
+| `FlowHeader` back | **40 × 44px** | *"the most-tapped control in the flow"*, by this commit's own words |
+
+Each is argued locally and each argument is reasonable — the row was sized by content at the owner's request, and an edge-anchored arrow does have effective outward reach on touch (44px is also the iOS HIG minimum, if not Material's 48). Both are self-documenting in their stylesheets.
+
+Raising it as one flag rather than two because the pattern is the point: the exceptions are accumulating in exactly one place — the salesman's ordering path, on a phone, in a shop — and that is where a mis-tap costs most (the wrong shop, or a lost step). Two is a pattern, not yet erosion. Worth a deliberate answer: either the token is 44 and says so, or the exceptions get a stated rule.
+
+**Blocking issues:** None. **Non-blocking suggestions:** 🟡 78, 🟡 79.
+
+**Domain / correctness checks:** **Money / RLS / state machine / snapshots** — untouched. **Mobile** — the entire subject; the scroll bug was phone-only in effect and would never appear in a build.
+
+**What I tried:** Read the diff and the new spec doc; confirmed the flow document-scrolls (`.page` is `min-height: 100vh`) so `window.scrollTo` is the right instrument, and noted where it would not be; enumerated `FlowHeader`'s callers against the claimed four; measured the new back box (40×44) against `--touch-target-min` and counted the token's 11 surviving honest usages to check whether it is being abandoned (it is not) — the basis of 🟡 79; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** **CLOSED: 🟡 76, 🟡 77.** New: 🟡 78, 🟡 79. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73.
