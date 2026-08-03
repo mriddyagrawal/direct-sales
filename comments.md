@@ -8401,3 +8401,68 @@ I would take the first, since a supported date is more useful than none.
 **What I tried:** Diffed the TSX to confirm the heading block was moved verbatim rather than rewritten; checked the chips render once, above the heading, ahead of both the phone rows and the desktop table; confirmed the `!notSynced` guard covers the chips as well as the window label; re-ran the class sweep with the corrected regex; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (settle before the PDF).
+
+---
+
+## Review of 074dc24 — feat(ledger): Export — the statement of account as a PDF
+
+**Verdict:** ✅ — every trap in the spec is handled, and I proved the document renders rather than trusting that it compiles.
+
+### Rendered, not just typechecked
+
+`tsc` passing says nothing about whether react-pdf can lay a document out. I called `renderStatementPdfBuffer` directly against three shapes:
+
+```
+  normal (5 entries)   4037 bytes  header=%PDF-  OK
+  credit opening       3434 bytes  header=%PDF-  OK
+  no entries           3299 bytes  header=%PDF-  OK
+```
+
+All three produce valid PDFs, including the two edge shapes — a **negative** opening balance and a statement with **no rows at all**. Byte inspection confirms **no raw U+20B9 anywhere** in the output, so the encoding trap is genuinely avoided rather than merely commented about.
+
+*(Two alarms from my own harness, both mine: I first passed `name` instead of `retailerName` and omitted `printedAtIso`, which produced the `.replace` failure; and I gave every row `id: 1`, which produced React key warnings. With correct props and unique ids: renders clean, zero warnings. The component's `key={e.id}` is right and real rows carry distinct bigints.)*
+
+### The access control is the fetch order, and it says so
+
+```
+⚠️ THE RETAILER IS FETCHED FIRST, AND THAT ORDER IS THE ACCESS CONTROL.
+```
+
+Retailer → `404` → *then* the ledger. Route sits at `/retailers/[id]/statement/pdf` — **neutral, never under `/dashboard/*`** — because the salesman must reach it, and the comment cites the pick-slip route's identical reasoning. `runtime = "nodejs"` present.
+
+**An addition I did not specify and should have:** a shop with `outstanding_paise === null` gets a **404 with a message** rather than a document, because *"printing a confident Rs 0 would be a lie… here the honest answer is no document at all."* That is the app's null-vs-zero discipline applied to something that leaves the building — the strongest place to apply it.
+
+**The `since` param is validated against the union with a fallback** rather than trusted or thrown on, so a hand-edited URL degrades to the default instead of erroring.
+
+### The document
+
+| spec | built |
+|---|---|
+| Period clamped to real data | `Period ${first} to ${last}` from the actual rows, never the nominal start |
+| Opening always printed, even Rs 0 | present, and the type documents why |
+| Running BALANCE column | `running = running + debit − credit`, seeded from the opening |
+| Oldest-first | inherited from the ascending query |
+| A4 | yes — *"a six-column table that has to stay legible after a phone photo of a printout"* |
+| `Rs`, never `₹` | via the lifted `pdfMoney` |
+
+**The totals foot the opening into the correct column** — `Math.max(opening, 0)` to DR and `Math.max(-opening, 0)` to CR — so a credit brought forward lands in CR. Same care the screen table got, and I did not specify it in either place.
+
+**The lift is real, not a copy.** `src/lib/pdf-encoding.ts` is new and **both** PDFs import from it; `PickSlipPdf.tsx` shrank by 36 lines. Two documents cannot now drift on the same WinAnsi workaround.
+
+**The Export button passes `?since=${since}`**, so the document follows the window on screen.
+
+### 🟡 82 — sidestepped in the PDF, still open on screen
+
+The PDF's opening row reads **"Opening balance"** with **no date**, which is the "brought forward" option and claims nothing. So the dated-balance risk never reaches a customer — which was the part that mattered.
+
+On screen both sites still read `Balance before {sinceLabel}` with the nominal filter date. The flag stays open, now purely cosmetic: a figure labelled "before 04 Feb" that is really the balance before the earliest held row.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 82 on the two screen sites.
+
+**Domain / correctness checks:** **Money** — paise throughout; opening footed to the correct column; `null` refused a document rather than rendered as zero. **RLS** — the fetch order is the boundary and is documented as such. **Mobile** — Export is a link with `target="_blank"`, so it works on a phone without the Web Share path the pick slip uses.
+
+**What I tried:** Read the route and confirmed neutral path, `runtime = "nodejs"`, retailer-before-ledger, the unsynced 404, and the validated `since`; **executed `renderStatementPdfBuffer` against three data shapes** and verified `%PDF-` headers and the absence of raw U+20B9; corrected two faults in my own harness before drawing conclusions; confirmed `pdf-encoding.ts` is imported by both PDFs; read the running-balance seed and the totals' `Math.max` split; checked the Export href carries `since`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only now).
