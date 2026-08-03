@@ -8642,3 +8642,48 @@ dependency. Parked as its own change, with `Rs` shipping meanwhile.
 
 **Open at the merge:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed),
 🟡 72, 🟡 73, 🟡 78 (parked). None blocking; all owner decisions.
+
+---
+
+## Review of f918979 — style(pdf): the statement table drops "Rs" from its cells
+
+**Verdict:** ✅ — committed straight to `main` and **already pushed**, so this is live.
+
+**The change:** the two standalone figures that bracket the table keep `Rs 17,100 Dr`; the cells and the TOTAL row go bare. Repeating a unit on ~50 rows across three columns is noise once it is stated at both ends — standard for a statement, and the figures that carry the *claim* are exactly the two that keep it.
+
+**Taking the TOTAL row bare with the table is the right call**, and the reason given is the good one: *"it is a column sum, and a column reads as one thing or it does not."* A totals row in a different unit format than the column it totals is worse than either choice made consistently.
+
+### The important part is structural, not cosmetic
+
+`pdfAmount()` returns the bare grouped figure and `pdfMoney()` is now `` `Rs ${pdfAmount()}` `` — so **the ₹-strip exists in exactly one place**, and the commit says why that matters:
+
+> *"the anchored-regex bug that printed 'Rs -¹15,702' two commits ago came from that strip, and a second copy is where it would come back."*
+
+Verified: `pdf-encoding.ts:41` is the only `.replace("₹", "")` in the file; every other occurrence is commentary. The obvious way to write this change was a second stripper for the bare case, which would have reintroduced the exact defect this run just fixed.
+
+### Tested at the level the bug actually lived
+
+My previous attempt searched PDF bytes for UTF-8 and could not have found anything. This time I exercised the helpers directly, which is where the defect was:
+
+```
+      paise         pdfAmount()        pdfMoney()
+   -1570200        -15,702            Rs -15,702
+   -4500000        -45,000            Rs -45,000
+16782340000        16,78,23,400       Rs 16,78,23,400
+  -50000000        -5,00,000          Rs -5,00,000
+                                      ₹ leaks: 0
+```
+
+Eight shapes including every negative and both real prod extremes — **zero leaks**. `pdfMoney` still prefixes `Rs`, so the pick slip is unaffected; `pdfAmount` is genuinely bare.
+
+Re-rendered all three document shapes afterwards: still valid PDFs. Stated precisely — that proves layout, not text content.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the unit is still stated twice, on the two figures that make claims; the cells that are read as a column are consistent with each other. **Mobile** — n/a, PDF only.
+
+**What I tried:** Ran `pdfAmount` and `pdfMoney` against eight values including all negatives and the prod max/min, checking both outputs for ₹ (zero); confirmed `pdf-encoding.ts` contains exactly one `.replace("₹", "")` and that everything else is comment; confirmed `pdfMoney` still prefixes `Rs` so the pick slip is untouched; re-rendered the three statement shapes; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
