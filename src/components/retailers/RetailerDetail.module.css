@@ -279,3 +279,42 @@
     padding: 24px;
   }
 }
+
+/* ── THE SINCE-FILTER ─────────────────────────────────────────────────────
+   Four presets, all of them ending TODAY. Same chip grammar as the retailers
+   queue's filter tabs — mono, small, the active one filled ink — so a filter
+   looks like a filter everywhere in the app. */
+.sinceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 9px 0 2px;
+}
+
+.sinceChip {
+  min-height: 28px;
+  padding: 3px 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-figures);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+}
+
+.sinceChipOn {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-white);
+}
+
+/* While a new window loads, the rows on screen are the PREVIOUS window's (see
+   keepPreviousData in the component) — so the opening balance derived from
+   them does not yet match the label above. Dimming says "updating" rather than
+   letting a stale-but-crisp number read as final. The chips and the heading
+   stay sharp: they are what the reader just acted on. */
+.statementBusy {
+  opacity: 0.55;
+}

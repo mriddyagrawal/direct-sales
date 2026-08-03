@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Pencil } from "lucide-react";
 import { BackLink } from "@/components/BackLink";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +20,8 @@ import {
   ledgerSinceDate,
   openingBalancePaise,
   LEDGER_SINCE_DEFAULT,
+  LEDGER_SINCE_PRESETS,
+  type LedgerSince,
 } from "@/lib/queries/ledger";
 import { createClient } from "@/lib/supabase/client";
 import { readBalance, ledgerText } from "@/lib/balance";
@@ -52,19 +54,33 @@ export function RetailerDetail({
   const isStaff = role === "staff";
   const now = new Date(nowMs());
 
-  // The ledger, from the same cache the page's server render seeded. The
-  // preset is the query KEY, not the date, so the server and the client agree
-  // even if the request crosses midnight IST between them.
-  const { data: entries = [] } = useQuery({
-    queryKey: ["ledger", retailer.id, LEDGER_SINCE_DEFAULT],
-    queryFn: () => fetchRetailerLedger(createClient(), retailer.id, ledgerSinceDate(LEDGER_SINCE_DEFAULT)),
+  // The statement window. A START DATE only, never a from/to range: the proof
+  // at the bottom is only the CURRENT outstanding if the window ends today, so
+  // a closed range would make the page state a figure it cannot support.
+  const [since, setSince] = useState<LedgerSince>(LEDGER_SINCE_DEFAULT);
+
+  // The ledger, from the same cache the page's server render seeded. The PRESET
+  // is the query key, not the date, so the server and the client agree even if
+  // the request crosses midnight IST between them.
+  //
+  // keepPreviousData: without it, tapping a chip changes the key, `data` goes
+  // undefined for the round trip, and the statement flashes its empty state —
+  // "No entries since …" — on a shop that has plenty. The old window's rows
+  // stay put instead, dimmed by .statementBusy, which also stops the opening
+  // balance flickering through a wrong value: it is DERIVED from the rows on
+  // screen, so while they are the previous window's it does not match the label
+  // above them. Dimming says "updating" for the ~200ms that lasts.
+  const { data: entries = [], isFetching } = useQuery({
+    queryKey: ["ledger", retailer.id, since],
+    queryFn: () => fetchRetailerLedger(createClient(), retailer.id, ledgerSinceDate(since)),
+    placeholderData: keepPreviousData,
   });
 
   const balance = readBalance(retailer.outstanding_paise);
   const balanceClass =
     balance.state === "unknown" ? styles.amtNone : balance.state === "clear" ? styles.amtClear : styles.amtOwed;
   const notSynced = retailer.outstanding_paise === null;
-  const sinceIso = ledgerSinceDate(LEDGER_SINCE_DEFAULT);
+  const sinceIso = ledgerSinceDate(since);
   const sinceLabel = sinceIso ? formatShortDate(sinceIso) : null;
 
   // Opening balance: what was owed BEFORE this window. Rendered only when it is
@@ -169,9 +185,32 @@ export function RetailerDetail({
       <section className={styles.statement}>
         <div className={styles.statementHead}>
           <span>STATEMENT</span>
-          {!notSynced && sinceLabel && <span className={styles.window}>since {sinceLabel} · to today</span>}
+          {!notSynced && (
+            <span className={styles.window}>{sinceLabel ? `since ${sinceLabel} · to today` : "all entries"}</span>
+          )}
         </div>
 
+        {/* Presets, not a date picker. Every one of them ends TODAY — see the
+            comment on the `since` state. Hidden on an unsynced shop, where
+            there is nothing to filter and the chips would only offer four ways
+            to see the same empty statement. */}
+        {!notSynced && (
+          <div className={styles.sinceRow}>
+            {LEDGER_SINCE_PRESETS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                className={`${styles.sinceChip} ${p.value === since ? styles.sinceChipOn : ""}`}
+                onClick={() => setSince(p.value)}
+                aria-pressed={p.value === since}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className={isFetching ? styles.statementBusy : undefined}>
         {entries.length === 0 ? (
           <p className={styles.empty}>
             {notSynced
@@ -216,6 +255,7 @@ export function RetailerDetail({
             )}
           </>
         )}
+        </div>
 
         {/* THE PROOF. Same figure as the claim above; the 2px ink rule is the
             app's existing "authoritative" device and marks this as a QED rather
