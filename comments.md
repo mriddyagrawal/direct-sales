@@ -8135,3 +8135,56 @@ That is the right treatment for a number that has now been wrong twice: state th
 **What I tried:** Wrote a `tsx` harness against the real `ledger.ts` and ran `ledgerSinceDate` at six boundaries (month middle, 31st, year crossing, both sides of 1 April, and a UTC instant that is the next IST day) plus `openingBalancePaise` at three (normal, empty, null outstanding) — table above; compared the FY rule against `_fy_start()` in the sync; confirmed `istDateKey` formats via `Intl` with an explicit IST zone; enumerated every `as RetailerRow` cast against `RETAILER_SELECT`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of ba133e7 — feat(ledger): the retailer page becomes the statement — claim, working, proof
+
+**Verdict:** ✅ — the spec's hardest trap is handled with the reasoning written where it matters, and two refinements improve on what I specified.
+
+### The RLS trap, handled exactly
+
+Both routes fetch the **retailer first**, `notFound()` on empty, and only then touch the ledger — with the ordering named as load-bearing:
+
+> *"THE LEDGER IS FETCHED ONLY AFTER THAT 404, and the order is load-bearing: `ledger_entries_select_all` is `auth_profile_role() IS NOT NULL`, so the ledger table scopes NOTHING… The retailer row is the boundary, so a shop this caller cannot see must stop the request before a single entry is read."*
+
+That is the one thing in this spec that could have leaked a deactivated shop's statement to a salesman by id, and it is closed by ordering rather than by a guard — which is the same discipline as the route's existing "the URL is not the boundary" comment.
+
+### Two things better than what I specified
+
+**1. The opening-balance guard gained a condition.** I wrote *"render only when non-zero"*; the build is `opening !== null && opening !== 0 && entries.length > 0`. The extra clause is right and the comment says why: with no entries the opening is arithmetically identical to the closing figure, so it would print the same number twice for no reason.
+
+**2. The empty state distinguishes three cases, where I had specified two.**
+
+```
+notSynced   → "Entries appear once a Tally ledger is linked to this shop."
+filtered    → "No entries since <date>."
+genuinely   → "No entries yet."
+```
+
+The middle one is the catch. Without it, a shop with two years of history filtered to 3M would read **"No entries yet"** — telling the reader the shop has no ledger when it has plenty, just older. That is a real misreading of the data, produced by a filter, and it is exactly the kind of thing that only appears once the filter exists.
+
+### Everything the spec settled is present
+
+| | |
+|---|---|
+| Fact table gone | `.facts/.fact/.factLabel/.factValue` **removed, not orphaned** — the dead-rule sweep is clean |
+| Voucher types verbatim | `{e.voucher_type}` raw, no mapping anywhere in the file |
+| Identity as one line | `[area, phone].filter(Boolean)` — absent, not blank |
+| Tally name | `isStaff && notSynced` |
+| Salesman sees the statement | `isStaff` appears **4 times only** — back fallback, the Tally diagnosis, Edit. **No gate on the statement** |
+| Shared balance rule | `readBalance` + `ledgerText` imported and used; no fifth private reading |
+
+**The Tally-name rule was tightened beyond the spec** to `isStaff && notSynced`, with a reason — *"Staff-only, because linking it is an edit."* Correct: a salesman on an unsynced shop cannot act on that name, so showing it would be information he can only be puzzled by. Better than what I wrote.
+
+**CSS swept both directions:** 30 refs in the component and 9 in the skeleton all resolve, and **no rule in the stylesheet is unused** — which matters here because this commit deleted a whole section, and a deleted section is where orphaned rules come from.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — `readBalance`/`ledgerText`/`formatRupees`; the opening derivation stays in paise. **RLS** — the central concern, handled above. **Mobile** — the primary surface, and the empty-state wording is the part a phone reader is most likely to hit. **Immutable snapshots** — n/a; every figure here is live and the page says so.
+
+**What I tried:** Read both route files to confirm the retailer is fetched before the ledger and that `notFound()` precedes any entry read; checked the opening guard and its `entries.length > 0` clause; grepped for any voucher-type mapping (none — rendered raw); confirmed `isStaff` gates only the back fallback, the diagnosis line and Edit, so the salesman gets the full statement; scripted the CSS class sweep in both directions across the component and the skeleton (39 refs resolve, 0 unused rules); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
