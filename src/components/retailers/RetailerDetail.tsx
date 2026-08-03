@@ -84,6 +84,19 @@ export function RetailerDetail({
   const sinceIso = ledgerSinceDate(since);
   const sinceLabel = sinceIso ? formatShortDate(sinceIso) : null;
 
+  // "04 Feb - NOW" (owner 2026-08-04), not "since 04 Feb · to today". Every
+  // preset ends today, so the range form says it in fewer words.
+  //
+  // ALL has no nominal start, so it borrows the OLDEST entry actually held —
+  // which is the honest start of the data rather than an invented one. On the
+  // dated presets the nominal date stays even when it precedes anything we
+  // hold (6M says 04 Feb while the app's earliest row is 1 May): the window is
+  // what was asked for, and overstating it costs nothing on screen. The PDF
+  // clamps to real data instead, because a document sent to a shopkeeper must
+  // not claim months it has no entries for.
+  const windowStart = sinceLabel ?? (entries.length > 0 ? formatShortDate(entries[0].entry_date) : null);
+  const windowLabel = windowStart ? `${windowStart} - NOW` : "all entries";
+
   // Opening balance: what was owed BEFORE this window. Rendered only when it is
   // non-zero — 113 of 406 shops reconcile on their own and the row would say
   // nothing, so its ABSENCE is the signal — and only when there are entries,
@@ -196,7 +209,7 @@ export function RetailerDetail({
         <div className={styles.statementHead}>
           <span>STATEMENT</span>
           {!notSynced && (
-            <span className={styles.window}>{sinceLabel ? `since ${sinceLabel} · to today` : "all entries"}</span>
+            <span className={styles.window}>{windowLabel}</span>
           )}
         </div>
 
