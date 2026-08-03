@@ -221,6 +221,18 @@ export function RetailerDetail({
           </p>
         ) : (
           <>
+            {/* FIRST in the list because it is the OLDEST thing on it. That
+                reasoning is unchanged from when this sat at the BOTTOM — what
+                moved is the entries, which now run oldest-first (owner
+                2026-08-04), so "what they owed before all this" belongs above
+                them rather than below. The proof then reads straight down:
+                opening → bills → receipts → closing. */}
+            {showOpening && (
+              <div className={styles.opening}>
+                <span>Balance before {sinceLabel}</span>
+                <span className={styles.openingValue}>{formatRupees(opening)}</span>
+              </div>
+            )}
             {entries.map((e) => {
               // Sign and colour are the ONLY direction signal on the phone,
               // because the voucher type is Tally's verbatim string and no
@@ -244,15 +256,6 @@ export function RetailerDetail({
                 </div>
               );
             })}
-            {/* Last in the list because it is the OLDEST thing on it — the
-                entries run newest-first, so "what they owed before all this"
-                belongs under them. */}
-            {showOpening && (
-              <div className={styles.opening}>
-                <span>Balance before {sinceLabel}</span>
-                <span className={styles.openingValue}>{formatRupees(opening)}</span>
-              </div>
-            )}
           </>
         )}
         </div>
