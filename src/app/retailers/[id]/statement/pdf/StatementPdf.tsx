@@ -1,5 +1,5 @@
 import { Document, Page, View, Text, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
-import { formatFullTimestamp, formatShortDate } from "@/lib/format";
+import { formatFullDate, formatFullTimestamp, formatShortDate } from "@/lib/format";
 import { pdfMoney, pdfText } from "@/lib/pdf-encoding";
 import type { LedgerEntryRow } from "@/lib/queries/ledger";
 
@@ -110,13 +110,17 @@ export async function renderStatementPdfBuffer(p: StatementPdfProps): Promise<Bu
         <Text style={s.shopName}>{pdfText(p.retailerName)}</Text>
         {meta && <Text style={s.shopMeta}>{pdfText(meta)}</Text>}
         <Text style={s.period}>
-          {first && last ? `Period  ${formatShortDate(first)} to ${formatShortDate(last)}` : "Period  no entries"}
+          {first && last ? `Period  ${formatFullDate(first)} to ${formatFullDate(last)}` : "Period  no entries"}
         </Text>
         {p.balanceAsOf && (
           <Text style={s.asOf}>As per our books as on {formatFullTimestamp(p.balanceAsOf)}</Text>
         )}
 
-        <View style={s.thead}>
+        {/* `fixed` repeats this on every page. Without it page 2 of a
+            50-entry statement was six unlabelled columns of figures — the
+            reader has to know which is DR and which is CR, on a document whose
+            whole job is being checkable. */}
+        <View style={s.thead} fixed>
           <Text style={[s.th, s.cDate]}>DATE</Text>
           <Text style={[s.th, s.cEntry]}>ENTRY</Text>
           <Text style={[s.th, s.cVoucher]}>VOUCHER</Text>

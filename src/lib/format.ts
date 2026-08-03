@@ -118,6 +118,19 @@ export function formatShortDate(iso: string): string {
 
 // ₹ en-IN grouping, e.g. 447800 paise -> "₹4,478" (whole rupees — this app
 // never shows paise fractions; see money-display-paise-conversion memory).
+// "01 May 2026" — a date carrying its YEAR, for documents rather than screens.
+// formatShortDate drops the year, which is right in a list the reader is
+// scanning today and wrong on a statement that gets filed, photographed and
+// argued over months later.
+export function formatFullDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIME_ZONE,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
 export function formatRupees(paise: number): string {
   const rupees = Math.round(paise / 100);
   return new Intl.NumberFormat("en-IN", {

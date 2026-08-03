@@ -19,8 +19,16 @@ import { formatRupees } from "@/lib/format";
 
 // "Rs 15,000" — still formatRupees underneath, so paise are converted and
 // grouped en-IN, never printed raw.
+//
+// ⚠️ The strip is UNANCHORED, and that is the whole point. It used to be
+// /^₹/, which works only while the ₹ is the first character — and on a NEGATIVE
+// amount formatRupees returns "-₹15,702", sign first. So the ₹ survived, and
+// WinAnsi printed it as the superscript "¹": a live statement showed
+// "Rs -¹15,702" on every row where a shop went into credit (owner caught it in
+// the first generated PDF, 2026-08-04). The pick slip shared the same bug the
+// moment it was handed a negative.
 export function pdfMoney(paise: number): string {
-  return `Rs ${formatRupees(paise).replace(/^₹/, "")}`;
+  return `Rs ${formatRupees(paise).replace("₹", "")}`;
 }
 
 const GLYPH_MAP: Record<string, string> = {
