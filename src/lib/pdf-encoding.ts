@@ -28,7 +28,17 @@ import { formatRupees } from "@/lib/format";
 // the first generated PDF, 2026-08-04). The pick slip shared the same bug the
 // moment it was handed a negative.
 export function pdfMoney(paise: number): string {
-  return `Rs ${formatRupees(paise).replace("₹", "")}`;
+  return `Rs ${pdfAmount(paise)}`;
+}
+
+// The bare figure — grouped en-IN, no currency mark at all: "15,702".
+//
+// For a COLUMN of money, where repeating "Rs" on every row is noise and the
+// unit is established once by the document's own standalone figures. The
+// ₹-strip lives here rather than being repeated, so the anchoring bug above
+// cannot come back in a second place.
+export function pdfAmount(paise: number): string {
+  return formatRupees(paise).replace("₹", "");
 }
 
 const GLYPH_MAP: Record<string, string> = {

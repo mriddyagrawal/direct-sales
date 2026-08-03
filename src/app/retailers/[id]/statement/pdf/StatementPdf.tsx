@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import { formatFullDate, formatFullTimestamp, formatShortDate } from "@/lib/format";
-import { pdfMoney, pdfText } from "@/lib/pdf-encoding";
+import { pdfAmount, pdfMoney, pdfText } from "@/lib/pdf-encoding";
 import type { LedgerEntryRow } from "@/lib/queries/ledger";
 
 // The STATEMENT OF ACCOUNT as a real generated PDF — the document a salesman
@@ -182,18 +182,24 @@ export async function renderStatementPdfBuffer(p: StatementPdfProps): Promise<Bu
           <Text style={[s.cMoney, s.th]}>BALANCE</Text>
         </View>
 
-        {/* Always printed, even at Rs 0 — see openingPaise. */}
+        {/* Money INSIDE the table is a bare figure — no "Rs" (owner
+            2026-08-04). Repeating it on ~50 rows across three columns is noise,
+            and the unit is already stated by the two standalone figures that
+            bracket the table: OUTSTANDING at the top and BALANCE DUE at the
+            bottom, both of which keep it.
+
+            Always printed, even at 0 — see openingPaise. */}
         <View style={s.row}>
           <Text style={[s.cDate, s.openingRow]}>—</Text>
           <Text style={[s.cEntry, s.openingRow]}>Opening balance</Text>
           <Text style={[s.cVoucher, s.openingRow]}> </Text>
           <Text style={[s.cMoney, s.openingRow]}>
-            {p.openingPaise > 0 ? pdfMoney(p.openingPaise) : "-"}
+            {p.openingPaise > 0 ? pdfAmount(p.openingPaise) : "-"}
           </Text>
           <Text style={[s.cMoney, s.openingRow]}>
-            {p.openingPaise < 0 ? pdfMoney(-p.openingPaise) : "-"}
+            {p.openingPaise < 0 ? pdfAmount(-p.openingPaise) : "-"}
           </Text>
-          <Text style={[s.cMoney, s.openingRow]}>{pdfMoney(p.openingPaise)}</Text>
+          <Text style={[s.cMoney, s.openingRow]}>{pdfAmount(p.openingPaise)}</Text>
         </View>
 
         {rows.length === 0 ? (
@@ -206,17 +212,17 @@ export async function renderStatementPdfBuffer(p: StatementPdfProps): Promise<Bu
                   held beside Tally and agree. */}
               <Text style={s.cEntry}>{pdfText(e.voucher_type)}</Text>
               <Text style={s.cVoucher}>{e.voucher_no ? pdfText(e.voucher_no) : "-"}</Text>
-              <Text style={s.cMoney}>{e.debit_paise > 0 ? pdfMoney(e.debit_paise) : "-"}</Text>
-              <Text style={s.cMoney}>{e.credit_paise > 0 ? pdfMoney(e.credit_paise) : "-"}</Text>
-              <Text style={s.cMoney}>{pdfMoney(e.balance)}</Text>
+              <Text style={s.cMoney}>{e.debit_paise > 0 ? pdfAmount(e.debit_paise) : "-"}</Text>
+              <Text style={s.cMoney}>{e.credit_paise > 0 ? pdfAmount(e.credit_paise) : "-"}</Text>
+              <Text style={s.cMoney}>{pdfAmount(e.balance)}</Text>
             </View>
           ))
         )}
 
         <View style={s.totalRow}>
           <Text style={s.totalLabel}>TOTAL</Text>
-          <Text style={s.totalMoney}>{pdfMoney(totalDebit)}</Text>
-          <Text style={s.totalMoney}>{pdfMoney(totalCredit)}</Text>
+          <Text style={s.totalMoney}>{pdfAmount(totalDebit)}</Text>
+          <Text style={s.totalMoney}>{pdfAmount(totalCredit)}</Text>
           <Text style={s.totalMoney}> </Text>
         </View>
 
