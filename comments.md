@@ -8327,3 +8327,51 @@ Re-checked with a correct pattern: every class resolves. Recording it because a 
 **What I tried:** Confirmed both `.order()` calls flipped to ascending and the opening row moved first; diffed the reasoning comment to confirm it was reworded rather than deleted; checked the stale `(step 4)` reference is gone; confirmed the shared `table.module.css` is imported rather than a new copy started; read the opening row's Dr/Cr split; verified the phone path still uses `isCredit`; ran a class sweep, got six false positives, re-ran with a corrected pattern (all resolve) and confirmed `.phoneRows` lives inside the media block; compared `max-width` usage against the app's other full-page tables (`RetailersQueue`, `UsersAdmin` — zero each) before closing 🟡 81; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** **CLOSED: 🟡 81.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of e236207 — style(ledger): the statement caption reads "04 Feb - NOW"
+
+**Verdict:** ⚠️ — the caption change is right, and it surfaces a mislabel on the row beside it that has money attached.
+
+**The change itself is good.** Every preset ends today, so a range reads in fewer words than "since X · to today" at 10px. **ALL borrows the oldest entry actually held** rather than inventing a start, and falls back to "all entries" when there is nothing — both correct.
+
+**It records the coupling it introduces**, which is the part worth crediting:
+
+> *"Now depends on `entries` being oldest-first — `entries[0]` is the earliest row, which is true since `73176d2` and would have been the NEWEST row before it."*
+
+That is a real trap. Two commits ago this same expression would have labelled the window with the *most recent* date. Anyone who ever flips the sort back breaks this silently, and now they will find out why.
+
+### 🟡 82 — "Balance before 04 Feb" is a date the figure cannot support
+
+The opening balance is derived as `outstanding − Σ(movement over the shown entries)`. The shown entries are everything from the filter's start onward — but **the app holds nothing before 1 May**. So on 6M the figure is genuinely *"the balance before the earliest row we hold"*, i.e. before **1 May**.
+
+Both render sites label it with the **nominal** filter start:
+
+```
+RetailerDetail.tsx:255   <span>Balance before {sinceLabel}</span>      (phone)
+RetailerDetail.tsx:312   <td colSpan={2}>Balance before {sinceLabel}</td>  (desktop)
+```
+
+So it reads **"Balance before 04 Feb ₹31,442"** for a figure that is the balance before 1 May. If the shop transacted between February and April, that activity is folded into this number — correct arithmetically, but the label puts a date on it the data cannot stand behind.
+
+This is the same nominal-vs-real distinction the commit reasons about for the caption, and the commit is right that it is harmless *there* — a date range is a description of a request. It is not harmless on **a money figure**, because a figure with a date beside it reads as a balance *as at* that date.
+
+**The fix is small and there are two shapes:**
+
+- Label with the **earliest shown entry** — `Balance before 01 May` — always true, and it already has the value to hand (`entries[0].entry_date`, the same expression this commit just added for ALL).
+- Or drop the date: **"Balance brought forward"**, the accounting term, which makes no date claim at all.
+
+I would take the first, since a supported date is more useful than none.
+
+**This matters more for the PDF than the screen.** The spec already clamps the PDF's *period* to real data; the opening row's label needs the same treatment, or the document will carry a dated balance claim it cannot support — to a customer. Worth fixing before step 4 rather than after.
+
+**Blocking issues:** None on screen. **Should be resolved before the PDF ships**, where the same label becomes a claim in a document that leaves the building.
+
+**Non-blocking suggestions:** 🟡 82 above.
+
+**Domain / correctness checks:** **Money** — the opening *figure* is right; only its label is over-precise. **Mobile** — both render sites carry the same label, so the fix is one expression used twice.
+
+**What I tried:** Read the diff and the new `windowStart` expression; confirmed ALL falls back to `entries[0].entry_date` and then to "all entries"; traced `openingBalancePaise` to confirm the figure is bounded by the *shown entries* rather than by the filter's nominal start; grepped both "Balance before" render sites to confirm they use `sinceLabel` (the nominal date) rather than the earliest row; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 82. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
