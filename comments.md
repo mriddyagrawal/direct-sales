@@ -8588,3 +8588,57 @@ That is a sharper statement of the flag than I wrote. It also does the more usef
 **What I tried:** Confirmed both render sites use `openingLabel`; traced `openingLabel` to `entries[0].entry_date` and confirmed `showOpening` guarantees a non-empty array; confirmed the PDF's opening row still carries no date and was not touched; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** **CLOSED: 🟡 82.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## MERGED TO MAIN AND PUSHED — 59b7c0d, 2026-08-04
+
+Not a review. The second merge boundary in this log, and unlike the first one it
+is **complete**.
+
+`feat/ledger-desktop-and-export` merged as `59b7c0d` and pushed — `origin/main`
+is at the merge, so Vercel is serving it.
+
+**Verified at the boundary:**
+
+- **All eight feature commits have review blocks.** No gaps.
+- **All four spec steps landed** — oldest-first, the desktop DR/CR table, the
+  chips above the heading, the export. The previous merge (`6de4175`) shipped
+  three of four and left step 4 unbuilt with a future-tense comment pointing at
+  it; that is fixed and the comment is gone.
+- **`main` builds** — `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean,
+  with `/retailers/[id]/statement/pdf` in the route manifest.
+
+**What shipped:** the statement reads oldest-first with the opening balance on
+top; desktop gets a real `DR`/`CR` table on the shared grammar (which closed
+🟡 81); the filter chips precede the heading they control; and Export produces a
+statement-of-account PDF at a neutral path that staff *and* the salesman can
+reach.
+
+**Three defects were found in this run, and none of them by a build:**
+
+1. **`Rs -¹15,702`** — an anchored `/^₹/` that never matched a negative. Found by
+   the owner generating a real statement.
+2. **Five headers in the wrong font** — react-pdf's last-wins style arrays.
+   Found by the owner looking at the rendered page; the *symptom* pointed at the
+   one column that was correct.
+3. **A dated balance claim the data could not support** (🟡 82). Found by
+   reading, but only because the caption change put the two dates side by side.
+
+`tsc`, `eslint` and `npm run build` were green through all three.
+
+**And one was missed by me and caught by the owner.** My review of `074dc24`
+claimed byte inspection had ruled out the rupee leak. The check was
+`"₹".encode("utf-8") in pdf_bytes`, and a PDF does not store text as UTF-8 — it
+could not have found the character either way, and the value that triggers the
+bug was in my own test data. **A verification that cannot fail is not a
+verification**, and it is worth more to say so here than to have it read as a
+clean pass.
+
+**Deliberately not done:** the ₹ glyph in PDFs. Measured during this run — a
+subset carrying the rupee is **17 KB**, not the ~1 MB first estimated, and an
+`fs.existsSync` guard would make the font an enhancement rather than a runtime
+dependency. Parked as its own change, with `Rs` shipping meanwhile.
+
+**Open at the merge:** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed),
+🟡 72, 🟡 73, 🟡 78 (parked). None blocking; all owner decisions.
