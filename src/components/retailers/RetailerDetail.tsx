@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, FileDown, Pencil } from "lucide-react";
+import { ChevronLeft, Pencil } from "lucide-react";
 import { BackLink } from "@/components/BackLink";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -14,6 +14,8 @@ import { StatusTag } from "@/components/ui/StatusTag";
 // in shared components. Same cross-folder shape as scan/[id] reaching for
 // godown's PickScreen.
 import { RetailerModal } from "@/app/dashboard/retailers/RetailerModal";
+import { SharePdfButton } from "@/components/SharePdfButton";
+import { statementFileName } from "@/lib/statement-filename";
 import type { RetailerRow } from "@/lib/queries/retailers";
 import {
   fetchRetailerLedger,
@@ -181,23 +183,24 @@ export function RetailerDetail({
             An affordance that can only ever produce a raw RLS error is worse
             than no affordance. (Closes flag 59.) */}
         <div className={styles.headActions}>
-          {/* Export is for BOTH lenses (owner 2026-08-04) — a salesman handing
-              a shopkeeper their own statement in the shop is the strongest
-              collection tool on this page, and it is the shop's own data. It
-              carries the on-screen filter, because pressing Export while
-              looking at one window and getting another is surprising.
-              An unsynced shop has no balance to foot to, so there is nothing to
-              export and the route would 404 anyway. */}
+          {/* SHARE, the same control order detail uses — same glyph, same ink
+              variant, same behaviour: the native share sheet gets the actual
+              FILE on a phone, and desktop opens the PDF in a tab (owner
+              2026-08-04). That matters more here than on an order: the point of
+              a statement is handing it to the shopkeeper, usually over
+              WhatsApp, standing in the shop.
+
+              For BOTH lenses — a salesman sharing a shop its own statement is
+              the strongest collection tool on this page. It carries the
+              on-screen filter, because sharing one window while looking at
+              another is surprising. An unsynced shop has no balance to foot to,
+              so there is nothing to share and the route would 404 anyway. */}
           {!notSynced && (
-            <a
-              className={styles.exportLink}
-              href={`/retailers/${retailer.id}/statement/pdf?since=${since}`}
-              target="_blank"
-              rel="noopener"
-            >
-              <Glyph icon={FileDown} />
-              Export
-            </a>
+            <SharePdfButton
+              url={`/retailers/${retailer.id}/statement/pdf?since=${since}`}
+              fileName={statementFileName(retailer.name)}
+              variant="ink"
+            />
           )}
           {isStaff && (
             <Button variant="secondary" onClick={() => setEditing(true)}>

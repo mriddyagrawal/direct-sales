@@ -8,6 +8,7 @@ import { StatusTag } from "@/components/ui/StatusTag";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { SharePdfButton } from "@/components/SharePdfButton";
+import { pickSlipFileName } from "@/lib/pickslip-filename";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { getOrderStatusTag } from "@/lib/order-status";
 import {
@@ -706,7 +707,11 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
         (order.status === "cancelled" ||
           order.status === "dispatched" ||
           (order.status === "billed" && role === "salesman")) && (
-          <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="primary" />
+          <SharePdfButton
+            url={`/orders/${order.id}/pdf`}
+            fileName={pickSlipFileName(order.retailerName, order.orderRef)}
+            variant="primary"
+          />
         )}
       {/* Mark billed removed from the Pending-scan screen (owner 2026-07-12):
           every order must reach ready_to_bill via the godown pick first. The
@@ -781,7 +786,11 @@ export function OrderDetailView({ order, items: initialItems, events, currentUse
           order.status !== "cancelled" &&
           order.status !== "dispatched" &&
           !(order.status === "billed" && role === "salesman") && (
-            <SharePdfButton orderId={order.id} orderRef={order.orderRef} retailerName={order.retailerName} variant="ink" />
+            <SharePdfButton
+              url={`/orders/${order.id}/pdf`}
+              fileName={pickSlipFileName(order.retailerName, order.orderRef)}
+              variant="ink"
+            />
           )}
         {/* Salesman scans his own approved LG order — Share | Scan splits the
             secondaries (staff get Scan in the split override above instead). */}

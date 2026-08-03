@@ -370,23 +370,6 @@
   flex-shrink: 0;
 }
 
-/* An <a>, not a button: it downloads a file, so middle-click and long-press
-   should behave. Styled as the app's secondary button so the pair reads as one
-   control group. */
-.exportLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: var(--touch-target-min);
-  padding: 0 20px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  font-weight: 600;
-  color: var(--color-ink);
-  text-decoration: none;
-  cursor: pointer;
-}
+/* `.exportLink` lived here — the Export anchor became the shared
+   SharePdfButton (owner 2026-08-04), so the hand-rolled button styling went
+   with it rather than staying as a dead rule. */

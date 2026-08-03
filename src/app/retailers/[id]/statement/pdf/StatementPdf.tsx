@@ -57,9 +57,26 @@ const s = StyleSheet.create({
   totalLabel: { width: "58%", fontFamily: "Helvetica-Bold", fontSize: 9 },
   totalMoney: { width: "14%", fontFamily: "Courier-Bold", fontSize: 9, textAlign: "right" },
 
-  due: { flexDirection: "row", justifyContent: "flex-end", marginTop: 12 },
-  dueLabel: { fontFamily: "Helvetica-Bold", fontSize: 10, marginRight: 10 },
-  dueValue: { fontFamily: "Courier-Bold", fontSize: 12 },
+  // The claim, top right — the same figure the page states above its statement,
+  // so the document opens by saying what it is about rather than making the
+  // reader add up two pages to find out.
+  idRow: { flexDirection: "row", alignItems: "flex-start" },
+  idLeft: { flex: 1 },
+  claimBox: { alignItems: "flex-end" },
+  claimLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5, letterSpacing: 0.5, color: "#555" },
+  claimValue: { fontFamily: "Courier-Bold", fontSize: 15, marginTop: 2 },
+
+  // BALANCE DUE sits ON the table's grid: the label right-aligns across the
+  // first four columns and the figure occupies the last two, so its right edge
+  // lands exactly under the BALANCE column above it. Floating it loose was what
+  // made it look unmoored from the table it concludes.
+  due: { flexDirection: "row", alignItems: "baseline", marginTop: 9 },
+  dueLabel: { flex: 1, fontFamily: "Helvetica-Bold", fontSize: 9.5, textAlign: "right", marginRight: 12 },
+  dueValue: { width: "28%", fontFamily: "Courier-Bold", fontSize: 12, textAlign: "right" },
+
+  // Colour marks the CONCLUSION only — see the note where these are applied.
+  owed: { color: "#b91c1c" },
+  clear: { color: "#15803d" },
 
   empty: { fontSize: 9, color: "#555", paddingVertical: 10 },
 
@@ -97,6 +114,25 @@ export async function renderStatementPdfBuffer(p: StatementPdfProps): Promise<Bu
     return { ...e, balance: running };
   });
 
+  // Dr / Cr rather than a sign — this is a ledger document, and it is what
+  // Tally itself prints. Cr takes the absolute value: "-Rs 45,000 Cr" would say
+  // the opposite of what it means.
+  const dueText =
+    p.outstandingPaise < 0
+      ? `${pdfMoney(-p.outstandingPaise)} Cr`
+      : `${pdfMoney(p.outstandingPaise)}${p.outstandingPaise > 0 ? " Dr" : ""}`;
+  // COLOUR MARKS THE CONCLUSION, NOT EVERY LINE, and only here and at the top.
+  //
+  // The DR and CR columns stay black on purpose. Direction already comes from
+  // WHICH COLUMN a figure sits in, so colour would be decoration; 30 red rows
+  // would drown the one figure that matters; and this document gets printed and
+  // photocopied in black and white, where colour carries nothing at all. The
+  // Dr/Cr words are what survive a mono printer, which is why they do the work.
+  //
+  // Red when the shop owes, green when it does not — the app's rule everywhere
+  // (a credit balance is green because there is nothing to chase).
+  const dueTone = p.outstandingPaise > 0 ? s.owed : s.clear;
+
   const totalDebit = p.entries.reduce((sum, e) => sum + e.debit_paise, 0) + Math.max(p.openingPaise, 0);
   const totalCredit = p.entries.reduce((sum, e) => sum + e.credit_paise, 0) + Math.max(-p.openingPaise, 0);
 
@@ -107,8 +143,18 @@ export async function renderStatementPdfBuffer(p: StatementPdfProps): Promise<Bu
         <Text style={s.docTitle}>STATEMENT OF ACCOUNT</Text>
         <View style={s.rule} />
 
-        <Text style={s.shopName}>{pdfText(p.retailerName)}</Text>
-        {meta && <Text style={s.shopMeta}>{pdfText(meta)}</Text>}
+        <View style={s.idRow}>
+          <View style={s.idLeft}>
+            <Text style={s.shopName}>{pdfText(p.retailerName)}</Text>
+            {meta && <Text style={s.shopMeta}>{pdfText(meta)}</Text>}
+          </View>
+          {/* Stated at the top and proved at the bottom — the same argument the
+              screen makes, and the reason this figure appears twice. */}
+          <View style={s.claimBox}>
+            <Text style={s.claimLabel}>OUTSTANDING</Text>
+            <Text style={[s.claimValue, dueTone]}>{dueText}</Text>
+          </View>
+        </View>
         <Text style={s.period}>
           {first && last ? `Period  ${formatFullDate(first)} to ${formatFullDate(last)}` : "Period  no entries"}
         </Text>
@@ -121,12 +167,19 @@ export async function renderStatementPdfBuffer(p: StatementPdfProps): Promise<Bu
             reader has to know which is DR and which is CR, on a document whose
             whole job is being checkable. */}
         <View style={s.thead} fixed>
-          <Text style={[s.th, s.cDate]}>DATE</Text>
-          <Text style={[s.th, s.cEntry]}>ENTRY</Text>
-          <Text style={[s.th, s.cVoucher]}>VOUCHER</Text>
-          <Text style={[s.th, s.cMoney]}>DR</Text>
-          <Text style={[s.th, s.cMoney]}>CR</Text>
-          <Text style={[s.th, s.cMoney]}>BALANCE</Text>
+          {/* COLUMN STYLE FIRST, `th` LAST — react-pdf resolves a style array
+              last-wins, so the old [s.th, s.cX] order let each column's own
+              fontFamily override the header's. Five headers silently took
+              Courier from their column; ENTRY, the only column that sets no
+              font, kept Helvetica-Bold — which is exactly the odd one out the
+              owner spotted. This way the column contributes width and
+              alignment, and `th` contributes the type for all six. */}
+          <Text style={[s.cDate, s.th]}>DATE</Text>
+          <Text style={[s.cEntry, s.th]}>ENTRY</Text>
+          <Text style={[s.cVoucher, s.th]}>VOUCHER</Text>
+          <Text style={[s.cMoney, s.th]}>DR</Text>
+          <Text style={[s.cMoney, s.th]}>CR</Text>
+          <Text style={[s.cMoney, s.th]}>BALANCE</Text>
         </View>
 
         {/* Always printed, even at Rs 0 — see openingPaise. */}
@@ -169,13 +222,7 @@ export async function renderStatementPdfBuffer(p: StatementPdfProps): Promise<Bu
 
         <View style={s.due}>
           <Text style={s.dueLabel}>BALANCE DUE</Text>
-          {/* Dr / Cr rather than a sign: this is a ledger document, and it is
-              the convention Tally itself prints. */}
-          <Text style={s.dueValue}>
-            {p.outstandingPaise < 0
-              ? `${pdfMoney(-p.outstandingPaise)} Cr`
-              : `${pdfMoney(p.outstandingPaise)}${p.outstandingPaise > 0 ? " Dr" : ""}`}
-          </Text>
+          <Text style={[s.dueValue, dueTone]}>{dueText}</Text>
         </View>
 
         <View style={s.footer} fixed>
