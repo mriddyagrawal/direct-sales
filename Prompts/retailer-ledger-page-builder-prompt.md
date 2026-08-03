@@ -1,5 +1,11 @@
 # BUILDER prompt — the retailer detail page becomes the Tally ledger
 
+> **⚠️ DONE — DO NOT BUILD FROM THIS FILE.**
+> Steps 1–3 shipped and merged to `main` (`6de4175`, live).
+> **Step 4 was never built** and has moved, with three additions, to
+> **`Prompts/retailer-ledger-desktop-and-export-builder-prompt.md`**.
+> Kept as the record of what steps 1–3 were built against.
+
 Read **`docs/specs/retailer-ledger-page.md`** and implement it. That file is the
 spec; this is how to work. The rendered design is at
 https://claude.ai/code/artifact/fad886d7-e3f3-4b52-9034-53d5def52b1a
