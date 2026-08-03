@@ -14,6 +14,8 @@ import { StatusTag } from "@/components/ui/StatusTag";
 // in shared components. Same cross-folder shape as scan/[id] reaching for
 // godown's PickScreen.
 import { RetailerModal } from "@/app/dashboard/retailers/RetailerModal";
+import { SharePdfButton } from "@/components/SharePdfButton";
+import { statementFileName } from "@/lib/statement-filename";
 import type { RetailerRow } from "@/lib/queries/retailers";
 import {
   fetchRetailerLedger,
@@ -28,6 +30,7 @@ import { readBalance, ledgerText } from "@/lib/balance";
 import { formatOrderTimestamp, formatRupees, formatShortDate } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import back from "@/components/ui/back.module.css";
+import table from "@/components/ui/table.module.css";
 import styles from "./RetailerDetail.module.css";
 
 // The edit entry point moved HERE from the row click (spec 2026-08-01).
@@ -83,6 +86,34 @@ export function RetailerDetail({
   const sinceIso = ledgerSinceDate(since);
   const sinceLabel = sinceIso ? formatShortDate(sinceIso) : null;
 
+  // "04 Feb - NOW" (owner 2026-08-04), not "since 04 Feb · to today". Every
+  // preset ends today, so the range form says it in fewer words.
+  //
+  // ALL has no nominal start, so it borrows the OLDEST entry actually held —
+  // which is the honest start of the data rather than an invented one. On the
+  // dated presets the nominal date stays even when it precedes anything we
+  // hold (6M says 04 Feb while the app's earliest row is 1 May): the window is
+  // what was asked for, and overstating it costs nothing on screen. The PDF
+  // clamps to real data instead, because a document sent to a shopkeeper must
+  // not claim months it has no entries for.
+  const windowStart = sinceLabel ?? (entries.length > 0 ? formatShortDate(entries[0].entry_date) : null);
+
+  // The opening row's label is the EARLIEST ROW ACTUALLY SHOWN, never the
+  // filter's nominal start (REVIEWER 🟡 82). The figure is
+  // `outstanding − Σ(movement over the shown entries)`, so it is the balance
+  // before the first row on screen — and the app holds nothing before 1 May
+  // while 6M nominally starts 04 Feb. "Balance before 04 Feb" would put a date
+  // on a figure the data cannot stand behind.
+  //
+  // The caption above deliberately keeps the nominal date: a range is a
+  // description of what was REQUESTED, and overstating that is harmless. A
+  // money figure with a date beside it reads as a balance AS AT that date,
+  // which is a claim. Same distinction, opposite answer.
+  //
+  // Safe to index: this only renders when entries.length > 0.
+  const openingLabel = entries.length > 0 ? formatShortDate(entries[0].entry_date) : sinceLabel;
+  const windowLabel = windowStart ? `${windowStart} - NOW` : "all entries";
+
   // Opening balance: what was owed BEFORE this window. Rendered only when it is
   // non-zero — 113 of 406 shops reconcile on their own and the row would say
   // nothing, so its ABSENCE is the signal — and only when there are entries,
@@ -90,6 +121,15 @@ export function RetailerDetail({
   // would print the same number twice for no reason.
   const opening = openingBalancePaise(retailer.outstanding_paise, entries);
   const showOpening = opening !== null && opening !== 0 && entries.length > 0;
+
+  // Desktop foots two real columns, so the opening has to land in ONE of them:
+  // a positive opening is money already owed (a debit), a negative one is money
+  // sitting in the shop's credit. Splitting it here is what makes the column
+  // sums add up to the outstanding figure, which IS the proof in table form.
+  const openingDebit = showOpening && opening > 0 ? opening : 0;
+  const openingCredit = showOpening && opening < 0 ? -opening : 0;
+  const totalDebit = entries.reduce((sum, e) => sum + e.debit_paise, 0) + openingDebit;
+  const totalCredit = entries.reduce((sum, e) => sum + e.credit_paise, 0) + openingCredit;
 
   // Area · phone, as ONE line, absent rather than blank when there is nothing —
   // 582 of 600 shops have no area at all, so a fact table was three rows of
@@ -157,12 +197,33 @@ export function RetailerDetail({
             already refuses it (retailers_staff_update is accountant/admin).
             An affordance that can only ever produce a raw RLS error is worse
             than no affordance. (Closes flag 59.) */}
-        {isStaff && (
-          <Button variant="secondary" onClick={() => setEditing(true)}>
-            <Glyph icon={Pencil} />
-            Edit
-          </Button>
-        )}
+        <div className={styles.headActions}>
+          {/* SHARE, the same control order detail uses — same glyph, same ink
+              variant, same behaviour: the native share sheet gets the actual
+              FILE on a phone, and desktop opens the PDF in a tab (owner
+              2026-08-04). That matters more here than on an order: the point of
+              a statement is handing it to the shopkeeper, usually over
+              WhatsApp, standing in the shop.
+
+              For BOTH lenses — a salesman sharing a shop its own statement is
+              the strongest collection tool on this page. It carries the
+              on-screen filter, because sharing one window while looking at
+              another is surprising. An unsynced shop has no balance to foot to,
+              so there is nothing to share and the route would 404 anyway. */}
+          {!notSynced && (
+            <SharePdfButton
+              url={`/retailers/${retailer.id}/statement/pdf?since=${since}`}
+              fileName={statementFileName(retailer.name)}
+              variant="ink"
+            />
+          )}
+          {isStaff && (
+            <Button variant="secondary" onClick={() => setEditing(true)}>
+              <Glyph icon={Pencil} />
+              Edit
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* THE CLAIM. The balance is stated here and PROVED at the bottom of the
@@ -183,13 +244,6 @@ export function RetailerDetail({
       </div>
 
       <section className={styles.statement}>
-        <div className={styles.statementHead}>
-          <span>STATEMENT</span>
-          {!notSynced && (
-            <span className={styles.window}>{sinceLabel ? `since ${sinceLabel} · to today` : "all entries"}</span>
-          )}
-        </div>
-
         {/* Presets, not a date picker. Every one of them ends TODAY — see the
             comment on the `since` state. Hidden on an unsynced shop, where
             there is nothing to filter and the chips would only offer four ways
@@ -210,7 +264,14 @@ export function RetailerDetail({
           </div>
         )}
 
-        <div className={isFetching ? styles.statementBusy : undefined}>
+        <div className={styles.statementHead}>
+          <span>STATEMENT</span>
+          {!notSynced && (
+            <span className={styles.window}>{windowLabel}</span>
+          )}
+        </div>
+
+        <div className={`${styles.phoneRows} ${isFetching ? styles.statementBusy : ""}`}>
         {entries.length === 0 ? (
           <p className={styles.empty}>
             {notSynced
@@ -221,11 +282,23 @@ export function RetailerDetail({
           </p>
         ) : (
           <>
+            {/* FIRST in the list because it is the OLDEST thing on it. That
+                reasoning is unchanged from when this sat at the BOTTOM — what
+                moved is the entries, which now run oldest-first (owner
+                2026-08-04), so "what they owed before all this" belongs above
+                them rather than below. The proof then reads straight down:
+                opening → bills → receipts → closing. */}
+            {showOpening && (
+              <div className={styles.opening}>
+                <span>Balance before {openingLabel}</span>
+                <span className={styles.openingValue}>{formatRupees(opening)}</span>
+              </div>
+            )}
             {entries.map((e) => {
               // Sign and colour are the ONLY direction signal on the phone,
               // because the voucher type is Tally's verbatim string and no
-              // longer says "Receipt" or "Bill". Desktop gets real Debit and
-              // Credit columns instead (step 4).
+              // longer says "Receipt" or "Bill". Desktop uses real DR and CR
+              // columns instead — see the table below.
               const isCredit = e.credit_paise > 0;
               const amount = isCredit ? e.credit_paise : e.debit_paise;
               return (
@@ -244,18 +317,68 @@ export function RetailerDetail({
                 </div>
               );
             })}
-            {/* Last in the list because it is the OLDEST thing on it — the
-                entries run newest-first, so "what they owed before all this"
-                belongs under them. */}
-            {showOpening && (
-              <div className={styles.opening}>
-                <span>Balance before {sinceLabel}</span>
-                <span className={styles.openingValue}>{formatRupees(opening)}</span>
-              </div>
-            )}
           </>
         )}
         </div>
+
+        {/* DESKTOP — the same statement as real columns. Direction comes from
+            WHICH COLUMN a figure sits in, so there are no signs and no coloured
+            amounts here; the phone signs and colours because two money columns
+            do not fit a phone. That divergence is deliberate, and with voucher
+            types rendered verbatim the direction has to come from somewhere.
+
+            It also fixes 🟡 81 structurally: this stylesheet has no max-width,
+            so on a 1400px window every phone row put its amount a screen-width
+            from the entry that earned it. Columns do the aligning instead. */}
+        {entries.length > 0 && (
+          <table className={`${table.table} ${isFetching ? styles.statementBusy : ""}`}>
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>ENTRY</th>
+                <th>VOUCHER</th>
+                {/* DR / CR, not DEBIT / CREDIT — compact, and it matches the
+                    `Dr` the balance above already wears. */}
+                <th className={table.numeric}>DR</th>
+                <th className={table.numeric}>CR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {showOpening && (
+                <tr className={styles.openingRow}>
+                  <td className={table.mono}>—</td>
+                  <td colSpan={2}>Balance before {openingLabel}</td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {openingDebit > 0 ? formatRupees(openingDebit) : <span className={styles.dash}>—</span>}
+                  </td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {openingCredit > 0 ? formatRupees(openingCredit) : <span className={styles.dash}>—</span>}
+                  </td>
+                </tr>
+              )}
+              {entries.map((e) => (
+                <tr key={e.id}>
+                  <td className={`${table.mono} ${table.cellMeta}`}>{formatShortDate(e.entry_date)}</td>
+                  <td className={table.cellName}>{e.voucher_type}</td>
+                  <td className={`${table.mono} ${table.cellMeta}`}>{e.voucher_no || "—"}</td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {e.debit_paise > 0 ? formatRupees(e.debit_paise) : <span className={styles.dash}>—</span>}
+                  </td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {e.credit_paise > 0 ? formatRupees(e.credit_paise) : <span className={styles.dash}>—</span>}
+                  </td>
+                </tr>
+              ))}
+              {/* Foots BOTH columns. Their difference is restated by the proof
+                  below, which is the same figure the page opens with. */}
+              <tr className={styles.totalRow}>
+                <td colSpan={3}>TOTAL</td>
+                <td className={`${table.mono} ${table.numeric}`}>{formatRupees(totalDebit)}</td>
+                <td className={`${table.mono} ${table.numeric}`}>{formatRupees(totalCredit)}</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
 
         {/* THE PROOF. Same figure as the claim above; the 2px ink rule is the
             app's existing "authoritative" device and marks this as a QED rather

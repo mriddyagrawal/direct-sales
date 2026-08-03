@@ -50,12 +50,12 @@
   color: var(--color-ink);
 }
 
-/* The Edit button sits hard right, by its own auto margin — the same
-   mechanism the queue and Products use, so a third element could be added
-   later without stranding anything mid-row. */
-.headRow button {
-  margin-left: auto;
-}
+/* `.headRow button { margin-left: auto }` lived here, and it was true when Edit
+   was the only control: it pushed itself hard right. There are two now (Export
+   and Edit), so the GROUP carries the auto margin instead — see .headActions.
+   Left as a bare `button` rule it would still have matched Edit as a
+   descendant and tried to push it within the group, which is the kind of
+   leftover that only shows up as an unexplained gap. */
 
 /* The skeleton's Edit placeholder. It needs its own class because Skeleton
    renders a <div>, so the `button` rule above does not reach it and the bar
@@ -284,11 +284,16 @@
    Four presets, all of them ending TODAY. Same chip grammar as the retailers
    queue's filter tabs — mono, small, the active one filled ink — so a filter
    looks like a filter everywhere in the app. */
+/* ABOVE the STATEMENT heading (owner 2026-08-04). It sat below, so the
+   caption — "04 Feb - NOW" — described a result before the reader had met the
+   control that produced it. A control precedes the thing it controls.
+   The padding flipped with it: the breathing room now goes underneath, between
+   the chips and the heading they act on. */
 .sinceRow {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 9px 0 2px;
+  padding: 2px 0 9px;
 }
 
 .sinceChip {
@@ -318,3 +323,53 @@
 .statementBusy {
   opacity: 0.55;
 }
+
+/* ── DESKTOP ──────────────────────────────────────────────────────────────
+   The phone statement steps aside for the shared table grammar, which switches
+   itself on at 768px. This block sits at the BOTTOM of the file on purpose: a
+   media query adds no specificity, so an override placed above the rule it
+   overrides loses the source-order tie and does nothing. Three live bugs in
+   this project came from exactly that. */
+
+/* The opening balance as a table row — greyed, because it is context for the
+   entries rather than one of them. */
+.openingRow td {
+  color: var(--color-locked);
+}
+
+/* The footing row. 2px ink above it is the app's "authoritative" device, the
+   same rule the claim and the proof already wear — this is the third and last
+   place it appears on the page, and all three bracket the same argument. */
+.totalRow td {
+  border-bottom: 0;
+  border-top: 2px solid var(--color-ink);
+  font-weight: 700;
+}
+
+/* An empty cell reads as missing data; a hairline dash reads as "nothing on
+   this side", which is what it means in a two-column ledger. */
+.dash {
+  color: var(--color-hairline);
+}
+
+@media (min-width: 768px) {
+  .phoneRows {
+    display: none;
+  }
+}
+
+/* Export + Edit as one group at the right of the head row. The group carries
+   the auto margin now; `.headRow button` used to do it alone, which stopped
+   working the moment there were two controls (the first would have been pushed
+   right and the second would have followed it with a gap in between). */
+.headActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* `.exportLink` lived here — the Export anchor became the shared
+   SharePdfButton (owner 2026-08-04), so the hand-rolled button styling went
+   with it rather than staying as a dead rule. */

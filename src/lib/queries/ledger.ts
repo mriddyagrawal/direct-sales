@@ -80,10 +80,23 @@ export function ledgerSinceDate(preset: LedgerSince, now: Date = new Date()): st
   return start.toISOString().slice(0, 10);
 }
 
-// Newest first — the statement reads top-down from today. The id tiebreak keeps
-// same-day entries in a stable order; without it PostgREST is free to return
-// them differently between requests, and a list that reshuffles on a refetch
-// looks like data changing.
+// OLDEST first (owner 2026-08-04, a change of convention rather than a fix —
+// newest-first was coherent and shipped that way deliberately).
+//
+// The page's claim is that the balance is PROVED by the working, and a proof
+// has to be legible in order: opening → bills → receipts → closing, the
+// arithmetic running down the page. Newest-first made the reader assemble the
+// sum bottom-up. It is also the universal statement-of-account convention, so
+// the screen and the exported PDF now read the same way with no mental flip
+// between them.
+//
+// The accepted cost: on a shop with years of entries this opens far from
+// today's activity. The filter is what makes that survivable — the default is
+// 6M, and "All" is an explicit opt-in where scrolling is expected.
+//
+// The id tiebreak keeps same-day entries in a stable order; without it
+// PostgREST is free to return them differently between requests, and a list
+// that reshuffles on a refetch looks like data changing.
 export async function fetchRetailerLedger(
   supabase: SupabaseClient<Database>,
   retailerId: string,
@@ -93,8 +106,8 @@ export async function fetchRetailerLedger(
     .from("retailer_ledger_entries")
     .select(LEDGER_SELECT)
     .eq("retailer_id", retailerId)
-    .order("entry_date", { ascending: false })
-    .order("id", { ascending: false });
+    .order("entry_date", { ascending: true })
+    .order("id", { ascending: true });
 
   if (since) query = query.gte("entry_date", since);
 

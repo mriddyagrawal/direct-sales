@@ -4,16 +4,21 @@ import { useState } from "react";
 import { Share2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
-import { pickSlipFileName } from "@/lib/pickslip-filename";
 
 interface SharePdfButtonProps {
-  orderId: string;
-  orderRef: string;
-  retailerName: string;
+  // The PDF route to fetch. Generalised from a hardcoded /orders/[id]/pdf when
+  // the retailer statement became the second shareable document (2026-08-04) —
+  // the sharing behaviour below is identical for both, and a second copy of it
+  // is how the two would drift apart on the Android caption quirk.
+  url: string;
+  // Carried by the caller because each document names itself differently: an
+  // order leads with its ref, a statement with the shop and the date.
+  fileName: string;
   variant?: "primary" | "secondary" | "ink";
 }
 
-// The one pick-slip action (owner decision: share-only, no preview page).
+// THE share action for every generated PDF — the pick slip and the retailer
+// statement (owner decision: share-only, no preview page).
 // Phone: fetches the generated PDF and hands the actual FILE to the native
 // share sheet. The file is named "<ref> - <Retailer>.pdf" — that's the SINGLE
 // carrier of the retailer name, shown as the document title on BOTH platforms.
@@ -23,15 +28,12 @@ interface SharePdfButtonProps {
 // file-share support): opens the PDF route directly — the browser's own
 // viewer renders it inline with the proper filename, no per-platform code.
 // A dismissed share sheet (AbortError) is not a failure.
-export function SharePdfButton({ orderId, orderRef, retailerName, variant = "secondary" }: SharePdfButtonProps) {
+export function SharePdfButton({ url, fileName, variant = "secondary" }: SharePdfButtonProps) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const url = `/orders/${orderId}/pdf`;
 
   async function handleClick() {
     setFailed(false);
-
-    const fileName = pickSlipFileName(retailerName, orderRef);
 
     // Feature-detect file sharing with a stand-in File BEFORE fetching, so
     // the desktop path never downloads the blob just to throw it away.

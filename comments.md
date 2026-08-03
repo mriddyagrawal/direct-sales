@@ -8276,3 +8276,283 @@ Step 4 as specced fixes this properly (a real table, where the columns do the al
 **What I tried:** Listed the branch's non-merge commits (three, matching steps 1–3 and no step 4); grepped the stylesheet for every `@media` block (one, `padding: 24px`) and for `max-width` (none); found the component's own future-tense reference to step 4; compared against `PickRetailer.module.css:23`, where the same uncapped-row problem was solved with `max-width: 480px`; confirmed `origin/main` equals local so this is live; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 81. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 73176d2 + a363de5 — oldest-first, and the desktop DR/CR table
+
+**Verdicts:** both ✅ — **🟡 81 CLOSED.**
+
+### 73176d2 — the reordering, and the comment handled as asked
+
+`fetchRetailerLedger` now sorts `entry_date` and `id` **ascending**, and the opening balance renders first.
+
+**The comment was reworded, not deleted** — which is what the prompt asked for, and the distinction matters. The old text explained *why* the opening sat at the bottom; that reasoning was correct for the arrangement it described, and deleting it would have thrown away a true observation because the arrangement changed. The new version keeps the logic and re-points it:
+
+> *"…the entries, which now run oldest-first (owner 2026-08-04), so 'what they owed before all this' belongs **above** them."*
+
+A builder who read the instruction as "your comment was wrong" would have removed it. This one read it as "your comment described the old order".
+
+### a363de5 — the table, and one detail better than specified
+
+| | |
+|---|---|
+| Shared grammar | `import table from "@/components/ui/table.module.css"` — **no fifth copy** |
+| Columns | `DATE · ENTRY · VOUCHER · DR · CR` |
+| Opening row | present, `colSpan={2}`, dated `—` |
+| Totals | a footed `TOTAL` row |
+| Phone | untouched — still `isCredit` sign + colour |
+| Stale `(step 4)` comment | **gone** |
+
+**Better than specified:** the opening balance is split into `openingDebit` / `openingCredit` rather than printed as a signed figure in DR. So a shop carrying a **credit** balance forward has that figure land in the **CR** column, where a credit belongs. I wrote "the opening balance is a row in the table, dated —" and did not think about which column a negative opening goes in; double-entry says CR, and that is what it does.
+
+### 🟡 81 CLOSED
+
+The complaint was that with no `max-width`, a 1400px window put every amount a screen-width from the entry that earned it. The table closes it **structurally**: figures now sit in columns, so the eye scans a column vertically instead of hunting across each row. That is how a statement is actually read.
+
+There is still no `max-width`, and after checking I do not think one is wanted: **`RetailersQueue.module.css` and `UsersAdmin.module.css` — the app's other two full-page tables — have zero `max-width` rules** and have been in production for months. Capping only this page would make it the odd screen out. Unbounded full-page tables are the house norm, not an oversight here.
+
+### On my own check, since it produced a false alarm
+
+My class sweep reported **six danglings** — `table.numeric`, `table.mono`, `table.cellMeta`, `table.cellName`, `table.module`, `styles.phoneRows`. **All six were my regex, not the code.** I matched `^\.class`, but `table.module.css` deliberately scopes as `.table td.numeric` and `.table thead th.numeric` — that scoping *was flag 53's fix*, because the bare versions never applied. And `.phoneRows` is defined inside the `@media` block, which is legitimate for a wrapper needing no phone styling and hidden on desktop.
+
+Re-checked with a correct pattern: every class resolves. Recording it because a reviewer's tooling producing six false positives is worth knowing about — a line-start regex encodes an assumption this codebase deliberately broke.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — paise throughout; the opening split preserves the Dr/Cr distinction rather than flattening it to a sign. **Mobile** — explicitly unchanged, and verified: the phone still signs and colours. **RLS** — untouched.
+
+**What I tried:** Confirmed both `.order()` calls flipped to ascending and the opening row moved first; diffed the reasoning comment to confirm it was reworded rather than deleted; checked the stale `(step 4)` reference is gone; confirmed the shared `table.module.css` is imported rather than a new copy started; read the opening row's Dr/Cr split; verified the phone path still uses `isCredit`; ran a class sweep, got six false positives, re-ran with a corrected pattern (all resolve) and confirmed `.phoneRows` lives inside the media block; compared `max-width` usage against the app's other full-page tables (`RetailersQueue`, `UsersAdmin` — zero each) before closing 🟡 81; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** **CLOSED: 🟡 81.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of e236207 — style(ledger): the statement caption reads "04 Feb - NOW"
+
+**Verdict:** ⚠️ — the caption change is right, and it surfaces a mislabel on the row beside it that has money attached.
+
+**The change itself is good.** Every preset ends today, so a range reads in fewer words than "since X · to today" at 10px. **ALL borrows the oldest entry actually held** rather than inventing a start, and falls back to "all entries" when there is nothing — both correct.
+
+**It records the coupling it introduces**, which is the part worth crediting:
+
+> *"Now depends on `entries` being oldest-first — `entries[0]` is the earliest row, which is true since `73176d2` and would have been the NEWEST row before it."*
+
+That is a real trap. Two commits ago this same expression would have labelled the window with the *most recent* date. Anyone who ever flips the sort back breaks this silently, and now they will find out why.
+
+### 🟡 82 — "Balance before 04 Feb" is a date the figure cannot support
+
+The opening balance is derived as `outstanding − Σ(movement over the shown entries)`. The shown entries are everything from the filter's start onward — but **the app holds nothing before 1 May**. So on 6M the figure is genuinely *"the balance before the earliest row we hold"*, i.e. before **1 May**.
+
+Both render sites label it with the **nominal** filter start:
+
+```
+RetailerDetail.tsx:255   <span>Balance before {sinceLabel}</span>      (phone)
+RetailerDetail.tsx:312   <td colSpan={2}>Balance before {sinceLabel}</td>  (desktop)
+```
+
+So it reads **"Balance before 04 Feb ₹31,442"** for a figure that is the balance before 1 May. If the shop transacted between February and April, that activity is folded into this number — correct arithmetically, but the label puts a date on it the data cannot stand behind.
+
+This is the same nominal-vs-real distinction the commit reasons about for the caption, and the commit is right that it is harmless *there* — a date range is a description of a request. It is not harmless on **a money figure**, because a figure with a date beside it reads as a balance *as at* that date.
+
+**The fix is small and there are two shapes:**
+
+- Label with the **earliest shown entry** — `Balance before 01 May` — always true, and it already has the value to hand (`entries[0].entry_date`, the same expression this commit just added for ALL).
+- Or drop the date: **"Balance brought forward"**, the accounting term, which makes no date claim at all.
+
+I would take the first, since a supported date is more useful than none.
+
+**This matters more for the PDF than the screen.** The spec already clamps the PDF's *period* to real data; the opening row's label needs the same treatment, or the document will carry a dated balance claim it cannot support — to a customer. Worth fixing before step 4 rather than after.
+
+**Blocking issues:** None on screen. **Should be resolved before the PDF ships**, where the same label becomes a claim in a document that leaves the building.
+
+**Non-blocking suggestions:** 🟡 82 above.
+
+**Domain / correctness checks:** **Money** — the opening *figure* is right; only its label is over-precise. **Mobile** — both render sites carry the same label, so the fix is one expression used twice.
+
+**What I tried:** Read the diff and the new `windowStart` expression; confirmed ALL falls back to `entries[0].entry_date` and then to "all entries"; traced `openingBalancePaise` to confirm the figure is bounded by the *shown entries* rather than by the filter's nominal start; grepped both "Balance before" render sites to confirm they use `sinceLabel` (the nominal date) rather than the earliest row; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 82. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 35a6b90 — feat(ledger): the filter chips move above the STATEMENT heading
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Put the control before the thing it controls.
+
+**A pure move**, and the diff proves it: the `statementHead` block is deleted and re-inserted verbatim below the chip row — same markup, same `!notSynced` guard on the window label. Nothing was rewritten under cover of a reorder, which is the thing to check on a commit like this.
+
+**The chips are one block serving both surfaces**, sitting above the heading, which sits above the phone rows and the desktop table. So the fix lands on both without a second copy.
+
+**The `!notSynced` guard on the chips is right** and worth naming: on a shop the sync never matched, every preset returns the same empty statement, so four chips that cannot change anything are worse than none. That is the same "render only when it says something" rule the placeholder removal, the opening row and the contact line all follow — a control with no possible effect is furniture.
+
+**All `styles.*` resolve** (re-run with the corrected pattern, not the line-start one that produced six false positives last time). `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**🟡 82 is untouched**, as expected — both `Balance before {sinceLabel}` sites still carry the nominal date. Not this commit's job; it needs settling before the PDF.
+
+**Domain / correctness checks:** **Money** — untouched. **Mobile** — the chips are the primary interaction and now precede their result on both surfaces.
+
+**What I tried:** Diffed the TSX to confirm the heading block was moved verbatim rather than rewritten; checked the chips render once, above the heading, ahead of both the phone rows and the desktop table; confirmed the `!notSynced` guard covers the chips as well as the window label; re-ran the class sweep with the corrected regex; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (settle before the PDF).
+
+---
+
+## Review of 074dc24 — feat(ledger): Export — the statement of account as a PDF
+
+**Verdict:** ✅ — every trap in the spec is handled, and I proved the document renders rather than trusting that it compiles.
+
+### Rendered, not just typechecked
+
+`tsc` passing says nothing about whether react-pdf can lay a document out. I called `renderStatementPdfBuffer` directly against three shapes:
+
+```
+  normal (5 entries)   4037 bytes  header=%PDF-  OK
+  credit opening       3434 bytes  header=%PDF-  OK
+  no entries           3299 bytes  header=%PDF-  OK
+```
+
+All three produce valid PDFs, including the two edge shapes — a **negative** opening balance and a statement with **no rows at all**. Byte inspection confirms **no raw U+20B9 anywhere** in the output, so the encoding trap is genuinely avoided rather than merely commented about.
+
+*(Two alarms from my own harness, both mine: I first passed `name` instead of `retailerName` and omitted `printedAtIso`, which produced the `.replace` failure; and I gave every row `id: 1`, which produced React key warnings. With correct props and unique ids: renders clean, zero warnings. The component's `key={e.id}` is right and real rows carry distinct bigints.)*
+
+### The access control is the fetch order, and it says so
+
+```
+⚠️ THE RETAILER IS FETCHED FIRST, AND THAT ORDER IS THE ACCESS CONTROL.
+```
+
+Retailer → `404` → *then* the ledger. Route sits at `/retailers/[id]/statement/pdf` — **neutral, never under `/dashboard/*`** — because the salesman must reach it, and the comment cites the pick-slip route's identical reasoning. `runtime = "nodejs"` present.
+
+**An addition I did not specify and should have:** a shop with `outstanding_paise === null` gets a **404 with a message** rather than a document, because *"printing a confident Rs 0 would be a lie… here the honest answer is no document at all."* That is the app's null-vs-zero discipline applied to something that leaves the building — the strongest place to apply it.
+
+**The `since` param is validated against the union with a fallback** rather than trusted or thrown on, so a hand-edited URL degrades to the default instead of erroring.
+
+### The document
+
+| spec | built |
+|---|---|
+| Period clamped to real data | `Period ${first} to ${last}` from the actual rows, never the nominal start |
+| Opening always printed, even Rs 0 | present, and the type documents why |
+| Running BALANCE column | `running = running + debit − credit`, seeded from the opening |
+| Oldest-first | inherited from the ascending query |
+| A4 | yes — *"a six-column table that has to stay legible after a phone photo of a printout"* |
+| `Rs`, never `₹` | via the lifted `pdfMoney` |
+
+**The totals foot the opening into the correct column** — `Math.max(opening, 0)` to DR and `Math.max(-opening, 0)` to CR — so a credit brought forward lands in CR. Same care the screen table got, and I did not specify it in either place.
+
+**The lift is real, not a copy.** `src/lib/pdf-encoding.ts` is new and **both** PDFs import from it; `PickSlipPdf.tsx` shrank by 36 lines. Two documents cannot now drift on the same WinAnsi workaround.
+
+**The Export button passes `?since=${since}`**, so the document follows the window on screen.
+
+### 🟡 82 — sidestepped in the PDF, still open on screen
+
+The PDF's opening row reads **"Opening balance"** with **no date**, which is the "brought forward" option and claims nothing. So the dated-balance risk never reaches a customer — which was the part that mattered.
+
+On screen both sites still read `Balance before {sinceLabel}` with the nominal filter date. The flag stays open, now purely cosmetic: a figure labelled "before 04 Feb" that is really the balance before the earliest held row.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** 🟡 82 on the two screen sites.
+
+**Domain / correctness checks:** **Money** — paise throughout; opening footed to the correct column; `null` refused a document rather than rendered as zero. **RLS** — the fetch order is the boundary and is documented as such. **Mobile** — Export is a link with `target="_blank"`, so it works on a phone without the Web Share path the pick slip uses.
+
+**What I tried:** Read the route and confirmed neutral path, `runtime = "nodejs"`, retailer-before-ledger, the unsynced 404, and the validated `since`; **executed `renderStatementPdfBuffer` against three data shapes** and verified `%PDF-` headers and the absence of raw U+20B9; corrected two faults in my own harness before drawing conclusions; confirmed `pdf-encoding.ts` is imported by both PDFs; read the running-balance seed and the totals' `Math.max` split; checked the Export href carries `since`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only now).
+
+---
+
+## Review of a47c698 — fix(pdf): the rupee sign leaked through on negative amounts
+
+**Verdict:** ✅ — and this one corrects the record on my own previous review, which claimed to have ruled this out.
+
+### 🔴 The bug, and why my verification could never have caught it
+
+`pdfMoney` stripped with `/^₹/` — **anchored**. `formatRupees` returns the sign first on a negative, so `-₹15,702` never had ₹ at index 0, it was never stripped, and WinAnsi printed it as `¹`. Every row where a shop went into credit read **"Rs -¹15,702"**.
+
+Reproduced against the real values, old behaviour versus new:
+
+```
+   -1570200   Rs -₹15,702      ->  Rs -15,702    ₹ LEAKED
+    -123400   Rs -₹1,234       ->  Rs -1,234     ₹ LEAKED
+   -4500000   Rs -₹45,000      ->  Rs -45,000    ₹ LEAKED
+    7591600   Rs 75,916            unchanged
+   48430200   Rs 4,84,302          unchanged
+```
+
+**`-4500000` is the exact value in my own "credit opening" test case at `074dc24`.** So my test data did exercise this path, the generated PDF almost certainly carried the leak, and my review reported:
+
+> *"Byte inspection confirms no raw U+20B9 anywhere in the output, so the encoding trap is genuinely avoided rather than merely commented about."*
+
+**That conclusion was unfounded.** The check was `"₹".encode("utf-8") in pdf_bytes`. A PDF does not store text as UTF-8 — characters are encoded to font-specific codes inside compressed streams — so the test could not have found the character whether or not it was rendered. Re-examining that same file now, my extractor recovers **zero** text objects from it, which is the proof: it was never reading the document's text at all. It returned False because it was looking in the wrong place.
+
+The rendering half of that review stands — three shapes really did produce valid PDFs, and that was worth knowing. **The encoding half was a check that could only ever return the answer it gave.** A verification that cannot fail is not a verification, and I presented it as the stronger kind.
+
+**The fix itself is right and minimal:** the strip is unanchored, `.replace("₹", "")`. The comment records the whole chain — anchored pattern, sign-first formatting, WinAnsi's `¹` — so the next person does not re-anchor it for tidiness.
+
+**And the lift paid off exactly as intended.** This was in the *shared* helper, so `PickSlipPdf` carried the same bug the moment it was handed a negative. Lifting `pdfMoney` one commit earlier turned this into a single fix instead of two — and into one that could not be half-applied.
+
+### The two statement gaps
+
+**The table header now repeats** — `<View style={s.thead} fixed>`. Page 2 of a 50-entry statement was six unlabelled columns of figures, on a document whose entire job is being checkable against Tally. The footer already carried `fixed`; the header did not.
+
+**The period carries the year** — `formatFullDate` (`en-GB`, IST, `year: "numeric"`) instead of `formatShortDate`. "Period 01 May to 22 Jul" is fine on a screen you are looking at today and meaningless on a printout filed for six months.
+
+Both were found by the owner generating a real statement, which is the only way either would have surfaced.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the defect was a money-rendering defect in a customer-facing document, now fixed at the shared helper so both PDFs are covered. **Mobile** — n/a.
+
+**What I tried:** Reproduced the old anchored behaviour alongside the current helper across six values including the three from the owner's PDF (table above); confirmed `-4500000` was in my own earlier test data; re-opened the PDF my previous review declared clean and found my extractor recovers zero text objects from it, establishing that the original check could not read PDF text; confirmed the header `View` now carries `fixed` and the footer already did; confirmed `formatFullDate` includes the year; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only).
+
+---
+
+## Review of 047d643 — PDF polish, and Share replaces Export
+
+**Verdict:** ✅ — the header-font finding is a real class of bug, and the builder checked the other instance of it before it could bite there too.
+
+### The style-array trap, and the check that followed it
+
+react-pdf resolves a style **array last-wins**, so `[s.th, s.cDate]` let each column's own `fontFamily` override the header's. Five headers silently took Courier from their column; **ENTRY — the only column setting no font — kept Helvetica-Bold** and was the visible odd one out. The cause was invisible in the symptom.
+
+Fixed by swapping to `[s.cX, s.th]`, verified across all six headers. The column now contributes width and alignment; `th` contributes type.
+
+**And they checked the pick slip for the same shape rather than only fixing what was reported.** It uses `[s.th, s.colItem]` too — the same risky order — but its `col*` styles set **zero** `fontFamily` (I confirmed: `colQty`, `colItem`, `colRate`, `colAmount` are width/flex/textAlign only), so `th` wins there and there is no equivalent bug. Finding a class of defect and immediately auditing its other instance is the behaviour that stops the second one shipping.
+
+### The rest
+
+**The outstanding now opens the document**, so it states the figure at the top and proves it at the bottom — the same shape as the screen, instead of making a reader add two pages to learn what the document is about.
+
+**BALANCE DUE sits on the grid** rather than floating right: the label right-aligns across the first four columns, the figure occupies the last two, so its right edge lands under the BALANCE column above it.
+
+**Colour marks the conclusion, not every line** — the closing figure red when owed and green when not, the DR/CR columns black. That answers "should Cr be red or green throughout" the right way: colouring every credit line would make the document a wall of alternating colour and would break its resemblance to a Tally statement, which is the point of the whole page.
+
+### Share replaces Export, and the shared button generalised cleanly
+
+`SharePdfButton` now takes `url` + `fileName` instead of `orderId`/`orderRef`/`retailerName`, with the reason recorded: *"a second copy of it is how the two would drift apart on the Android caption quirk."* That quirk is real and already handled in this component — duplicating the share logic would have meant duplicating a workaround, which is the same argument that made `pdfMoney`'s lift pay off one commit ago.
+
+**All three call sites verified** — `OrderDetailView:710`, `OrderDetailView:789` and the new `RetailerDetail:199`. The two order-detail ones pass the identical url and `pickSlipFileName(...)` the component used to compute internally, so the pick slip's behaviour is unchanged.
+
+**Re-rendered after the polish** — all three shapes still produce valid PDFs (4168 / 3543 / 3417 bytes, `%PDF-` headers). Stated precisely this time: that proves the document still lays out, and **nothing about its text content**. My previous review over-claimed on exactly that distinction.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the closing figure's colour follows the app's owed/clear rule; DR/CR stay black. **Mobile** — Share is the phone-appropriate action and now serves both documents through one implementation. **RLS** — untouched.
+
+**What I tried:** Confirmed all six headers reordered to `[column, th]`; independently checked the pick slip's `col*` styles for `fontFamily` (zero — their claim holds); read the `SharePdfButton` API change and verified all three call sites, including that the two order-detail ones pass what the component previously computed internally; re-ran the three-shape render after the polish; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only).
