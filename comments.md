@@ -8556,3 +8556,35 @@ Fixed by swapping to `[s.cX, s.th]`, verified across all six headers. The column
 **What I tried:** Confirmed all six headers reordered to `[column, th]`; independently checked the pick slip's `col*` styles for `fontFamily` (zero — their claim holds); read the `SharePdfButton` API change and verified all three call sites, including that the two order-detail ones pass what the component previously computed internally; re-ran the three-shape render after the polish; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only).
+
+---
+
+## Review of 34238d2 — fix(ledger): the opening row is dated by the earliest row shown
+
+**Verdict:** ✅ — **🟡 82 CLOSED**, and the comment states the distinction better than the flag did.
+
+**Both render sites fixed** — `RetailerDetail.tsx:293` (phone) and `:350` (desktop) now read `Balance before {openingLabel}`, where:
+
+```ts
+const openingLabel = entries.length > 0 ? formatShortDate(entries[0].entry_date) : sinceLabel;
+```
+
+`entries[0]` is the earliest row since the ordering flip, and the indexing is safe because `showOpening` already requires `entries.length > 0` — noted in the comment rather than left for a reader to check.
+
+**The caption deliberately keeps the nominal date, and the code now says why:**
+
+> *"A range is a description of what was REQUESTED, and overstating that is harmless. A money figure with a date beside it reads as a balance AS AT that date, which is a claim. Same distinction, opposite answer."*
+
+That is a sharper statement of the flag than I wrote. It also does the more useful job: the caption and the opening row now *deliberately* disagree about which date they show, and without that comment the next reader would reasonably "fix" them into consistency — in whichever direction they happened to notice first.
+
+**The PDF was already safe** and is untouched: its opening row says `Opening balance` with no date at all, so it never carried the claim. Screen and document now differ in wording but agree in honesty — the screen dates it because it can, the document declines to because it did not need to.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — this was a money-labelling defect and is the one class of thing this page cannot afford, since its entire claim is that the balance is provable. **Mobile** — both surfaces carry the same expression, so they cannot drift.
+
+**What I tried:** Confirmed both render sites use `openingLabel`; traced `openingLabel` to `entries[0].entry_date` and confirmed `showOpening` guarantees a non-empty array; confirmed the PDF's opening row still carries no date and was not touched; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** **CLOSED: 🟡 82.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
