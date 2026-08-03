@@ -8087,3 +8087,51 @@ That is the right treatment for a number that has now been wrong twice: state th
 **What I tried:** Recomputed the band from the current `.header` and `.back` rules for both the subtitle and no-subtitle cases (57px in each, matching); verified the "subtitle is free" claim by comparing the title stack (~38px) against the button (44px); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of a06fe81 — feat(ledger): the retailer ledger query builder, and balance_as_of in RETAILER_SELECT
+
+**Verdict:** ✅ — step 1 of the ledger page, and the date arithmetic holds at every boundary I could find to push on.
+
+**Branched, not on main.** `feat/retailer-ledger-page`, per the prompt.
+
+### The date arithmetic is the risk in this commit, so I executed it
+
+`ledgerSinceDate` is the kind of function that reads fine and is wrong at one boundary. Ran it against the real module:
+
+| moment (IST unless noted) | 3M | 6M | FY |
+|---|---|---|---|
+| 3 Aug, mid-month | 2026-05-03 | 2026-02-03 | 2026-04-01 |
+| **31 Aug** | 2026-05-31 | **2026-03-03** | 2026-04-01 |
+| **15 Jan** | 2025-10-15 | **2025-07-15** | 2025-04-01 |
+| **1 April** | 2026-01-01 | 2025-10-01 | **2026-04-01** |
+| **31 March** | 2025-12-31 | 2025-10-01 | **2025-04-01** |
+| 23:45 **UTC** (= 4 Aug IST) | 2026-05-**04** | 2026-02-**04** | 2026-04-01 |
+
+- **The FY boundary is exact on both sides** — 1 April gives this year, 31 March gives last year — matching `_fy_start()` in `ledger_sync.py`. The spec said mirror that rule rather than invent one, and it does.
+- **31 Aug − 6M = 3 March**, the documented month-overflow rollback, and the comment says so before you have to work it out.
+- **January crosses the year** correctly via JS's negative month index.
+- **The 23:45 UTC case is the one that proves `istDateKey` is load-bearing** rather than decorative: at that instant IST is already 4 August and the function returns 4th-based dates. A browser-local implementation would disagree for anyone outside India.
+
+`openingBalancePaise(8432000, [+95,200 / −42,322])` returns **3144200** — ₹31,442, the exact figure the design carries. Empty entries return the outstanding unchanged (correct: everything predates the window), and a null outstanding stays null rather than becoming 0.
+
+### The rest
+
+**The RLS trap is carried into the code, not left in the spec.** The file opens with a ⚠️ saying `ledger_entries_select_all` scopes nothing and that the page must fetch the retailer first. That is where it needs to be — the next person to use this builder reads the file, not the spec.
+
+**Verbatim voucher types are documented at the type**, with the reason that makes it non-negotiable: *"'Ganpati Payment' is 30 entries and every one is a DEBIT, so a friendly label like 'Receipt' would state the opposite of the truth."*
+
+**The `id` tiebreak on the sort is a real catch I did not specify.** Without it PostgREST may return same-day entries in a different order between requests, and a list that reshuffles on refetch reads as data changing. Two `.order()` calls, newest-first on both.
+
+**The widening keeps every cast truthful** — the `₹NaN` lesson applied. `balance_as_of` was added to the constant *and* to `RetailerRow` together, and all three `as RetailerRow` sites (both detail routes and `fetchRetailers`) sit on `RETAILER_SELECT`, so none of them is now claiming a column the query does not fetch.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — paise throughout; the opening derivation never converts and never rounds. **RLS** — correctly relied on *not* scoping, and said so loudly. **Immutable snapshots** — n/a. **Mobile** — no surface yet.
+
+**What I tried:** Wrote a `tsx` harness against the real `ledger.ts` and ran `ledgerSinceDate` at six boundaries (month middle, 31st, year crossing, both sides of 1 April, and a UTC instant that is the next IST day) plus `openingBalancePaise` at three (normal, empty, null outstanding) — table above; compared the FY rule against `_fy_start()` in the sync; confirmed `istDateKey` formats via `Intl` with an explicit IST zone; enumerated every `as RetailerRow` cast against `RETAILER_SELECT`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
