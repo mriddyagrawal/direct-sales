@@ -8375,3 +8375,29 @@ I would take the first, since a supported date is more useful than none.
 **What I tried:** Read the diff and the new `windowStart` expression; confirmed ALL falls back to `entries[0].entry_date` and then to "all entries"; traced `openingBalancePaise` to confirm the figure is bounded by the *shown entries* rather than by the filter's nominal start; grepped both "Balance before" render sites to confirm they use `sinceLabel` (the nominal date) rather than the earliest row; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 82. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 35a6b90 — feat(ledger): the filter chips move above the STATEMENT heading
+
+**Verdict:** ✅
+
+**Phase / commit goal:** Put the control before the thing it controls.
+
+**A pure move**, and the diff proves it: the `statementHead` block is deleted and re-inserted verbatim below the chip row — same markup, same `!notSynced` guard on the window label. Nothing was rewritten under cover of a reorder, which is the thing to check on a commit like this.
+
+**The chips are one block serving both surfaces**, sitting above the heading, which sits above the phone rows and the desktop table. So the fix lands on both without a second copy.
+
+**The `!notSynced` guard on the chips is right** and worth naming: on a shop the sync never matched, every preset returns the same empty statement, so four chips that cannot change anything are worse than none. That is the same "render only when it says something" rule the placeholder removal, the opening row and the contact line all follow — a control with no possible effect is furniture.
+
+**All `styles.*` resolve** (re-run with the corrected pattern, not the line-start one that produced six false positives last time). `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**🟡 82 is untouched**, as expected — both `Balance before {sinceLabel}` sites still carry the nominal date. Not this commit's job; it needs settling before the PDF.
+
+**Domain / correctness checks:** **Money** — untouched. **Mobile** — the chips are the primary interaction and now precede their result on both surfaces.
+
+**What I tried:** Diffed the TSX to confirm the heading block was moved verbatim rather than rewritten; checked the chips render once, above the heading, ahead of both the phone rows and the desktop table; confirmed the `!notSynced` guard covers the chips as well as the window label; re-ran the class sweep with the corrected regex; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (settle before the PDF).
