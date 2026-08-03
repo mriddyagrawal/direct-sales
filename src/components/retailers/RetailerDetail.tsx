@@ -206,13 +206,6 @@ export function RetailerDetail({
       </div>
 
       <section className={styles.statement}>
-        <div className={styles.statementHead}>
-          <span>STATEMENT</span>
-          {!notSynced && (
-            <span className={styles.window}>{windowLabel}</span>
-          )}
-        </div>
-
         {/* Presets, not a date picker. Every one of them ends TODAY — see the
             comment on the `since` state. Hidden on an unsynced shop, where
             there is nothing to filter and the chips would only offer four ways
@@ -232,6 +225,13 @@ export function RetailerDetail({
             ))}
           </div>
         )}
+
+        <div className={styles.statementHead}>
+          <span>STATEMENT</span>
+          {!notSynced && (
+            <span className={styles.window}>{windowLabel}</span>
+          )}
+        </div>
 
         <div className={`${styles.phoneRows} ${isFetching ? styles.statementBusy : ""}`}>
         {entries.length === 0 ? (

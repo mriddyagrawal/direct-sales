@@ -284,11 +284,16 @@
    Four presets, all of them ending TODAY. Same chip grammar as the retailers
    queue's filter tabs — mono, small, the active one filled ink — so a filter
    looks like a filter everywhere in the app. */
+/* ABOVE the STATEMENT heading (owner 2026-08-04). It sat below, so the
+   caption — "04 Feb - NOW" — described a result before the reader had met the
+   control that produced it. A control precedes the thing it controls.
+   The padding flipped with it: the breathing room now goes underneath, between
+   the chips and the heading they act on. */
 .sinceRow {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 9px 0 2px;
+  padding: 2px 0 9px;
 }
 
 .sinceChip {
