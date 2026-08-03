@@ -8188,3 +8188,43 @@ The middle one is the catch. Without it, a shop with two years of history filter
 **What I tried:** Read both route files to confirm the retailer is fetched before the ledger and that `notFound()` precedes any entry read; checked the opening guard and its `entries.length > 0` clause; grepped for any voucher-type mapping (none — rendered raw); confirmed `isStaff` gates only the back fallback, the diagnosis line and Edit, so the salesman gets the full statement; scripted the CSS class sweep in both directions across the component and the skeleton (39 refs resolve, 0 unused rules); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 93d8914 — feat(ledger): the since-filter — 3M · 6M · This FY · All
+
+**Verdict:** ✅ — and it closes a transition hole created by the derived opening balance, which I had only flagged as "be deliberate about".
+
+### The cache keys align, and the reason they align is the right one
+
+Server prefetches `["ledger", id, LEDGER_SINCE_DEFAULT]`; the client's `useQuery` uses `["ledger", retailer.id, since]` with `since` initialised to that same default. So the hydrated cache is hit on first render — no double fetch, no flash.
+
+The reasoning behind it is what makes it robust:
+
+> *"The PRESET is the query key, not the date, so the server and the client agree even if the request crosses midnight IST between them."*
+
+Keying on the **computed date** would have been the obvious move and would desync a request that straddles midnight — the server writes one key, the client asks for another, and the page refetches for no reason. Keying on the preset makes that impossible.
+
+### The transition hole I had not thought through
+
+The spec says the opening balance recomputes with the filter and that it moving is correct. What I did not follow through is what happens **during** the refetch.
+
+The opening balance is **derived from the rows on screen**. With `placeholderData: keepPreviousData`, those rows are the *previous* window's while the label above them already says the new date — so for the ~200ms of the fetch the page would show a confidently wrong number under an accurate label. Their fix is to dim the block via `.statementBusy` while `isFetching`, and the comment states exactly that chain:
+
+> *"…it also stops the opening balance flickering through a wrong value: it is DERIVED from the rows on screen, so while they are the previous window's it does not match the label above them."*
+
+That is a real consequence of the derived-opening design, found by thinking it through rather than by seeing it fail. Keeping the previous rows (rather than blanking) is also the right call for a filter — a list that empties and refills on every chip tap feels broken.
+
+**The chips are proper buttons with `aria-pressed`**, not styled divs — so the filter is operable by keyboard and announced as a toggle group.
+
+**All `styles.*` refs resolve**, including the new `.sinceChip`, `.sinceChipOn` and `.statementBusy`. `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None. One observation for the record, not a defect: `ledgerSinceDate(since)` is called with its own `new Date()` default while the component also holds `const now = new Date(nowMs())` for timestamps. Functionally identical — both are "now" — but if this page ever needs a frozen clock for testing, those are two sources rather than one.
+
+**Domain / correctness checks:** **Money** — the opening derivation is unchanged and still in paise; the dim is the only new behaviour around it. **RLS** — no change; the filter narrows an already-authorised read. **Mobile** — the chips are the primary interaction; `keepPreviousData` matters most on a phone, where a list emptying and refilling is the most jarring.
+
+**What I tried:** Compared the server prefetch key against the client `useQuery` key (identical, so hydration hits); read the `keepPreviousData` + `.statementBusy` pairing and traced why it is needed — the opening balance is derived from rows that are briefly the wrong window's; confirmed the chips are `<button aria-pressed>` rather than divs; re-ran the CSS class sweep after the new classes landed (all resolve); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
