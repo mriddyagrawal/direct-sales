@@ -8516,3 +8516,43 @@ Both were found by the owner generating a real statement, which is the only way 
 **What I tried:** Reproduced the old anchored behaviour alongside the current helper across six values including the three from the owner's PDF (table above); confirmed `-4500000` was in my own earlier test data; re-opened the PDF my previous review declared clean and found my extractor recovers zero text objects from it, establishing that the original check could not read PDF text; confirmed the header `View` now carries `fixed` and the footer already did; confirmed `formatFullDate` includes the year; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only).
+
+---
+
+## Review of 047d643 — PDF polish, and Share replaces Export
+
+**Verdict:** ✅ — the header-font finding is a real class of bug, and the builder checked the other instance of it before it could bite there too.
+
+### The style-array trap, and the check that followed it
+
+react-pdf resolves a style **array last-wins**, so `[s.th, s.cDate]` let each column's own `fontFamily` override the header's. Five headers silently took Courier from their column; **ENTRY — the only column setting no font — kept Helvetica-Bold** and was the visible odd one out. The cause was invisible in the symptom.
+
+Fixed by swapping to `[s.cX, s.th]`, verified across all six headers. The column now contributes width and alignment; `th` contributes type.
+
+**And they checked the pick slip for the same shape rather than only fixing what was reported.** It uses `[s.th, s.colItem]` too — the same risky order — but its `col*` styles set **zero** `fontFamily` (I confirmed: `colQty`, `colItem`, `colRate`, `colAmount` are width/flex/textAlign only), so `th` wins there and there is no equivalent bug. Finding a class of defect and immediately auditing its other instance is the behaviour that stops the second one shipping.
+
+### The rest
+
+**The outstanding now opens the document**, so it states the figure at the top and proves it at the bottom — the same shape as the screen, instead of making a reader add two pages to learn what the document is about.
+
+**BALANCE DUE sits on the grid** rather than floating right: the label right-aligns across the first four columns, the figure occupies the last two, so its right edge lands under the BALANCE column above it.
+
+**Colour marks the conclusion, not every line** — the closing figure red when owed and green when not, the DR/CR columns black. That answers "should Cr be red or green throughout" the right way: colouring every credit line would make the document a wall of alternating colour and would break its resemblance to a Tally statement, which is the point of the whole page.
+
+### Share replaces Export, and the shared button generalised cleanly
+
+`SharePdfButton` now takes `url` + `fileName` instead of `orderId`/`orderRef`/`retailerName`, with the reason recorded: *"a second copy of it is how the two would drift apart on the Android caption quirk."* That quirk is real and already handled in this component — duplicating the share logic would have meant duplicating a workaround, which is the same argument that made `pdfMoney`'s lift pay off one commit ago.
+
+**All three call sites verified** — `OrderDetailView:710`, `OrderDetailView:789` and the new `RetailerDetail:199`. The two order-detail ones pass the identical url and `pickSlipFileName(...)` the component used to compute internally, so the pick slip's behaviour is unchanged.
+
+**Re-rendered after the polish** — all three shapes still produce valid PDFs (4168 / 3543 / 3417 bytes, `%PDF-` headers). Stated precisely this time: that proves the document still lays out, and **nothing about its text content**. My previous review over-claimed on exactly that distinction.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the closing figure's colour follows the app's owed/clear rule; DR/CR stay black. **Mobile** — Share is the phone-appropriate action and now serves both documents through one implementation. **RLS** — untouched.
+
+**What I tried:** Confirmed all six headers reordered to `[column, th]`; independently checked the pick slip's `col*` styles for `fontFamily` (zero — their claim holds); read the `SharePdfButton` API change and verified all three call sites, including that the two order-detail ones pass what the component previously computed internally; re-ran the three-shape render after the polish; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only).
