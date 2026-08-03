@@ -1,0 +1,45 @@
+import { formatRupees } from "@/lib/format";
+
+// WinAnsi survival kit for @react-pdf/renderer, shared by every PDF this app
+// generates. Lifted out of PickSlipPdf.tsx when the statement became the second
+// document (owner 2026-08-04) — two PDFs with two private copies of the same
+// workaround is exactly how they drift apart, which is the lesson readBalance
+// already taught this codebase.
+//
+// react-pdf's built-in fonts (Helvetica / Courier) are WinAnsi-encoded, so
+// they have no ₹ (U+20B9 prints as "¹") and no ⋆ (prints as "Æ") — both of
+// which appear in real data here. This is an ENCODING limit, not a style
+// choice: printing ₹ does not look worse, it prints the wrong character.
+//
+// The fix is registering real fonts, which is a known follow-up: it means
+// committing font binaries to the repo, re-checking every column of both
+// documents against new metrics, and proving the files resolve at runtime on
+// Vercel — where a failure breaks PDF generation outright rather than
+// degrading. Until then, these two functions are the workaround.
+
+// "Rs 15,000" — still formatRupees underneath, so paise are converted and
+// grouped en-IN, never printed raw.
+export function pdfMoney(paise: number): string {
+  return `Rs ${formatRupees(paise).replace(/^₹/, "")}`;
+}
+
+const GLYPH_MAP: Record<string, string> = {
+  "⋆": "*",
+  "★": "*",
+  "・": " · ",
+  "→": "->",
+  "‘": "'",
+  "’": "'",
+  "“": '"',
+  "”": '"',
+};
+
+export function pdfText(text: string): string {
+  // Collapse whitespace FIRST (so a newline in a note becomes a space, not a
+  // "?"), then map known symbols and squash anything else outside printable
+  // Latin-1 to "?" so the WinAnsi encoder never prints a random wrong glyph.
+  return text
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[^ -ÿ]/g, (c) => GLYPH_MAP[c] ?? "?");
+}

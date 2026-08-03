@@ -50,12 +50,12 @@
   color: var(--color-ink);
 }
 
-/* The Edit button sits hard right, by its own auto margin — the same
-   mechanism the queue and Products use, so a third element could be added
-   later without stranding anything mid-row. */
-.headRow button {
-  margin-left: auto;
-}
+/* `.headRow button { margin-left: auto }` lived here, and it was true when Edit
+   was the only control: it pushed itself hard right. There are two now (Export
+   and Edit), so the GROUP carries the auto margin instead — see .headActions.
+   Left as a bare `button` rule it would still have matched Edit as a
+   descendant and tried to push it within the group, which is the kind of
+   leftover that only shows up as an unexplained gap. */
 
 /* The skeleton's Edit placeholder. It needs its own class because Skeleton
    renders a <div>, so the `button` rule above does not reach it and the bar
@@ -356,4 +356,37 @@
   .phoneRows {
     display: none;
   }
+}
+
+/* Export + Edit as one group at the right of the head row. The group carries
+   the auto margin now; `.headRow button` used to do it alone, which stopped
+   working the moment there were two controls (the first would have been pushed
+   right and the second would have followed it with a gap in between). */
+.headActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* An <a>, not a button: it downloads a file, so middle-click and long-press
+   should behave. Styled as the app's secondary button so the pair reads as one
+   control group. */
+.exportLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--touch-target-min);
+  padding: 0 20px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--color-ink);
+  text-decoration: none;
+  cursor: pointer;
 }

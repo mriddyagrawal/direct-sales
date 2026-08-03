@@ -1,36 +1,10 @@
 import { Document, Page, View, Text, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
-import { formatFullTimestamp, formatRupees } from "@/lib/format";
+import { formatFullTimestamp } from "@/lib/format";
+import { pdfMoney, pdfText } from "@/lib/pdf-encoding";
 
-// react-pdf's built-in fonts (Helvetica/Courier) are WinAnsi-encoded — no ₹
-// (U+20B9, rendered "¹") and no ⋆ (rendered "Æ"), both of which appear in
-// real data. Until real fonts are registered (the planned follow-up), money
-// renders as "Rs 15,000" (still formatRupees underneath — converted paise,
-// en-IN grouping, never raw paise) and free text is mapped to WinAnsi-safe
-// equivalents rather than garbled.
-function pdfMoney(paise: number): string {
-  return `Rs ${formatRupees(paise).replace(/^₹/, "")}`;
-}
-
-const GLYPH_MAP: Record<string, string> = {
-  "⋆": "*",
-  "★": "*",
-  "・": " · ",
-  "→": "->",
-  "‘": "'",
-  "’": "'",
-  "“": '"',
-  "”": '"',
-};
-
-function pdfText(text: string): string {
-  // Collapse whitespace FIRST (so a newline in a note becomes a space, not a
-  // "?"), then map known symbols and squash anything else outside printable
-  // Latin-1 to "?" so the WinAnsi encoder never prints a random wrong glyph.
-  return text
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[^ -ÿ]/g, (c) => GLYPH_MAP[c] ?? "?");
-}
+// pdfMoney() and pdfText() moved to src/lib/pdf-encoding.ts when the statement
+// PDF became their second caller — one copy of the WinAnsi workaround, so the
+// two documents cannot drift apart on how money and stray glyphs are printed.
 
 // The A5 ORDER COPY as a real generated PDF — mirrors the on-screen sheet
 // (PickSlip.tsx): header + ORDER COPY badge, meta, QTY·ITEM·RATE·AMOUNT table

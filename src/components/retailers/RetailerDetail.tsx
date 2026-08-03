@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Pencil } from "lucide-react";
+import { ChevronLeft, FileDown, Pencil } from "lucide-react";
 import { BackLink } from "@/components/BackLink";
 import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
@@ -180,12 +180,32 @@ export function RetailerDetail({
             already refuses it (retailers_staff_update is accountant/admin).
             An affordance that can only ever produce a raw RLS error is worse
             than no affordance. (Closes flag 59.) */}
-        {isStaff && (
-          <Button variant="secondary" onClick={() => setEditing(true)}>
-            <Glyph icon={Pencil} />
-            Edit
-          </Button>
-        )}
+        <div className={styles.headActions}>
+          {/* Export is for BOTH lenses (owner 2026-08-04) — a salesman handing
+              a shopkeeper their own statement in the shop is the strongest
+              collection tool on this page, and it is the shop's own data. It
+              carries the on-screen filter, because pressing Export while
+              looking at one window and getting another is surprising.
+              An unsynced shop has no balance to foot to, so there is nothing to
+              export and the route would 404 anyway. */}
+          {!notSynced && (
+            <a
+              className={styles.exportLink}
+              href={`/retailers/${retailer.id}/statement/pdf?since=${since}`}
+              target="_blank"
+              rel="noopener"
+            >
+              <Glyph icon={FileDown} />
+              Export
+            </a>
+          )}
+          {isStaff && (
+            <Button variant="secondary" onClick={() => setEditing(true)}>
+              <Glyph icon={Pencil} />
+              Edit
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* THE CLAIM. The balance is stated here and PROVED at the bottom of the
