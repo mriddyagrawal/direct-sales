@@ -8466,3 +8466,53 @@ On screen both sites still read `Balance before {sinceLabel}` with the nominal f
 **What I tried:** Read the route and confirmed neutral path, `runtime = "nodejs"`, retailer-before-ledger, the unsynced 404, and the validated `since`; **executed `renderStatementPdfBuffer` against three data shapes** and verified `%PDF-` headers and the absence of raw U+20B9; corrected two faults in my own harness before drawing conclusions; confirmed `pdf-encoding.ts` is imported by both PDFs; read the running-balance seed and the totals' `Math.max` split; checked the Export href carries `since`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only now).
+
+---
+
+## Review of a47c698 — fix(pdf): the rupee sign leaked through on negative amounts
+
+**Verdict:** ✅ — and this one corrects the record on my own previous review, which claimed to have ruled this out.
+
+### 🔴 The bug, and why my verification could never have caught it
+
+`pdfMoney` stripped with `/^₹/` — **anchored**. `formatRupees` returns the sign first on a negative, so `-₹15,702` never had ₹ at index 0, it was never stripped, and WinAnsi printed it as `¹`. Every row where a shop went into credit read **"Rs -¹15,702"**.
+
+Reproduced against the real values, old behaviour versus new:
+
+```
+   -1570200   Rs -₹15,702      ->  Rs -15,702    ₹ LEAKED
+    -123400   Rs -₹1,234       ->  Rs -1,234     ₹ LEAKED
+   -4500000   Rs -₹45,000      ->  Rs -45,000    ₹ LEAKED
+    7591600   Rs 75,916            unchanged
+   48430200   Rs 4,84,302          unchanged
+```
+
+**`-4500000` is the exact value in my own "credit opening" test case at `074dc24`.** So my test data did exercise this path, the generated PDF almost certainly carried the leak, and my review reported:
+
+> *"Byte inspection confirms no raw U+20B9 anywhere in the output, so the encoding trap is genuinely avoided rather than merely commented about."*
+
+**That conclusion was unfounded.** The check was `"₹".encode("utf-8") in pdf_bytes`. A PDF does not store text as UTF-8 — characters are encoded to font-specific codes inside compressed streams — so the test could not have found the character whether or not it was rendered. Re-examining that same file now, my extractor recovers **zero** text objects from it, which is the proof: it was never reading the document's text at all. It returned False because it was looking in the wrong place.
+
+The rendering half of that review stands — three shapes really did produce valid PDFs, and that was worth knowing. **The encoding half was a check that could only ever return the answer it gave.** A verification that cannot fail is not a verification, and I presented it as the stronger kind.
+
+**The fix itself is right and minimal:** the strip is unanchored, `.replace("₹", "")`. The comment records the whole chain — anchored pattern, sign-first formatting, WinAnsi's `¹` — so the next person does not re-anchor it for tidiness.
+
+**And the lift paid off exactly as intended.** This was in the *shared* helper, so `PickSlipPdf` carried the same bug the moment it was handed a negative. Lifting `pdfMoney` one commit earlier turned this into a single fix instead of two — and into one that could not be half-applied.
+
+### The two statement gaps
+
+**The table header now repeats** — `<View style={s.thead} fixed>`. Page 2 of a 50-entry statement was six unlabelled columns of figures, on a document whose entire job is being checkable against Tally. The footer already carried `fixed`; the header did not.
+
+**The period carries the year** — `formatFullDate` (`en-GB`, IST, `year: "numeric"`) instead of `formatShortDate`. "Period 01 May to 22 Jul" is fine on a screen you are looking at today and meaningless on a printout filed for six months.
+
+Both were found by the owner generating a real statement, which is the only way either would have surfaced.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — the defect was a money-rendering defect in a customer-facing document, now fixed at the shared helper so both PDFs are covered. **Mobile** — n/a.
+
+**What I tried:** Reproduced the old anchored behaviour alongside the current helper across six values including the three from the owner's PDF (table above); confirmed `-4500000` was in my own earlier test data; re-opened the PDF my previous review declared clean and found my extractor recovers zero text objects from it, establishing that the original check could not read PDF text; confirmed the header `View` now carries `fixed` and the footer already did; confirmed `formatFullDate` includes the year; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 82 (screen only).
