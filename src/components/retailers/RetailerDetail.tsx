@@ -97,6 +97,21 @@ export function RetailerDetail({
   // clamps to real data instead, because a document sent to a shopkeeper must
   // not claim months it has no entries for.
   const windowStart = sinceLabel ?? (entries.length > 0 ? formatShortDate(entries[0].entry_date) : null);
+
+  // The opening row's label is the EARLIEST ROW ACTUALLY SHOWN, never the
+  // filter's nominal start (REVIEWER 🟡 82). The figure is
+  // `outstanding − Σ(movement over the shown entries)`, so it is the balance
+  // before the first row on screen — and the app holds nothing before 1 May
+  // while 6M nominally starts 04 Feb. "Balance before 04 Feb" would put a date
+  // on a figure the data cannot stand behind.
+  //
+  // The caption above deliberately keeps the nominal date: a range is a
+  // description of what was REQUESTED, and overstating that is harmless. A
+  // money figure with a date beside it reads as a balance AS AT that date,
+  // which is a claim. Same distinction, opposite answer.
+  //
+  // Safe to index: this only renders when entries.length > 0.
+  const openingLabel = entries.length > 0 ? formatShortDate(entries[0].entry_date) : sinceLabel;
   const windowLabel = windowStart ? `${windowStart} - NOW` : "all entries";
 
   // Opening balance: what was owed BEFORE this window. Rendered only when it is
@@ -275,7 +290,7 @@ export function RetailerDetail({
                 opening → bills → receipts → closing. */}
             {showOpening && (
               <div className={styles.opening}>
-                <span>Balance before {sinceLabel}</span>
+                <span>Balance before {openingLabel}</span>
                 <span className={styles.openingValue}>{formatRupees(opening)}</span>
               </div>
             )}
@@ -332,7 +347,7 @@ export function RetailerDetail({
               {showOpening && (
                 <tr className={styles.openingRow}>
                   <td className={table.mono}>—</td>
-                  <td colSpan={2}>Balance before {sinceLabel}</td>
+                  <td colSpan={2}>Balance before {openingLabel}</td>
                   <td className={`${table.mono} ${table.numeric}`}>
                     {openingDebit > 0 ? formatRupees(openingDebit) : <span className={styles.dash}>—</span>}
                   </td>
