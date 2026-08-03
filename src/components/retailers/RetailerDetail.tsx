@@ -28,6 +28,7 @@ import { readBalance, ledgerText } from "@/lib/balance";
 import { formatOrderTimestamp, formatRupees, formatShortDate } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import back from "@/components/ui/back.module.css";
+import table from "@/components/ui/table.module.css";
 import styles from "./RetailerDetail.module.css";
 
 // The edit entry point moved HERE from the row click (spec 2026-08-01).
@@ -90,6 +91,15 @@ export function RetailerDetail({
   // would print the same number twice for no reason.
   const opening = openingBalancePaise(retailer.outstanding_paise, entries);
   const showOpening = opening !== null && opening !== 0 && entries.length > 0;
+
+  // Desktop foots two real columns, so the opening has to land in ONE of them:
+  // a positive opening is money already owed (a debit), a negative one is money
+  // sitting in the shop's credit. Splitting it here is what makes the column
+  // sums add up to the outstanding figure, which IS the proof in table form.
+  const openingDebit = showOpening && opening > 0 ? opening : 0;
+  const openingCredit = showOpening && opening < 0 ? -opening : 0;
+  const totalDebit = entries.reduce((sum, e) => sum + e.debit_paise, 0) + openingDebit;
+  const totalCredit = entries.reduce((sum, e) => sum + e.credit_paise, 0) + openingCredit;
 
   // Area · phone, as ONE line, absent rather than blank when there is nothing —
   // 582 of 600 shops have no area at all, so a fact table was three rows of
@@ -210,7 +220,7 @@ export function RetailerDetail({
           </div>
         )}
 
-        <div className={isFetching ? styles.statementBusy : undefined}>
+        <div className={`${styles.phoneRows} ${isFetching ? styles.statementBusy : ""}`}>
         {entries.length === 0 ? (
           <p className={styles.empty}>
             {notSynced
@@ -236,8 +246,8 @@ export function RetailerDetail({
             {entries.map((e) => {
               // Sign and colour are the ONLY direction signal on the phone,
               // because the voucher type is Tally's verbatim string and no
-              // longer says "Receipt" or "Bill". Desktop gets real Debit and
-              // Credit columns instead (step 4).
+              // longer says "Receipt" or "Bill". Desktop uses real DR and CR
+              // columns instead — see the table below.
               const isCredit = e.credit_paise > 0;
               const amount = isCredit ? e.credit_paise : e.debit_paise;
               return (
@@ -259,6 +269,65 @@ export function RetailerDetail({
           </>
         )}
         </div>
+
+        {/* DESKTOP — the same statement as real columns. Direction comes from
+            WHICH COLUMN a figure sits in, so there are no signs and no coloured
+            amounts here; the phone signs and colours because two money columns
+            do not fit a phone. That divergence is deliberate, and with voucher
+            types rendered verbatim the direction has to come from somewhere.
+
+            It also fixes 🟡 81 structurally: this stylesheet has no max-width,
+            so on a 1400px window every phone row put its amount a screen-width
+            from the entry that earned it. Columns do the aligning instead. */}
+        {entries.length > 0 && (
+          <table className={`${table.table} ${isFetching ? styles.statementBusy : ""}`}>
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>ENTRY</th>
+                <th>VOUCHER</th>
+                {/* DR / CR, not DEBIT / CREDIT — compact, and it matches the
+                    `Dr` the balance above already wears. */}
+                <th className={table.numeric}>DR</th>
+                <th className={table.numeric}>CR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {showOpening && (
+                <tr className={styles.openingRow}>
+                  <td className={table.mono}>—</td>
+                  <td colSpan={2}>Balance before {sinceLabel}</td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {openingDebit > 0 ? formatRupees(openingDebit) : <span className={styles.dash}>—</span>}
+                  </td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {openingCredit > 0 ? formatRupees(openingCredit) : <span className={styles.dash}>—</span>}
+                  </td>
+                </tr>
+              )}
+              {entries.map((e) => (
+                <tr key={e.id}>
+                  <td className={`${table.mono} ${table.cellMeta}`}>{formatShortDate(e.entry_date)}</td>
+                  <td className={table.cellName}>{e.voucher_type}</td>
+                  <td className={`${table.mono} ${table.cellMeta}`}>{e.voucher_no || "—"}</td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {e.debit_paise > 0 ? formatRupees(e.debit_paise) : <span className={styles.dash}>—</span>}
+                  </td>
+                  <td className={`${table.mono} ${table.numeric}`}>
+                    {e.credit_paise > 0 ? formatRupees(e.credit_paise) : <span className={styles.dash}>—</span>}
+                  </td>
+                </tr>
+              ))}
+              {/* Foots BOTH columns. Their difference is restated by the proof
+                  below, which is the same figure the page opens with. */}
+              <tr className={styles.totalRow}>
+                <td colSpan={3}>TOTAL</td>
+                <td className={`${table.mono} ${table.numeric}`}>{formatRupees(totalDebit)}</td>
+                <td className={`${table.mono} ${table.numeric}`}>{formatRupees(totalCredit)}</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
 
         {/* THE PROOF. Same figure as the claim above; the 2px ink rule is the
             app's existing "authoritative" device and marks this as a QED rather

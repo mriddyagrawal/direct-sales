@@ -318,3 +318,37 @@
 .statementBusy {
   opacity: 0.55;
 }
+
+/* ── DESKTOP ──────────────────────────────────────────────────────────────
+   The phone statement steps aside for the shared table grammar, which switches
+   itself on at 768px. This block sits at the BOTTOM of the file on purpose: a
+   media query adds no specificity, so an override placed above the rule it
+   overrides loses the source-order tie and does nothing. Three live bugs in
+   this project came from exactly that. */
+
+/* The opening balance as a table row — greyed, because it is context for the
+   entries rather than one of them. */
+.openingRow td {
+  color: var(--color-locked);
+}
+
+/* The footing row. 2px ink above it is the app's "authoritative" device, the
+   same rule the claim and the proof already wear — this is the third and last
+   place it appears on the page, and all three bracket the same argument. */
+.totalRow td {
+  border-bottom: 0;
+  border-top: 2px solid var(--color-ink);
+  font-weight: 700;
+}
+
+/* An empty cell reads as missing data; a hairline dash reads as "nothing on
+   this side", which is what it means in a two-column ledger. */
+.dash {
+  color: var(--color-hairline);
+}
+
+@media (min-width: 768px) {
+  .phoneRows {
+    display: none;
+  }
+}
