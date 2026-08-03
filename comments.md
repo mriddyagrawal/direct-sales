@@ -8228,3 +8228,51 @@ That is a real consequence of the derived-opening design, found by thinking it t
 **What I tried:** Compared the server prefetch key against the client `useQuery` key (identical, so hydration hits); read the `keepPreviousData` + `.statementBusy` pairing and traced why it is needed — the opening balance is derived from rows that are briefly the wrong window's; confirmed the chips are `<button aria-pressed>` rather than divs; re-ran the CSS class sweep after the new classes landed (all resolve); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 6de4175 — Merge feat/retailer-ledger-page (MERGED AND PUSHED — step 4 was never built)
+
+**Verdict:** ⚠️ — the three merged commits are each ✅ and were reviewed clean. The warning is that the run merged **one step short**, and it is live.
+
+**This is on `main` and pushed** — `origin/main` and local are both `6de4175`, so Vercel is serving it.
+
+### Step 4 does not exist
+
+The branch carries **three** feature commits — the query builder, the page, the filter. The spec's fourth step (*"Desktop: full width, Debit/Credit columns, footed totals"*) has no commit, and the code says so itself. `RetailerDetail.tsx:227`:
+
+> *"…Desktop gets real Debit and Credit columns instead (step 4)."*
+
+Written in the future tense, in shipped code. The only desktop rule in the whole stylesheet is:
+
+```css
+@media (min-width: 768px) { .page { padding: 24px; } }
+```
+
+Padding, not a layout. There is **no Debit/Credit table, no footed totals, and no `max-width` anywhere in the file**.
+
+**Nothing is broken** — the phone layout renders on desktop and is usable, and `tsc`, `eslint` and `npm run build` are all clean. But the merge subject says *"the retailer page becomes the Tally statement"*, and on desktop it became the phone statement with more padding. Anyone reading the log, or the design, will expect otherwise.
+
+### 🟡 81 — the statement rows have no width cap on desktop, which is a known-solved problem here
+
+`.page` sets `padding` and `gap` and nothing else. Each statement row is `date + voucher type` left, amount right, `justify-content: space-between` — so on a 1400px window the amount sits about a metre from the entry that earns it, with the eye crossing empty space on **every row**.
+
+This is the same defect the Quick Order picker had and fixed, in this same month, with one rule:
+
+```css
+/* PickRetailer.module.css */  max-width: 480px;
+```
+
+There it was flagged as a trap *before* the change landed, precisely because a right-aligned figure on an uncapped row is unreadable at width. The ledger page is denser — more rows, two aligned columns of meaning — so it has the problem harder.
+
+Step 4 as specced fixes this properly (a real table, where the columns do the aligning). A `max-width` is the cheap interim if step 4 is not coming soon. Either is fine; **shipping neither is the thing to decide about**, since it is live now.
+
+**Blocking issues:** None — nothing is broken, and the merge is coherent as far as it goes.
+
+**Non-blocking suggestions:** 🟡 81 above, and the stale forward reference at `RetailerDetail.tsx:227` should either be built or reworded — shipped code that points at a step which may never come is a note that decays into confusion.
+
+**Domain / correctness checks:** **RLS** — the retailer-first ordering from `ba133e7` is intact through the merge. **Money** — unchanged. **Mobile** — complete and reviewed; the phone is the surface that actually got the design. **Desktop** — the gap.
+
+**What I tried:** Listed the branch's non-merge commits (three, matching steps 1–3 and no step 4); grepped the stylesheet for every `@media` block (one, `padding: 24px`) and for `max-width` (none); found the component's own future-tense reference to step 4; compared against `PickRetailer.module.css:23`, where the same uncapped-row problem was solved with `max-width: 480px`; confirmed `origin/main` equals local so this is live; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** New: 🟡 81. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
