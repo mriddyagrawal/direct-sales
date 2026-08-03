@@ -25,6 +25,10 @@ export interface RetailerRow {
   // the last run — "not in the last sync", never ₹0 (0 is a real, square
   // balance). The office queue surfaces that as its own tab + badge.
   outstanding_paise: number | null;
+  // When that sync last matched this shop. The ledger page prints it under the
+  // balance ("Tally, as of …") — a live figure on a page that is otherwise a
+  // mirror needs to say how fresh it is. NULL wherever outstanding_paise is.
+  balance_as_of: string | null;
 }
 
 // The column list, once. Both retailer-detail routes (staff and salesman) read
@@ -32,7 +36,8 @@ export interface RetailerRow {
 // many — one RetailerRow shape means one select, the same way
 // ORDER_DETAIL_SELECT serves all three order-detail routes. Three hand-typed
 // copies of a column list is how a lens quietly ends up missing a field.
-export const RETAILER_SELECT = "id, name, area, phone, verified, active, tally_ledger_name, outstanding_paise";
+export const RETAILER_SELECT =
+  "id, name, area, phone, verified, active, tally_ledger_name, outstanding_paise, balance_as_of";
 
 export async function fetchRetailers(supabase: SupabaseClient<Database>): Promise<RetailerRow[]> {
   const { data, error } = await supabase

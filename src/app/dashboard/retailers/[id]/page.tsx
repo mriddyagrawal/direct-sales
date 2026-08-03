@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { RetailerDetail } from "@/components/retailers/RetailerDetail";
 import { RETAILER_SELECT, type RetailerRow } from "@/lib/queries/retailers";
+import { fetchRetailerLedger, ledgerSinceDate, LEDGER_SINCE_DEFAULT } from "@/lib/queries/ledger";
+import { getQueryClient } from "@/lib/query-client";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
 // Retailer detail — the row-click destination for the office queue, replacing
 // the modal that used to open in place (spec 2026-08-01). Deliberately minimal:
@@ -17,5 +20,20 @@ export default async function RetailerDetailPage({ params }: { params: Promise<{
 
   if (!data) notFound();
 
-  return <RetailerDetail retailer={data as RetailerRow} role="staff" />;
+  // THE LEDGER IS FETCHED ONLY AFTER THAT 404, and the order is load-bearing:
+  // `ledger_entries_select_all` is `auth_profile_role() IS NOT NULL`, so the
+  // ledger table scopes NOTHING — every signed-in role can read every entry for
+  // every shop. The retailer row is the boundary, so a shop this caller cannot
+  // see must stop the request before a single entry is read.
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery({
+    queryKey: ["ledger", id, LEDGER_SINCE_DEFAULT],
+    queryFn: () => fetchRetailerLedger(supabase, id, ledgerSinceDate(LEDGER_SINCE_DEFAULT)),
+  });
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <RetailerDetail retailer={data as RetailerRow} role="staff" />
+    </HydrationBoundary>
+  );
 }

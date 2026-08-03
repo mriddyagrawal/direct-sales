@@ -18,41 +18,29 @@
   gap: 6px;
 }
 
-/* The shop name must land on the SAME y as the shop name on order detail
-   (owner 2026-08-01 — it already did, by coincidence, and the coincidence
-   broke the moment the back eyebrow above grew to match order detail's).
-   Made deliberate, in two parts:
+/* The shop name still lands on the same y as the shop name on order detail
+   (owner 2026-08-01), but the mechanism is simpler now than it was.
 
-   min-height  the Edit button is 48px (--touch-target-min), so THIS row is
-               48px on the staff lens. The salesman lens has no Edit button
-               and would collapse to the title's own ~27px line box, putting
-               his headline 10px higher than everyone else's. Pinning the
-               floor means one band height for both lenses.
+   It used to need `margin-top: -10px` to compensate for the title being
+   vertically CENTRED in a 48px row against order detail's top-aligned hero
+   line. The identity block is a name PLUS a contact line PLUS (on an unsynced
+   shop) a diagnosis line, so centring a stack of that height was never going
+   to hold — top-aligning it instead makes the first line land where order
+   detail's does with no compensation at all:
 
-   margin-top  a 48px row centres its title 24px down from its own top; order
-               detail's hero centres its first line at ~13.5px — half a ~27px
-               LINE BOX, which is what 21px type at `line-height: normal`
-               produces. (Not half of 21. An earlier draft of this comment
-               said "half a 21px line box", which would re-derive to -13.5px
-               and shift the headline 3.5px — REVIEWER 🟡 65.)
-               Everything above is now identical — 16px padding, a 24px back
-               band, a 16px gap — so pulling this row up by the ~10px
-               difference lands the two headlines together.
+     16px page padding + 24px back band + 16px gap + ~14px (half a ~27px line
+     box, which is what 21px type at line-height: normal produces) = ~70px,
+     against order detail's ~69.5px.
 
-               THREE things force a re-derivation: the touch target, the name
-               type scale, and — least visibly — the display FONT. Nothing in
-               globals.css sets a line-height, so that ~27px box comes from
-               Space Grotesk's own metrics via next/font; a different face
-               changes it without a single number in this repo changing
-               (REVIEWER 🟡 66). The alignment itself is a rendered-pixel
-               fact, confirmed by the owner on screenshots, not by the CSS. */
+   min-height stays: the Edit button is 48px on the staff lens, and the
+   salesman lens has no button, so without a floor his header would be shorter
+   than everyone else's. */
 .headRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px 10px;
   min-height: var(--touch-target-min);
-  margin-top: -10px;
 }
 
 .title {
@@ -76,40 +64,257 @@
   margin-left: auto;
 }
 
-/* Label-over-value facts; the balance and statement land under these next. */
-.facts {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border-top: 2px solid var(--color-ink);
+/* ── IDENTITY ─────────────────────────────────────────────────────────────
+   A name and ONE line under it, never a fact table. 582 of 600 shops have no
+   area at all, so three labelled rows were furniture for a field almost
+   nobody has. */
+.identity {
+  flex: 1;
+  min-width: 0;
 }
 
-.fact {
+.contact {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 6px;
+  margin-top: 3px;
+  font-family: var(--font-structure);
+  font-size: 12.5px;
+  color: var(--color-locked);
+}
+
+/* The phone is a tel: link — the one action on a read-only page. */
+.phone {
+  color: var(--color-accent);
+  text-decoration: none;
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.factLabel {
+/* Shown only on an unsynced shop, where the Tally name is the diagnosis rather
+   than noise. Amber = attention, matching the "Not synced" chip's family. */
+.diagnosis {
+  margin-top: 4px;
+  padding-left: 8px;
+  border-left: 2px solid var(--color-amber);
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-amber);
+}
+
+/* ── THE CLAIM ────────────────────────────────────────────────────────────
+   Stated here, proved at the bottom. The 2px ink rule appears exactly twice on
+   this page — under the claim and above the proof — and it brackets the
+   working. It is the app's existing "authoritative" device, not a new one. */
+.claim {
+  border-top: 2px solid var(--color-ink);
+  padding-top: 11px;
+}
+
+.claimFigure {
+  font-family: var(--font-figures);
+  font-size: 33px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+/* "Not in the last sync" is prose, not a figure — it must not wear 33px
+   display type, and it must never be a confident ₹0. */
+.claimUnknown {
+  font-size: 19px;
+}
+
+.asOf {
+  margin-top: 5px;
+  font-family: var(--font-figures);
+  font-size: 10.5px;
+  color: var(--color-locked);
+}
+
+/* ── THE WORKING ──────────────────────────────────────────────────────────*/
+.statement {
+  display: flex;
+  flex-direction: column;
+}
+
+.statementHead {
+  display: flex;
+  align-items: baseline;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--color-hairline);
   font-family: var(--font-figures);
   font-size: var(--text-section-label-size);
-  letter-spacing: var(--text-table-head-tracking);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-locked);
+}
+
+.window {
+  margin-left: auto;
+  font-weight: 400;
+}
+
+/* The 202 shops with nothing must read as ORDINARY, not broken: the heading
+   stays and this says plainly what is missing. */
+.empty {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-family: var(--font-structure);
+  font-size: 12.5px;
+  color: var(--color-locked);
+}
+
+.entry {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.entryLeft {
+  flex: 1;
+  min-width: 0;
+}
+
+.entryDate {
+  font-family: var(--font-figures);
+  font-size: 11px;
   text-transform: uppercase;
   color: var(--color-locked);
 }
 
-.factValue {
+/* Tally's own voucher type, verbatim — the reason this page can be held beside
+   Tally and agree. Truncates rather than wrapping: the amount is what the eye
+   is running down. */
+.entryType {
+  margin-top: 1px;
   font-family: var(--font-structure);
-  font-size: var(--text-body-size);
+  font-size: 13px;
+  font-weight: 600;
   color: var(--color-ink);
-  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voucherNo {
+  font-family: var(--font-figures);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--color-locked);
+}
+
+/* Sign and colour are the ONLY direction signal here, because the voucher type
+   no longer says "Receipt" or "Bill". Desktop gets Debit/Credit columns
+   instead — that divergence is deliberate, and it is why the two are drawn
+   separately. */
+.entryAmount {
+  flex-shrink: 0;
+  font-family: var(--font-figures);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.opening {
+  display: flex;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-family: var(--font-figures);
+  font-size: 11.5px;
+  color: var(--color-locked);
+}
+
+.openingValue {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* ── THE PROOF ────────────────────────────────────────────────────────────*/
+.qed {
+  display: flex;
+  align-items: baseline;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 2px solid var(--color-ink);
+}
+
+.qedLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-locked);
+}
+
+.qedValue {
+  margin-left: auto;
+  font-family: var(--font-figures);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* The balance tones, one meaning per colour across every surface. Owed is RED
+   here: the blue on the picker and the Retailers tab is the LEAK rule — those
+   are lists that expose every OTHER shop's balance over the salesman's
+   shoulder. This page is one shop, opened deliberately. */
+.amtOwed {
+  color: var(--color-error);
+}
+
+.amtClear {
+  color: var(--color-processed);
+}
+
+.amtNone {
+  color: var(--color-locked);
 }
 
 @media (min-width: 768px) {
   .page {
     padding: 24px;
   }
+}
+
+/* ── THE SINCE-FILTER ─────────────────────────────────────────────────────
+   Four presets, all of them ending TODAY. Same chip grammar as the retailers
+   queue's filter tabs — mono, small, the active one filled ink — so a filter
+   looks like a filter everywhere in the app. */
+.sinceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 9px 0 2px;
+}
+
+.sinceChip {
+  min-height: 28px;
+  padding: 3px 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-figures);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+}
+
+.sinceChipOn {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-white);
+}
+
+/* While a new window loads, the rows on screen are the PREVIOUS window's (see
+   keepPreviousData in the component) — so the opening balance derived from
+   them does not yet match the label above. Dimming says "updating" rather than
+   letting a stale-but-crisp number read as final. The chips and the heading
+   stay sharp: they are what the reader just acted on. */
+.statementBusy {
+  opacity: 0.55;
 }

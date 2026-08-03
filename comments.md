@@ -8087,3 +8087,144 @@ That is the right treatment for a number that has now been wrong twice: state th
 **What I tried:** Recomputed the band from the current `.header` and `.back` rules for both the subtitle and no-subtitle cases (57px in each, matching); verified the "subtitle is free" claim by comparing the title stack (~38px) against the button (44px); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of a06fe81 — feat(ledger): the retailer ledger query builder, and balance_as_of in RETAILER_SELECT
+
+**Verdict:** ✅ — step 1 of the ledger page, and the date arithmetic holds at every boundary I could find to push on.
+
+**Branched, not on main.** `feat/retailer-ledger-page`, per the prompt.
+
+### The date arithmetic is the risk in this commit, so I executed it
+
+`ledgerSinceDate` is the kind of function that reads fine and is wrong at one boundary. Ran it against the real module:
+
+| moment (IST unless noted) | 3M | 6M | FY |
+|---|---|---|---|
+| 3 Aug, mid-month | 2026-05-03 | 2026-02-03 | 2026-04-01 |
+| **31 Aug** | 2026-05-31 | **2026-03-03** | 2026-04-01 |
+| **15 Jan** | 2025-10-15 | **2025-07-15** | 2025-04-01 |
+| **1 April** | 2026-01-01 | 2025-10-01 | **2026-04-01** |
+| **31 March** | 2025-12-31 | 2025-10-01 | **2025-04-01** |
+| 23:45 **UTC** (= 4 Aug IST) | 2026-05-**04** | 2026-02-**04** | 2026-04-01 |
+
+- **The FY boundary is exact on both sides** — 1 April gives this year, 31 March gives last year — matching `_fy_start()` in `ledger_sync.py`. The spec said mirror that rule rather than invent one, and it does.
+- **31 Aug − 6M = 3 March**, the documented month-overflow rollback, and the comment says so before you have to work it out.
+- **January crosses the year** correctly via JS's negative month index.
+- **The 23:45 UTC case is the one that proves `istDateKey` is load-bearing** rather than decorative: at that instant IST is already 4 August and the function returns 4th-based dates. A browser-local implementation would disagree for anyone outside India.
+
+`openingBalancePaise(8432000, [+95,200 / −42,322])` returns **3144200** — ₹31,442, the exact figure the design carries. Empty entries return the outstanding unchanged (correct: everything predates the window), and a null outstanding stays null rather than becoming 0.
+
+### The rest
+
+**The RLS trap is carried into the code, not left in the spec.** The file opens with a ⚠️ saying `ledger_entries_select_all` scopes nothing and that the page must fetch the retailer first. That is where it needs to be — the next person to use this builder reads the file, not the spec.
+
+**Verbatim voucher types are documented at the type**, with the reason that makes it non-negotiable: *"'Ganpati Payment' is 30 entries and every one is a DEBIT, so a friendly label like 'Receipt' would state the opposite of the truth."*
+
+**The `id` tiebreak on the sort is a real catch I did not specify.** Without it PostgREST may return same-day entries in a different order between requests, and a list that reshuffles on refetch reads as data changing. Two `.order()` calls, newest-first on both.
+
+**The widening keeps every cast truthful** — the `₹NaN` lesson applied. `balance_as_of` was added to the constant *and* to `RetailerRow` together, and all three `as RetailerRow` sites (both detail routes and `fetchRetailers`) sit on `RETAILER_SELECT`, so none of them is now claiming a column the query does not fetch.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — paise throughout; the opening derivation never converts and never rounds. **RLS** — correctly relied on *not* scoping, and said so loudly. **Immutable snapshots** — n/a. **Mobile** — no surface yet.
+
+**What I tried:** Wrote a `tsx` harness against the real `ledger.ts` and ran `ledgerSinceDate` at six boundaries (month middle, 31st, year crossing, both sides of 1 April, and a UTC instant that is the next IST day) plus `openingBalancePaise` at three (normal, empty, null outstanding) — table above; compared the FY rule against `_fy_start()` in the sync; confirmed `istDateKey` formats via `Intl` with an explicit IST zone; enumerated every `as RetailerRow` cast against `RETAILER_SELECT`; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of ba133e7 — feat(ledger): the retailer page becomes the statement — claim, working, proof
+
+**Verdict:** ✅ — the spec's hardest trap is handled with the reasoning written where it matters, and two refinements improve on what I specified.
+
+### The RLS trap, handled exactly
+
+Both routes fetch the **retailer first**, `notFound()` on empty, and only then touch the ledger — with the ordering named as load-bearing:
+
+> *"THE LEDGER IS FETCHED ONLY AFTER THAT 404, and the order is load-bearing: `ledger_entries_select_all` is `auth_profile_role() IS NOT NULL`, so the ledger table scopes NOTHING… The retailer row is the boundary, so a shop this caller cannot see must stop the request before a single entry is read."*
+
+That is the one thing in this spec that could have leaked a deactivated shop's statement to a salesman by id, and it is closed by ordering rather than by a guard — which is the same discipline as the route's existing "the URL is not the boundary" comment.
+
+### Two things better than what I specified
+
+**1. The opening-balance guard gained a condition.** I wrote *"render only when non-zero"*; the build is `opening !== null && opening !== 0 && entries.length > 0`. The extra clause is right and the comment says why: with no entries the opening is arithmetically identical to the closing figure, so it would print the same number twice for no reason.
+
+**2. The empty state distinguishes three cases, where I had specified two.**
+
+```
+notSynced   → "Entries appear once a Tally ledger is linked to this shop."
+filtered    → "No entries since <date>."
+genuinely   → "No entries yet."
+```
+
+The middle one is the catch. Without it, a shop with two years of history filtered to 3M would read **"No entries yet"** — telling the reader the shop has no ledger when it has plenty, just older. That is a real misreading of the data, produced by a filter, and it is exactly the kind of thing that only appears once the filter exists.
+
+### Everything the spec settled is present
+
+| | |
+|---|---|
+| Fact table gone | `.facts/.fact/.factLabel/.factValue` **removed, not orphaned** — the dead-rule sweep is clean |
+| Voucher types verbatim | `{e.voucher_type}` raw, no mapping anywhere in the file |
+| Identity as one line | `[area, phone].filter(Boolean)` — absent, not blank |
+| Tally name | `isStaff && notSynced` |
+| Salesman sees the statement | `isStaff` appears **4 times only** — back fallback, the Tally diagnosis, Edit. **No gate on the statement** |
+| Shared balance rule | `readBalance` + `ledgerText` imported and used; no fifth private reading |
+
+**The Tally-name rule was tightened beyond the spec** to `isStaff && notSynced`, with a reason — *"Staff-only, because linking it is an edit."* Correct: a salesman on an unsynced shop cannot act on that name, so showing it would be information he can only be puzzled by. Better than what I wrote.
+
+**CSS swept both directions:** 30 refs in the component and 9 in the skeleton all resolve, and **no rule in the stylesheet is unused** — which matters here because this commit deleted a whole section, and a deleted section is where orphaned rules come from.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — `readBalance`/`ledgerText`/`formatRupees`; the opening derivation stays in paise. **RLS** — the central concern, handled above. **Mobile** — the primary surface, and the empty-state wording is the part a phone reader is most likely to hit. **Immutable snapshots** — n/a; every figure here is live and the page says so.
+
+**What I tried:** Read both route files to confirm the retailer is fetched before the ledger and that `notFound()` precedes any entry read; checked the opening guard and its `entries.length > 0` clause; grepped for any voucher-type mapping (none — rendered raw); confirmed `isStaff` gates only the back fallback, the diagnosis line and Edit, so the salesman gets the full statement; scripted the CSS class sweep in both directions across the component and the skeleton (39 refs resolve, 0 unused rules); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 93d8914 — feat(ledger): the since-filter — 3M · 6M · This FY · All
+
+**Verdict:** ✅ — and it closes a transition hole created by the derived opening balance, which I had only flagged as "be deliberate about".
+
+### The cache keys align, and the reason they align is the right one
+
+Server prefetches `["ledger", id, LEDGER_SINCE_DEFAULT]`; the client's `useQuery` uses `["ledger", retailer.id, since]` with `since` initialised to that same default. So the hydrated cache is hit on first render — no double fetch, no flash.
+
+The reasoning behind it is what makes it robust:
+
+> *"The PRESET is the query key, not the date, so the server and the client agree even if the request crosses midnight IST between them."*
+
+Keying on the **computed date** would have been the obvious move and would desync a request that straddles midnight — the server writes one key, the client asks for another, and the page refetches for no reason. Keying on the preset makes that impossible.
+
+### The transition hole I had not thought through
+
+The spec says the opening balance recomputes with the filter and that it moving is correct. What I did not follow through is what happens **during** the refetch.
+
+The opening balance is **derived from the rows on screen**. With `placeholderData: keepPreviousData`, those rows are the *previous* window's while the label above them already says the new date — so for the ~200ms of the fetch the page would show a confidently wrong number under an accurate label. Their fix is to dim the block via `.statementBusy` while `isFetching`, and the comment states exactly that chain:
+
+> *"…it also stops the opening balance flickering through a wrong value: it is DERIVED from the rows on screen, so while they are the previous window's it does not match the label above them."*
+
+That is a real consequence of the derived-opening design, found by thinking it through rather than by seeing it fail. Keeping the previous rows (rather than blanking) is also the right call for a filter — a list that empties and refills on every chip tap feels broken.
+
+**The chips are proper buttons with `aria-pressed`**, not styled divs — so the filter is operable by keyboard and announced as a toggle group.
+
+**All `styles.*` refs resolve**, including the new `.sinceChip`, `.sinceChipOn` and `.statementBusy`. `tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None.
+
+**Non-blocking suggestions:** None. One observation for the record, not a defect: `ledgerSinceDate(since)` is called with its own `new Date()` default while the component also holds `const now = new Date(nowMs())` for timestamps. Functionally identical — both are "now" — but if this page ever needs a frozen clock for testing, those are two sources rather than one.
+
+**Domain / correctness checks:** **Money** — the opening derivation is unchanged and still in paise; the dim is the only new behaviour around it. **RLS** — no change; the filter narrows an already-authorised read. **Mobile** — the chips are the primary interaction; `keepPreviousData` matters most on a phone, where a list emptying and refilling is the most jarring.
+
+**What I tried:** Compared the server prefetch key against the client `useQuery` key (identical, so hydration hits); read the `keepPreviousData` + `.statementBusy` pairing and traced why it is needed — the opening balance is derived from rows that are briefly the wrong window's; confirmed the chips are `<button aria-pressed>` rather than divs; re-ran the CSS class sweep after the new classes landed (all resolve); `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
