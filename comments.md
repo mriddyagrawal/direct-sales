@@ -8276,3 +8276,54 @@ Step 4 as specced fixes this properly (a real table, where the columns do the al
 **What I tried:** Listed the branch's non-merge commits (three, matching steps 1–3 and no step 4); grepped the stylesheet for every `@media` block (one, `padding: 24px`) and for `max-width` (none); found the component's own future-tense reference to step 4; compared against `PickRetailer.module.css:23`, where the same uncapped-row problem was solved with `max-width: 480px`; confirmed `origin/main` equals local so this is live; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** New: 🟡 81. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 73176d2 + a363de5 — oldest-first, and the desktop DR/CR table
+
+**Verdicts:** both ✅ — **🟡 81 CLOSED.**
+
+### 73176d2 — the reordering, and the comment handled as asked
+
+`fetchRetailerLedger` now sorts `entry_date` and `id` **ascending**, and the opening balance renders first.
+
+**The comment was reworded, not deleted** — which is what the prompt asked for, and the distinction matters. The old text explained *why* the opening sat at the bottom; that reasoning was correct for the arrangement it described, and deleting it would have thrown away a true observation because the arrangement changed. The new version keeps the logic and re-points it:
+
+> *"…the entries, which now run oldest-first (owner 2026-08-04), so 'what they owed before all this' belongs **above** them."*
+
+A builder who read the instruction as "your comment was wrong" would have removed it. This one read it as "your comment described the old order".
+
+### a363de5 — the table, and one detail better than specified
+
+| | |
+|---|---|
+| Shared grammar | `import table from "@/components/ui/table.module.css"` — **no fifth copy** |
+| Columns | `DATE · ENTRY · VOUCHER · DR · CR` |
+| Opening row | present, `colSpan={2}`, dated `—` |
+| Totals | a footed `TOTAL` row |
+| Phone | untouched — still `isCredit` sign + colour |
+| Stale `(step 4)` comment | **gone** |
+
+**Better than specified:** the opening balance is split into `openingDebit` / `openingCredit` rather than printed as a signed figure in DR. So a shop carrying a **credit** balance forward has that figure land in the **CR** column, where a credit belongs. I wrote "the opening balance is a row in the table, dated —" and did not think about which column a negative opening goes in; double-entry says CR, and that is what it does.
+
+### 🟡 81 CLOSED
+
+The complaint was that with no `max-width`, a 1400px window put every amount a screen-width from the entry that earned it. The table closes it **structurally**: figures now sit in columns, so the eye scans a column vertically instead of hunting across each row. That is how a statement is actually read.
+
+There is still no `max-width`, and after checking I do not think one is wanted: **`RetailersQueue.module.css` and `UsersAdmin.module.css` — the app's other two full-page tables — have zero `max-width` rules** and have been in production for months. Capping only this page would make it the odd screen out. Unbounded full-page tables are the house norm, not an oversight here.
+
+### On my own check, since it produced a false alarm
+
+My class sweep reported **six danglings** — `table.numeric`, `table.mono`, `table.cellMeta`, `table.cellName`, `table.module`, `styles.phoneRows`. **All six were my regex, not the code.** I matched `^\.class`, but `table.module.css` deliberately scopes as `.table td.numeric` and `.table thead th.numeric` — that scoping *was flag 53's fix*, because the bare versions never applied. And `.phoneRows` is defined inside the `@media` block, which is legitimate for a wrapper needing no phone styling and hidden on desktop.
+
+Re-checked with a correct pattern: every class resolves. Recording it because a reviewer's tooling producing six false positives is worth knowing about — a line-start regex encodes an assumption this codebase deliberately broke.
+
+`tsc` 0, `eslint src` 0, `npm run build` clean.
+
+**Blocking issues:** None. **Non-blocking suggestions:** None.
+
+**Domain / correctness checks:** **Money** — paise throughout; the opening split preserves the Dr/Cr distinction rather than flattening it to a sign. **Mobile** — explicitly unchanged, and verified: the phone still signs and colours. **RLS** — untouched.
+
+**What I tried:** Confirmed both `.order()` calls flipped to ascending and the opening row moved first; diffed the reasoning comment to confirm it was reworded rather than deleted; checked the stale `(step 4)` reference is gone; confirmed the shared `table.module.css` is imported rather than a new copy started; read the opening row's Dr/Cr split; verified the phone path still uses `isCredit`; ran a class sweep, got six false positives, re-ran with a corrected pattern (all resolve) and confirmed `.phoneRows` lives inside the media block; compared `max-width` usage against the app's other full-page tables (`RetailersQueue`, `UsersAdmin` — zero each) before closing 🟡 81; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
+
+**Open flags (cumulative):** **CLOSED: 🟡 81.** Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
