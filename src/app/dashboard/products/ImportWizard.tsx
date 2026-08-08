@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Glyph } from "@/components/ui/Glyph";
 import { formatRupees } from "@/lib/format";
 import { parsePricePaise } from "@/lib/price";
-import { normalizeCategory, effectiveTallyName } from "@/lib/catalog";
+import { normalizeCategory, effectiveTallyName, applyBrandTallyPrefix, brandTallyPrefix } from "@/lib/catalog";
 import type { BrandOption } from "./ProductModal";
 import styles from "./ImportWizard.module.css";
 
@@ -78,6 +78,12 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       if (!ws) return setStep("unreadable");
 
+      // Resolved here, NOT from the component-level `brandName` above: that one
+      // carries a `?? "products"` fallback for the template filename, and a
+      // fallback that silently becomes a real-looking brand name has no place
+      // in a rule that rewrites the match key.
+      const importBrandName = brands.find((b) => b.id === brandId)?.name ?? "";
+
       const grid = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" }) as unknown[][];
       if (grid.length < 1) return setStep("unreadable");
 
@@ -118,7 +124,14 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
         if (!cat && !rawName && !rawTally && !priceCell && !activeCell) continue; // blank row
 
         const rowNo = r + 1; // 1-based, header is row 1
-        const effTally = effectiveTallyName(rawTally, rawName); // match key: tally ← display
+        // match key: tally ← display, THEN the brand prefix.
+        //
+        // The order matters and is deliberate. A sheet whose only name column is
+        // "Display Name" flows through the fallback, and at that point the
+        // resolved value IS the tally name — so it needs prefixing too.
+        // Prefixing rawTally before the fallback would silently skip that sheet
+        // shape, which is the common one for a manufacturer price list.
+        const effTally = applyBrandTallyPrefix(importBrandName, effectiveTallyName(rawTally, rawName));
         const ex = existingByTally.get(effTally);
         const matched = ex !== undefined;
         fileTallies.add(effTally);
@@ -256,6 +269,13 @@ export function ImportWizard({ brands, onClose, onDone }: ImportWizardProps) {
               <strong>Display Name or Tally Name</strong>; a new product also needs a Category. On an existing product any blank cell
               keeps its current value; a new product uses the Tally name for a blank Display name and TBD for a blank Price.
             </p>
+            {brandTallyPrefix(brandName) && (
+              <p className={styles.hint}>
+                Tally names will be prefixed with <strong>{brandTallyPrefix(brandName)}</strong> — {brandName}
+                &apos;s price lists give the bare model, the catalog stores it prefixed. A name that already starts
+                with it is left alone. Display names are never prefixed.
+              </p>
+            )}
             <button type="button" className={styles.linkBtn} onClick={downloadTemplate}>
               Download template
             </button>
