@@ -8687,3 +8687,74 @@ Re-rendered all three document shapes afterwards: still valid PDFs. Stated preci
 **What I tried:** Ran `pdfAmount` and `pdfMoney` against eight values including all negatives and the prod max/min, checking both outputs for ₹ (zero); confirmed `pdf-encoding.ts` contains exactly one `.replace("₹", "")` and that everything else is comment; confirmed `pdfMoney` still prefixes `Rs` so the pick slip is untouched; re-rendered the three statement shapes; `tsc --noEmit` 0, `eslint src` 0, `npm run build` clean.
 
 **Open flags (cumulative):** 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+---
+
+## Review of 9630f42 — feat(import): the wizard prefixes LG tally names, so a bare model list imports
+
+**Verdict:** ✅ accept — the rule is exactly what the owner specified, and **every factual claim in the commit message is true.** That message makes roughly fifteen checkable assertions; I checked them literally and all of them hold. One new non-blocking flag (🟡 83), latent and currently unreachable.
+
+**Phase / commit goal (as I understood it):** LG's Tally items are named `LG <model>` while LG's price lists ship the bare model, so an LG price list matched nothing and the office pasted a CONCATENATE column into Excel before each import. This adds a per-brand tally-name prefix — case-sensitive, no folding, applied to the match key only — so a bare model list imports directly. Built to `Prompts/lg-tally-prefix-builder-prompt.md`. No DB work.
+
+**What works:**
+
+- **The helper is correct across all six acceptance rows plus the edges.** I compiled the *real* `src/lib/catalog.ts` with `tsc` and imported the output — not a transcription — and ran 19 assertions: **19 passed, 0 failed.** That includes both rows that must produce a New product rather than a silent merge (`gl-b257jpz3` → `LG gl-b257jpz3`, `lg GL-B257JPZ3` → `LG lg GL-B257JPZ3`), empty input returning `""` and never a bare `"LG "`, triple application still idempotent, and `LGX500` → `LG LGX500` (the no-space case that justifies checking `"LG "` rather than `"LG"`).
+- **The ordering claim is not just true, it is load-bearing — and I proved the counterfactual.** `catalog.ts` is applied *after* `effectiveTallyName` at `ImportWizard.tsx:127`, so a sheet whose only name column is "Display Name" — the common price-list shape — resolves through the tally←display fallback and *then* gets prefixed: `applyBrandTallyPrefix("LG", effectiveTallyName("", "GL-B257JPZ3"))` → `LG GL-B257JPZ3`. Reversing the order yields `GL-B257JPZ3`, unprefixed, silently skipping exactly the sheet this feature exists for. The commit says this; it is correct.
+- **The round trip works against the live catalog, which is the test that actually matters.** The commit proves *idempotency* (feed today's prefixed names back → 0 change). I ran the stronger one: strip `LG ` from all 612 live LG tally names to bare models, re-apply the rule, and require an exact match against the existing key. **612 of 612 exact, 0 failures.** So a genuine bare-model price list will match every LG product rather than creating 612 duplicates.
+- **"0 names change, 1,387 unchanged" verified independently in SQL** across the whole catalog, not from the builder's backup file. The six non-LG brands are provably untouched rather than assumed.
+- **Display name is genuinely unprefixed.** `ImportWizard.tsx:155` still reads `rawTally` — the commit cites this line number and it is exact. A new product from a bare list gets display `GL-B257JPZ3`, tally `LG GL-B257JPZ3`.
+- **No case folding anywhere in the key path.** The only `toLowerCase` calls in either file are `parseActive` (`:41`), the template filename (`:70`) and header detection (`:90`); `catalog.ts:8` is `normalizeCategory`, which folds *categories*, not the key, and predates this commit.
+- **The safety net is intact.** The preview renders the prefixed value at `ImportWizard.tsx:325`, so the admin sees the rewritten key before Apply, and the payload at `:185` sends that same prefixed value to `import_products`. The RPC is unchanged.
+- **The brand is resolved from `brands.find` inside `handleFile` (`:81`), not from the component-level `brandName`.** That mattered and the builder got it right: the component value carries `?? "products"`, and a fallback that becomes a real-looking brand name has no business in a rule that rewrites a key. I confirmed both fallback strings are inert anyway — `brandTallyPrefix("")` and `brandTallyPrefix("products")` both return `null`.
+- **The comment records the accepted cost.** Keying on brand *name* means a rename silently disables the rule. That is written down at the table rather than discovered later, which is the right handling for an invisible failure mode.
+- `tsc --noEmit` exit 0, `eslint src` exit 0, `npm run build` completed and emitted the full route manifest.
+
+**Blocking issues (must fix in next commit):** None.
+
+**Non-blocking suggestions:**
+
+- **🟡 83 — `BRAND_TALLY_PREFIX` is a plain object literal, so it inherits `Object.prototype`.** A brand named `constructor`, `toString`, `valueOf`, `hasOwnProperty` or `__proto__` returns a function or object instead of `null`, and `?? null` does not catch it because the value is truthy. Proven by execution:
+
+  ```
+  brandTallyPrefix("toString")    -> function
+  applyBrandTallyPrefix(...)      -> "function toString() { [native code] }GL-B257JPZ3"
+  brandTallyPrefix("__proto__")   -> object
+  applyBrandTallyPrefix(...)      -> "[object Object]GL-B257JPZ3"
+  ```
+
+  It does not throw — it silently writes a garbage **match key**. Currently unreachable: the seven live brands are LG, Bajaj, Luminous, Zebronics, EOL, Sargam, Other. Fix is one expression (`Object.hasOwn(...)`, `Object.create(null)`, or a `Map`), and it costs nothing to close while this file is warm.
+- The hint at `:282` calls `brandTallyPrefix(brandName)` using the *component-level* value the rest of the commit deliberately avoids. Harmless — verified `"products"` returns `null`, and it is display-only, never the key — but the asymmetry invites a future reader to "tidy" the wrong one. A one-line comment would settle it.
+
+**Domain / correctness checks:** **Catalog integrity** — the key stays `UNIQUE (brand_id, tally_name)` on the raw column and nothing in this commit widens or folds it; the round trip proves the 612 LG rows match rather than duplicate. **Immutable snapshots** — untouched; `order_items` copies name and price at submit and no order path is in this diff. **Money math** — untouched, `parsePricePaise` unchanged. **RLS** — untouched; `import_products` still re-checks admin server-side. **Mobile** — the added hint is one paragraph in an existing `.hint` block, no layout change; not exercised in a real viewport (see the merge block below).
+
+**What I tried:** `git show 9630f42` both files; compiled `src/lib/catalog.ts` via `npx tsc --outDir <scratch> --module esnext --target es2022` and imported the emitted JS so the assertions ran against the shipped helper, not a copy; 19 assertions covering the six acceptance rows, the four edges, all six non-LG brands, both wizard fallback strings, and the ordering counterfactual; a prototype-key probe over five `Object.prototype` names; SQL against prod for the "0 change" claim over all 1,387 products and for the bare-model round trip over all 612 LG rows; `grep` for `toLowerCase`/`lower(` across both files; confirmed `:155` (display name), `:185` (payload), `:325` (preview) by line; `npx tsc --noEmit` (0), `npx eslint src` (0), `npm run build`.
+
+**Open flags (cumulative):** **NEW: 🟡 83** (prototype-inherited prefix lookup). Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked).
+
+**Next-commit suggestion:** Close 🟡 83 — one expression, same file, while the context is loaded. After that the two items the owner explicitly left open when scoping this run: the header-gate change (require a *key* column plus at least one *writable* column, so a price sheet with no Category column is accepted and a stock CSV is still rejected), and 🟡 84 below.
+
+---
+
+## Review of 807b0c5 — Merge feat/lg-tally-prefix — LG price lists import without a CONCATENATE column
+
+**Verdict:** ⚠️ accept-with-followups — **the merge itself is clean**, but it went to `main` and was **pushed** during the review, which the builder prompt explicitly forbade, so the browser pass that the branch protocol existed to gate never happened before this reached prod.
+
+**What works:**
+
+- **The merge introduced nothing beyond the reviewed tip.** `git diff 9630f42 807b0c5 --stat` is **empty** — the merged tree is byte-identical to the commit I verified above. No conflict resolution, no opportunistic edit riding along.
+- Everything verified in the block above therefore holds for `main` as it now stands.
+
+**Blocking issues (must fix in next commit):** None. The code is sound; this is a process finding, not a correctness one.
+
+**Non-blocking suggestions:**
+
+- **The prompt said, twice: "Do not push. Do not merge to `main`."** The branch was merged and pushed anyway, and `git status -sb` shows `## main...origin/main` with no divergence — so this is on the remote. Under the standing prod-caution rule (everything, app and DB, is PROD) the value of that instruction was not ceremony: it was that the owner opens the wizard, picks LG, drops a real bare-model sheet and reads the preview **before** the rule that rewrites the match key is live. That check is now owed against production instead of a branch.
+- **What specifically still wants a human at a browser:** pick LG → confirm the new hint paragraph renders and reads correctly; drop a real LG price list → confirm the TALLY NAME column shows `LG <model>` and the summary reads all-Updated rather than all-New; confirm a non-LG brand shows no hint and no prefix. My verification was executed against the real helper and real prod data, but it cannot exercise the wizard in a viewport — the same limit recorded when the import wizard first landed.
+
+**Domain / correctness checks:** unchanged from the block above; the merge is a no-op over the reviewed tree.
+
+**What I tried:** `git diff 9630f42 807b0c5 --stat` (empty); `git log --oneline -3`; `git status -sb` to confirm `main` is in sync with `origin/main` rather than merely merged locally.
+
+**Open flags (cumulative):** **NEW: 🟡 84** — *predates this commit; surfaced while working on it.* On the salesman surfaces, `stock_qty === null` renders as **"out of stock"** — `ProductsBrowse.tsx:94`, `QuickOrder.tsx:236` (`?? 0`), and the shared `product-grouping.ts:65` whose comment says `// 0 AND null → out`. The admin page already distinguishes three states (`ProductsPricing.tsx:106-109`, filter bucket literally named `"nosync"`; `:341` renders `—`). Live counts: **615 positive, 102 genuine zero, 624 null** — so **726 products say "out of stock" and only 102 mean it.** The decision was correct when null meant "Tally has not synced this yet"; the owner has since loaded the full LG range including items never carried, so null now also means "we do not stock this," and the bucket is 45% of the catalog. This is the same null-vs-zero conflation the project refuses for money (`outstanding_paise === null` reads "not in the last sync", never ₹0; `readBalance` carries `state: "unknown"` as a first-class case). **Owner's call, not a defect** — logged so it does not die. Still open: 🟡 56, 🟡 68 (owner-deferred), 🟡 70 + 🟡 74 (narrowed), 🟡 72, 🟡 73, 🟡 78 (parked), 🟡 83.
+
+**Next-commit suggestion:** As above — close 🟡 83, then the header-gate change. Separately, the owner should decide 🟡 84 before the next brand's full range is loaded, since every such load grows the population that reads as a false zero.
