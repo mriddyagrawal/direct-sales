@@ -1,10 +1,22 @@
--- ⚠️ PENDING — NOT YET APPLIED TO PROD (2026-08-31). Everything is prod
--- (owner rule 2026-07-11): this file ships on the branch for review and is
--- applied ONLY on the owner's go-ahead. After applying, regenerate
--- src/lib/types/database.types.ts — the branch carries a hand-extension of
--- the generated types that must be replaced by the real generator's output.
--- The branch must NOT merge before this is applied: DEPOSITS_LIST_SELECT
--- now names these columns, and the lists would 400 on a DB without them.
+-- EXPAND migration (owner go-ahead 2026-08-31; contract half comes at merge).
+-- Applied to prod AHEAD of the code deploy, so it must be — and is —
+-- NON-BREAKING for the app that is live right now:
+--   · columns are additive (nullable / defaulted);
+--   · the OLD create_deposit/update_deposit signatures are LEFT STANDING so
+--     the deployed form keeps saving deposits (sans receipt/discount) during
+--     the test window; the new signatures are added ALONGSIDE as overloads.
+-- PostgREST disambiguates the overloads by the keys the caller provides: an
+-- old-shape call lacks p_receipt_ref (REQUIRED, no default, in the new
+-- signature) so it can only match the old one; a new-shape call carries keys
+-- the old signature doesn't have. Probe both shapes after applying — a
+-- PGRST203 ambiguity error means back out the new overloads and fall back to
+-- a coordinated apply+deploy cutover.
+-- A follow-up CONTRACT migration drops the old signatures when this branch
+-- merges — do not leave permissive-era signatures behind long-term.
+-- After applying, regenerate src/lib/types/database.types.ts — the branch
+-- carries a hand-extension that must be replaced by the generator's output.
+-- The branch itself must still NOT merge before this applies:
+-- DEPOSITS_LIST_SELECT names these columns and would 400 without them.
 --
 -- Deposits gain the paper-receipt reference and a discount (owner 2026-08-31):
 --
@@ -36,12 +48,10 @@ alter table public.deposits
   add constraint deposits_discount_lt_amount
   check (discount_paise >= 0 and discount_paise < amount_paise);
 
--- The two write RPCs change SIGNATURE, so the old ones must be DROPPED, not
--- replaced — `create or replace` with different parameters creates an
--- OVERLOAD, and PostgREST refuses ambiguous overloaded RPC names outright
--- (the dispatch_order migration already walked this path; same treatment).
-drop function if exists public.create_deposit(uuid, integer, text, text);
-drop function if exists public.update_deposit(uuid, uuid, integer, text, text);
+-- The new-signature RPCs. NOTE: `create or replace` with a different
+-- parameter list does not replace — it creates an OVERLOAD beside the old
+-- function. Here that is DELIBERATE (see header): the old signatures keep
+-- the deployed app alive until the contract migration retires them.
 
 create or replace function public.create_deposit(
   p_retailer_id uuid,
