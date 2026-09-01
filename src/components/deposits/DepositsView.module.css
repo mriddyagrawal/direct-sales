@@ -561,3 +561,29 @@
   border-radius: var(--radius); /* r5: the order-detail buttons' radius (2px) */
   color: var(--color-white);
 }
+
+/* ---- Outstanding snapshot beside the name (owner 2026-09-01) ---- */
+/* Frozen at recording time by create_deposit — red owed / green clear,
+   wordless on the phone (the color IS the label), a labeled column on the
+   desktop table. UI to be refined later per owner. */
+.rowNameLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.outSnap {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.outOwed {
+  color: var(--color-error);
+}
+
+.outClear {
+  color: var(--color-processed);
+}
