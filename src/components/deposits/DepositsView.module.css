@@ -558,6 +558,6 @@
   align-self: stretch;
   background: var(--color-accent);
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius); /* r5: the order-detail buttons' radius (2px) */
   color: var(--color-white);
 }
