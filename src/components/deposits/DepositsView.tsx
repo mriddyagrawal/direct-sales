@@ -220,6 +220,12 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
             {d.retailers?.name ?? "Unknown retailer"}
           </span>
           <span className={styles.rowMeta}>
+            {/* The row's NAME leads the meta line (owner 2026-09-01) — the
+                shared reference for a phone call between the desktop and a
+                shop. Kept apart from the paper receipt no. so the two numbers
+                never read as one. */}
+            <span className={styles.rowRef}>{d.deposit_ref}</span>
+            {" · "}
             {isStaff && d.profiles?.full_name ? `${d.profiles.full_name} · ` : ""}
             <MethodChip method={d.method} />
             {d.receipt_ref ? ` · receipt ${d.receipt_ref}` : ""}
@@ -352,6 +358,10 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
             <table className={styles.table}>
               <thead>
                 <tr>
+                  {/* REF leads like a statement's voucher-number column (owner
+                      2026-09-01) — and sits three columns from RECEIPT so the
+                      app's identity and the paper number never blur. */}
+                  <th>REF</th>
                   <th>SALESMAN</th>
                   <th>RETAILER</th>
                   <th>RECEIPT</th>
@@ -367,6 +377,7 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
                   const net = depositNetPaise(d.amount_paise, d.discount_paise);
                   return (
                     <tr key={d.id} className={voided ? styles.rowVoided : ""}>
+                      <td className={`${styles.mono} ${styles.refCell}`}>{d.deposit_ref}</td>
                       <td>{d.profiles?.full_name ?? "Unknown"}</td>
                       <td className={voided ? styles.voided : ""}>
                         {d.retailers?.name ?? "Unknown retailer"}
