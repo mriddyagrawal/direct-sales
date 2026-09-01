@@ -169,13 +169,6 @@
   color: var(--color-inactive);
 }
 
-/* The duplicate-receipt warning — advisory amber, deliberately NOT .error red:
-   it never blocks, the next tap saves anyway (owner: warn, don't block). */
-.warn {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-amber);
-}
 
 .confirmTitle {
   font-family: var(--font-structure);

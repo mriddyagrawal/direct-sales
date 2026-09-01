@@ -80,10 +80,13 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
   const [voidReason, setVoidReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The same-salesman duplicate-receipt WARNING (owner 2026-08-31: warn,
-  // never block). First save with a duplicate ref shows the warning; the next
-  // tap saves anyway. Editing the ref re-arms it.
-  const [dupWarning, setDupWarning] = useState<string | null>(null);
+  // The same-salesman duplicate-receipt warning (owner 2026-08-31: warn,
+  // never block) — a QUIET pop-up, not the godown's PAKKA (owner 2026-09-01:
+  // same mechanism, none of the volume). Few words: the salesmen read numbers
+  // better than sentences. "Save anyway" proceeds; "Change no." backs out.
+  const [dupSheet, setDupSheet] = useState<{ ref: string; depRef: string; amountPaise: number; when: string } | null>(
+    null,
+  );
 
   function handleSelectRetailer(r: SelectedRetailer) {
     setRetailer(r);
@@ -102,7 +105,7 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
       ? depositNetPaise(parsedAmount.paise, parsedDiscount.paise)
       : null;
 
-  async function handleSave() {
+  async function handleSave(skipDupCheck = false) {
     const parsed = parsePricePaise(amountText);
     if (!parsed.ok) {
       setError(parsed.error);
@@ -139,7 +142,7 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     // editing (an admin correcting is still checking that salesman's book),
     // the caller when creating. Advisory only: on failure to fetch we save
     // rather than trap the salesman behind a broken warning.
-    if (dupWarning === null) {
+    if (!skipDupCheck) {
       try {
         const supabase = createClient();
         const bookOwner = isEdit ? editDeposit!.salesmanId : salesmanId;
@@ -153,9 +156,7 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
         const dup = findDuplicateReceipt((data ?? []) as ReceiptRefRow[], ref, isEdit ? editDeposit!.id : null);
         if (dup) {
           const when = new Date(dup.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-          setDupWarning(
-            `Receipt ${ref} was already used on ${dup.deposit_ref} (${formatRupees(dup.amount_paise)}, ${when}). Tap Save again to record it anyway.`,
-          );
+          setDupSheet({ ref, depRef: dup.deposit_ref, amountPaise: dup.amount_paise, when });
           setSaving(false);
           return;
         }
@@ -235,10 +236,7 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
           maxLength={40}
           placeholder="number from your receipt book"
           autoFocus={!isEdit}
-          onChange={(e) => {
-            setReceiptRef(e.target.value);
-            setDupWarning(null); // a changed ref re-arms the duplicate warning
-          }}
+          onChange={(e) => setReceiptRef(e.target.value)}
         />
 
         <label className={styles.fieldLabel}>AMOUNT</label>
@@ -304,11 +302,10 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
           onChange={(e) => setNote(e.target.value)}
         />
 
-        {dupWarning && <p className={styles.warn}>{dupWarning}</p>}
         {error && <p className={styles.error}>{error}</p>}
 
-        <Button variant="primary" onClick={handleSave} loading={saving}>
-          {dupWarning ? "Save anyway" : isEdit ? "Save changes" : "Save deposit"}
+        <Button variant="primary" onClick={() => void handleSave()} loading={saving}>
+          {isEdit ? "Save changes" : "Save deposit"}
         </Button>
         {isEdit && (
           <Button variant="destructive" onClick={() => setConfirmVoid(true)} disabled={saving}>
@@ -316,6 +313,30 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
           </Button>
         )}
       </div>
+
+      {dupSheet && (
+        <BottomSheet onClose={() => setDupSheet(null)}>
+          <p className={styles.confirmTitle}>Receipt {dupSheet.ref} used before</p>
+          <p className={styles.confirmBody}>
+            {dupSheet.depRef} · {formatRupees(dupSheet.amountPaise)} · {dupSheet.when}
+          </p>
+          <div className={styles.confirmActions}>
+            <Button variant="secondary" onClick={() => setDupSheet(null)}>
+              Change no.
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setDupSheet(null);
+                void handleSave(true);
+              }}
+              loading={saving}
+            >
+              Save anyway
+            </Button>
+          </div>
+        </BottomSheet>
+      )}
 
       {confirmVoid && (
         <BottomSheet onClose={() => setConfirmVoid(false)}>
