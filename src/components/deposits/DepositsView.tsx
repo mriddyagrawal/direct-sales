@@ -306,8 +306,20 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
     const inner = (
       <>
         <div className={styles.rowMain}>
-          <span className={`${styles.rowRetailer} ${voided ? styles.voided : ""}`}>
-            {d.retailers?.name ?? "Unknown retailer"}
+          <span className={styles.rowNameLine}>
+            <span className={`${styles.rowRetailer} ${voided ? styles.voided : ""}`}>
+              {d.retailers?.name ?? "Unknown retailer"}
+            </span>
+            {/* The outstanding SNAPSHOT at recording time (owner 2026-09-01)
+                — red owed / green clear, no label on the phone. Null =
+                pre-snapshot row, nothing shown. */}
+            {!voided && d.previous_outstanding_paise !== null && (
+              <span
+                className={`${styles.outSnap} ${d.previous_outstanding_paise > 0 ? styles.outOwed : styles.outClear}`}
+              >
+                {formatRupees(d.previous_outstanding_paise)}
+              </span>
+            )}
           </span>
           <span className={styles.rowMeta}>
             {/* The row's NAME leads the meta line (owner 2026-09-01) — the
@@ -460,6 +472,7 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
                   <th>REF</th>
                   <th>SALESMAN</th>
                   <th>RETAILER</th>
+                  <th className={styles.numeric}>PREV. OUTSTANDING</th>
                   <th>RECEIPT</th>
                   <th className={styles.numeric}>AMOUNT</th>
                   <th>METHOD</th>
@@ -480,6 +493,17 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
                         {d.retailers?.name ?? "Unknown retailer"}
                         {editedBadge(d)}
                         {voided && d.void_reason && <span className={styles.voidNote}>voided: {d.void_reason}</span>}
+                      </td>
+                      {/* Snapshot at recording time — frozen on the row, not
+                          the live Tally figure. Dash = pre-snapshot row. */}
+                      <td className={`${styles.mono} ${styles.numeric} ${voided ? styles.voided : ""}`}>
+                        {d.previous_outstanding_paise === null ? (
+                          "—"
+                        ) : (
+                          <span className={d.previous_outstanding_paise > 0 ? styles.outOwed : styles.outClear}>
+                            {formatRupees(d.previous_outstanding_paise)}
+                          </span>
+                        )}
                       </td>
                       <td className={`${styles.mono} ${voided ? styles.voided : ""}`}>{d.receipt_ref ?? "—"}</td>
                       {/* Note sits UNDER the amount (owner 2026-07-19) — the
@@ -516,7 +540,7 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
                     </tr>
                     {trailOpenId === d.id && (
                       <tr className={styles.trailTableRow}>
-                        <td colSpan={8}>
+                        <td colSpan={9}>
                           <EditTrail depositId={d.id} />
                         </td>
                       </tr>
