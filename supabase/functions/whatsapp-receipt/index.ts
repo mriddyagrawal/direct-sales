@@ -110,6 +110,11 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
   const net = amount - discount;
   // The Tally sync's figure; null (never-synced shop) = 0 by owner's rule.
   const prev = r?.outstanding_paise ?? 0;
+  // The outstanding drops by the GROSS, not the net (owner 2026-09-01): the
+  // office books TWO Tally lines from one deposit — receipt ₹9,500 +
+  // discount ₹500 — so the ledger falls by the full ₹10,000. The message's
+  // "collected" stays the net (what changed hands); the deduction is gross.
+  const current = prev - amount;
   const params = {
     salesperson: (actor as { full_name: string } | null)?.full_name ?? "our salesperson",
     received_amount: inr(net),
@@ -117,7 +122,7 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
     discount: inr(discount),
     initial_amount: inr(amount),
     previous_outstanding: inr(prev),
-    current_outstanding: inr(prev - net),
+    current_outstanding: inr(current),
     number_if_cheque: d.method === "cheque" && d.note ? `Cheque no: ${d.note}` : "-",
   };
 
@@ -153,7 +158,7 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
       wamid: body.messages[0].id,
       to,
       previous_outstanding_paise: prev,
-      current_outstanding_paise: prev - net,
+      current_outstanding_paise: current,
     });
     return Response.json({ sent: true });
   }
