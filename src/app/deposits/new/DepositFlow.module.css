@@ -200,3 +200,19 @@
   font-size: var(--text-body-size);
   resize: vertical;
 }
+
+/* The shop's live outstanding under its name (owner 2026-09-01) — red owed /
+   green clear, the deposits-page convention; unknown renders nothing. */
+.retailerOut {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.retailerOutOwed {
+  color: var(--color-error);
+}
+
+.retailerOutClear {
+  color: var(--color-processed);
+}

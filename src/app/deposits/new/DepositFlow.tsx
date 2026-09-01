@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { parsePricePaise } from "@/lib/price";
 import { formatRupees } from "@/lib/format";
+import { readBalance } from "@/lib/balance";
 import {
   depositNetPaise,
   parseDiscountPaise,
@@ -232,6 +233,19 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
           <div>
             <p className={styles.retailerName}>{retailer?.name}</p>
             {retailer?.area && <p className={styles.retailerArea}>{retailer.area}</p>}
+            {/* The shop's live Tally outstanding, under the name (owner
+                2026-09-01) — the salesman sees what's owed on the very screen
+                where he types the collection. THE shared reading, THE house
+                rule: null = "not synced", never ₹0, left uncoloured. */}
+            {(() => {
+              const bal = readBalance(retailers.find((x) => x.id === retailer?.id)?.outstanding_paise ?? null);
+              if (bal.state === "unknown") return null;
+              return (
+                <p className={`${styles.retailerOut} ${bal.state === "owed" ? styles.retailerOutOwed : styles.retailerOutClear}`}>
+                  Outstanding: {bal.text}
+                </p>
+              );
+            })()}
           </div>
           <button type="button" className={styles.changeLink} onClick={() => setStep("retailer")}>
             Change
