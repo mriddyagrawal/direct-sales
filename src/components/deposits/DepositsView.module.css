@@ -174,12 +174,27 @@
 }
 
 .groupHeader {
+  /* The products pages' category-band treatment, for dates (owner
+     2026-09-01): a sticky full-bleed white strip — hairline below, the
+     previous row's own border above — so a day break reads at a glance.
+     .wrap insets 16px; the -16px margins pull the band to the screen edges,
+     the matching padding keeps the label at the content inset. */
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--color-white);
   font-family: var(--font-figures);
   font-size: var(--text-section-label-size);
   letter-spacing: var(--text-section-label-tracking);
   text-transform: uppercase;
-  color: var(--color-locked);
-  padding: 10px 0 6px;
+  color: var(--color-accent);
+  border-bottom: 1px solid var(--color-hairline);
+  margin: 8px -16px 0;
+  padding: 8px 16px 4px;
+}
+
+.group:first-child .groupHeader {
+  margin-top: 0;
 }
 
 .row {
@@ -205,6 +220,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex: 1;
   min-width: 0;
 }
 
@@ -525,15 +541,18 @@
   padding: 4px 8px 10px;
 }
 
-/* The edit affordance, made VISIBLE (owner 2026-09-01) — replaces the
-   whispered "· edit" after the timestamp. Accent, not amber: this is an
-   action hint, not a warning. The whole card stays the tap target. */
-.editChip {
-  display: inline-flex;
+/* The edit affordance (owner 2026-09-01, r2): a pencil in a small square at
+   the far end of the ribbon — symbol only, no word. Accent, not amber: an
+   action hint, not a warning. The whole card stays the tap target; the
+   square just says where tapping leads. */
+.editSquare {
+  flex-shrink: 0;
+  display: flex;
   align-items: center;
-  gap: 3px;
-  font-family: var(--font-structure);
-  font-size: 11px;
-  font-weight: 600;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
   color: var(--color-accent);
 }

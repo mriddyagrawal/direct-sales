@@ -336,12 +336,12 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
             </span>
           )}
           <span className={styles.rowTime}>{formatOrderTime(d.created_at)}</span>
-          {editable && (
-            <span className={styles.editChip}>
-              <Glyph icon={Pencil} size={11} /> Edit
-            </span>
-          )}
         </div>
+        {editable && (
+          <span className={styles.editSquare} aria-hidden>
+            <Glyph icon={Pencil} size={13} />
+          </span>
+        )}
       </>
     );
     return (
