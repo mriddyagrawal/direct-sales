@@ -9,7 +9,7 @@ import { DepositsView } from "@/components/deposits/DepositsView";
 // gives staff every deposit; the view's hero is the chosen day's per-method +
 // per-salesman totals (the cash-count worksheet), the itemized list below.
 // The ADMIN additionally taps a row to correct/void it (allowed past the
-// 1-hour window — the RPCs gate it); the accountant's rows are read-only.
+// 30-minute window — the RPCs gate it); the accountant's rows are read-only.
 export default async function DashboardDepositsPage() {
   const supabase = await createClient();
   const {

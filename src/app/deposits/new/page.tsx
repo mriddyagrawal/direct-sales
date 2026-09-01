@@ -74,7 +74,7 @@ export default async function NewDepositPage({
     } | null;
     // The RPCs are the real gate; this is the UX mirror — a VOIDED row is
     // never editable; otherwise admin always, the creating salesman only
-    // inside his 1-hour window. (RLS already hides other salesmen's rows →
+    // inside his 30-minute window. (RLS already hides other salesmen's rows →
     // row null → bounce.)
     const mayEdit =
       row &&

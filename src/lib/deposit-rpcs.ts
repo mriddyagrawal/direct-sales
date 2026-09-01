@@ -24,7 +24,8 @@ async function callRpc<T>(fn: () => PromiseLike<{ data: T | null; error: RpcErro
 }
 
 // Record a collection (salesman/accountant/admin; the RPC re-checks the role).
-// salesman_id = the caller; editable_until = +1 hour (both server-set). Amount
+// salesman_id = the caller; editable_until = +30 minutes (both server-set,
+// owner 2026-09-01 — was 1 hour). Amount
 // is integer paise, > 0 — parsePricePaise upstream, never a float.
 // amountPaise is the GROSS knocked off the balance; discountPaise the
 // concession; the net received is derived, never sent (deposit-fields.ts).
@@ -50,7 +51,7 @@ export async function createDeposit(
   );
 }
 
-// Correct a deposit — the creating salesman within his 1-hour window, or an
+// Correct a deposit — the creating salesman within his 30-minute window, or an
 // admin anytime (server-enforced; past the window the RPC raises "locked").
 // Only retailer/amount/discount/receipt-ref/method/note ever change.
 export async function updateDeposit(
@@ -78,7 +79,7 @@ export async function updateDeposit(
 
 // Remove a deposit = VOID it (owner 2026-07-19: nothing is ever hard-deleted).
 // The row stays — struck, excluded from totals, audited. Reason REQUIRED for
-// everyone; allowed for the creator within his 1-hour window or an admin
+// everyone; allowed for the creator within his 30-minute window or an admin
 // anytime (server-enforced).
 export async function voidDeposit(id: string, reason: string): Promise<DepositRow> {
   const supabase = createClient();
