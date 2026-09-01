@@ -11,8 +11,9 @@
 // OUTSTANDING IS AUTO-PULLED (owner 2026-09-01, reversing the typed-field
 // design after live use): previous = retailers.outstanding_paise, the Tally
 // sync's figure, null treated as 0 (owner: "zeros and positives don't
-// matter, just do basic math"); current = previous − net, negative fine
-// (an advance). The figures QUOTED to the retailer are logged in the
+// matter, just do basic math"); current = previous − GROSS (the ledger
+// falls by the full receipt amount — receipt + discount lines), negative
+// fine (an advance). The figures QUOTED to the retailer are logged in the
 // receipt_sent event details — the row no longer stores them, the trail is
 // the record of what was said. Known cost, owner-accepted: the sync figure
 // is as-of-last-run, so two same-day deposits quote the same "previous".

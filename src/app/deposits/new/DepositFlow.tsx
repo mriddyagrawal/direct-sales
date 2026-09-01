@@ -251,7 +251,10 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
           onChange={(e) => setReceiptRef(e.target.value)}
         />
 
-        <label className={styles.fieldLabel}>AMOUNT</label>
+        {/* "GROSS" in the salesman's face (owner 2026-09-01): this is the
+            full figure off the paper receipt BEFORE discount — the amount
+            the outstanding drops by. UI wording only; DB names unchanged. */}
+        <label className={styles.fieldLabel}>GROSS AMOUNT</label>
         <label className={styles.amountField}>
           <span className={styles.amountPrefix}>₹</span>
           <input
