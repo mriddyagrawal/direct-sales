@@ -11,6 +11,8 @@ import { formatRupees } from "@/lib/format";
 import {
   depositNetPaise,
   parseDiscountPaise,
+  parseOutstandingPaise,
+  currentOutstandingPaise,
   methodNoteRule,
   findDuplicateReceipt,
   type ReceiptRefRow,
@@ -27,6 +29,7 @@ export interface EditDepositData {
   retailerArea: string | null;
   amountPaise: number;
   discountPaise: number;
+  previousOutstandingPaise: number | null;
   receiptRef: string;
   // The DEPOSIT's salesman (≠ the viewer when an admin edits) — the
   // duplicate-receipt warning must check against the book that wrote it.
@@ -72,6 +75,9 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     isEdit && editDeposit!.discountPaise > 0 ? String(editDeposit!.discountPaise / 100) : "",
   );
   const [receiptRef, setReceiptRef] = useState(isEdit ? editDeposit!.receiptRef : "");
+  const [prevOutText, setPrevOutText] = useState(
+    isEdit && editDeposit!.previousOutstandingPaise !== null ? String(editDeposit!.previousOutstandingPaise / 100) : "",
+  );
   const [method, setMethod] = useState<DepositMethod | null>(
     isEdit ? (editDeposit!.method as DepositMethod) : null,
   );
@@ -105,6 +111,14 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
       ? depositNetPaise(parsedAmount.paise, parsedDiscount.paise)
       : null;
 
+  // Live "new outstanding" line: previous (salesman-typed) − net. Shown only
+  // when both sides parse — the same show-the-arithmetic rule as the net line.
+  const parsedPrevOut = parseOutstandingPaise(prevOutText);
+  const newOutstandingPreview =
+    parsedPrevOut.ok && parsedPrevOut.paise != null && parsedAmount.ok && parsedAmount.paise != null && parsedDiscount.ok
+      ? currentOutstandingPaise(parsedPrevOut.paise, parsedAmount.paise, parsedDiscount.paise ?? 0)
+      : null;
+
   async function handleSave(skipDupCheck = false) {
     const parsed = parsePricePaise(amountText);
     if (!parsed.ok) {
@@ -118,6 +132,11 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     const discount = parseDiscountPaise(discountText, parsed.paise);
     if (!discount.ok) {
       setError(discount.error);
+      return;
+    }
+    const prevOut = parseOutstandingPaise(prevOutText);
+    if (!prevOut.ok) {
+      setError(prevOut.error);
       return;
     }
     const ref = receiptRef.trim();
@@ -167,9 +186,13 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
 
     try {
       if (isEdit) {
-        await updateDeposit(editDeposit!.id, retailer.id, parsed.paise, method, ref, discount.paise ?? 0, cleanNote || undefined);
+        await updateDeposit(
+          editDeposit!.id, retailer.id, parsed.paise, method, ref, discount.paise ?? 0, prevOut.paise, cleanNote || undefined,
+        );
       } else {
-        await createDeposit(retailer.id, parsed.paise, method, ref, discount.paise ?? 0, cleanNote || undefined);
+        await createDeposit(
+          retailer.id, parsed.paise, method, ref, discount.paise ?? 0, prevOut.paise, cleanNote || undefined,
+        );
       }
       router.push(returnTo);
       router.refresh();
@@ -271,6 +294,27 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
             Receiving <strong>{formatRupees(netPreview)}</strong>{" "}
             <s className={styles.netGross}>{formatRupees(parsedAmount.ok ? (parsedAmount.paise ?? 0) : 0)}</s> −{" "}
             {formatRupees(parsedDiscount.ok ? (parsedDiscount.paise ?? 0) : 0)} discount
+          </p>
+        )}
+
+        {/* Salesman-typed, deliberately NOT the Tally sync's figure (owner
+            2026-09-01) — this feeds the WhatsApp receipt's outstanding lines.
+            Optional: left blank, the deposit saves and no receipt is sent. */}
+        <label className={styles.fieldLabel}>PREVIOUS OUTSTANDING · OPTIONAL</label>
+        <label className={`${styles.amountField} ${styles.discountField}`}>
+          <span className={styles.amountPrefix}>₹</span>
+          <input
+            className={styles.amountInput}
+            inputMode="decimal"
+            value={prevOutText}
+            placeholder="0"
+            onChange={(e) => setPrevOutText(e.target.value)}
+          />
+        </label>
+
+        {newOutstandingPreview !== null && (
+          <p className={styles.netLine}>
+            New outstanding <strong>{formatRupees(newOutstandingPreview)}</strong>
           </p>
         )}
 
