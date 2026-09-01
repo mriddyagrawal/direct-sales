@@ -26,6 +26,7 @@ export default async function DepositsPage() {
     .eq("id", user.id)
     .maybeSingle();
   if (profile?.role === "admin" || profile?.role === "accountant") redirect("/dashboard/deposits");
+  if (profile?.role === "godown") redirect("/godown/deposits");
 
   // Deposits query via the shared builder (spec D12); prefetch → dehydrate
   // seeds the client cache (per-request query client, spec D2) and

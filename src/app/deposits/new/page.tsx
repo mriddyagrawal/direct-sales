@@ -24,9 +24,11 @@ export default async function NewDepositPage({
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
   const role = profile?.role ?? "";
-  if (role === "godown") redirect("/godown");
   const isAdmin = role === "admin";
-  const returnTo = role === "admin" || role === "accountant" ? "/dashboard/deposits" : "/deposits";
+  // Role-aware landing: staff → dashboard, godown → their own shell's tab
+  // (owner 2026-09-01 — godown records counter collections), else salesman.
+  const returnTo =
+    role === "admin" || role === "accountant" ? "/dashboard/deposits" : role === "godown" ? "/godown/deposits" : "/deposits";
 
   const [{ data: retailerRows }, { data: recentRows }] = await Promise.all([
     // RETAILER_SELECT, never a hand-typed list: this page casts the result to
