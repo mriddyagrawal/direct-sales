@@ -551,12 +551,13 @@
   align-items: center;
   justify-content: center;
   width: 34px;
-  /* Full row height (owner 2026-09-01 r3): stretch across the flex row and
-     eat the row's own 10px vertical padding, so the square runs hairline to
-     hairline like a cell of its own. Sharp corners, deliberately. */
+  /* r4 (owner): stretch WITH the row's own padding as the inset — no pinned
+     height, no negative margins, so it tracks content height on any device,
+     zoom, or line count and stays a step short of the hairlines. Solid
+     accent, white glyph. Sharp corners stay. */
   align-self: stretch;
-  margin: -10px 0;
-  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  border: none;
   border-radius: 0;
-  color: var(--color-accent);
+  color: var(--color-white);
 }
