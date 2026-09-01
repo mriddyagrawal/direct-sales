@@ -180,32 +180,3 @@ export function describeDepositEdit(before: EventSnapshot, after: EventSnapshot)
   }
   return changes;
 }
-
-// ---- Previous / current outstanding (owner 2026-09-01) --------------------
-// The WhatsApp receipt states the shop's outstanding before and after this
-// payment. PREVIOUS is typed by the salesman (deliberately NOT the Tally
-// sync's figure — that is as-of-last-run, and a stale number in an
-// anti-fraud message costs trust); CURRENT is previous − net, derived,
-// never typed, never stored. Optional: a deposit without it saves fine and
-// simply sends no receipt message — the rollout lever.
-
-// Blank ⇒ null (not entered). Zero is a real value (a clear shop paying for
-// a fresh bill). Built on parsePricePaise for the digit/decimal rules.
-export function parseOutstandingPaise(input: string): PriceParse {
-  const t = input.trim();
-  if (t === "") return { ok: true, paise: null };
-  if (/^0+(\.0+)?$/.test(t)) return { ok: true, paise: 0 };
-  const parsed = parsePricePaise(t);
-  if (!parsed.ok) return { ok: false, error: parsed.error.replace("Price", "Outstanding") };
-  return { ok: true, paise: parsed.paise ?? 0 };
-}
-
-// May go NEGATIVE — a payment larger than the outstanding is an advance,
-// which is a real state, not an error.
-export function currentOutstandingPaise(
-  previousOutstandingPaise: number,
-  amountPaise: number,
-  discountPaise: number,
-): number {
-  return previousOutstandingPaise - depositNetPaise(amountPaise, discountPaise);
-}

@@ -6,11 +6,20 @@
 // One caller: the DB trigger (whatsapp_receipt_webhook() on deposit_events
 // INSERT, action 'created', x-trigger-secret header). Sends the approved
 // `receipt_with_discount` utility template to the retailer, filled from the
-// event's own snapshot — the salesman never touches the message. Sent ONLY
-// when previous_outstanding_paise was entered (the template requires it;
-// that's the owner's rollout lever). Logged back into deposit_events as
-// receipt_sent / receipt_failed — visible in the dashboard's edit-trail UI,
-// and a safe no-op in `notify` (its depositCards only knows created/voided).
+// event's own snapshot — the salesman never touches the message.
+//
+// OUTSTANDING IS AUTO-PULLED (owner 2026-09-01, reversing the typed-field
+// design after live use): previous = retailers.outstanding_paise, the Tally
+// sync's figure, null treated as 0 (owner: "zeros and positives don't
+// matter, just do basic math"); current = previous − net, negative fine
+// (an advance). The figures QUOTED to the retailer are logged in the
+// receipt_sent event details — the row no longer stores them, the trail is
+// the record of what was said. Known cost, owner-accepted: the sync figure
+// is as-of-last-run, so two same-day deposits quote the same "previous".
+//
+// Logged back into deposit_events as receipt_sent / receipt_failed —
+// visible in the dashboard's edit-trail UI, and a safe no-op in `notify`
+// (its depositCards only knows created/voided).
 //
 // A message must NEVER block or break the deposit it rides on: every path
 // here fails soft.
@@ -71,10 +80,6 @@ async function logEvent(depositId: string, action: string, details: Record<strin
 // ---- the DB trigger -------------------------------------------------------
 async function handleDepositCreated(record: DepositEventRecord): Promise<Response> {
   const d = record.details;
-  const prev = d.previous_outstanding_paise;
-  if (prev === null || prev === undefined) {
-    return Response.json({ skipped: "no previous outstanding entered" });
-  }
   const db = service();
 
   // Idempotency: pg_net can retry — one receipt per deposit, ever.
@@ -87,13 +92,14 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
   if (already && already.length > 0) return Response.json({ skipped: "already sent" });
 
   const [{ data: retailer }, { data: actor }] = await Promise.all([
-    db.from("retailers").select("name, phone").eq("id", d.retailer_id!).maybeSingle(),
+    db.from("retailers").select("name, phone, outstanding_paise").eq("id", d.retailer_id!).maybeSingle(),
     record.actor_id
       ? db.from("profiles").select("full_name").eq("id", record.actor_id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+  const r = retailer as { phone: string | null; outstanding_paise: number | null } | null;
 
-  const to = e164India((retailer as { phone: string | null } | null)?.phone ?? null);
+  const to = e164India(r?.phone ?? null);
   if (!to) {
     await logEvent(record.deposit_id, "receipt_failed", { reason: "retailer has no usable phone number" });
     return Response.json({ skipped: "no phone" });
@@ -102,6 +108,8 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
   const amount = d.amount_paise ?? 0;
   const discount = d.discount_paise ?? 0;
   const net = amount - discount;
+  // The Tally sync's figure; null (never-synced shop) = 0 by owner's rule.
+  const prev = r?.outstanding_paise ?? 0;
   const params = {
     salesperson: (actor as { full_name: string } | null)?.full_name ?? "our salesperson",
     received_amount: inr(net),
@@ -139,7 +147,14 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
   const body = await res.json().catch(() => ({}));
 
   if (res.ok && body.messages?.[0]?.id) {
-    await logEvent(record.deposit_id, "receipt_sent", { wamid: body.messages[0].id, to });
+    // The quoted figures ride the event — the deposit row no longer stores
+    // them; this is the durable record of what the retailer was told.
+    await logEvent(record.deposit_id, "receipt_sent", {
+      wamid: body.messages[0].id,
+      to,
+      previous_outstanding_paise: prev,
+      current_outstanding_paise: prev - net,
+    });
     return Response.json({ sent: true });
   }
   await logEvent(record.deposit_id, "receipt_failed", {

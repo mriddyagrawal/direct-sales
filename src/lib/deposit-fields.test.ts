@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  currentOutstandingPaise,
   describeDepositEdit,
   depositNetPaise,
-  parseOutstandingPaise,
   parseDiscountPaise,
   methodNoteRule,
   receiptRefKey,
@@ -154,33 +152,6 @@ describe("describeDepositEdit", () => {
   });
   it("a key appearing on one side only IS a change", () => {
     expect(describeDepositEdit({}, { receipt_ref: "A-1" })).toEqual([{ label: "receipt", from: "—", to: "A-1" }]);
-  });
-});
-
-describe("parseOutstandingPaise", () => {
-  it("blank means not entered — null, not zero", () => {
-    expect(parseOutstandingPaise("")).toEqual({ ok: true, paise: null });
-  });
-  it("zero is a real value: a clear shop paying a fresh bill", () => {
-    expect(parseOutstandingPaise("0")).toEqual({ ok: true, paise: 0 });
-  });
-  it("parses rupees to paise", () => {
-    expect(parseOutstandingPaise("84320")).toEqual({ ok: true, paise: 8432000 });
-  });
-  it("rejects junk with Outstanding wording", () => {
-    const bad = parseOutstandingPaise("abc");
-    expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.error).toBe("Outstanding must be a number.");
-  });
-});
-
-describe("currentOutstandingPaise", () => {
-  it("the receipt's arithmetic: previous − net", () => {
-    // owed 84,320; pays 10,000 gross with 500 discount → 9,500 net → 74,820
-    expect(currentOutstandingPaise(8432000, 1000000, 50000)).toBe(7482000);
-  });
-  it("overpayment goes negative — an advance, not an error", () => {
-    expect(currentOutstandingPaise(500000, 600000, 0)).toBe(-100000);
   });
 });
 
