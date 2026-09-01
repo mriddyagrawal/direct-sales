@@ -1,36 +1,40 @@
-// Edge Function `whatsapp-receipt` — deposit → WhatsApp receipt, SEND-ONLY
-// (owner 2026-09-01; the Meta→us webhook receiver lives on the
-// feat/whatsapp-webhooks branch, deliberately split out pending the owner's
-// call — merging that branch restores it to this same function).
+// Edge Function `whatsapp-receipt` — the deposit → WhatsApp receipt pipeline
+// (owner 2026-09-01). Three callers, one function:
 //
-// One caller: the DB trigger (whatsapp_receipt_webhook() on deposit_events
-// INSERT, action 'created', x-trigger-secret header). Sends the approved
-// `receipt_with_discount` utility template to the retailer, filled from the
-// event's own snapshot — the salesman never touches the message.
+//   1. The DB trigger (whatsapp_receipt_webhook() on deposit_events INSERT,
+//      action 'created', x-trigger-secret header): sends the approved
+//      `receipt_with_discount` utility template to the retailer, filled from
+//      the event's own snapshot — the salesman never touches the message.
+//      OUTSTANDING IS AUTO-PULLED (owner 2026-09-01, reversing the
+//      typed-field design after live use): previous =
+//      retailers.outstanding_paise (the Tally sync's figure, null = 0 by
+//      owner's rule), current = previous − GROSS (the ledger falls by the
+//      full receipt amount — receipt + discount lines), negative fine.
+//      The quoted figures ride the receipt_sent event details — the trail is
+//      the durable record of what was said. Known, owner-accepted cost: the
+//      sync figure is as-of-last-run, so two same-day deposits quote the
+//      same "previous". Logged as receipt_sent / receipt_failed; a safe
+//      no-op in `notify` (its depositCards only knows created/voided).
 //
-// OUTSTANDING IS AUTO-PULLED (owner 2026-09-01, reversing the typed-field
-// design after live use): previous = retailers.outstanding_paise, the Tally
-// sync's figure, null treated as 0 (owner: "zeros and positives don't
-// matter, just do basic math"); current = previous − GROSS (the ledger
-// falls by the full receipt amount — receipt + discount lines), negative
-// fine (an advance). The figures QUOTED to the retailer are logged in the
-// receipt_sent event details — the row no longer stores them, the trail is
-// the record of what was said. Known cost, owner-accepted: the sync figure
-// is as-of-last-run, so two same-day deposits quote the same "previous".
+//   2. Meta's webhook VERIFY (GET hub.challenge + verify token).
 //
-// Logged back into deposit_events as receipt_sent / receipt_failed —
-// visible in the dashboard's edit-trail UI, and a safe no-op in `notify`
-// (its depositCards only knows created/voided).
+//   3. Meta's webhook EVENTS (POST, gated by ?vt=<verify token> in the
+//      callback URL): delivery statuses update the trail
+//      (receipt_delivered / receipt_failed); an inbound REPLY — the
+//      template says "reply if something looks wrong", the anti-fraud
+//      tripwire — is pinned to the latest receipt sent to that phone as a
+//      reply_received event.
 //
 // A message must NEVER block or break the deposit it rides on: every path
-// here fails soft.
+// here fails soft and answers 200 to Meta (who retries hard on non-200).
 //
 // Secrets (function store): WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID,
-// WA_TRIGGER_SECRET. SUPABASE_URL / SERVICE_ROLE injected.
+// WA_VERIFY_TOKEN, WA_TRIGGER_SECRET. SUPABASE_URL / SERVICE_ROLE injected.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const WHATSAPP_TOKEN = Deno.env.get("WHATSAPP_TOKEN") ?? "";
 const PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
+const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN") ?? "";
 const TRIGGER_SECRET = Deno.env.get("WA_TRIGGER_SECRET") ?? "";
 const TEMPLATE_NAME = "receipt_with_discount";
 
@@ -78,7 +82,7 @@ async function logEvent(depositId: string, action: string, details: Record<strin
   await service().from("deposit_events").insert({ deposit_id: depositId, actor_id: null, action, details });
 }
 
-// ---- the DB trigger -------------------------------------------------------
+// ---- caller 1: the DB trigger --------------------------------------------
 async function handleDepositCreated(record: DepositEventRecord): Promise<Response> {
   const d = record.details;
   const db = service();
@@ -170,20 +174,113 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
   return Response.json({ sent: false });
 }
 
+// ---- caller 3: Meta's event webhook --------------------------------------
+interface MetaStatus {
+  id: string;
+  status: string;
+  errors?: { code: number; title?: string; message?: string }[];
+}
+interface MetaMessage {
+  from: string;
+  id: string;
+  text?: { body: string };
+  type: string;
+}
+
+async function findDepositByWamid(db: ReturnType<typeof service>, wamid: string): Promise<string | null> {
+  const { data } = await db
+    .from("deposit_events")
+    .select("deposit_id")
+    .eq("action", "receipt_sent")
+    .eq("details->>wamid", wamid)
+    .limit(1);
+  return data?.[0]?.deposit_id ?? null;
+}
+
+async function handleMetaEvents(payload: unknown): Promise<Response> {
+  const db = service();
+  const entries = (payload as { entry?: { changes?: { value?: Record<string, unknown> }[] }[] }).entry ?? [];
+  for (const entry of entries) {
+    for (const change of entry.changes ?? []) {
+      const value = change.value ?? {};
+
+      for (const s of (value.statuses as MetaStatus[] | undefined) ?? []) {
+        if (s.status !== "delivered" && s.status !== "failed") continue; // sent/read: noise
+        const depositId = await findDepositByWamid(db, s.id);
+        if (!depositId) continue;
+        const action = s.status === "delivered" ? "receipt_delivered" : "receipt_failed";
+        // Dedupe: Meta re-delivers webhooks; one trail line per outcome.
+        const { data: dup } = await db
+          .from("deposit_events")
+          .select("id")
+          .eq("deposit_id", depositId)
+          .eq("action", action)
+          .eq("details->>wamid", s.id)
+          .limit(1);
+        if (dup && dup.length > 0) continue;
+        await logEvent(depositId, action, {
+          wamid: s.id,
+          ...(s.errors?.length ? { reason: s.errors[0].message ?? s.errors[0].title ?? `code ${s.errors[0].code}` } : {}),
+        });
+      }
+
+      for (const m of (value.messages as MetaMessage[] | undefined) ?? []) {
+        if (m.type !== "text" || !m.text?.body) continue;
+        // Pin the reply to the LATEST receipt sent to this phone — the
+        // "reply if something looks wrong" tripwire, visible in the trail.
+        const { data: recent } = await db
+          .from("deposit_events")
+          .select("deposit_id, created_at")
+          .eq("action", "receipt_sent")
+          .eq("details->>to", m.from)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const depositId = recent?.[0]?.deposit_id;
+        if (!depositId) continue;
+        await logEvent(depositId, "reply_received", { from: m.from, text: m.text.body.slice(0, 500) });
+      }
+    }
+  }
+  return Response.json({ ok: true });
+}
+
 // ---- router ---------------------------------------------------------------
 Deno.serve(async (req) => {
   try {
-    if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
-    if (req.headers.get("x-trigger-secret") !== TRIGGER_SECRET || TRIGGER_SECRET === "") {
+    const url = new URL(req.url);
+
+    // Meta webhook verification handshake.
+    if (req.method === "GET") {
+      if (url.searchParams.get("hub.mode") === "subscribe" && url.searchParams.get("hub.verify_token") === VERIFY_TOKEN) {
+        return new Response(url.searchParams.get("hub.challenge") ?? "", { status: 200 });
+      }
       return new Response("forbidden", { status: 403 });
     }
+
+    if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
     const payload = await req.json().catch(() => null);
-    const record = (payload as { record?: DepositEventRecord } | null)?.record;
-    if (record?.action === "created") return await handleDepositCreated(record);
-    return Response.json({ skipped: "not a created event" });
+    if (!payload) return new Response("bad request", { status: 400 });
+
+    // Our DB trigger.
+    if (req.headers.get("x-trigger-secret") === TRIGGER_SECRET && TRIGGER_SECRET !== "") {
+      const record = (payload as { record?: DepositEventRecord }).record;
+      if (record?.action === "created") return await handleDepositCreated(record);
+      return Response.json({ skipped: "not a created event" });
+    }
+
+    // Meta events — the callback URL carries ?vt=<verify token>, our gate
+    // against forged POSTs (Meta preserves the query string it verified).
+    if ((payload as { object?: string }).object === "whatsapp_business_account") {
+      if (url.searchParams.get("vt") !== VERIFY_TOKEN || VERIFY_TOKEN === "") {
+        return new Response("forbidden", { status: 403 });
+      }
+      return await handleMetaEvents(payload);
+    }
+
+    return new Response("forbidden", { status: 403 });
   } catch (err) {
-    // Fail soft, always: nothing here may ever matter more than the deposit
-    // that was saved.
+    // Fail soft, always: a broken webhook must not make Meta hammer retries,
+    // and nothing here may ever matter more than the deposit that was saved.
     console.error("whatsapp-receipt error:", err);
     return Response.json({ ok: false });
   }
