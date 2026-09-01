@@ -457,3 +457,67 @@
 }
 
 
+
+/* ---- Edited-row badge + expandable audit trail (owner 2026-09-01) ---- */
+/* Amber, quiet, and a BUTTON: the triangle + "edited" + a chevron that
+   rotates open. Deliberately the app's icon grammar, not the ⚠️ emoji —
+   emoji render differently per platform (the July selects lesson). */
+.editedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-amber);
+  vertical-align: baseline;
+}
+
+/* The same thin CSS-border chevron as Quick Order's expansions — points
+   down at rest, rotates up when the trail is open. */
+.badgeChevron {
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  margin-top: -3px;
+  border-right: 2px solid var(--color-amber);
+  border-bottom: 2px solid var(--color-amber);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.badgeChevronOpen {
+  transform: rotate(225deg);
+  margin-top: 2px;
+}
+
+.trail {
+  padding: 8px 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trailLine {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.trailWho {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+.trailTableRow td {
+  padding: 4px 8px 10px;
+}

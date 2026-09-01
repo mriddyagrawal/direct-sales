@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, TriangleAlert } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -13,7 +13,7 @@ import { nowMs } from "@/lib/cart";
 import { voidDeposit } from "@/lib/deposit-rpcs";
 import { createClient } from "@/lib/supabase/client";
 import { fetchDepositsList, type DepositListRow, type DepositsScope } from "@/lib/queries/deposits";
-import { depositNetPaise } from "@/lib/deposit-fields";
+import { depositNetPaise, describeDepositEdit } from "@/lib/deposit-fields";
 import { useQuery } from "@tanstack/react-query";
 import fab from "@/components/ui/fab.module.css";
 import styles from "./DepositsView.module.css";
@@ -46,6 +46,60 @@ function weekEndKey(dateKey: string): string {
   const d = new Date(`${weekStartKey(dateKey)}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 6);
   return d.toISOString().slice(0, 10);
+}
+
+// One deposit's audit trail, fetched only when its card is expanded (staff
+// only — deposit_events RLS). Chronological: recorded → each edit's field
+// diffs (describeDepositEdit) → void, each line stamped who + when.
+interface TrailEvent {
+  action: string;
+  created_at: string;
+  details: {
+    before?: Parameters<typeof describeDepositEdit>[0];
+    after?: Parameters<typeof describeDepositEdit>[1];
+    reason?: string;
+  } | null;
+  profiles: { full_name: string } | null;
+}
+
+function EditTrail({ depositId }: { depositId: string }) {
+  const { data: events, isError } = useQuery({
+    queryKey: ["deposit-events", depositId],
+    queryFn: async () => {
+      const { data, error } = await createClient()
+        .from("deposit_events")
+        .select("action, created_at, details, profiles!deposit_events_actor_id_fkey(full_name)")
+        .eq("deposit_id", depositId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as unknown as TrailEvent[];
+    },
+  });
+  if (isError) return <div className={styles.trail}>Couldn&apos;t load the history — try again.</div>;
+  if (!events) return <div className={styles.trail}>…</div>;
+  return (
+    <div className={styles.trail}>
+      {events.map((e, i) => {
+        let text = "";
+        if (e.action === "created") text = "recorded";
+        else if (e.action === "voided") text = e.details?.reason ? `voided — ${e.details.reason}` : "voided";
+        else if (e.action === "updated") {
+          const changes = describeDepositEdit(e.details?.before ?? {}, e.details?.after ?? {});
+          text = changes.length
+            ? changes.map((c) => (c.to ? `${c.label} ${c.from} → ${c.to}` : `${c.label} ${c.from}`)).join(" · ")
+            : "edited (no field change)";
+        } else text = e.action;
+        return (
+          <p key={i} className={styles.trailLine}>
+            <span className={styles.trailWho}>
+              {formatOrderTimestamp(e.created_at, new Date())} · {e.profiles?.full_name ?? "—"}
+            </span>{" "}
+            {text}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 function MethodChip({ method }: { method: string }) {
@@ -83,6 +137,11 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
   const [anchorKey, setAnchorKey] = useState(todayKey);
   const [range, setRange] = useState<"day" | "week" | "month">("day");
   const [salesmanFilter, setSalesmanFilter] = useState("all");
+
+  // ---- edited-row trail (owner 2026-09-01): amber badge + chevron on rows
+  // that carry an 'updated' event; tapping expands the audit trail in place.
+  // Staff-only by construction — the events embed is RLS-empty for salesmen.
+  const [trailOpenId, setTrailOpenId] = useState<string | null>(null);
 
   // ---- admin void sheet ----
   const [voidTarget, setVoidTarget] = useState<DepositListRow | null>(null);
@@ -209,6 +268,28 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
     }
   }
 
+  function editedBadge(d: DepositListRow) {
+    if (!isStaff || !d.deposit_events?.some((e) => e.action === "updated")) return null;
+    const open = trailOpenId === d.id;
+    return (
+      <button
+        type="button"
+        className={styles.editedBadge}
+        aria-expanded={open}
+        onClick={(e) => {
+          // rows can be Links (admin edit) — the badge must never navigate
+          e.preventDefault();
+          e.stopPropagation();
+          setTrailOpenId(open ? null : d.id);
+        }}
+      >
+        <Glyph icon={TriangleAlert} size={12} />
+        edited
+        <span className={`${styles.badgeChevron} ${open ? styles.badgeChevronOpen : ""}`} aria-hidden />
+      </button>
+    );
+  }
+
   function renderCardRow(d: DepositListRow) {
     const voided = d.voided_at !== null;
     const editable = canEditRow(d);
@@ -231,6 +312,7 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
             {d.receipt_ref ? ` · receipt ${d.receipt_ref}` : ""}
             {d.note ? ` · ${d.note}` : ""}
             {voided && d.void_reason ? ` · voided: ${d.void_reason}` : voided ? " · voided" : ""}
+            {editedBadge(d)}
           </span>
         </div>
         <div className={styles.rowSide}>
@@ -251,14 +333,17 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
         </div>
       </>
     );
-    return editable ? (
-      <Link key={d.id} href={`/deposits/new?edit=${d.id}`} className={`${styles.row} ${styles.rowTappable}`}>
-        {inner}
-      </Link>
-    ) : (
-      <div key={d.id} className={styles.row}>
-        {inner}
-      </div>
+    return (
+      <Fragment key={d.id}>
+        {editable ? (
+          <Link href={`/deposits/new?edit=${d.id}`} className={`${styles.row} ${styles.rowTappable}`}>
+            {inner}
+          </Link>
+        ) : (
+          <div className={styles.row}>{inner}</div>
+        )}
+        {trailOpenId === d.id && <EditTrail depositId={d.id} />}
+      </Fragment>
     );
   }
 
@@ -376,11 +461,13 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
                   const voided = d.voided_at !== null;
                   const net = depositNetPaise(d.amount_paise, d.discount_paise);
                   return (
-                    <tr key={d.id} className={voided ? styles.rowVoided : ""}>
+                    <Fragment key={d.id}>
+                    <tr className={voided ? styles.rowVoided : ""}>
                       <td className={`${styles.mono} ${styles.refCell}`}>{d.deposit_ref}</td>
                       <td>{d.profiles?.full_name ?? "Unknown"}</td>
                       <td className={voided ? styles.voided : ""}>
                         {d.retailers?.name ?? "Unknown retailer"}
+                        {editedBadge(d)}
                         {voided && d.void_reason && <span className={styles.voidNote}>voided: {d.void_reason}</span>}
                       </td>
                       <td className={`${styles.mono} ${voided ? styles.voided : ""}`}>{d.receipt_ref ?? "—"}</td>
@@ -418,6 +505,14 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
                         </td>
                       )}
                     </tr>
+                    {trailOpenId === d.id && (
+                      <tr className={styles.trailTableRow}>
+                        <td colSpan={isAdmin ? 8 : 7}>
+                          <EditTrail depositId={d.id} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>

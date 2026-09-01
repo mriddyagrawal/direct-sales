@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  describeDepositEdit,
   depositNetPaise,
   parseDiscountPaise,
   methodNoteRule,
@@ -113,5 +114,43 @@ describe("findDuplicateReceipt", () => {
   });
   it("a fresh number passes silently", () => {
     expect(findDuplicateReceipt(rows, "B-1", null)).toBeNull();
+  });
+});
+
+
+describe("describeDepositEdit", () => {
+  it("the owner's example: amount corrected", () => {
+    expect(describeDepositEdit({ amount_paise: 1000000 }, { amount_paise: 950000 })).toEqual([
+      { label: "amount", from: "₹10,000", to: "₹9,500" },
+    ]);
+  });
+  it("en-IN grouping in the labels", () => {
+    expect(describeDepositEdit({ amount_paise: 16782340000 }, { amount_paise: 100 })[0]).toEqual({
+      label: "amount",
+      from: "₹16,78,23,400",
+      to: "₹1",
+    });
+  });
+  it("several fields at once, stable order", () => {
+    const out = describeDepositEdit(
+      { amount_paise: 1000000, discount_paise: 0, receipt_ref: "12", method: "cash", note: null },
+      { amount_paise: 1000000, discount_paise: 50000, receipt_ref: "14", method: "cheque", note: "123456" },
+    );
+    expect(out.map((c) => c.label)).toEqual(["discount", "receipt", "method", "note"]);
+    expect(out[0]).toEqual({ label: "discount", from: "₹0", to: "₹500" });
+    expect(out[2]).toEqual({ label: "method", from: "Cash", to: "Cheque" });
+  });
+  it("retailer change shows the fact, not the ids", () => {
+    expect(describeDepositEdit({ retailer_id: "a" }, { retailer_id: "b" })).toEqual([
+      { label: "shop", from: "changed", to: "" },
+    ]);
+  });
+  it("pre-receipt-era events (keys absent on both sides) report no change", () => {
+    expect(
+      describeDepositEdit({ amount_paise: 5000, method: "cash" }, { amount_paise: 5000, method: "cash" }),
+    ).toEqual([]);
+  });
+  it("a key appearing on one side only IS a change", () => {
+    expect(describeDepositEdit({}, { receipt_ref: "A-1" })).toEqual([{ label: "receipt", from: "—", to: "A-1" }]);
   });
 });
