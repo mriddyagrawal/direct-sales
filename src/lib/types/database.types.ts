@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_config: {
+        Row: {
+          name: string
+          secret_hash: string
+          updated_at: string
+        }
+        Insert: {
+          name: string
+          secret_hash: string
+          updated_at?: string
+        }
+        Update: {
+          name?: string
+          secret_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       brands: {
         Row: {
           active: boolean
@@ -71,17 +89,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "deposit_events_deposit_id_fkey"
-            columns: ["deposit_id"]
-            isOneToOne: false
-            referencedRelation: "deposits"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "deposit_events_actor_id_fkey"
             columns: ["actor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deposit_events_deposit_id_fkey"
+            columns: ["deposit_id"]
+            isOneToOne: false
+            referencedRelation: "deposits"
             referencedColumns: ["id"]
           },
         ]
@@ -665,6 +683,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _apply_ledger: { Args: { p_payload: Json }; Returns: Json }
       approve_order: {
         Args: { p_order_id: string }
         Returns: {
@@ -812,12 +831,18 @@ export type Database = {
         }
       }
       email_for_username: { Args: { p_username: string }; Returns: string }
+      import_ledger: { Args: { p_payload: Json }; Returns: Json }
+      import_ledger_agent: {
+        Args: { p_payload: Json; p_secret: string }
+        Returns: Json
+      }
       import_products: {
         Args: { p_brand_id: string; p_rows: Json }
         Returns: Json
       }
-      import_stock: {
-        Args: { p_rows: Json }
+      import_stock: { Args: { p_rows: Json }; Returns: Json }
+      import_stock_agent: {
+        Args: { p_rows: Json; p_secret: string }
         Returns: Json
       }
       process_order: {
