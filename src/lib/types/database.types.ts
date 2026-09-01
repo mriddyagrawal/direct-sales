@@ -92,10 +92,12 @@ export type Database = {
           created_at: string
           deposit_no: number
           deposit_ref: string
+          discount_paise: number
           editable_until: string
           id: string
           method: string
           note: string | null
+          receipt_ref: string | null
           retailer_id: string
           salesman_id: string
           void_reason: string | null
@@ -107,10 +109,12 @@ export type Database = {
           created_at?: string
           deposit_no?: number
           deposit_ref: string
+          discount_paise?: number
           editable_until: string
           id?: string
           method: string
           note?: string | null
+          receipt_ref?: string | null
           retailer_id: string
           salesman_id: string
           void_reason?: string | null
@@ -122,10 +126,12 @@ export type Database = {
           created_at?: string
           deposit_no?: number
           deposit_ref?: string
+          discount_paise?: number
           editable_until?: string
           id?: string
           method?: string
           note?: string | null
+          receipt_ref?: string | null
           retailer_id?: string
           salesman_id?: string
           void_reason?: string | null
@@ -737,8 +743,10 @@ export type Database = {
       create_deposit: {
         Args: {
           p_amount_paise: number
+          p_discount_paise?: number
           p_method: string
           p_note?: string
+          p_receipt_ref: string
           p_retailer_id: string
         }
         Returns: {
@@ -746,10 +754,12 @@ export type Database = {
           created_at: string
           deposit_no: number
           deposit_ref: string
+          discount_paise: number
           editable_until: string
           id: string
           method: string
           note: string | null
+          receipt_ref: string | null
           retailer_id: string
           salesman_id: string
           void_reason: string | null
@@ -1040,9 +1050,11 @@ export type Database = {
       update_deposit: {
         Args: {
           p_amount_paise: number
+          p_discount_paise?: number
           p_id: string
           p_method: string
           p_note?: string
+          p_receipt_ref: string
           p_retailer_id: string
         }
         Returns: {
@@ -1050,10 +1062,12 @@ export type Database = {
           created_at: string
           deposit_no: number
           deposit_ref: string
+          discount_paise: number
           editable_until: string
           id: string
           method: string
           note: string | null
+          receipt_ref: string | null
           retailer_id: string
           salesman_id: string
           void_reason: string | null
@@ -1117,10 +1131,12 @@ export type Database = {
           created_at: string
           deposit_no: number
           deposit_ref: string
+          discount_paise: number
           editable_until: string
           id: string
           method: string
           note: string | null
+          receipt_ref: string | null
           retailer_id: string
           salesman_id: string
           void_reason: string | null

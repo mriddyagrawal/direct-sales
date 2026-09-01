@@ -242,6 +242,31 @@
   color: var(--color-locked);
 }
 
+/* The row's app identity (DEP-x) — quiet mono, never competing with the
+   retailer or the money; it exists to be read aloud on a phone call. */
+.rowRef {
+  font-family: var(--font-figures);
+  color: var(--color-locked);
+}
+
+.refCell {
+  color: var(--color-locked);
+  white-space: nowrap;
+}
+
+/* Discounted row: the struck GROSS + concession under the net (owner
+   2026-08-31). Deliberately quieter than .rowAmount and visually distinct
+   from .voided — the strike here covers ONE figure, not the record. */
+.rowGross {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+.rowGross s {
+  color: var(--color-inactive);
+}
+
 /* ---- Method chips: dot + text, same language as the stock pills ---- */
 .methodChip {
   display: inline-flex;

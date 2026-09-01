@@ -13,6 +13,7 @@ import { nowMs } from "@/lib/cart";
 import { voidDeposit } from "@/lib/deposit-rpcs";
 import { createClient } from "@/lib/supabase/client";
 import { fetchDepositsList, type DepositListRow, type DepositsScope } from "@/lib/queries/deposits";
+import { depositNetPaise } from "@/lib/deposit-fields";
 import { useQuery } from "@tanstack/react-query";
 import fab from "@/components/ui/fab.module.css";
 import styles from "./DepositsView.module.css";
@@ -121,15 +122,15 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
   // the filter only narrows the itemized list below.
   const methodTotals = useMemo(() => {
     const totals: Record<string, number> = { cash: 0, cheque: 0, online: 0 };
-    for (const d of activeInRange) totals[d.method] = (totals[d.method] ?? 0) + d.amount_paise;
+    for (const d of activeInRange) totals[d.method] = (totals[d.method] ?? 0) + depositNetPaise(d.amount_paise, d.discount_paise);
     return totals;
   }, [activeInRange]);
-  const rangeTotal = activeInRange.reduce((s, d) => s + d.amount_paise, 0);
+  const rangeTotal = activeInRange.reduce((s, d) => s + depositNetPaise(d.amount_paise, d.discount_paise), 0);
   const salesmanTotals = useMemo(() => {
     const map = new Map<string, { name: string; total: number }>();
     for (const d of activeInRange) {
       const cur = map.get(d.salesman_id) ?? { name: d.profiles?.full_name ?? "Unknown", total: 0 };
-      cur.total += d.amount_paise;
+      cur.total += depositNetPaise(d.amount_paise, d.discount_paise);
       map.set(d.salesman_id, cur);
     }
     return [...map.values()].sort((a, b) => b.total - a.total);
@@ -140,7 +141,9 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
     () =>
       deposits.reduce(
         (s, d) =>
-          d.voided_at === null && istDateKey(new Date(d.created_at)) === todayKey ? s + d.amount_paise : s,
+          d.voided_at === null && istDateKey(new Date(d.created_at)) === todayKey
+            ? s + depositNetPaise(d.amount_paise, d.discount_paise)
+            : s,
         0,
       ),
     [deposits, todayKey],
@@ -148,7 +151,10 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
   const myWeek = useMemo(() => {
     const start = weekStartKey(todayKey);
     return deposits.reduce(
-      (s, d) => (d.voided_at === null && istDateKey(new Date(d.created_at)) >= start ? s + d.amount_paise : s),
+      (s, d) =>
+        d.voided_at === null && istDateKey(new Date(d.created_at)) >= start
+          ? s + depositNetPaise(d.amount_paise, d.discount_paise)
+          : s,
       0,
     );
   }, [deposits, todayKey]);
@@ -206,6 +212,7 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
   function renderCardRow(d: DepositListRow) {
     const voided = d.voided_at !== null;
     const editable = canEditRow(d);
+    const net = depositNetPaise(d.amount_paise, d.discount_paise);
     const inner = (
       <>
         <div className={styles.rowMain}>
@@ -213,14 +220,30 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
             {d.retailers?.name ?? "Unknown retailer"}
           </span>
           <span className={styles.rowMeta}>
+            {/* The row's NAME leads the meta line (owner 2026-09-01) — the
+                shared reference for a phone call between the desktop and a
+                shop. Kept apart from the paper receipt no. so the two numbers
+                never read as one. */}
+            <span className={styles.rowRef}>{d.deposit_ref}</span>
+            {" · "}
             {isStaff && d.profiles?.full_name ? `${d.profiles.full_name} · ` : ""}
             <MethodChip method={d.method} />
+            {d.receipt_ref ? ` · receipt ${d.receipt_ref}` : ""}
             {d.note ? ` · ${d.note}` : ""}
             {voided && d.void_reason ? ` · voided: ${d.void_reason}` : voided ? " · voided" : ""}
           </span>
         </div>
         <div className={styles.rowSide}>
-          <span className={`${styles.rowAmount} ${voided ? styles.voided : ""}`}>{formatRupees(d.amount_paise)}</span>
+          {/* NET prominent, GROSS struck beside it (owner 2026-08-31) — the
+              row leads with the money that changed hands; the struck figure
+              is what came off the balance. Voided rows keep the plain single
+              figure: two different strikethroughs on one line read as noise. */}
+          <span className={`${styles.rowAmount} ${voided ? styles.voided : ""}`}>{formatRupees(net)}</span>
+          {!voided && d.discount_paise > 0 && (
+            <span className={styles.rowGross}>
+              <s>{formatRupees(d.amount_paise)}</s> − {formatRupees(d.discount_paise)} disc
+            </span>
+          )}
           <span className={styles.rowTime}>
             {formatOrderTime(d.created_at)}
             {editable ? " · edit" : ""}
@@ -335,8 +358,13 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
             <table className={styles.table}>
               <thead>
                 <tr>
+                  {/* REF leads like a statement's voucher-number column (owner
+                      2026-09-01) — and sits three columns from RECEIPT so the
+                      app's identity and the paper number never blur. */}
+                  <th>REF</th>
                   <th>SALESMAN</th>
                   <th>RETAILER</th>
+                  <th>RECEIPT</th>
                   <th className={styles.numeric}>AMOUNT</th>
                   <th>METHOD</th>
                   <th>TIME</th>
@@ -346,17 +374,29 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
               <tbody>
                 {listRows.map((d) => {
                   const voided = d.voided_at !== null;
+                  const net = depositNetPaise(d.amount_paise, d.discount_paise);
                   return (
                     <tr key={d.id} className={voided ? styles.rowVoided : ""}>
+                      <td className={`${styles.mono} ${styles.refCell}`}>{d.deposit_ref}</td>
                       <td>{d.profiles?.full_name ?? "Unknown"}</td>
                       <td className={voided ? styles.voided : ""}>
                         {d.retailers?.name ?? "Unknown retailer"}
                         {voided && d.void_reason && <span className={styles.voidNote}>voided: {d.void_reason}</span>}
                       </td>
+                      <td className={`${styles.mono} ${voided ? styles.voided : ""}`}>{d.receipt_ref ?? "—"}</td>
                       {/* Note sits UNDER the amount (owner 2026-07-19) — the
-                          cheque no. / UPI ref reads with the money it explains. */}
+                          cheque no. / UPI ref reads with the money it explains.
+                          NET leads; on a discounted row the struck GROSS and
+                          the discount sit beneath it — dad books TWO Tally
+                          lines from this cell (receipt + discount), so both
+                          figures stay legible, never merged. */}
                       <td className={`${styles.mono} ${styles.numeric} ${voided ? styles.voided : ""}`}>
-                        {formatRupees(d.amount_paise)}
+                        {formatRupees(net)}
+                        {!voided && d.discount_paise > 0 && (
+                          <span className={styles.tableNote}>
+                            <s>{formatRupees(d.amount_paise)}</s> − {formatRupees(d.discount_paise)} disc
+                          </span>
+                        )}
                         {!voided && d.note && <span className={styles.tableNote}>{d.note}</span>}
                       </td>
                       <td>
@@ -407,8 +447,8 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
         <BottomSheet onClose={() => setVoidTarget(null)}>
           <p className={styles.confirmTitle}>Void {voidTarget.deposit_ref}?</p>
           <p className={styles.confirmBody}>
-            {voidTarget.retailers?.name} · {formatRupees(voidTarget.amount_paise)} — the row stays, struck out and
-            excluded from totals.
+            {voidTarget.retailers?.name} · {formatRupees(depositNetPaise(voidTarget.amount_paise, voidTarget.discount_paise))} —
+            the row stays, struck out and excluded from totals.
           </p>
           <label className={styles.reasonLabel}>REASON (required)</label>
           <textarea

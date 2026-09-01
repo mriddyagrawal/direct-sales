@@ -54,7 +54,9 @@ export default async function NewDepositPage({
   if (edit) {
     const { data } = await supabase
       .from("deposits")
-      .select("id, retailer_id, salesman_id, amount_paise, method, note, editable_until, voided_at, retailers(name, area)")
+      .select(
+        "id, retailer_id, salesman_id, amount_paise, discount_paise, receipt_ref, method, note, editable_until, voided_at, retailers(name, area)",
+      )
       .eq("id", edit)
       .maybeSingle();
     const row = data as unknown as {
@@ -62,6 +64,8 @@ export default async function NewDepositPage({
       retailer_id: string;
       salesman_id: string;
       amount_paise: number;
+      discount_paise: number;
+      receipt_ref: string | null;
       method: string;
       note: string | null;
       editable_until: string;
@@ -83,6 +87,11 @@ export default async function NewDepositPage({
       retailerName: row.retailers?.name ?? "Unknown retailer",
       retailerArea: row.retailers?.area ?? null,
       amountPaise: row.amount_paise,
+      discountPaise: row.discount_paise,
+      // Legacy rows predate the receipt ref — the editor supplies it on save
+      // (the RPC requires it; the field starts empty, not fabricated).
+      receiptRef: row.receipt_ref ?? "",
+      salesmanId: row.salesman_id,
       method: row.method,
       note: row.note ?? "",
     };

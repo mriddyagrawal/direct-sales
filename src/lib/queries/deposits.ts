@@ -12,10 +12,16 @@ import type { Database } from "@/lib/types/database.types";
 // filtering/pagination someday ⇒ the key MUST grow those params.
 
 // One row off the deposits query (retailer + salesman names embedded).
+// amount_paise is the GROSS knocked off the balance; discount_paise the
+// concession; the money in hand is depositNetPaise(amount, discount) — every
+// total a human reconciles against cash MUST sum the net (deposit-fields.ts).
+// receipt_ref is the paper-book number; null on rows that predate it.
 export interface DepositListRow {
   id: string;
   deposit_ref: string;
   amount_paise: number;
+  discount_paise: number;
+  receipt_ref: string | null;
   method: string;
   note: string | null;
   created_at: string;
@@ -30,7 +36,7 @@ export interface DepositListRow {
 export type DepositsScope = "salesman" | "staff";
 
 export const DEPOSITS_LIST_SELECT =
-  "id, deposit_ref, amount_paise, method, note, created_at, editable_until, salesman_id, voided_at, void_reason, retailers(name), profiles!deposits_salesman_id_fkey(full_name)";
+  "id, deposit_ref, amount_paise, discount_paise, receipt_ref, method, note, created_at, editable_until, salesman_id, voided_at, void_reason, retailers(name), profiles!deposits_salesman_id_fkey(full_name)";
 
 // Caps carried over verbatim from the old inline page queries: the office
 // reconciles a longer horizon (1000) than a salesman's personal ledger (500).

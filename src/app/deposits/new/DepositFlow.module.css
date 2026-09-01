@@ -142,6 +142,34 @@
   color: var(--color-error);
 }
 
+/* The discount is a smaller entry than the amount — same field grammar,
+   quieter type, so the gross stays the visually primary number. */
+.discountField .amountPrefix,
+.discountField .amountInput {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Live net derivation under the two money fields: what should actually be in
+   the salesman's hand. The struck figure is the GROSS (owner 2026-08-31 —
+   "10,000 should have a strikethrough"), never the net. */
+.netLine {
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-locked);
+}
+
+.netLine strong {
+  font-family: var(--font-figures);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.netGross {
+  color: var(--color-inactive);
+}
+
+
 .confirmTitle {
   font-family: var(--font-structure);
   font-size: var(--text-header-size);
