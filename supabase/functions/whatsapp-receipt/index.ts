@@ -8,7 +8,8 @@
 //      OUTSTANDING IS AUTO-PULLED (owner 2026-09-01, reversing the
 //      typed-field design after live use): previous =
 //      retailers.outstanding_paise (the Tally sync's figure, null = 0 by
-//      owner's rule), current = previous − net, negative fine (an advance).
+//      owner's rule), current = previous − GROSS (the ledger falls by the
+//      full receipt amount — receipt + discount lines), negative fine.
 //      The quoted figures ride the receipt_sent event details — the trail is
 //      the durable record of what was said. Known, owner-accepted cost: the
 //      sync figure is as-of-last-run, so two same-day deposits quote the
