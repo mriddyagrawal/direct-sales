@@ -463,11 +463,14 @@
    rotates open. Deliberately the app's icon grammar, not the ⚠️ emoji —
    emoji render differently per platform (the July selects lesson). */
 .editedBadge {
-  display: inline-flex;
+  /* Own line under the name/meta (owner 2026-09-01), never inline — flex on
+     a button is block-level in flow, which is exactly the point. */
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 3px;
-  margin-left: 6px;
-  padding: 1px 4px;
+  margin-top: 2px;
+  padding: 1px 0;
   background: none;
   border: none;
   cursor: pointer;

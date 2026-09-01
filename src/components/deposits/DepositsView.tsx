@@ -312,8 +312,8 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
             {d.receipt_ref ? ` · receipt ${d.receipt_ref}` : ""}
             {d.note ? ` · ${d.note}` : ""}
             {voided && d.void_reason ? ` · voided: ${d.void_reason}` : voided ? " · voided" : ""}
-            {editedBadge(d)}
           </span>
+          {editedBadge(d)}
         </div>
         <div className={styles.rowSide}>
           {/* NET prominent, GROSS struck beside it (owner 2026-08-31) — the
