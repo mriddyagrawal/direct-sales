@@ -36,6 +36,7 @@ export async function createDeposit(
   method: DepositMethod,
   receiptRef: string,
   discountPaise: number,
+  previousOutstandingPaise: number | null,
   note?: string,
 ): Promise<DepositRow> {
   const supabase = createClient();
@@ -46,6 +47,11 @@ export async function createDeposit(
       p_method: method,
       p_receipt_ref: receiptRef,
       p_discount_paise: discountPaise,
+      // The KEY must always be present — its absence would make PostgREST
+      // resolve the OLD overload and silently drop the field. The generated
+      // type says `number` (required, no default in SQL); null is valid at
+      // the wire level and means "not entered".
+      p_previous_outstanding_paise: previousOutstandingPaise as unknown as number,
       p_note: note,
     }),
   );
@@ -61,6 +67,7 @@ export async function updateDeposit(
   method: DepositMethod,
   receiptRef: string,
   discountPaise: number,
+  previousOutstandingPaise: number | null,
   note?: string,
 ): Promise<DepositRow> {
   const supabase = createClient();
@@ -72,6 +79,8 @@ export async function updateDeposit(
       p_method: method,
       p_receipt_ref: receiptRef,
       p_discount_paise: discountPaise,
+      // See createDeposit — key always present, null = "not entered".
+      p_previous_outstanding_paise: previousOutstandingPaise as unknown as number,
       p_note: note,
     }),
   );

@@ -115,6 +115,7 @@ export type Database = {
           id: string
           method: string
           note: string | null
+          previous_outstanding_paise: number | null
           receipt_ref: string | null
           retailer_id: string
           salesman_id: string
@@ -132,6 +133,7 @@ export type Database = {
           id?: string
           method: string
           note?: string | null
+          previous_outstanding_paise?: number | null
           receipt_ref?: string | null
           retailer_id: string
           salesman_id: string
@@ -149,6 +151,7 @@ export type Database = {
           id?: string
           method?: string
           note?: string | null
+          previous_outstanding_paise?: number | null
           receipt_ref?: string | null
           retailer_id?: string
           salesman_id?: string
@@ -765,6 +768,7 @@ export type Database = {
           p_discount_paise?: number
           p_method: string
           p_note?: string
+          p_previous_outstanding_paise: number
           p_receipt_ref: string
           p_retailer_id: string
         }
@@ -778,6 +782,7 @@ export type Database = {
           id: string
           method: string
           note: string | null
+          previous_outstanding_paise: number | null
           receipt_ref: string | null
           retailer_id: string
           salesman_id: string
@@ -1079,6 +1084,7 @@ export type Database = {
           p_id: string
           p_method: string
           p_note?: string
+          p_previous_outstanding_paise: number
           p_receipt_ref: string
           p_retailer_id: string
         }
@@ -1092,6 +1098,7 @@ export type Database = {
           id: string
           method: string
           note: string | null
+          previous_outstanding_paise: number | null
           receipt_ref: string | null
           retailer_id: string
           salesman_id: string
@@ -1161,6 +1168,7 @@ export type Database = {
           id: string
           method: string
           note: string | null
+          previous_outstanding_paise: number | null
           receipt_ref: string | null
           retailer_id: string
           salesman_id: string
