@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, TriangleAlert } from "lucide-react";
+import { Pencil, Plus, TriangleAlert } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -30,6 +30,10 @@ interface DepositsViewProps {
   scope: DepositsScope;
   role: "salesman" | "staff";
   isAdmin?: boolean;
+  // Who is looking. The edit affordance is own-rows-in-window for everyone
+  // but the admin — including the ACCOUNTANT (owner 2026-09-01), whose own
+  // fresh entries the server always permitted but the UI never surfaced.
+  viewerId: string;
 }
 
 const METHOD_LABEL: Record<string, string> = { cash: "Cash", cheque: "Cheque", online: "Online" };
@@ -117,7 +121,7 @@ function MethodChip({ method }: { method: string }) {
 // ADMIN gets per-row Edit / Void (void = struck + kept + reasoned — nothing
 // is ever hard-deleted). Voided rows are struck + muted and excluded from
 // every total, both roles.
-export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps) {
+export function DepositsView({ scope, role, isAdmin = false, viewerId }: DepositsViewProps) {
   const router = useRouter();
   // Spec D10/D13: render ONLY from the query cache — seeded by the server
   // render, corrected by background refetches (mount/focus/reconnect, D6) and
@@ -129,7 +133,11 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
     queryKey: ["deposits", scope],
     queryFn: () => fetchDepositsList(createClient(), scope),
   });
-  const [tick] = useState(nowMs);
+  const [tick, setTick] = useState(nowMs);
+  useEffect(() => {
+    const t = setInterval(() => setTick(nowMs()), 30_000);
+    return () => clearInterval(t);
+  }, []);
   const now = useMemo(() => new Date(tick), [tick]);
   const todayKey = istDateKey(now);
 
@@ -240,7 +248,8 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
 
   function canEditRow(d: DepositListRow): boolean {
     if (d.voided_at !== null) return false;
-    return role === "salesman" ? tick < new Date(d.editable_until).getTime() : isAdmin;
+    if (isAdmin) return true;
+    return d.salesman_id === viewerId && tick < new Date(d.editable_until).getTime();
   }
 
   function openVoid(d: DepositListRow) {
@@ -326,10 +335,12 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
               <s>{formatRupees(d.amount_paise)}</s> − {formatRupees(d.discount_paise)} disc
             </span>
           )}
-          <span className={styles.rowTime}>
-            {formatOrderTime(d.created_at)}
-            {editable ? " · edit" : ""}
-          </span>
+          <span className={styles.rowTime}>{formatOrderTime(d.created_at)}</span>
+          {editable && (
+            <span className={styles.editChip}>
+              <Glyph icon={Pencil} size={11} /> Edit
+            </span>
+          )}
         </div>
       </>
     );
@@ -453,7 +464,7 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
                   <th className={styles.numeric}>AMOUNT</th>
                   <th>METHOD</th>
                   <th>TIME</th>
-                  {isAdmin && <th />}
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -490,24 +501,22 @@ export function DepositsView({ scope, role, isAdmin = false }: DepositsViewProps
                         <MethodChip method={d.method} />
                       </td>
                       <td className={styles.mono}>{formatOrderTimestamp(d.created_at, now)}</td>
-                      {isAdmin && (
-                        <td className={styles.actionsCell}>
-                          {!voided && (
-                            <>
-                              <Link href={`/deposits/new?edit=${d.id}`} className={styles.actionLink}>
-                                Edit
-                              </Link>
-                              <button type="button" className={styles.actionVoid} onClick={() => openVoid(d)}>
-                                Void
-                              </button>
-                            </>
-                          )}
-                        </td>
-                      )}
+                      <td className={styles.actionsCell}>
+                        {canEditRow(d) && (
+                          <Link href={`/deposits/new?edit=${d.id}`} className={styles.actionLink}>
+                            Edit
+                          </Link>
+                        )}
+                        {isAdmin && !voided && (
+                          <button type="button" className={styles.actionVoid} onClick={() => openVoid(d)}>
+                            Void
+                          </button>
+                        )}
+                      </td>
                     </tr>
                     {trailOpenId === d.id && (
                       <tr className={styles.trailTableRow}>
-                        <td colSpan={isAdmin ? 8 : 7}>
+                        <td colSpan={8}>
                           <EditTrail depositId={d.id} />
                         </td>
                       </tr>

@@ -41,7 +41,7 @@ export default async function DepositsPage() {
       <TopStrip accountLabel={profile?.full_name ?? user.email ?? ""} />
       <div className={styles.scroll}>
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <DepositsView scope="salesman" role="salesman" />
+          <DepositsView scope="salesman" role="salesman" viewerId={user.id} />
         </HydrationBoundary>
       </div>
       <BottomTabBar />

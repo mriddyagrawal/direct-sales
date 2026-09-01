@@ -30,7 +30,7 @@ export default async function DashboardDepositsPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <DepositsView scope="staff" role="staff" isAdmin={profile.role === "admin"} />
+      <DepositsView scope="staff" role="staff" isAdmin={profile.role === "admin"} viewerId={user.id} />
     </HydrationBoundary>
   );
 }

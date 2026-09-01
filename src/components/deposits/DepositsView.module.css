@@ -524,3 +524,16 @@
 .trailTableRow td {
   padding: 4px 8px 10px;
 }
+
+/* The edit affordance, made VISIBLE (owner 2026-09-01) — replaces the
+   whispered "· edit" after the timestamp. Accent, not amber: this is an
+   action hint, not a warning. The whole card stays the tap target. */
+.editChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
