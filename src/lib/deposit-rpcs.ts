@@ -26,10 +26,15 @@ async function callRpc<T>(fn: () => PromiseLike<{ data: T | null; error: RpcErro
 // Record a collection (salesman/accountant/admin; the RPC re-checks the role).
 // salesman_id = the caller; editable_until = +1 hour (both server-set). Amount
 // is integer paise, > 0 — parsePricePaise upstream, never a float.
+// amountPaise is the GROSS knocked off the balance; discountPaise the
+// concession; the net received is derived, never sent (deposit-fields.ts).
+// receiptRef = the number off the salesman's paper receipt book, required.
 export async function createDeposit(
   retailerId: string,
   amountPaise: number,
   method: DepositMethod,
+  receiptRef: string,
+  discountPaise: number,
   note?: string,
 ): Promise<DepositRow> {
   const supabase = createClient();
@@ -38,6 +43,8 @@ export async function createDeposit(
       p_retailer_id: retailerId,
       p_amount_paise: amountPaise,
       p_method: method,
+      p_receipt_ref: receiptRef,
+      p_discount_paise: discountPaise,
       p_note: note,
     }),
   );
@@ -45,12 +52,14 @@ export async function createDeposit(
 
 // Correct a deposit — the creating salesman within his 1-hour window, or an
 // admin anytime (server-enforced; past the window the RPC raises "locked").
-// Only retailer/amount/method/note ever change.
+// Only retailer/amount/discount/receipt-ref/method/note ever change.
 export async function updateDeposit(
   id: string,
   retailerId: string,
   amountPaise: number,
   method: DepositMethod,
+  receiptRef: string,
+  discountPaise: number,
   note?: string,
 ): Promise<DepositRow> {
   const supabase = createClient();
@@ -60,6 +69,8 @@ export async function updateDeposit(
       p_retailer_id: retailerId,
       p_amount_paise: amountPaise,
       p_method: method,
+      p_receipt_ref: receiptRef,
+      p_discount_paise: discountPaise,
       p_note: note,
     }),
   );
