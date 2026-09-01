@@ -54,7 +54,7 @@ const METHODS: { value: DepositMethod; label: string }[] = [
 // New/Edit deposit — a deliberately tiny flow (owner 2026-07-19): pick the
 // shop, type the amount, tap the method, save. Reuses PickRetailer wholesale.
 // Edit mode prefills and adds VOID (reason required — nothing is ever hard-
-// deleted; the row stays struck + out of totals). The 1-hour window +
+// deleted; the row stays struck + out of totals). The 30-minute window +
 // admin-anytime gates live in the RPCs — a locked row never reaches here
 // (the page redirects), and the server refuses regardless.
 export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDeposit, returnTo }: DepositFlowProps) {
