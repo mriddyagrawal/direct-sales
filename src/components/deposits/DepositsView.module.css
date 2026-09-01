@@ -174,12 +174,27 @@
 }
 
 .groupHeader {
+  /* The products pages' category-band treatment, for dates (owner
+     2026-09-01): a sticky full-bleed white strip — hairline below, the
+     previous row's own border above — so a day break reads at a glance.
+     .wrap insets 16px; the -16px margins pull the band to the screen edges,
+     the matching padding keeps the label at the content inset. */
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--color-white);
   font-family: var(--font-figures);
   font-size: var(--text-section-label-size);
   letter-spacing: var(--text-section-label-tracking);
   text-transform: uppercase;
-  color: var(--color-locked);
-  padding: 10px 0 6px;
+  color: var(--color-accent);
+  border-bottom: 1px solid var(--color-hairline);
+  margin: 8px -16px 0;
+  padding: 8px 16px 4px;
+}
+
+.group:first-child .groupHeader {
+  margin-top: 0;
 }
 
 .row {
@@ -205,6 +220,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  flex: 1;
   min-width: 0;
 }
 
@@ -457,3 +473,91 @@
 }
 
 
+
+/* ---- Edited-row badge + expandable audit trail (owner 2026-09-01) ---- */
+/* Amber, quiet, and a BUTTON: the triangle + "edited" + a chevron that
+   rotates open. Deliberately the app's icon grammar, not the ⚠️ emoji —
+   emoji render differently per platform (the July selects lesson). */
+.editedBadge {
+  /* Own line under the name/meta (owner 2026-09-01), never inline — flex on
+     a button is block-level in flow, which is exactly the point. */
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  padding: 1px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-structure);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-amber);
+  vertical-align: baseline;
+}
+
+/* The same thin CSS-border chevron as Quick Order's expansions — points
+   down at rest, rotates up when the trail is open. */
+.badgeChevron {
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  margin-top: -3px;
+  border-right: 2px solid var(--color-amber);
+  border-bottom: 2px solid var(--color-amber);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.badgeChevronOpen {
+  transform: rotate(225deg);
+  margin-top: 2px;
+}
+
+.trail {
+  padding: 8px 12px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trailLine {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+
+.trailWho {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+}
+
+.trailTableRow td {
+  padding: 4px 8px 10px;
+}
+
+/* The edit affordance (owner 2026-09-01, r2): a pencil in a small square at
+   the far end of the ribbon — symbol only, no word. Accent, not amber: an
+   action hint, not a warning. The whole card stays the tap target; the
+   square just says where tapping leads. */
+.editSquare {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  /* r4 (owner): stretch WITH the row's own padding as the inset — no pinned
+     height, no negative margins, so it tracks content height on any device,
+     zoom, or line count and stays a step short of the hairlines. Solid
+     accent, white glyph. Sharp corners stay. */
+  align-self: stretch;
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius); /* r5: the order-detail buttons' radius (2px) */
+  color: var(--color-white);
+}

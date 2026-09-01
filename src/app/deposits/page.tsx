@@ -26,6 +26,7 @@ export default async function DepositsPage() {
     .eq("id", user.id)
     .maybeSingle();
   if (profile?.role === "admin" || profile?.role === "accountant") redirect("/dashboard/deposits");
+  if (profile?.role === "godown") redirect("/godown/deposits");
 
   // Deposits query via the shared builder (spec D12); prefetch → dehydrate
   // seeds the client cache (per-request query client, spec D2) and
@@ -41,7 +42,7 @@ export default async function DepositsPage() {
       <TopStrip accountLabel={profile?.full_name ?? user.email ?? ""} />
       <div className={styles.scroll}>
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <DepositsView scope="salesman" role="salesman" />
+          <DepositsView scope="salesman" role="salesman" viewerId={user.id} />
         </HydrationBoundary>
       </div>
       <BottomTabBar />

@@ -111,3 +111,64 @@ export function findDuplicateReceipt(
   }
   return null;
 }
+
+// ---- The edit trail (owner 2026-09-01) ------------------------------------
+// deposit_events 'updated' rows carry {before, after} jsonb. This turns one
+// into display-ready change lines for the dashboard's expandable trail.
+// Pure and defensive: events from the pre-receipt era lack receipt_ref /
+// discount_paise keys entirely — a key absent on BOTH sides is no change.
+
+export interface DepositEditChange {
+  label: string;
+  from: string;
+  to: string;
+}
+
+interface EventSnapshot {
+  retailer_id?: string | null;
+  amount_paise?: number | null;
+  discount_paise?: number | null;
+  receipt_ref?: string | null;
+  method?: string | null;
+  note?: string | null;
+}
+
+const METHOD_LABELS: Record<string, string> = { cash: "Cash", cheque: "Cheque", online: "Online" };
+
+function paiseLabel(v: number | null | undefined): string {
+  if (v == null) return "—";
+  return "₹" + new Intl.NumberFormat("en-IN").format(v / 100);
+}
+
+export function describeDepositEdit(before: EventSnapshot, after: EventSnapshot): DepositEditChange[] {
+  const changes: DepositEditChange[] = [];
+  const changed = (k: keyof EventSnapshot) => {
+    const b = before[k] ?? null;
+    const a = after[k] ?? null;
+    return b !== a;
+  };
+  if (changed("retailer_id")) {
+    // ids mean nothing to a reader; the fact of the change is the signal.
+    changes.push({ label: "shop", from: "changed", to: "" });
+  }
+  if (changed("amount_paise")) {
+    changes.push({ label: "amount", from: paiseLabel(before.amount_paise), to: paiseLabel(after.amount_paise) });
+  }
+  if (changed("discount_paise")) {
+    changes.push({ label: "discount", from: paiseLabel(before.discount_paise ?? 0), to: paiseLabel(after.discount_paise ?? 0) });
+  }
+  if (changed("receipt_ref")) {
+    changes.push({ label: "receipt", from: before.receipt_ref ?? "—", to: after.receipt_ref ?? "—" });
+  }
+  if (changed("method")) {
+    changes.push({
+      label: "method",
+      from: METHOD_LABELS[before.method ?? ""] ?? before.method ?? "—",
+      to: METHOD_LABELS[after.method ?? ""] ?? after.method ?? "—",
+    });
+  }
+  if (changed("note")) {
+    changes.push({ label: "note", from: before.note ?? "—", to: after.note ?? "—" });
+  }
+  return changes;
+}

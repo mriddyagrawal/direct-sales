@@ -104,11 +104,15 @@ export async function updateSession(request: NextRequest) {
   const isDashboardRoute = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   const isGodownRoute = pathname === "/godown" || pathname.startsWith("/godown/");
   const isSalesmanHomeRoute = pathname === "/";
-  // Godown is confined to /godown (its whole app); everyone else is fenced
+  // Godown is confined to /godown (its whole app) — EXCEPT the shared
+  // new/edit-deposit form (owner 2026-09-01, counter collections): the form
+  // is shell-less, role-aware, and returns godown to /godown/deposits, so
+  // opening this one path leaks no other surface. Everyone else is fenced
   // OUT of /godown. Salesman/staff fencing is unchanged beyond that.
+  const isSharedDepositForm = pathname === "/deposits/new";
   const wrongTerritory =
     (role === "salesman" && (isDashboardRoute || isGodownRoute)) ||
-    (role === "godown" && !isGodownRoute) ||
+    (role === "godown" && !isGodownRoute && !isSharedDepositForm) ||
     (role !== "salesman" && role !== "godown" && (isSalesmanHomeRoute || isGodownRoute));
 
   if (wrongTerritory) {
