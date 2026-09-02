@@ -151,14 +151,14 @@
 }
 
 /* The net pinned to the right end of the discount box (owner 2026-09-02):
-   full-ink, not gray — the answer the salesman is actually looking for. */
+   green — money coming in, the same hue as a clear balance. */
 .discountNet {
   margin-left: auto;
   white-space: nowrap;
   font-family: var(--font-structure);
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-ink);
+  color: var(--color-processed);
 }
 
 .discountNet strong {
