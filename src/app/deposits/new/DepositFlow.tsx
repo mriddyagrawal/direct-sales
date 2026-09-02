@@ -106,6 +106,13 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     parsedAmount.ok && parsedAmount.paise != null && parsedDiscount.ok && parsedDiscount.paise != null && parsedDiscount.paise > 0
       ? depositNetPaise(parsedAmount.paise, parsedDiscount.paise)
       : null;
+  // Same derivation, shown INSIDE the discount box (owner 2026-09-02) — live
+  // even at zero discount, so the box always answers "so how much am I
+  // actually taking?" while the salesman types.
+  const netInBox =
+    parsedAmount.ok && parsedAmount.paise != null && parsedDiscount.ok && parsedDiscount.paise != null
+      ? depositNetPaise(parsedAmount.paise, parsedDiscount.paise)
+      : null;
 
   // The outstanding is AUTO-PULLED server-side from the retailer's Tally-
   // synced figure (owner 2026-09-01) — no field here, nothing to preview.
@@ -290,6 +297,11 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
             placeholder="0"
             onChange={(e) => setDiscountText(e.target.value)}
           />
+          {netInBox !== null && (
+            <span className={styles.discountNet}>
+              Net amount: <strong>{formatRupees(netInBox)}</strong>
+            </span>
+          )}
         </label>
 
         {/* The owner's model made visible as it's typed: amount is the GROSS
