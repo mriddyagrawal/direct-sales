@@ -541,11 +541,11 @@
   padding: 4px 8px 10px;
 }
 
-/* The edit affordance (owner 2026-09-01, r2): a pencil in a small square at
-   the far end of the ribbon — symbol only, no word. Accent, not amber: an
-   action hint, not a warning. The whole card stays the tap target; the
-   square just says where tapping leads. */
-.editSquare {
+/* The void affordance (owner 2026-09-02, replacing the edit pencil): a
+   garbage can in the same square, same geometry the owner tuned for the
+   pencil — but WHITE with a red glyph at rest (destructive, not inviting),
+   inverting to solid red while pressed. Tapping opens the void sheet. */
+.voidSquare {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -553,12 +553,18 @@
   width: 34px;
   /* r4 (owner): stretch WITH the row's own padding as the inset — no pinned
      height, no negative margins, so it tracks content height on any device,
-     zoom, or line count and stays a step short of the hairlines. Solid
-     accent, white glyph. Sharp corners stay. */
+     zoom, or line count and stays a step short of the hairlines. */
   align-self: stretch;
-  background: var(--color-accent);
-  border: none;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
   border-radius: var(--radius); /* r5: the order-detail buttons' radius (2px) */
+  color: var(--color-error);
+  cursor: pointer;
+}
+
+.voidSquare:active {
+  background: var(--color-error);
+  border-color: var(--color-error);
   color: var(--color-white);
 }
 
