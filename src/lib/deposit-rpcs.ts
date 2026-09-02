@@ -57,34 +57,9 @@ export async function createDeposit(
   );
 }
 
-// Correct a deposit — the creating salesman within his 30-minute window, or an
-// admin anytime (server-enforced; past the window the RPC raises "locked").
-// Only retailer/amount/discount/receipt-ref/method/note ever change.
-export async function updateDeposit(
-  id: string,
-  retailerId: string,
-  amountPaise: number,
-  method: DepositMethod,
-  receiptRef: string,
-  discountPaise: number,
-  previousOutstandingPaise: number | null,
-  note?: string,
-): Promise<DepositRow> {
-  const supabase = createClient();
-  return callRpc(() =>
-    supabase.rpc("update_deposit", {
-      p_id: id,
-      p_retailer_id: retailerId,
-      p_amount_paise: amountPaise,
-      p_method: method,
-      p_receipt_ref: receiptRef,
-      p_discount_paise: discountPaise,
-      // See createDeposit — key always present, null = "not entered".
-      p_previous_outstanding_paise: previousOutstandingPaise as unknown as number,
-      p_note: note,
-    }),
-  );
-}
+// updateDeposit is GONE (owner 2026-09-02): deposits are never edited — a
+// wrong one is voided (below) and recorded again. update_deposit was dropped
+// from the DB in the same change; editing is impossible, not just hidden.
 
 // Remove a deposit = VOID it (owner 2026-07-19: nothing is ever hard-deleted).
 // The row stays — struck, excluded from totals, audited. Reason REQUIRED for

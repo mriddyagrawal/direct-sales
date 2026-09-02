@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, TriangleAlert } from "lucide-react";
+import { Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -246,7 +246,10 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
     return out;
   }, [listRows, now]);
 
-  function canEditRow(d: DepositListRow): boolean {
+  // Void-only world (owner 2026-09-02): editing is gone — a wrong deposit is
+  // VOIDED (reason required) and recorded again. Same gate the RPC enforces:
+  // the creator inside the 30-minute window, an admin anytime.
+  function canVoidRow(d: DepositListRow): boolean {
     if (d.voided_at !== null) return false;
     if (isAdmin) return true;
     return d.salesman_id === viewerId && tick < new Date(d.editable_until).getTime();
@@ -301,7 +304,7 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
 
   function renderCardRow(d: DepositListRow) {
     const voided = d.voided_at !== null;
-    const editable = canEditRow(d);
+    const voidable = canVoidRow(d);
     const net = depositNetPaise(d.amount_paise, d.discount_paise);
     const inner = (
       <>
@@ -349,22 +352,16 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
           )}
           <span className={styles.rowTime}>{formatOrderTime(d.created_at)}</span>
         </div>
-        {editable && (
-          <span className={styles.editSquare} aria-hidden>
-            <Glyph icon={Pencil} size={13} />
-          </span>
+        {voidable && (
+          <button type="button" className={styles.voidSquare} aria-label="Void deposit" onClick={() => openVoid(d)}>
+            <Glyph icon={Trash2} size={13} />
+          </button>
         )}
       </>
     );
     return (
       <Fragment key={d.id}>
-        {editable ? (
-          <Link href={`/deposits/new?edit=${d.id}`} className={`${styles.row} ${styles.rowTappable}`}>
-            {inner}
-          </Link>
-        ) : (
-          <div className={styles.row}>{inner}</div>
-        )}
+        <div className={styles.row}>{inner}</div>
         {trailOpenId === d.id && <EditTrail depositId={d.id} />}
       </Fragment>
     );
@@ -526,12 +523,7 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
                       </td>
                       <td className={styles.mono}>{formatOrderTimestamp(d.created_at, now)}</td>
                       <td className={styles.actionsCell}>
-                        {canEditRow(d) && (
-                          <Link href={`/deposits/new?edit=${d.id}`} className={styles.actionLink}>
-                            Edit
-                          </Link>
-                        )}
-                        {isAdmin && !voided && (
+                        {canVoidRow(d) && (
                           <button type="button" className={styles.actionVoid} onClick={() => openVoid(d)}>
                             Void
                           </button>

@@ -16,33 +16,16 @@ import {
   findDuplicateReceipt,
   type ReceiptRefRow,
 } from "@/lib/deposit-fields";
-import { createDeposit, updateDeposit, voidDeposit, type DepositMethod } from "@/lib/deposit-rpcs";
+import { createDeposit, type DepositMethod } from "@/lib/deposit-rpcs";
 import { createClient } from "@/lib/supabase/client";
 import type { RetailerOption } from "@/app/new-order/page";
 import styles from "./DepositFlow.module.css";
-
-export interface EditDepositData {
-  id: string;
-  retailerId: string;
-  retailerName: string;
-  retailerArea: string | null;
-  amountPaise: number;
-  discountPaise: number;
-  previousOutstandingPaise: number | null;
-  receiptRef: string;
-  // The DEPOSIT's salesman (≠ the viewer when an admin edits) — the
-  // duplicate-receipt warning must check against the book that wrote it.
-  salesmanId: string;
-  method: string;
-  note: string;
-}
 
 interface DepositFlowProps {
   retailers: RetailerOption[];
   recentRetailerIds: string[];
   salesmanId: string;
-  editDeposit: EditDepositData | null;
-  // Role-aware landing after save/delete (salesman → /deposits, staff →
+  // Role-aware landing after save (salesman → /deposits, staff →
   // /dashboard/deposits) — mirrors new-order's detailBase.
   returnTo: string;
 }
@@ -53,33 +36,22 @@ const METHODS: { value: DepositMethod; label: string }[] = [
   { value: "online", label: "Online" },
 ];
 
-// New/Edit deposit — a deliberately tiny flow (owner 2026-07-19): pick the
-// shop, type the amount, tap the method, save. Reuses PickRetailer wholesale.
-// Edit mode prefills and adds VOID (reason required — nothing is ever hard-
-// deleted; the row stays struck + out of totals). The 30-minute window +
-// admin-anytime gates live in the RPCs — a locked row never reaches here
-// (the page redirects), and the server refuses regardless.
-export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDeposit, returnTo }: DepositFlowProps) {
+// New deposit — a deliberately tiny flow (owner 2026-07-19): pick the shop,
+// type the amount, tap the method, save. Reuses PickRetailer wholesale.
+// EDITING IS GONE (owner 2026-09-02): a wrong deposit is voided from the
+// deposits list (reason required, 30-min creator window / admin anytime) and
+// recorded again — the retailer's message history can never drift from the
+// books.
+export function DepositFlow({ retailers, recentRetailerIds, salesmanId, returnTo }: DepositFlowProps) {
   const router = useRouter();
-  const isEdit = editDeposit !== null;
 
-  const [step, setStep] = useState<"retailer" | "form">(isEdit ? "form" : "retailer");
-  const [retailer, setRetailer] = useState<SelectedRetailer | null>(
-    isEdit
-      ? { id: editDeposit!.retailerId, name: editDeposit!.retailerName, area: editDeposit!.retailerArea }
-      : null,
-  );
-  const [amountText, setAmountText] = useState(isEdit ? String(editDeposit!.amountPaise / 100) : "");
-  const [discountText, setDiscountText] = useState(
-    isEdit && editDeposit!.discountPaise > 0 ? String(editDeposit!.discountPaise / 100) : "",
-  );
-  const [receiptRef, setReceiptRef] = useState(isEdit ? editDeposit!.receiptRef : "");
-  const [method, setMethod] = useState<DepositMethod | null>(
-    isEdit ? (editDeposit!.method as DepositMethod) : null,
-  );
-  const [note, setNote] = useState(isEdit ? editDeposit!.note : "");
-  const [confirmVoid, setConfirmVoid] = useState(false);
-  const [voidReason, setVoidReason] = useState("");
+  const [step, setStep] = useState<"retailer" | "form">("retailer");
+  const [retailer, setRetailer] = useState<SelectedRetailer | null>(null);
+  const [amountText, setAmountText] = useState("");
+  const [discountText, setDiscountText] = useState("");
+  const [receiptRef, setReceiptRef] = useState("");
+  const [method, setMethod] = useState<DepositMethod | null>(null);
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The same-salesman duplicate-receipt warning (owner 2026-08-31: warn,
@@ -150,22 +122,20 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     setSaving(true);
     setError(null);
 
-    // Duplicate check against THIS book's rows — the deposit's salesman when
-    // editing (an admin correcting is still checking that salesman's book),
-    // the caller when creating. Advisory only: on failure to fetch we save
-    // rather than trap the salesman behind a broken warning.
+    // Duplicate check against the caller's own book. Advisory only: on
+    // failure to fetch we save rather than trap the salesman behind a broken
+    // warning.
     if (!skipDupCheck) {
       try {
         const supabase = createClient();
-        const bookOwner = isEdit ? editDeposit!.salesmanId : salesmanId;
         const { data } = await supabase
           .from("deposits")
           .select("id, deposit_ref, receipt_ref, amount_paise, created_at, voided_at")
-          .eq("salesman_id", bookOwner)
+          .eq("salesman_id", salesmanId)
           .not("receipt_ref", "is", null)
           .order("created_at", { ascending: false })
           .limit(500);
-        const dup = findDuplicateReceipt((data ?? []) as ReceiptRefRow[], ref, isEdit ? editDeposit!.id : null);
+        const dup = findDuplicateReceipt((data ?? []) as ReceiptRefRow[], ref, null);
         if (dup) {
           const when = new Date(dup.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
           setDupSheet({ ref, depRef: dup.deposit_ref, amountPaise: dup.amount_paise, when });
@@ -178,40 +148,13 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
     }
 
     try {
-      if (isEdit) {
-        // Pass the stored value through UNCHANGED — the column is legacy now
-        // (auto-pull era) but nulling it on edit would spray "outstanding
-        // ₹X → —" noise into old rows' trails.
-        await updateDeposit(
-          editDeposit!.id, retailer.id, parsed.paise, method, ref, discount.paise ?? 0,
-          editDeposit!.previousOutstandingPaise, cleanNote || undefined,
-        );
-      } else {
-        await createDeposit(
-          retailer.id, parsed.paise, method, ref, discount.paise ?? 0, null, cleanNote || undefined,
-        );
-      }
+      await createDeposit(
+        retailer.id, parsed.paise, method, ref, discount.paise ?? 0, null, cleanNote || undefined,
+      );
       router.push(returnTo);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the deposit.");
-      setSaving(false);
-    }
-  }
-
-  async function handleVoid() {
-    if (!voidReason.trim()) {
-      setError("A reason is required to void a deposit.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await voidDeposit(editDeposit!.id, voidReason.trim());
-      router.push(returnTo);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not void the deposit.");
       setSaving(false);
     }
   }
@@ -223,18 +166,14 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
         recentRetailerIds={recentRetailerIds}
         salesmanId={salesmanId}
         onSelect={handleSelectRetailer}
-        onBack={() => (isEdit ? setStep("form") : router.push(returnTo))}
+        onBack={() => router.push(returnTo)}
       />
     );
   }
 
   return (
     <div className={styles.page}>
-      <FlowHeader
-        title={isEdit ? "Edit deposit" : "New deposit"}
-        subtitle={retailer?.name}
-        onBack={() => router.push(returnTo)}
-      />
+      <FlowHeader title="New deposit" subtitle={retailer?.name} onBack={() => router.push(returnTo)} />
       <div className={styles.content}>
         <div className={styles.retailerRow}>
           <div>
@@ -268,7 +207,7 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
           value={receiptRef}
           maxLength={40}
           placeholder="number from your receipt book"
-          autoFocus={!isEdit}
+          autoFocus
           onChange={(e) => setReceiptRef(e.target.value)}
         />
 
@@ -346,13 +285,8 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
         {error && <p className={styles.error}>{error}</p>}
 
         <Button variant="primary" onClick={() => void handleSave()} loading={saving}>
-          {isEdit ? "Save changes" : "Save deposit"}
+          Save deposit
         </Button>
-        {isEdit && (
-          <Button variant="destructive" onClick={() => setConfirmVoid(true)} disabled={saving}>
-            Void deposit
-          </Button>
-        )}
       </div>
 
       {dupSheet && (
@@ -379,30 +313,6 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, editDepo
         </BottomSheet>
       )}
 
-      {confirmVoid && (
-        <BottomSheet onClose={() => setConfirmVoid(false)}>
-          <p className={styles.confirmTitle}>Void this deposit?</p>
-          <p className={styles.confirmBody}>
-            {retailer?.name} · the record stays in the ledger, struck out and excluded from totals.
-          </p>
-          <label className={styles.fieldLabel}>REASON (required)</label>
-          <textarea
-            className={styles.reasonInput}
-            value={voidReason}
-            onChange={(e) => setVoidReason(e.target.value)}
-            placeholder="e.g. entered the wrong shop"
-          />
-          {error && <p className={styles.error}>{error}</p>}
-          <div className={styles.confirmActions}>
-            <Button variant="secondary" onClick={() => setConfirmVoid(false)}>
-              Keep it
-            </Button>
-            <Button variant="destructive-filled" onClick={handleVoid} loading={saving}>
-              Void deposit
-            </Button>
-          </div>
-        </BottomSheet>
-      )}
     </div>
   );
 }
