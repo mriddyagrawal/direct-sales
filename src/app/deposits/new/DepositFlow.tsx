@@ -199,10 +199,14 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, returnTo
           <span className={styles.receiptWords}>Receipt number</span>
           <span className={styles.receiptField}>
             <span className={styles.receiptHash}>#</span>
+            {/* Numeric KEYPAD (approved mockup), free-text STORAGE — the
+                keypad nudges digits without forbidding a book that carries a
+                prefix; the DB column stays text either way. */}
             <input
               className={styles.receiptInput}
               value={receiptRef}
               maxLength={40}
+              inputMode="numeric"
               placeholder="1043"
               autoFocus
               onChange={(e) => setReceiptRef(e.target.value)}
