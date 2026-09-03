@@ -1,3 +1,9 @@
+/* New deposit — the revamped form (owner 2026-09-03, from the approved
+   mockup): real hierarchy. The gross is the giant, the NET is the green
+   answer, the receipt number is a compact inline code, methods carry their
+   identity colours, and the save button repeats the money. No decorative
+   left-bars — labels are quiet small caps. */
+
 .page {
   display: flex;
   flex-direction: column;
@@ -7,18 +13,19 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
+  gap: 12px;
+  padding: 12px 16px 120px; /* clearance for the sticky save bar */
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
 }
 
-.retailerRow {
+/* ---- WHO: the shop card ---- */
+.shopCard {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+  align-items: stretch;
+  gap: 10px;
   padding: 12px 14px;
   background: var(--color-white);
   border: 1px solid var(--color-hairline);
@@ -27,7 +34,7 @@
 
 .retailerName {
   font-family: var(--font-structure);
-  font-size: var(--text-body-size);
+  font-size: 15px;
   font-weight: 700;
   color: var(--color-ink);
 }
@@ -36,9 +43,166 @@
   font-family: var(--font-structure);
   font-size: 12px;
   color: var(--color-locked);
+  margin-top: 1px;
 }
 
-.changeLink {
+/* The live Tally outstanding — red owed / green clear; LIGHT weight (owner
+   2026-09-03: context, not a headline). */
+.retailerOut {
+  font-family: var(--font-figures);
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+.retailerOutOwed {
+  color: var(--color-error);
+}
+
+.retailerOutClear {
+  color: var(--color-processed);
+}
+
+/* Change-retailer: the solid accent square + white pencil — the same square
+   grammar the owner tuned on the deposits rows. */
+.changeSquare {
+  flex-shrink: 0;
+  width: 38px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius);
+  color: var(--color-white);
+  cursor: pointer;
+}
+
+.changeSquare:active {
+  background: #1a45c2;
+}
+
+/* ---- Receipt number: inline words + #-box ---- */
+.receiptRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  padding: 8px 8px 8px 14px;
+}
+
+.receiptWords {
+  font-family: var(--font-structure);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.receiptField {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  width: 150px;
+  min-height: 42px;
+}
+
+.receiptField:focus-within {
+  border-color: var(--color-accent);
+}
+
+.receiptHash {
+  font-family: var(--font-figures);
+  font-size: 16px;
+  color: var(--color-inactive);
+  font-weight: 600;
+}
+
+.receiptInput {
+  border: none;
+  outline: none;
+  background: none;
+  width: 100%;
+  font-family: var(--font-figures);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-align: right;
+  color: var(--color-ink);
+}
+
+/* ---- THE MONEY CARD ---- */
+.moneyCard {
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.grossBlock {
+  padding: 14px 14px 10px;
+}
+
+.grossTag {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  color: var(--color-locked);
+}
+
+.grossEntry {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+  border-bottom: 2px solid var(--color-hairline);
+  padding-bottom: 6px;
+}
+
+.grossEntry:focus-within {
+  border-bottom-color: var(--color-accent);
+}
+
+.grossRupee {
+  font-family: var(--font-figures);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-locked);
+}
+
+.grossInput {
+  border: none;
+  outline: none;
+  background: none;
+  width: 100%;
+  min-width: 0;
+  font-family: var(--font-figures);
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.grossInput::placeholder {
+  color: var(--color-hairline);
+}
+
+/* Discount fold — most deposits have none. */
+.discRow {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-hairline);
+  min-height: 46px;
+}
+
+.discToggle {
   background: none;
   border: none;
   font-family: var(--font-structure);
@@ -46,89 +210,162 @@
   font-weight: 600;
   color: var(--color-accent);
   cursor: pointer;
-  padding: 8px;
+  padding: 4px 0;
 }
 
-.fieldLabel {
-  font-family: var(--font-figures);
-  font-size: var(--text-section-label-size);
-  letter-spacing: var(--text-section-label-tracking);
-  color: var(--color-locked);
-  border-left: 2px solid var(--color-accent);
-  padding-left: 8px;
-  margin-top: 8px;
-}
-
-/* Big, satisfying amount entry — the number is the point of the screen. */
-.amountField {
+.discOpen {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
+  align-items: baseline;
+  gap: 6px;
 }
 
-.amountField:focus-within {
-  border-color: var(--color-accent);
-}
-
-.amountPrefix {
-  font-family: var(--font-figures);
-  font-size: 24px;
-  font-weight: 700;
+.discLbl {
+  font-family: var(--font-structure);
+  font-size: 12px;
   color: var(--color-locked);
 }
 
-.amountInput {
-  flex: 1;
-  min-width: 0;
+.discRupee {
+  font-family: var(--font-figures);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-locked);
+}
+
+.discInput {
   border: none;
   outline: none;
   background: none;
   font-family: var(--font-figures);
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
+  width: 110px;
+  border-bottom: 2px solid var(--color-hairline);
+  padding-bottom: 2px;
   color: var(--color-ink);
 }
 
-.methodSeg {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  overflow: hidden;
+.discInput:focus {
+  border-bottom-color: var(--color-accent);
 }
 
-.methodBtn {
-  min-height: var(--touch-target-min);
-  background: var(--color-white);
+.discClear {
+  background: none;
   border: none;
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  font-weight: 600;
-  color: var(--color-locked);
+  color: var(--color-inactive);
+  font-size: 15px;
+  padding: 4px 8px;
   cursor: pointer;
 }
 
-.methodBtn + .methodBtn {
-  border-left: 1px solid var(--color-hairline);
+/* NET — the answer, green, riding the card's bottom edge. */
+.netBand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: #f0f7f1;
+  border-top: 2px solid var(--color-processed);
 }
 
-.methodBtnActive {
-  background: var(--color-accent);
-  color: var(--color-white);
+.netLbl {
+  font-family: var(--font-structure);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-processed);
 }
 
-.noteInput {
-  min-height: 44px;
-  padding: 0 12px;
+.netFig {
+  font-family: var(--font-figures);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-processed);
+}
+
+/* ---- quiet section labels (no bars) ---- */
+.zoneLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  color: var(--color-locked);
+  margin-top: 4px;
+}
+
+.reqMark {
+  color: var(--color-amber);
+  font-weight: 700;
+}
+
+/* ---- payment methods: identity colours, tinted when picked ---- */
+.methodSeg {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.methodBtn {
+  min-height: 56px;
   background: var(--color-white);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius);
   font-family: var(--font-structure);
-  font-size: var(--text-body-size);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-locked);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.methodDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.method_cash {
+  color: var(--color-processed);
+}
+
+.method_cheque {
+  color: var(--color-amber);
+}
+
+.method_online {
+  color: var(--color-accent);
+}
+
+.methodOn {
+  border: 2px solid currentColor;
+}
+
+.method_cash.methodOn {
+  background: #f0f7f1;
+}
+
+.method_cheque.methodOn {
+  background: #faf3e8;
+}
+
+.method_online.methodOn {
+  background: #eef2fb;
+}
+
+/* ---- note: deliberately small — a minor field (owner 2026-09-03) ---- */
+.noteInput {
+  min-height: 38px;
+  padding: 0 10px;
+  background: var(--color-white);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-figures);
+  font-size: 13px;
+  color: var(--color-ink);
 }
 
 .noteInput:focus {
@@ -142,50 +379,46 @@
   color: var(--color-error);
 }
 
-/* The discount is a smaller entry than the amount — same field grammar,
-   quieter type, so the gross stays the visually primary number. */
-.discountField .amountPrefix,
-.discountField .amountInput {
-  font-size: 18px;
-  font-weight: 600;
+/* ---- sticky save: the net rides the button ---- */
+.saveBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-hairline);
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
-/* The net pinned to the right end of the discount box (owner 2026-09-02):
-   green — money coming in, the same hue as a clear balance. */
-.discountNet {
-  margin-left: auto;
-  white-space: nowrap;
+.saveBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 448px;
+  margin: 0 auto;
+  min-height: 54px;
+  background: var(--color-accent);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius);
   font-family: var(--font-structure);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-processed);
-}
-
-.discountNet strong {
-  font-family: var(--font-figures);
+  font-size: 16px;
   font-weight: 700;
+  cursor: pointer;
 }
 
-/* Live net derivation under the two money fields: what should actually be in
-   the salesman's hand. The struck figure is the GROSS (owner 2026-08-31 —
-   "10,000 should have a strikethrough"), never the net. */
-.netLine {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
+.saveBtn:disabled {
+  background: var(--color-hairline);
   color: var(--color-locked);
 }
 
-.netLine strong {
+.saveAmt {
   font-family: var(--font-figures);
-  font-weight: 700;
-  color: var(--color-ink);
 }
 
-.netGross {
-  color: var(--color-inactive);
-}
-
-
+/* ---- dup-receipt warning sheet (unchanged mechanics) ---- */
 .confirmTitle {
   font-family: var(--font-structure);
   font-size: var(--text-header-size);
@@ -203,32 +436,4 @@
   display: flex;
   gap: 8px;
   margin-top: 8px;
-}
-
-.reasonInput {
-  min-height: 72px;
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  resize: vertical;
-}
-
-/* The shop's live outstanding under its name (owner 2026-09-01) — red owed /
-   green clear, the deposits-page convention; unknown renders nothing. */
-.retailerOut {
-  font-family: var(--font-figures);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.retailerOutOwed {
-  color: var(--color-error);
-}
-
-.retailerOutClear {
-  color: var(--color-processed);
 }

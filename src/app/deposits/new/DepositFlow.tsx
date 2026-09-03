@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil } from "lucide-react";
+import { Glyph } from "@/components/ui/Glyph";
 import { PickRetailer, type SelectedRetailer } from "@/app/new-order/PickRetailer";
 import { FlowHeader } from "@/components/ui/FlowHeader";
 import { Button } from "@/components/ui/Button";
@@ -52,6 +54,9 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, returnTo
   const [receiptRef, setReceiptRef] = useState("");
   const [method, setMethod] = useState<DepositMethod | null>(null);
   const [note, setNote] = useState("");
+  // The discount FOLD (owner 2026-09-03): collapsed for the 90% no-discount
+  // case — "+ Add discount" opens the field, ✕ clears and refolds.
+  const [discOpen, setDiscOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The same-salesman duplicate-receipt warning (owner 2026-08-31: warn,
@@ -69,19 +74,12 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, returnTo
 
   const noteRule = methodNoteRule(method);
 
-  // Live derivation for the preview line: net = amount − discount, shown only
-  // once both parse and a discount is actually in play.
+  // Live derivation: net = amount − discount, recomputed on every keystroke —
+  // the NET band and the save button both speak it (owner redesign 2026-09-03).
   const parsedAmount = parsePricePaise(amountText);
   const amountPaiseOrNull = parsedAmount.ok ? parsedAmount.paise : null;
   const parsedDiscount = parseDiscountPaise(discountText, amountPaiseOrNull);
-  const netPreview =
-    parsedAmount.ok && parsedAmount.paise != null && parsedDiscount.ok && parsedDiscount.paise != null && parsedDiscount.paise > 0
-      ? depositNetPaise(parsedAmount.paise, parsedDiscount.paise)
-      : null;
-  // Same derivation, shown INSIDE the discount box (owner 2026-09-02) — live
-  // even at zero discount, so the box always answers "so how much am I
-  // actually taking?" while the salesman types.
-  const netInBox =
+  const netPaise =
     parsedAmount.ok && parsedAmount.paise != null && parsedDiscount.ok && parsedDiscount.paise != null
       ? depositNetPaise(parsedAmount.paise, parsedDiscount.paise)
       : null;
@@ -171,107 +169,121 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, returnTo
     );
   }
 
+  const balPaise = retailers.find((x) => x.id === retailer?.id)?.outstanding_paise ?? null;
+  const bal = readBalance(balPaise);
+
   return (
     <div className={styles.page}>
-      <FlowHeader title="New deposit" subtitle={retailer?.name} onBack={() => router.push(returnTo)} />
+      <FlowHeader title="New deposit" onBack={() => router.push(returnTo)} />
       <div className={styles.content}>
-        <div className={styles.retailerRow}>
+        {/* WHO — the shop, its area, and the live Tally outstanding (house
+            rule: null = "not synced", never ₹0, nothing rendered). The pencil
+            square is the change affordance — the solid-accent grammar. */}
+        <div className={styles.shopCard}>
           <div>
             <p className={styles.retailerName}>{retailer?.name}</p>
             {retailer?.area && <p className={styles.retailerArea}>{retailer.area}</p>}
-            {/* The shop's live Tally outstanding, under the name (owner
-                2026-09-01) — the salesman sees what's owed on the very screen
-                where he types the collection. THE shared reading, THE house
-                rule: null = "not synced", never ₹0, left uncoloured. */}
-            {(() => {
-              const bal = readBalance(retailers.find((x) => x.id === retailer?.id)?.outstanding_paise ?? null);
-              if (bal.state === "unknown") return null;
-              return (
-                <p className={`${styles.retailerOut} ${bal.state === "owed" ? styles.retailerOutOwed : styles.retailerOutClear}`}>
-                  Outstanding: {bal.text}
-                </p>
-              );
-            })()}
+            {bal.state !== "unknown" && (
+              <p className={`${styles.retailerOut} ${bal.state === "owed" ? styles.retailerOutOwed : styles.retailerOutClear}`}>
+                Outstanding: {bal.text}
+              </p>
+            )}
           </div>
-          <button type="button" className={styles.changeLink} onClick={() => setStep("retailer")}>
-            Change
+          <button type="button" className={styles.changeSquare} aria-label="Change retailer" onClick={() => setStep("retailer")}>
+            <Glyph icon={Pencil} size={15} />
           </button>
         </div>
 
-        <label className={styles.fieldLabel} htmlFor="dep-receipt">
-          RECEIPT NO.
-        </label>
-        <input
-          id="dep-receipt"
-          className={styles.noteInput}
-          value={receiptRef}
-          maxLength={40}
-          placeholder="number from your receipt book"
-          autoFocus
-          onChange={(e) => setReceiptRef(e.target.value)}
-        />
-
-        {/* "GROSS" in the salesman's face (owner 2026-09-01): this is the
-            full figure off the paper receipt BEFORE discount — the amount
-            the outstanding drops by. UI wording only; DB names unchanged. */}
-        <label className={styles.fieldLabel}>GROSS AMOUNT</label>
-        <label className={styles.amountField}>
-          <span className={styles.amountPrefix}>₹</span>
-          <input
-            className={styles.amountInput}
-            inputMode="decimal"
-            value={amountText}
-            placeholder="0"
-            onChange={(e) => setAmountText(e.target.value)}
-          />
+        {/* Receipt number — inline: the words left, the #-box right. */}
+        <label className={styles.receiptRow}>
+          <span className={styles.receiptWords}>Receipt number</span>
+          <span className={styles.receiptField}>
+            <span className={styles.receiptHash}>#</span>
+            <input
+              className={styles.receiptInput}
+              value={receiptRef}
+              maxLength={40}
+              placeholder="1043"
+              autoFocus
+              onChange={(e) => setReceiptRef(e.target.value)}
+            />
+          </span>
         </label>
 
-        <label className={styles.fieldLabel}>DISCOUNT · OPTIONAL</label>
-        <label className={`${styles.amountField} ${styles.discountField}`}>
-          <span className={styles.amountPrefix}>₹</span>
-          <input
-            className={styles.amountInput}
-            inputMode="decimal"
-            value={discountText}
-            placeholder="0"
-            onChange={(e) => setDiscountText(e.target.value)}
-          />
-          {netInBox !== null && (
-            <span className={styles.discountNet}>
-              Net amount: <strong>{formatRupees(netInBox)}</strong>
-            </span>
-          )}
-        </label>
+        {/* THE MONEY CARD — gross giant, discount folded, NET celebrated.
+            "GROSS" stays in the salesman's face (owner 2026-09-01): the full
+            figure off the paper receipt, the amount the outstanding drops by. */}
+        <div className={styles.moneyCard}>
+          <div className={styles.grossBlock}>
+            <span className={styles.grossTag}>GROSS AMOUNT</span>
+            <label className={styles.grossEntry}>
+              <span className={styles.grossRupee}>₹</span>
+              <input
+                className={styles.grossInput}
+                inputMode="decimal"
+                value={amountText}
+                placeholder="0"
+                onChange={(e) => setAmountText(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className={styles.discRow}>
+            {!discOpen ? (
+              <button type="button" className={styles.discToggle} onClick={() => setDiscOpen(true)}>
+                + Add discount
+              </button>
+            ) : (
+              <span className={styles.discOpen}>
+                <span className={styles.discLbl}>Discount</span>
+                <span className={styles.discRupee}>− ₹</span>
+                <input
+                  className={styles.discInput}
+                  inputMode="decimal"
+                  value={discountText}
+                  placeholder="0"
+                  autoFocus
+                  onChange={(e) => setDiscountText(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={styles.discClear}
+                  aria-label="Remove discount"
+                  onClick={() => {
+                    setDiscountText("");
+                    setDiscOpen(false);
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+          </div>
+          <div className={styles.netBand}>
+            <span className={styles.netLbl}>NET</span>
+            <span className={styles.netFig}>{formatRupees(netPaise ?? 0)}</span>
+          </div>
+        </div>
 
-        {/* The owner's model made visible as it's typed: amount is the GROSS
-            knocked off the balance, the net is derived — the salesman sees
-            the money that should be in his hand before saving. */}
-        {netPreview !== null && (
-          <p className={styles.netLine}>
-            Receiving <strong>{formatRupees(netPreview)}</strong>{" "}
-            <s className={styles.netGross}>{formatRupees(parsedAmount.ok ? (parsedAmount.paise ?? 0) : 0)}</s> −{" "}
-            {formatRupees(parsedDiscount.ok ? (parsedDiscount.paise ?? 0) : 0)} discount
-          </p>
-        )}
-
-        <label className={styles.fieldLabel}>HOW WAS IT PAID?</label>
-        <div className={styles.methodSeg} role="group" aria-label="Method">
+        <p className={styles.zoneLabel}>PAYMENT METHOD</p>
+        <div className={styles.methodSeg} role="group" aria-label="Payment method">
           {METHODS.map((m) => (
             <button
               key={m.value}
               type="button"
-              className={`${styles.methodBtn} ${method === m.value ? styles.methodBtnActive : ""}`}
+              className={`${styles.methodBtn} ${styles[`method_${m.value}`]} ${method === m.value ? styles.methodOn : ""}`}
               onClick={() => setMethod(m.value)}
             >
+              <span className={styles.methodDot} aria-hidden />
               {m.label}
             </button>
           ))}
         </div>
 
         {/* The note's identity follows the method (deposit-fields.ts): cheque
-            no. / UPI ref are REQUIRED, cash keeps a free optional note. */}
-        <label className={styles.fieldLabel} htmlFor="dep-note">
+            no. / UPI ref are REQUIRED, cash keeps a small optional note. */}
+        <label className={styles.zoneLabel} htmlFor="dep-note">
           {noteRule.label}
+          {method && noteRule.required && <span className={styles.reqMark}> · REQUIRED</span>}
         </label>
         <input
           id="dep-note"
@@ -283,10 +295,17 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, returnTo
         />
 
         {error && <p className={styles.error}>{error}</p>}
+      </div>
 
-        <Button variant="primary" onClick={() => void handleSave()} loading={saving}>
-          Save deposit
-        </Button>
+      {/* Sticky save — the net rides the button: the thumb confirms the money. */}
+      <div className={styles.saveBar}>
+        <button type="button" className={styles.saveBtn} disabled={saving} onClick={() => void handleSave()}>
+          {saving ? "Saving…" : (
+            <>
+              Save deposit — <span className={styles.saveAmt}>{formatRupees(netPaise ?? 0)}</span>
+            </>
+          )}
+        </button>
       </div>
 
       {dupSheet && (
