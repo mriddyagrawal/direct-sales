@@ -166,6 +166,11 @@
   background: var(--color-error) !important;
 }
 
+/* WhatsApp's read-blue — used ONLY for read, nowhere else in the app. */
+.tone_read::before {
+  background: #0e9fd8 !important;
+}
+
 .tlWhat {
   font-weight: 600;
 }
