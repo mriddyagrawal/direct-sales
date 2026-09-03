@@ -337,12 +337,14 @@
   flex-shrink: 0;
 }
 
+/* WhatsApp's own grammar (owner 2026-09-03): sent vs delivered is the tick
+   COUNT, both grey — colour would falsely imply "read". Red stays failure. */
 .msgSent {
   color: var(--color-inactive);
 }
 
 .msgDelivered {
-  color: var(--color-processed);
+  color: var(--color-inactive);
 }
 
 .msgFailed {
