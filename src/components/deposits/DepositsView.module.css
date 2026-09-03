@@ -274,12 +274,15 @@
   background: var(--color-paper);
 }
 
-/* A shop reply flares the row's left edge amber — the tripwire is loud. */
+/* A shop reply flares the row's left edge amber — the tripwire is loud.
+   The negative margin reaches the flare toward the screen edge; the width
+   grows by the same 13px so the RIGHT edge stays flush with every other
+   row (owner catch 2026-09-03: the chip + time were dragging left). */
 .cardReply {
   border-left: 3px solid var(--color-amber);
   padding-left: 10px;
   margin-left: -13px;
-  padding-right: 0;
+  width: calc(100% + 13px);
 }
 
 .rowTop {
