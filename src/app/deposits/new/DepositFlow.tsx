@@ -207,7 +207,7 @@ export function DepositFlow({ retailers, recentRetailerIds, salesmanId, returnTo
               value={receiptRef}
               maxLength={40}
               inputMode="numeric"
-              placeholder="1043"
+              placeholder="0000"
               autoFocus
               onChange={(e) => setReceiptRef(e.target.value)}
             />
