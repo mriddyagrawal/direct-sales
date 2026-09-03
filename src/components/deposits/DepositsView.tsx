@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchDepositsList, type DepositListRow, type DepositsScope } from "@/lib/queries/deposits";
 import { depositNetPaise } from "@/lib/deposit-fields";
 import { DepositDetail, depositMsgState, type MsgState } from "./DepositDetail";
+import { TickSingle, TickDouble, TickCross } from "./MsgTicks";
 import { useQuery } from "@tanstack/react-query";
 import fab from "@/components/ui/fab.module.css";
 import styles from "./DepositsView.module.css";
@@ -57,20 +58,33 @@ function MethodChip({ method }: { method: string }) {
   return <span className={`${styles.methodChip} ${tone}`}>{METHOD_LABEL[method] ?? method}</span>;
 }
 
-// The row's message state as a glyph (redesign 2026-09-03) — the WhatsApp
-// mental model: grey ✓ sent, green ✓✓ delivered, red ✕ failed, amber REPLY
-// chip (the tripwire outranks everything). Voided rows show VOIDED instead;
-// legacy rows with no events show nothing.
+// The row's message state (redesign 2026-09-03) — the WhatsApp mental model:
+// grey tick sent, grey DOUBLE tick delivered (count carries the difference,
+// colour stays out of it), red cross failed, amber REPLY chip (the tripwire
+// outranks everything). Owner-supplied SVG marks (MsgTicks). Voided rows
+// show VOIDED instead; legacy rows with no events show nothing.
 function MsgGlyph({ state }: { state: MsgState }) {
   switch (state.kind) {
     case "reply":
       return <span className={styles.replyChip}>{state.count > 1 ? `${state.count} REPLIES` : "1 REPLY"}</span>;
     case "delivered":
-      return <span className={`${styles.msg} ${styles.msgDelivered}`}>✓✓</span>;
+      return (
+        <span className={`${styles.msg} ${styles.msgDelivered}`} title="Delivered">
+          <TickDouble />
+        </span>
+      );
     case "sent":
-      return <span className={`${styles.msg} ${styles.msgSent}`}>✓</span>;
+      return (
+        <span className={`${styles.msg} ${styles.msgSent}`} title="Sent — not yet delivered">
+          <TickSingle />
+        </span>
+      );
     case "failed":
-      return <span className={`${styles.msg} ${styles.msgFailed}`}>✕</span>;
+      return (
+        <span className={`${styles.msg} ${styles.msgFailed}`} title="Message failed">
+          <TickCross size={12} />
+        </span>
+      );
     default:
       return null;
   }
