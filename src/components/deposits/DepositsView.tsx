@@ -222,10 +222,10 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
 
   // Void-only world (owner 2026-09-02): the creator inside the 30-minute
   // window, an admin anytime — same gate the RPC enforces.
-  function voidStateFor(d: DepositListRow): { kind: "window"; minutesLeft: number } | { kind: "admin" } | { kind: "closed" } {
+  function voidStateFor(d: DepositListRow): { kind: "window"; until: string } | { kind: "admin" } | { kind: "closed" } {
     if (isAdmin) return { kind: "admin" };
     const msLeft = new Date(d.editable_until).getTime() - tick;
-    if (d.salesman_id === viewerId && msLeft > 0) return { kind: "window", minutesLeft: Math.max(1, Math.ceil(msLeft / 60_000)) };
+    if (d.salesman_id === viewerId && msLeft > 0) return { kind: "window", until: d.editable_until };
     return { kind: "closed" };
   }
 

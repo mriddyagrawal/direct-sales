@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { formatRupees, formatOrderTime } from "@/lib/format";
+import { formatRupees, formatOrderTime, istDateKey } from "@/lib/format";
 import { depositNetPaise, describeDepositEdit } from "@/lib/deposit-fields";
 import type { DepositListRow } from "@/lib/queries/deposits";
 import styles from "./DepositDetail.module.css";
@@ -104,12 +104,21 @@ function describeEvent(e: TrailEvent): { tone: "" | "ok" | "warn" | "bad"; what:
   }
 }
 
+// "You can void by 2:44 pm today." — the deadline as a clock time, not a
+// countdown (owner 2026-09-03). A window that crosses midnight says
+// tomorrow; the RPC remains the real gate either way.
+function voidDeadline(until: string): string {
+  const day = istDateKey(new Date(until)) === istDateKey(new Date()) ? "today" : "tomorrow";
+  return `You can void by ${formatOrderTime(until)} ${day}.`;
+}
+
 interface DepositDetailProps {
   deposit: DepositListRow;
   // Void affordance, decided by the parent (same gate as the RPC): "window"
-  // shows the button + minutes left, "admin" the button + anytime caption,
-  // "closed" the ask-the-office line; a voided row shows its banner instead.
-  voidState: { kind: "window"; minutesLeft: number } | { kind: "admin" } | { kind: "closed" };
+  // shows the button + deadline, "admin" the bare button (owner 2026-09-03:
+  // no anytime caption), "closed" the ask-the-office line; a voided row
+  // shows its banner instead.
+  voidState: { kind: "window"; until: string } | { kind: "admin" } | { kind: "closed" };
   onVoid: () => void;
   // Desktop’s expanded row lays the three sections side by side.
   layout: "sheet" | "wide";
@@ -220,11 +229,7 @@ export function DepositDetail({ deposit: d, voidState, onVoid, layout }: Deposit
             <button type="button" className={styles.voidBtn} onClick={onVoid}>
               Void deposit
             </button>
-            <p className={styles.voidCaption}>
-              {voidState.kind === "admin"
-                ? "Admins can void anytime"
-                : `${voidState.minutesLeft} min left in your window`}
-            </p>
+            {voidState.kind === "window" && <p className={styles.voidCaption}>{voidDeadline(voidState.until)}</p>}
           </>
         )}
       </div>
