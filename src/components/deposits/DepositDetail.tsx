@@ -16,11 +16,14 @@ import styles from "./DepositDetail.module.css";
 const METHOD_LABEL: Record<string, string> = { cash: "Cash", cheque: "Cheque", online: "Online" };
 
 // The row's message state, derived from the action-only embed. Precedence:
-// a reply outranks everything (the tripwire), then delivered > sent >
-// failed (a failed try that later succeeded reads as sent). No events =
+// a reply outranks everything (the tripwire), then read > delivered > sent >
+// failed (a failed try that later succeeded reads as sent). READ is bonus
+// signal only — Meta sends it solely when the retailer has read receipts
+// enabled, so grey ✓✓ means "delivered, maybe read, unknowable". No events =
 // no glyph (legacy rows predating WhatsApp).
 export type MsgState =
   | { kind: "reply"; count: number }
+  | { kind: "read" }
   | { kind: "delivered" }
   | { kind: "sent" }
   | { kind: "failed" }
@@ -30,6 +33,7 @@ export function depositMsgState(events: { action: string }[]): MsgState {
   const replies = events.filter((e) => e.action === "reply_received").length;
   if (replies > 0) return { kind: "reply", count: replies };
   const has = (a: string) => events.some((e) => e.action === a);
+  if (has("receipt_read")) return { kind: "read" };
   if (has("receipt_delivered")) return { kind: "delivered" };
   if (has("receipt_sent")) return { kind: "sent" };
   if (has("receipt_failed")) return { kind: "failed" };
@@ -60,7 +64,7 @@ interface TrailEvent {
 // action → timeline line. tone drives the dot colour; sub is the quiet
 // second line; reply renders the amber quote card. Owner-alert events are
 // deliberately NOT shown — dad's pings are plumbing, not shop history.
-function describeEvent(e: TrailEvent): { tone: "" | "ok" | "warn" | "bad"; what: string; sub?: string } | null {
+function describeEvent(e: TrailEvent): { tone: "" | "ok" | "warn" | "bad" | "read"; what: string; sub?: string } | null {
   const who = e.profiles?.full_name ?? "the office";
   switch (e.action) {
     case "created":
@@ -81,23 +85,29 @@ function describeEvent(e: TrailEvent): { tone: "" | "ok" | "warn" | "bad"; what:
       return { tone: "", what: "Receipt sent", sub: `WhatsApp · ${prettyPhone(e.details?.to) ?? "—"}` };
     case "receipt_delivered":
       return { tone: "ok", what: "Delivered" };
+    case "receipt_read":
+      return { tone: "read", what: "Read" };
     case "receipt_failed":
       return { tone: "bad", what: "Receipt failed", sub: e.details?.reason };
     case "void_notice_sent":
       return { tone: "", what: "Cancellation sent", sub: `WhatsApp · ${prettyPhone(e.details?.to) ?? "—"}` };
     case "void_notice_delivered":
       return { tone: "ok", what: "Cancellation delivered" };
+    case "void_notice_read":
+      return { tone: "read", what: "Cancellation read" };
     case "void_notice_failed":
       return { tone: "bad", what: "Cancellation failed", sub: e.details?.reason };
     case "reply_received":
       return { tone: "warn", what: "Shop replied" };
-    // Owner pings and their delivery ticks: logged, not displayed.
+    // Owner pings and their delivery/read ticks: logged, not displayed.
     case "owner_alert_sent":
     case "owner_alert_failed":
     case "owner_alert_delivered":
+    case "owner_alert_read":
     case "owner_void_alert_sent":
     case "owner_void_alert_failed":
     case "owner_void_alert_delivered":
+    case "owner_void_alert_read":
       return null;
     default:
       return { tone: "", what: e.action };

@@ -67,6 +67,12 @@ function MsgGlyph({ state }: { state: MsgState }) {
   switch (state.kind) {
     case "reply":
       return <span className={styles.replyChip}>{state.count > 1 ? `${state.count} REPLIES` : "1 REPLY"}</span>;
+    case "read":
+      return (
+        <span className={`${styles.msg} ${styles.msgRead}`} title="Read">
+          <TickDouble />
+        </span>
+      );
     case "delivered":
       return (
         <span className={`${styles.msg} ${styles.msgDelivered}`} title="Delivered">

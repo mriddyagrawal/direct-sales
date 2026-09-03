@@ -336,10 +336,12 @@ async function handleMetaEvents(payload: unknown): Promise<Response> {
       const value = change.value ?? {};
 
       for (const s of (value.statuses as MetaStatus[] | undefined) ?? []) {
-        if (s.status !== "delivered" && s.status !== "failed") continue; // sent/read: noise
+        // read is BONUS signal (owner 2026-09-03): it only arrives when the
+        // recipient has read receipts on — absence never means unread.
+        if (s.status !== "delivered" && s.status !== "failed" && s.status !== "read") continue; // sent: noise
         const hit = await findSentByWamid(db, s.id);
         if (!hit) continue;
-        const action = `${hit.kind}_${s.status === "delivered" ? "delivered" : "failed"}`;
+        const action = `${hit.kind}_${s.status}`;
         // Dedupe: Meta re-delivers webhooks; one trail line per outcome.
         const { data: dup } = await db
           .from("deposit_events")

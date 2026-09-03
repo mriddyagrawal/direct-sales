@@ -349,6 +349,12 @@
   color: var(--color-inactive);
 }
 
+/* Blue ✓✓ = READ, WhatsApp's own signal — bonus only (needs the shop's read
+   receipts on); grey ✓✓ stays "delivered, maybe read". */
+.msgRead {
+  color: #0e9fd8;
+}
+
 .msgFailed {
   color: var(--color-error);
 }
