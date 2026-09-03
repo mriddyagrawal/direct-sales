@@ -42,13 +42,34 @@ const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN") ?? "";
 const TRIGGER_SECRET = Deno.env.get("WA_TRIGGER_SECRET") ?? "";
 const OWNER_PHONE = Deno.env.get("OWNER_PHONE") ?? "";
 
-// Approved template roster (Graph API read, 2026-09-03) — names + param
-// names are load-bearing: a mismatch is a rejected send.
-const T_RECEIPT = "receipt_with_discount_v2";
-const T_RECEIPT_CHEQUE = "receipt_with_discount_with_cheque_v2";
+// Template roster (Graph API read 2026-09-03, evening) — the owner built a
+// FULL MATRIX: {receipt, owner alert} × {cheque, plain} × {discount, none},
+// so no message ever carries a "discount ₹0" line. Names + param names are
+// load-bearing: a mismatch is a rejected send.
+const T_RECEIPT = {
+  plain: "receipt_v2",
+  disc: "receipt_with_discount_v2",
+  cheque: "receipt_with_cheque_v2",
+  chequeDisc: "receipt_with_discount_with_cheque_v2",
+};
+const T_OWNER = {
+  plain: "owner_deposit_alert_without_discount",
+  disc: "owner_deposit_alert",
+  cheque: "owner_deposit_alert_cheque_without_discount",
+  chequeDisc: "owner_deposit_alert_cheque",
+};
+// The ORIGINAL template — still approved while the matrix sits in review
+// (editing an approved template throws it back to PENDING and pending
+// templates cannot send). Retailer receipts fall back to it on a
+// template-unavailable refusal, so shops keep getting receipts throughout;
+// delete it from Meta only once the matrix is approved and proven.
+const T_RECEIPT_FALLBACK = "receipt_with_discount";
 const T_RECEIPT_VOIDED = "receipt_voided";
-const T_OWNER_ALERT = "owner_deposit_alert";
 const T_OWNER_VOID = "owner_deposit_void_alert_with_payment_method";
+
+function pickVariant<T extends Record<string, string>>(t: T, isCheque: boolean, hasDisc: boolean): string {
+  return isCheque ? (hasDisc ? t.chequeDisc : t.cheque) : (hasDisc ? t.disc : t.plain);
+}
 
 function service() {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -169,42 +190,50 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
   const receiptNo = d.receipt_ref || "—";
   const method = METHOD_LABEL[d.method ?? ""] ?? d.method ?? "-";
 
-  // Retailer receipt — cheque deposits get the dedicated cheque template.
+  const isCheque = d.method === "cheque";
+  const hasDisc = discount > 0;
+  const chequeNo = d.note || "—";
+
+  // Retailer receipt — the matrix variant first; if Meta refuses because the
+  // template is (still) in review, fall back to the approved original so the
+  // shop is never left unmessaged while templates churn.
   const to = e164India(r?.phone ?? null);
   if (!(await alreadySent(db, record.deposit_id, "receipt_sent"))) {
     if (!to) {
       await logEvent(record.deposit_id, "receipt_failed", { reason: "retailer has no usable phone number" });
     } else {
-      const isCheque = d.method === "cheque";
-      const sent = await sendTemplate(
-        to,
-        isCheque ? T_RECEIPT_CHEQUE : T_RECEIPT,
-        isCheque
-          ? {
-              receipt_no: receiptNo,
-              net_amount: inr(net),
-              gross_amount: inr(amount),
-              discount: inr(discount),
-              salesperson,
-              cheque_number: d.note || "—",
-              current_outstanding: inr(current),
-            }
-          : {
-              receipt_no: receiptNo,
-              received_amount: inr(net),
-              payment_method: method,
-              gross_amount: inr(amount),
-              discount: inr(discount),
-              salesperson,
-              current_outstanding: inr(current),
-            },
-      );
+      const template = pickVariant(T_RECEIPT, isCheque, hasDisc);
+      const params: Record<string, string> = { receipt_no: receiptNo, net_amount: inr(net), salesperson, current_outstanding: inr(current) };
+      if (hasDisc) {
+        params.gross_amount = inr(amount);
+        params.discount = inr(discount);
+      }
+      if (isCheque) params.cheque_number = chequeNo;
+      else params.payment_method = method;
+
+      let sent = await sendTemplate(to, template, params);
+      let used = template;
+      if (!sent.ok) {
+        // Approved-original fallback (its params differ: the full old set).
+        used = T_RECEIPT_FALLBACK;
+        sent = await sendTemplate(to, T_RECEIPT_FALLBACK, {
+          salesperson,
+          received_amount: inr(net),
+          payment_method: method,
+          discount: inr(discount),
+          initial_amount: inr(amount),
+          previous_outstanding: inr(prev),
+          current_outstanding: inr(current),
+          number_if_cheque: isCheque && d.note ? `Cheque no: ${d.note}` : "-",
+        });
+      }
       if (sent.ok) {
-        // The quoted figures ride the event — the durable record of what
-        // the retailer was told.
+        // The quoted figures + template ride the event — the durable record
+        // of what the retailer was told.
         await logEvent(record.deposit_id, "receipt_sent", {
           wamid: sent.wamid,
           to,
+          template: used,
           previous_outstanding_paise: prev,
           current_outstanding_paise: current,
         });
@@ -214,21 +243,28 @@ async function handleDepositCreated(record: DepositEventRecord): Promise<Respons
     }
   }
 
-  // Owner alert — goes to dad EVEN when the retailer has no phone. The
-  // template has no method slot, so the method rides the salesperson param
-  // ("Rajesh (Cash)") — owner-approved fold, 2026-09-03.
+  // Owner alert — goes to dad EVEN when the retailer has no phone. Same
+  // matrix; no approved fallback exists, so while the alerts sit in review a
+  // failure is logged and life goes on (fail-soft, always).
   const owner = e164India(OWNER_PHONE);
   if (owner && !(await alreadySent(db, record.deposit_id, "owner_alert_sent"))) {
-    const sent = await sendTemplate(owner, T_OWNER_ALERT, {
-      gross_amount: inr(amount),
-      discount: inr(discount),
+    const params: Record<string, string> = {
       net_amount: inr(net),
-      salesperson: `${salesperson} (${method})`,
+      salesperson,
       retailer: r?.name ?? "Unknown retailer",
       receipt_no: receiptNo,
       current_outstanding: inr(current),
-    });
-    if (sent.ok) await logEvent(record.deposit_id, "owner_alert_sent", { wamid: sent.wamid, to: owner });
+    };
+    if (hasDisc) {
+      params.gross_amount = inr(amount);
+      params.discount = inr(discount);
+    }
+    if (isCheque) params.cheque_number = chequeNo;
+    else params.payment_method = method;
+
+    const template = pickVariant(T_OWNER, isCheque, hasDisc);
+    const sent = await sendTemplate(owner, template, params);
+    if (sent.ok) await logEvent(record.deposit_id, "owner_alert_sent", { wamid: sent.wamid, to: owner, template });
     else await logEvent(record.deposit_id, "owner_alert_failed", { reason: sent.reason, code: sent.code });
   }
 
