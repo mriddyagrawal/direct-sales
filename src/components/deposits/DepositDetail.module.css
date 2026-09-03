@@ -1,0 +1,257 @@
+/* The deposit's inside (redesign 2026-09-03) — shared by the phone sheet
+   (stacked) and the desktop expanded row (three columns). */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.wide {
+  display: grid;
+  grid-template-columns: 280px 1fr 220px;
+  gap: 28px;
+  padding: 18px 20px;
+}
+
+.sLabel {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  color: var(--color-locked);
+  border-left: 2px solid var(--color-accent);
+  padding-left: 8px;
+  margin: 16px 0 8px;
+}
+
+.wide .sLabel:first-child {
+  margin-top: 0;
+}
+
+.money {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  background: var(--color-white);
+}
+
+.mRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: var(--text-body-size);
+}
+
+.mRow:last-child {
+  border-bottom: none;
+}
+
+.mVal {
+  font-family: var(--font-figures);
+  font-weight: 600;
+}
+
+/* The answer row — a whisper of the processed green under the figure that
+   should match the money in hand. */
+.mNet {
+  background: #f6faf7;
+}
+
+.mNetLbl {
+  font-weight: 700;
+}
+
+.mNetVal {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.chip {
+  display: inline-block;
+  font-family: var(--font-figures);
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  color: var(--color-locked);
+  margin-left: 6px;
+}
+
+.refs {
+  margin-top: 10px;
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+  line-height: 1.8;
+}
+
+.refs b {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.outLine {
+  font-size: var(--text-body-size);
+  padding: 9px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius);
+  background: var(--color-white);
+}
+
+.outFig {
+  font-family: var(--font-figures);
+  font-weight: 700;
+}
+
+.owed {
+  color: var(--color-error);
+}
+
+.clear {
+  color: var(--color-processed);
+}
+
+.outArrow {
+  color: var(--color-inactive);
+  padding: 0 4px;
+}
+
+/* ---- timeline ---- */
+.tl {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tl li {
+  position: relative;
+  padding: 0 0 14px 22px;
+}
+
+.tl li::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-locked);
+}
+
+.tl li::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 14px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--color-hairline);
+}
+
+.tl li:last-child::after {
+  display: none;
+}
+
+.tone_ok::before {
+  background: var(--color-processed) !important;
+}
+
+.tone_warn::before {
+  background: var(--color-amber) !important;
+}
+
+.tone_bad::before {
+  background: var(--color-error) !important;
+}
+
+.tlWhat {
+  font-weight: 600;
+}
+
+.tlWhen {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+  margin-left: 6px;
+}
+
+.tlSub {
+  font-size: 12px;
+  color: var(--color-locked);
+  margin-top: 2px;
+}
+
+.trailNote {
+  font-size: 12px;
+  color: var(--color-locked);
+}
+
+/* The tripwire, quoted — amber card, loud on purpose. */
+.replyCard {
+  margin-top: 6px;
+  background: #fdf6ec;
+  border: 1px solid #ecd9bb;
+  border-left: 3px solid var(--color-amber);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: var(--text-body-size);
+  max-width: 420px;
+}
+
+.replyWho {
+  font-family: var(--font-figures);
+  font-size: 10px;
+  color: var(--color-amber);
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+
+/* ---- void zone ---- */
+.voidBtn {
+  width: 100%;
+  margin-top: 16px;
+  min-height: var(--touch-target-min);
+  background: var(--color-white);
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+  font-family: var(--font-structure);
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.wide .voidBtn {
+  margin-top: 0;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.voidBtn:active {
+  background: var(--color-error);
+  color: var(--color-white);
+}
+
+.voidCaption {
+  text-align: center;
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+  margin-top: 8px;
+}
+
+.voidedBanner {
+  margin-top: 16px;
+  border: 1px solid var(--color-error);
+  border-left: 3px solid var(--color-error);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  color: var(--color-error);
+  font-size: var(--text-body-size);
+}
+
+.wide .voidedBanner {
+  margin-top: 0;
+}

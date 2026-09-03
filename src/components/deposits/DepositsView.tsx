@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Glyph } from "@/components/ui/Glyph";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -13,7 +13,8 @@ import { nowMs } from "@/lib/cart";
 import { voidDeposit } from "@/lib/deposit-rpcs";
 import { createClient } from "@/lib/supabase/client";
 import { fetchDepositsList, type DepositListRow, type DepositsScope } from "@/lib/queries/deposits";
-import { depositNetPaise, describeDepositEdit } from "@/lib/deposit-fields";
+import { depositNetPaise } from "@/lib/deposit-fields";
+import { DepositDetail, depositMsgState, type MsgState } from "./DepositDetail";
 import { useQuery } from "@tanstack/react-query";
 import fab from "@/components/ui/fab.module.css";
 import styles from "./DepositsView.module.css";
@@ -30,9 +31,7 @@ interface DepositsViewProps {
   scope: DepositsScope;
   role: "salesman" | "staff";
   isAdmin?: boolean;
-  // Who is looking. The edit affordance is own-rows-in-window for everyone
-  // but the admin — including the ACCOUNTANT (owner 2026-09-01), whose own
-  // fresh entries the server always permitted but the UI never surfaced.
+  // Who is looking — void is own-rows-in-window for everyone but the admin.
   viewerId: string;
 }
 
@@ -52,83 +51,44 @@ function weekEndKey(dateKey: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-// One deposit's audit trail, fetched only when its card is expanded (staff
-// only — deposit_events RLS). Chronological: recorded → each edit's field
-// diffs (describeDepositEdit) → void, each line stamped who + when.
-interface TrailEvent {
-  action: string;
-  created_at: string;
-  details: {
-    before?: Parameters<typeof describeDepositEdit>[0];
-    after?: Parameters<typeof describeDepositEdit>[1];
-    reason?: string;
-  } | null;
-  profiles: { full_name: string } | null;
-}
-
-function EditTrail({ depositId }: { depositId: string }) {
-  const { data: events, isError } = useQuery({
-    queryKey: ["deposit-events", depositId],
-    queryFn: async () => {
-      const { data, error } = await createClient()
-        .from("deposit_events")
-        .select("action, created_at, details, profiles!deposit_events_actor_id_fkey(full_name)")
-        .eq("deposit_id", depositId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data as unknown as TrailEvent[];
-    },
-  });
-  if (isError) return <div className={styles.trail}>Couldn&apos;t load the history — try again.</div>;
-  if (!events) return <div className={styles.trail}>…</div>;
-  return (
-    <div className={styles.trail}>
-      {events.map((e, i) => {
-        let text = "";
-        if (e.action === "created") text = "recorded";
-        else if (e.action === "voided") text = e.details?.reason ? `voided — ${e.details.reason}` : "voided";
-        else if (e.action === "updated") {
-          const changes = describeDepositEdit(e.details?.before ?? {}, e.details?.after ?? {});
-          text = changes.length
-            ? changes.map((c) => (c.to ? `${c.label} ${c.from} → ${c.to}` : `${c.label} ${c.from}`)).join(" · ")
-            : "edited (no field change)";
-        } else text = e.action;
-        return (
-          <p key={i} className={styles.trailLine}>
-            <span className={styles.trailWho}>
-              {formatOrderTimestamp(e.created_at, new Date())} · {e.profiles?.full_name ?? "—"}
-            </span>{" "}
-            {text}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
-
 function MethodChip({ method }: { method: string }) {
   const tone =
     method === "cash" ? styles.methodCash : method === "cheque" ? styles.methodCheque : styles.methodOnline;
   return <span className={`${styles.methodChip} ${tone}`}>{METHOD_LABEL[method] ?? method}</span>;
 }
 
+// The row's message state as a glyph (redesign 2026-09-03) — the WhatsApp
+// mental model: grey ✓ sent, green ✓✓ delivered, red ✕ failed, amber REPLY
+// chip (the tripwire outranks everything). Voided rows show VOIDED instead;
+// legacy rows with no events show nothing.
+function MsgGlyph({ state }: { state: MsgState }) {
+  switch (state.kind) {
+    case "reply":
+      return <span className={styles.replyChip}>{state.count > 1 ? `${state.count} REPLIES` : "1 REPLY"}</span>;
+    case "delivered":
+      return <span className={`${styles.msg} ${styles.msgDelivered}`}>✓✓</span>;
+    case "sent":
+      return <span className={`${styles.msg} ${styles.msgSent}`}>✓</span>;
+    case "failed":
+      return <span className={`${styles.msg} ${styles.msgFailed}`}>✕</span>;
+    default:
+      return null;
+  }
+}
+
 // Deposits — the salesman's personal collection ledger and the office's
-// reconciliation view, one component (owner design 2026-07-19). SALESMAN
-// (phone-first): hero = his running totals (Today · This week), day-grouped
-// history, in-window rows tappable to edit, a New-deposit FAB. STAFF
-// (responsive): hero = the chosen day's per-method + per-salesman totals
-// (admin also week/month), desktop table ↔ mobile cards, a FAB too; the
-// ADMIN gets per-row Edit / Void (void = struck + kept + reasoned — nothing
-// is ever hard-deleted). Voided rows are struck + muted and excluded from
-// every total, both roles.
+// reconciliation view, one component (owner redesign 2026-09-03). The row is
+// FOUR THINGS AND A COLOUR — shop, net, time, message state — and everything
+// else lives INSIDE: tap a row (phone: bottom sheet, desktop: the row expands)
+// for the money block, both receipt numbers, the outstanding snapshot, the
+// full trail timeline, and the void action. Staff additionally get a
+// NEEDS-ATTENTION strip (replies + failed receipts) above the list — the
+// anti-fraud surface. Voided rows stay visible, struck, excluded from totals.
 export function DepositsView({ scope, role, isAdmin = false, viewerId }: DepositsViewProps) {
   const router = useRouter();
   // Spec D10/D13: render ONLY from the query cache — seeded by the server
-  // render, corrected by background refetches (mount/focus/reconnect, D6) and
-  // by mutation invalidations; `?? []` keeps a painted list painted if a
-  // background refetch fails (never gate rendering on isError). The post-void
-  // router.refresh() below keeps working: it re-renders the page and the
-  // fresh dehydrated payload feeds this same cache (spec D2/D7).
+  // render, corrected by background refetches; `?? []` keeps a painted list
+  // painted if a background refetch fails.
   const { data: deposits = [] } = useQuery({
     queryKey: ["deposits", scope],
     queryFn: () => fetchDepositsList(createClient(), scope),
@@ -146,12 +106,10 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
   const [range, setRange] = useState<"day" | "week" | "month">("day");
   const [salesmanFilter, setSalesmanFilter] = useState("all");
 
-  // ---- edited-row trail (owner 2026-09-01): amber badge + chevron on rows
-  // that carry an 'updated' event; tapping expands the audit trail in place.
-  // Staff-only by construction — the events embed is RLS-empty for salesmen.
-  const [trailOpenId, setTrailOpenId] = useState<string | null>(null);
+  // ---- the open deposit (phone: sheet, desktop: expanded row) ----
+  const [openId, setOpenId] = useState<string | null>(null);
 
-  // ---- admin void sheet ----
+  // ---- void sheet (opened from inside the detail) ----
   const [voidTarget, setVoidTarget] = useState<DepositListRow | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [voiding, setVoiding] = useState(false);
@@ -160,8 +118,7 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
   const isStaff = role === "staff";
 
   // Filter options derived from the rows themselves — everyone who has ever
-  // recorded a deposit (incl. an office recorder), so the filter always
-  // matches the data instead of a role-scoped profile list.
+  // recorded a deposit, so the filter always matches the data.
   const salesmen = useMemo(() => {
     const map = new Map<string, string>();
     for (const d of deposits) if (!map.has(d.salesman_id)) map.set(d.salesman_id, d.profiles?.full_name ?? "Unknown");
@@ -234,28 +191,46 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
       : inRange.filter((d) => d.salesman_id === salesmanFilter)
     : deposits;
 
-  // Day groups (mobile/salesman), newest day first (rows arrive created_at desc).
+  // Day groups (mobile/salesman), newest day first — each band carries its
+  // day's ACTIVE net total (redesign 2026-09-03).
   const groups = useMemo(() => {
-    const out: { key: string; header: string; rows: DepositListRow[] }[] = [];
+    const out: { key: string; header: string; total: number; rows: DepositListRow[] }[] = [];
     for (const d of listRows) {
       const key = istDateKey(new Date(d.created_at));
+      const net = d.voided_at === null ? depositNetPaise(d.amount_paise, d.discount_paise) : 0;
       const last = out[out.length - 1];
-      if (last && last.key === key) last.rows.push(d);
-      else out.push({ key, header: formatHistoryDayHeader(d.created_at, now), rows: [d] });
+      if (last && last.key === key) {
+        last.rows.push(d);
+        last.total += net;
+      } else out.push({ key, header: formatHistoryDayHeader(d.created_at, now), total: net, rows: [d] });
     }
     return out;
   }, [listRows, now]);
 
-  // Void-only world (owner 2026-09-02): editing is gone — a wrong deposit is
-  // VOIDED (reason required) and recorded again. Same gate the RPC enforces:
-  // the creator inside the 30-minute window, an admin anytime.
-  function canVoidRow(d: DepositListRow): boolean {
-    if (d.voided_at !== null) return false;
-    if (isAdmin) return true;
-    return d.salesman_id === viewerId && tick < new Date(d.editable_until).getTime();
+  // NEEDS ATTENTION (staff): replies + failed receipts in the visible range —
+  // the two signals worth interrupting the owner for, above everything.
+  const attention = useMemo(() => {
+    if (!isStaff) return [];
+    const out: { d: DepositListRow; kind: "reply" | "failed" }[] = [];
+    for (const d of inRange) {
+      const state = depositMsgState(d.deposit_events ?? []);
+      if (state.kind === "reply") out.push({ d, kind: "reply" });
+      else if (state.kind === "failed" && d.voided_at === null) out.push({ d, kind: "failed" });
+    }
+    return out.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "reply" ? -1 : 1)).slice(0, 6);
+  }, [isStaff, inRange]);
+
+  // Void-only world (owner 2026-09-02): the creator inside the 30-minute
+  // window, an admin anytime — same gate the RPC enforces.
+  function voidStateFor(d: DepositListRow): { kind: "window"; minutesLeft: number } | { kind: "admin" } | { kind: "closed" } {
+    if (isAdmin) return { kind: "admin" };
+    const msLeft = new Date(d.editable_until).getTime() - tick;
+    if (d.salesman_id === viewerId && msLeft > 0) return { kind: "window", minutesLeft: Math.max(1, Math.ceil(msLeft / 60_000)) };
+    return { kind: "closed" };
   }
 
   function openVoid(d: DepositListRow) {
+    setOpenId(null);
     setVoidTarget(d);
     setVoidReason("");
     setVoidError(null);
@@ -280,90 +255,36 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
     }
   }
 
-  function editedBadge(d: DepositListRow) {
-    if (!isStaff || !d.deposit_events?.some((e) => e.action === "updated")) return null;
-    const open = trailOpenId === d.id;
+  const openRow = openId === null ? null : (listRows.find((d) => d.id === openId) ?? null);
+
+  // THE ROW (redesign 2026-09-03): shop · net · time · message state — a
+  // teaser, like an order row. Everything else is inside; the whole card is
+  // the tap target. Replies flare the left edge amber.
+  function renderCardRow(d: DepositListRow) {
+    const voided = d.voided_at !== null;
+    const state = depositMsgState(d.deposit_events ?? []);
+    const net = depositNetPaise(d.amount_paise, d.discount_paise);
     return (
       <button
         type="button"
-        className={styles.editedBadge}
-        aria-expanded={open}
-        onClick={(e) => {
-          // rows can be Links (admin edit) — the badge must never navigate
-          e.preventDefault();
-          e.stopPropagation();
-          setTrailOpenId(open ? null : d.id);
-        }}
+        key={d.id}
+        className={`${styles.card} ${state.kind === "reply" ? styles.cardReply : ""}`}
+        onClick={() => setOpenId(d.id)}
       >
-        <Glyph icon={TriangleAlert} size={12} />
-        edited
-        <span className={`${styles.badgeChevron} ${open ? styles.badgeChevronOpen : ""}`} aria-hidden />
+        <span className={styles.rowTop}>
+          <span className={`${styles.shop} ${voided ? styles.voided : ""}`}>
+            {d.retailers?.name ?? "Unknown retailer"}
+          </span>
+          {voided ? <span className={styles.voidTag}>VOIDED</span> : <MsgGlyph state={state} />}
+        </span>
+        <span className={styles.rowBottom}>
+          <span className={`${styles.net} ${voided ? styles.voided : ""}`}>{formatRupees(net)}</span>
+          <span className={styles.rowRight}>
+            {isStaff && d.profiles?.full_name && <span className={styles.by}>{d.profiles.full_name}</span>}
+            <span className={styles.time}>{formatOrderTime(d.created_at)}</span>
+          </span>
+        </span>
       </button>
-    );
-  }
-
-  function renderCardRow(d: DepositListRow) {
-    const voided = d.voided_at !== null;
-    const voidable = canVoidRow(d);
-    const net = depositNetPaise(d.amount_paise, d.discount_paise);
-    const inner = (
-      <>
-        <div className={styles.rowMain}>
-          <span className={styles.rowNameLine}>
-            <span className={`${styles.rowRetailer} ${voided ? styles.voided : ""}`}>
-              {d.retailers?.name ?? "Unknown retailer"}
-            </span>
-            {/* The outstanding SNAPSHOT at recording time (owner 2026-09-01)
-                — red owed / green clear, no label on the phone. Null =
-                pre-snapshot row, nothing shown. */}
-            {!voided && d.previous_outstanding_paise !== null && (
-              <span
-                className={`${styles.outSnap} ${d.previous_outstanding_paise > 0 ? styles.outOwed : styles.outClear}`}
-              >
-                {formatRupees(d.previous_outstanding_paise)}
-              </span>
-            )}
-          </span>
-          <span className={styles.rowMeta}>
-            {/* The row's NAME leads the meta line (owner 2026-09-01) — the
-                shared reference for a phone call between the desktop and a
-                shop. Kept apart from the paper receipt no. so the two numbers
-                never read as one. */}
-            <span className={styles.rowRef}>{d.deposit_ref}</span>
-            {" · "}
-            {isStaff && d.profiles?.full_name ? `${d.profiles.full_name} · ` : ""}
-            <MethodChip method={d.method} />
-            {d.receipt_ref ? ` · receipt ${d.receipt_ref}` : ""}
-            {d.note ? ` · ${d.note}` : ""}
-            {voided && d.void_reason ? ` · voided: ${d.void_reason}` : voided ? " · voided" : ""}
-          </span>
-          {editedBadge(d)}
-        </div>
-        <div className={styles.rowSide}>
-          {/* NET prominent, GROSS struck beside it (owner 2026-08-31) — the
-              row leads with the money that changed hands; the struck figure
-              is what came off the balance. Voided rows keep the plain single
-              figure: two different strikethroughs on one line read as noise. */}
-          <span className={`${styles.rowAmount} ${voided ? styles.voided : ""}`}>{formatRupees(net)}</span>
-          {!voided && d.discount_paise > 0 && (
-            <span className={styles.rowGross}>
-              <s>{formatRupees(d.amount_paise)}</s> − {formatRupees(d.discount_paise)} disc
-            </span>
-          )}
-          <span className={styles.rowTime}>{formatOrderTime(d.created_at)}</span>
-        </div>
-        {voidable && (
-          <button type="button" className={styles.voidSquare} aria-label="Void deposit" onClick={() => openVoid(d)}>
-            <Glyph icon={Trash2} size={13} />
-          </button>
-        )}
-      </>
-    );
-    return (
-      <Fragment key={d.id}>
-        <div className={styles.row}>{inner}</div>
-        {trailOpenId === d.id && <EditTrail depositId={d.id} />}
-      </Fragment>
     );
   }
 
@@ -410,6 +331,24 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
             )}
             <SalesmanFilter salesmen={salesmen} value={salesmanFilter} onChange={setSalesmanFilter} />
           </div>
+
+          {/* The anti-fraud surface: replies + failed receipts, above
+              everything — tapping opens that deposit's inside. */}
+          {attention.length > 0 && (
+            <div className={styles.attn}>
+              <p className={styles.attnHead}>NEEDS ATTENTION · {attention.length}</p>
+              {attention.map(({ d, kind }) => (
+                <button key={d.id} type="button" className={styles.attnRow} onClick={() => setOpenId(d.id)}>
+                  <span className={styles.attnWhat}>
+                    {kind === "reply"
+                      ? `${d.retailers?.name ?? "A shop"} replied to a receipt`
+                      : `Receipt failed — ${d.retailers?.name ?? "unknown shop"}`}
+                  </span>
+                  <span className={styles.attnSub}>{formatOrderTime(d.created_at)}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Reconciliation hero: cash to count · cheques to bank · online to
               verify, then what each salesman's hand-in should total. */}
@@ -458,85 +397,58 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
         </div>
       ) : (
         <>
-          {/* Desktop (staff): a real table — mirrors OrdersView's split. */}
+          {/* Desktop (staff): the table trimmed to a teaser too — TIME ·
+              RETAILER · BY · NET · METHOD · MSG; clicking a row expands its
+              inside in place (money | trail | actions). */}
           {isStaff && (
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {/* REF leads like a statement's voucher-number column (owner
-                      2026-09-01) — and sits three columns from RECEIPT so the
-                      app's identity and the paper number never blur. */}
-                  <th>REF</th>
-                  <th>SALESMAN</th>
-                  <th>RETAILER</th>
-                  <th className={styles.numeric}>PREV. OUTSTANDING</th>
-                  <th>RECEIPT</th>
-                  <th className={styles.numeric}>AMOUNT</th>
-                  <th>METHOD</th>
                   <th>TIME</th>
-                  <th />
+                  <th>RETAILER</th>
+                  <th>BY</th>
+                  <th className={styles.numeric}>NET ₹</th>
+                  <th>METHOD</th>
+                  <th>MSG</th>
                 </tr>
               </thead>
               <tbody>
                 {listRows.map((d) => {
                   const voided = d.voided_at !== null;
+                  const state = depositMsgState(d.deposit_events ?? []);
                   const net = depositNetPaise(d.amount_paise, d.discount_paise);
+                  const open = openId === d.id;
                   return (
                     <Fragment key={d.id}>
-                    <tr className={voided ? styles.rowVoided : ""}>
-                      <td className={`${styles.mono} ${styles.refCell}`}>{d.deposit_ref}</td>
-                      <td>{d.profiles?.full_name ?? "Unknown"}</td>
-                      <td className={voided ? styles.voided : ""}>
-                        {d.retailers?.name ?? "Unknown retailer"}
-                        {editedBadge(d)}
-                        {voided && d.void_reason && <span className={styles.voidNote}>voided: {d.void_reason}</span>}
-                      </td>
-                      {/* Snapshot at recording time — frozen on the row, not
-                          the live Tally figure. Dash = pre-snapshot row. */}
-                      <td className={`${styles.mono} ${styles.numeric} ${voided ? styles.voided : ""}`}>
-                        {d.previous_outstanding_paise === null ? (
-                          "—"
-                        ) : (
-                          <span className={d.previous_outstanding_paise > 0 ? styles.outOwed : styles.outClear}>
-                            {formatRupees(d.previous_outstanding_paise)}
-                          </span>
-                        )}
-                      </td>
-                      <td className={`${styles.mono} ${voided ? styles.voided : ""}`}>{d.receipt_ref ?? "—"}</td>
-                      {/* Note sits UNDER the amount (owner 2026-07-19) — the
-                          cheque no. / UPI ref reads with the money it explains.
-                          NET leads; on a discounted row the struck GROSS and
-                          the discount sit beneath it — dad books TWO Tally
-                          lines from this cell (receipt + discount), so both
-                          figures stay legible, never merged. */}
-                      <td className={`${styles.mono} ${styles.numeric} ${voided ? styles.voided : ""}`}>
-                        {formatRupees(net)}
-                        {!voided && d.discount_paise > 0 && (
-                          <span className={styles.tableNote}>
-                            <s>{formatRupees(d.amount_paise)}</s> − {formatRupees(d.discount_paise)} disc
-                          </span>
-                        )}
-                        {!voided && d.note && <span className={styles.tableNote}>{d.note}</span>}
-                      </td>
-                      <td>
-                        <MethodChip method={d.method} />
-                      </td>
-                      <td className={styles.mono}>{formatOrderTimestamp(d.created_at, now)}</td>
-                      <td className={styles.actionsCell}>
-                        {canVoidRow(d) && (
-                          <button type="button" className={styles.actionVoid} onClick={() => openVoid(d)}>
-                            Void
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                    {trailOpenId === d.id && (
-                      <tr className={styles.trailTableRow}>
-                        <td colSpan={9}>
-                          <EditTrail depositId={d.id} />
+                      <tr
+                        className={`${styles.rowLink} ${voided ? styles.rowVoided : ""} ${open ? styles.rowOpen : ""}`}
+                        onClick={() => setOpenId(open ? null : d.id)}
+                      >
+                        <td className={styles.mono}>{formatOrderTimestamp(d.created_at, now)}</td>
+                        <td className={`${styles.shopCell} ${voided ? styles.voided : ""}`}>
+                          {d.retailers?.name ?? "Unknown retailer"}
                         </td>
+                        <td>{d.profiles?.full_name ?? "Unknown"}</td>
+                        <td className={`${styles.mono} ${styles.numeric} ${voided ? styles.voided : ""}`}>
+                          {formatRupees(net)}
+                        </td>
+                        <td>
+                          <MethodChip method={d.method} />
+                        </td>
+                        <td>{voided ? <span className={styles.voidTag}>VOIDED</span> : <MsgGlyph state={state} />}</td>
                       </tr>
-                    )}
+                      {open && (
+                        <tr className={styles.detailRow}>
+                          <td colSpan={6}>
+                            <DepositDetail
+                              deposit={d}
+                              voidState={voidStateFor(d)}
+                              onVoid={() => openVoid(d)}
+                              layout="wide"
+                            />
+                          </td>
+                        </tr>
+                      )}
                     </Fragment>
                   );
                 })}
@@ -544,11 +456,14 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
             </table>
           )}
 
-          {/* Mobile (staff) / always (salesman): day-grouped stacked rows. */}
+          {/* Mobile (staff) / always (salesman): day bands with day totals. */}
           <div className={isStaff ? styles.cardsMobile : undefined}>
             {groups.map((g) => (
               <section key={g.key} className={styles.group}>
-                <p className={styles.groupHeader}>{g.header}</p>
+                <p className={styles.groupHeader}>
+                  <span>{g.header}</span>
+                  <span className={styles.groupTotal}>{formatRupees(g.total)}</span>
+                </p>
                 {g.rows.map(renderCardRow)}
               </section>
             ))}
@@ -562,13 +477,34 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
         New deposit
       </Link>
 
-      {/* Admin void — reason required (mirrors cancel-order's sheet). */}
+      {/* The deposit's inside — phone bottom sheet (desktop uses the expanded
+          row instead; the sheet is hidden there by the cardsMobile split). */}
+      {openRow && (
+        <div className={isStaff ? styles.sheetMobileOnly : undefined}>
+          <BottomSheet onClose={() => setOpenId(null)}>
+            <div className={styles.dTitleRow}>
+              <div>
+                <p className={styles.dShop}>{openRow.retailers?.name ?? "Unknown retailer"}</p>
+                {openRow.retailers?.area && <p className={styles.dArea}>{openRow.retailers.area}</p>}
+              </div>
+              <p className={styles.dRefs}>
+                Receipt <b>{openRow.receipt_ref ?? "—"}</b>
+                <br />
+                {openRow.deposit_ref}
+              </p>
+            </div>
+            <DepositDetail deposit={openRow} voidState={voidStateFor(openRow)} onVoid={() => openVoid(openRow)} layout="sheet" />
+          </BottomSheet>
+        </div>
+      )}
+
+      {/* Void — reason required (mirrors cancel-order's sheet). */}
       {voidTarget && (
         <BottomSheet onClose={() => setVoidTarget(null)}>
           <p className={styles.confirmTitle}>Void {voidTarget.deposit_ref}?</p>
           <p className={styles.confirmBody}>
             {voidTarget.retailers?.name} · {formatRupees(depositNetPaise(voidTarget.amount_paise, voidTarget.discount_paise))} —
-            the row stays, struck out and excluded from totals.
+            the row stays, struck out and excluded from totals. The shop gets a cancellation message.
           </p>
           <label className={styles.reasonLabel}>REASON (required)</label>
           <textarea

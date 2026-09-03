@@ -1,6 +1,8 @@
-/* Deposits — salesman ledger + office reconciliation (owner design 2026-07-19).
-   Same visual grammar as the Orders list: hairlines, mono figures, muted meta,
-   day-group headers; totals are the hero. */
+/* Deposits — salesman ledger + office reconciliation, redesigned (owner
+   2026-09-03, from the approved mockups). The row is a TEASER — shop, net,
+   time, message state — and the record's inside opens on tap (phone sheet /
+   desktop expanded row). Same visual grammar as Orders: hairlines, mono
+   figures, day bands; totals are the hero. */
 
 .wrap {
   display: flex;
@@ -22,9 +24,6 @@
 
 .title {
   font-family: var(--font-structure);
-  /* The tokens Orders/Products/Retailers/Users all use. This page had them
-     hardcoded at 20px/700 — a pixel off everywhere else, and outside the type
-     scale, so a future token change would have skipped it. */
   font-size: var(--text-name-size);
   font-weight: var(--text-name-weight);
   color: var(--color-ink);
@@ -112,6 +111,55 @@
   color: var(--color-white);
 }
 
+/* ---- NEEDS ATTENTION (staff): replies + failed receipts, above all ---- */
+.attn {
+  border: 1px solid #ecd9bb;
+  border-left: 3px solid var(--color-amber);
+  border-radius: var(--radius);
+  background: #fdf6ec;
+}
+
+.attnHead {
+  font-family: var(--font-figures);
+  font-size: var(--text-section-label-size);
+  letter-spacing: var(--text-section-label-tracking);
+  color: var(--color-amber);
+  font-weight: 700;
+  padding: 8px 12px 4px;
+}
+
+.attnRow {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  border: none;
+  border-top: 1px solid #f3e7d2;
+  background: none;
+  text-align: left;
+  font-family: var(--font-structure);
+  font-size: var(--text-body-size);
+  color: var(--color-ink);
+}
+
+.attnRow:active {
+  background: #f8eeda;
+}
+
+.attnWhat {
+  font-weight: 600;
+}
+
+.attnSub {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+  flex-shrink: 0;
+}
+
 .reconGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -167,21 +215,20 @@
   color: var(--color-locked);
 }
 
-/* ---- Day-grouped list ---- */
+/* ---- Day bands (the products-page divider grammar) + day totals ---- */
 .group {
   display: flex;
   flex-direction: column;
 }
 
 .groupHeader {
-  /* The products pages' category-band treatment, for dates (owner
-     2026-09-01): a sticky full-bleed white strip — hairline below, the
-     previous row's own border above — so a day break reads at a glance.
-     .wrap insets 16px; the -16px margins pull the band to the screen edges,
-     the matching padding keeps the label at the content inset. */
   position: sticky;
   top: 0;
   z-index: 8;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
   background: var(--color-white);
   font-family: var(--font-figures);
   font-size: var(--text-section-label-size);
@@ -197,90 +244,129 @@
   margin-top: 0;
 }
 
-.row {
+/* The day's active net — the band doubles as a running reconciliation. */
+.groupTotal {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--color-locked);
+  text-transform: none;
+}
+
+/* ---- THE ROW: shop · net · time · message state ---- */
+.card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 11px 0;
+  border: none;
   border-bottom: 1px solid var(--color-hairline);
-  text-decoration: none;
-  color: inherit;
-}
-
-.rowTappable {
+  background: none;
+  text-align: left;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-structure);
+  color: var(--color-ink);
 }
 
-.rowTappable:active {
+.card:active {
   background: var(--color-paper);
 }
 
-.rowMain {
+/* A shop reply flares the row's left edge amber — the tripwire is loud. */
+.cardReply {
+  border-left: 3px solid var(--color-amber);
+  padding-left: 10px;
+  margin-left: -13px;
+  padding-right: 0;
+}
+
+.rowTop {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shop {
+  font-size: var(--text-body-size);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 
-.rowRetailer {
-  font-family: var(--font-structure);
-  font-size: var(--text-body-size);
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.rowMeta {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-locked);
-}
-
-.rowSide {
+.rowBottom {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.net {
+  font-family: var(--font-figures);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.rowRight {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   flex-shrink: 0;
 }
 
-.rowAmount {
-  font-family: var(--font-figures);
-  font-size: var(--text-body-size);
-  font-weight: 700;
-  color: var(--color-ink);
+.by {
+  font-size: 11px;
+  color: var(--color-locked);
 }
 
-.rowTime {
+.time {
   font-family: var(--font-figures);
   font-size: 11px;
   color: var(--color-locked);
 }
 
-/* The row's app identity (DEP-x) — quiet mono, never competing with the
-   retailer or the money; it exists to be read aloud on a phone call. */
-.rowRef {
+/* ---- Message-state glyphs (mono, so ✓✓ sits crisp) ---- */
+.msg {
   font-family: var(--font-figures);
-  color: var(--color-locked);
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
-.refCell {
-  color: var(--color-locked);
+.msgSent {
+  color: var(--color-inactive);
+}
+
+.msgDelivered {
+  color: var(--color-processed);
+}
+
+.msgFailed {
+  color: var(--color-error);
+}
+
+.replyChip {
+  font-family: var(--font-figures);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-white);
+  background: var(--color-amber);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
-/* Discounted row: the struck GROSS + concession under the net (owner
-   2026-08-31). Deliberately quieter than .rowAmount and visually distinct
-   from .voided — the strike here covers ONE figure, not the record. */
-.rowGross {
+.voidTag {
   font-family: var(--font-figures);
-  font-size: 11px;
-  color: var(--color-locked);
-}
-
-.rowGross s {
-  color: var(--color-inactive);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-error);
+  flex-shrink: 0;
 }
 
 /* ---- Method chips: dot + text, same language as the stock pills ---- */
@@ -347,14 +433,6 @@
   color: var(--color-locked);
 }
 
-.voidNote,
-.tableNote {
-  display: block;
-  font-size: 11px;
-  color: var(--color-locked);
-  text-decoration: none;
-}
-
 /* ---- Desktop table (staff) ↔ mobile cards — OrdersView's split ---- */
 .table {
   display: none;
@@ -378,7 +456,7 @@
   color: var(--color-ink);
   border-bottom: 1px solid var(--color-hairline);
   padding: 10px;
-  vertical-align: top;
+  vertical-align: baseline;
 }
 
 .mono {
@@ -389,29 +467,26 @@
   text-align: right;
 }
 
-.actionsCell {
-  white-space: nowrap;
-  text-align: right;
+.shopCell {
+  font-weight: 600;
 }
 
-.actionLink {
-  font-family: var(--font-structure);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-accent);
-  text-decoration: none;
-  padding: 6px 8px;
-}
-
-.actionVoid {
-  background: none;
-  border: none;
-  font-family: var(--font-structure);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-error);
+.rowLink {
   cursor: pointer;
-  padding: 6px 8px;
+}
+
+.rowLink:hover td {
+  background: #f6f8fb;
+}
+
+.rowOpen td {
+  background: #eef2fa;
+}
+
+/* The expanded row — the deposit's inside, opened in place. */
+.detailRow td {
+  background: #fbfcfe;
+  padding: 0;
 }
 
 @media (min-width: 768px) {
@@ -422,6 +497,47 @@
   .cardsMobile {
     display: none;
   }
+
+  /* Desktop opens rows in place — the phone sheet stays phone-only. */
+  .sheetMobileOnly {
+    display: none;
+  }
+}
+
+/* ---- Detail sheet header (phone) ---- */
+.dTitleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.dShop {
+  font-family: var(--font-structure);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.dArea {
+  font-family: var(--font-structure);
+  font-size: 12px;
+  color: var(--color-locked);
+  margin-top: 2px;
+}
+
+.dRefs {
+  font-family: var(--font-figures);
+  font-size: 11px;
+  color: var(--color-locked);
+  text-align: right;
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+
+.dRefs b {
+  color: var(--color-ink);
+  font-weight: 600;
 }
 
 /* ---- Void sheet (reason required) ---- */
@@ -470,126 +586,4 @@
   display: flex;
   gap: 8px;
   margin-top: 8px;
-}
-
-
-
-/* ---- Edited-row badge + expandable audit trail (owner 2026-09-01) ---- */
-/* Amber, quiet, and a BUTTON: the triangle + "edited" + a chevron that
-   rotates open. Deliberately the app's icon grammar, not the ⚠️ emoji —
-   emoji render differently per platform (the July selects lesson). */
-.editedBadge {
-  /* Own line under the name/meta (owner 2026-09-01), never inline — flex on
-     a button is block-level in flow, which is exactly the point. */
-  display: flex;
-  width: fit-content;
-  align-items: center;
-  gap: 3px;
-  margin-top: 2px;
-  padding: 1px 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-structure);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-amber);
-  vertical-align: baseline;
-}
-
-/* The same thin CSS-border chevron as Quick Order's expansions — points
-   down at rest, rotates up when the trail is open. */
-.badgeChevron {
-  width: 7px;
-  height: 7px;
-  margin-left: 2px;
-  margin-top: -3px;
-  border-right: 2px solid var(--color-amber);
-  border-bottom: 2px solid var(--color-amber);
-  transform: rotate(45deg);
-  transition: transform 0.18s ease;
-}
-
-.badgeChevronOpen {
-  transform: rotate(225deg);
-  margin-top: 2px;
-}
-
-.trail {
-  padding: 8px 12px;
-  background: var(--color-paper);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.trailLine {
-  font-family: var(--font-structure);
-  font-size: 12px;
-  color: var(--color-ink);
-}
-
-.trailWho {
-  font-family: var(--font-figures);
-  font-size: 11px;
-  color: var(--color-locked);
-}
-
-.trailTableRow td {
-  padding: 4px 8px 10px;
-}
-
-/* The void affordance (owner 2026-09-02, replacing the edit pencil): a
-   garbage can in the same square, same geometry the owner tuned for the
-   pencil — but WHITE with a red glyph at rest (destructive, not inviting),
-   inverting to solid red while pressed. Tapping opens the void sheet. */
-.voidSquare {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  /* r4 (owner): stretch WITH the row's own padding as the inset — no pinned
-     height, no negative margins, so it tracks content height on any device,
-     zoom, or line count and stays a step short of the hairlines. */
-  align-self: stretch;
-  background: var(--color-white);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius); /* r5: the order-detail buttons' radius (2px) */
-  color: var(--color-error);
-  cursor: pointer;
-}
-
-.voidSquare:active {
-  background: var(--color-error);
-  border-color: var(--color-error);
-  color: var(--color-white);
-}
-
-/* ---- Outstanding snapshot beside the name (owner 2026-09-01) ---- */
-/* Frozen at recording time by create_deposit — red owed / green clear,
-   wordless on the phone (the color IS the label), a labeled column on the
-   desktop table. UI to be refined later per owner. */
-.rowNameLine {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-
-.outSnap {
-  font-family: var(--font-figures);
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.outOwed {
-  color: var(--color-error);
-}
-
-.outClear {
-  color: var(--color-processed);
 }
