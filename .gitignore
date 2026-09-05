@@ -47,3 +47,6 @@ docs/tally-retailer-balances-*.md
 # One-off worklist of shops to delete, from the July cleanup. Names three
 # shops that no longer exist in the app; kept on disk, not tracked.
 /toremoveretailers.csv
+
+# scratch README draft — promoted to README.md when approved
+README_DEMO.md
