@@ -48,5 +48,3 @@ docs/tally-retailer-balances-*.md
 # shops that no longer exist in the app; kept on disk, not tracked.
 /toremoveretailers.csv
 
-# scratch README draft — promoted to README.md when approved
-README_DEMO.md
