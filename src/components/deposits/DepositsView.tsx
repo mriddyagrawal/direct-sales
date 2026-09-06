@@ -4,10 +4,13 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { Glyph } from "@/components/ui/Glyph";
 import { Button } from "@/components/ui/Button";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SalesmanFilter } from "@/components/orders/SalesmanFilter";
+import { DateRangeFilter } from "@/components/orders/DateRangeFilter";
+import { PRESETS } from "@/lib/date-range";
 import { formatRupees, formatOrderTime, formatOrderTimestamp, formatHistoryDayHeader, istDateKey } from "@/lib/format";
 import { nowMs } from "@/lib/cart";
 import { voidDeposit } from "@/lib/deposit-rpcs";
@@ -43,12 +46,6 @@ const METHODS = ["cash", "cheque", "online"] as const;
 function weekStartKey(dateKey: string): string {
   const d = new Date(`${dateKey}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-  return d.toISOString().slice(0, 10);
-}
-
-function weekEndKey(dateKey: string): string {
-  const d = new Date(`${weekStartKey(dateKey)}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 6);
   return d.toISOString().slice(0, 10);
 }
 
@@ -122,8 +119,10 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
   const todayKey = istDateKey(now);
 
   // ---- staff controls ----
-  const [anchorKey, setAnchorKey] = useState(todayKey);
-  const [range, setRange] = useState<"day" | "week" | "month">("day");
+  // The Orders page's range selector, verbatim (owner 2026-09-06: "everyone
+  // who has the deposits page gets the full picker" — no role gating).
+  // Defaults to TODAY, not Orders' 30 days: this page is the day's cash count.
+  const [range, setRange] = useState<DateRange | undefined>(() => PRESETS[0].range());
   const [salesmanFilter, setSalesmanFilter] = useState("all");
 
   // ---- the open deposit (phone: sheet, desktop: expanded row) ----
@@ -147,16 +146,17 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [deposits]);
 
-  // Rows in the staff view's selected range (day/week/month around the anchor).
+  // Rows in the staff view's selected range — IST day-key comparison, the
+  // same math OrdersView uses; an undefined range ("All") filters nothing.
   const inRange = useMemo(() => {
-    if (!isStaff) return deposits;
+    if (!isStaff || !range?.from) return deposits;
+    const fromKey = istDateKey(range.from);
+    const toKey = istDateKey(range.to ?? range.from);
     return deposits.filter((d) => {
       const key = istDateKey(new Date(d.created_at));
-      if (range === "day") return key === anchorKey;
-      if (range === "week") return key >= weekStartKey(anchorKey) && key <= weekEndKey(anchorKey);
-      return key.slice(0, 7) === anchorKey.slice(0, 7);
+      return key >= fromKey && key <= toKey;
     });
-  }, [isStaff, deposits, range, anchorKey]);
+  }, [isStaff, deposits, range]);
 
   // ACTIVE rows only feed totals — a voided deposit never counts anywhere.
   const activeInRange = useMemo(() => inRange.filter((d) => d.voided_at === null), [inRange]);
@@ -327,28 +327,7 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
       ) : (
         <>
           <div className={styles.controls}>
-            <input
-              type="date"
-              className={styles.dayPicker}
-              value={anchorKey}
-              max={todayKey}
-              onChange={(e) => e.target.value && setAnchorKey(e.target.value)}
-              aria-label="Day"
-            />
-            {isAdmin && (
-              <div className={styles.rangeSeg} role="group" aria-label="Range">
-                {(["day", "week", "month"] as const).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    className={`${styles.rangeBtn} ${range === r ? styles.rangeBtnActive : ""}`}
-                    onClick={() => setRange(r)}
-                  >
-                    {r === "day" ? "Day" : r === "week" ? "Week" : "Month"}
-                  </button>
-                ))}
-              </div>
-            )}
+            <DateRangeFilter value={range} onChange={setRange} />
             <SalesmanFilter salesmen={salesmen} value={salesmanFilter} onChange={setSalesmanFilter} />
           </div>
 
@@ -412,7 +391,7 @@ export function DepositsView({ scope, role, isAdmin = false, viewerId }: Deposit
               <p className={styles.emptyHint}>Tap ＋ to record the first one.</p>
             </>
           ) : (
-            <p className={styles.emptyLead}>No collections for this {range}.</p>
+            <p className={styles.emptyLead}>No collections in this range.</p>
           )}
         </div>
       ) : (
