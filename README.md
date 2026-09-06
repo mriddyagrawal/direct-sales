@@ -134,6 +134,6 @@ npm run build       # production build
 
 Built for **Ganpati Enterprises** · Korba, Chhattisgarh 🇮🇳
 
-*Proprietary — source visible for portfolio review only. See [LICENSE](LICENSE).*
+*Licensed under [PolyForm Strict 1.0.0](LICENSE) — personal and noncommercial use permitted; no commercial use, no distribution, no derivatives.*
 
 </div>
