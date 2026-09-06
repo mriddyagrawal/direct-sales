@@ -134,6 +134,6 @@ npm run build       # production build
 
 Built for **Ganpati Enterprises** · Korba, Chhattisgarh 🇮🇳
 
-*Proprietary software. All rights reserved.*
+*Proprietary — source visible for portfolio review only. See [LICENSE](LICENSE).*
 
 </div>
